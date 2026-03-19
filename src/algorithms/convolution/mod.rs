@@ -102,11 +102,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
     ///
     /// Maybe also consider taking the ring by `&RingBase`, since this would then allow
     /// for dynamic dispatch.
-    fn compute_convolution<
-        S: RingStore<Type = R> + Copy,
-        V1: VectorView<R::Element>,
-        V2: VectorView<R::Element>,
-    >(
+    fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(
         &self,
         lhs: V1,
         rhs: V2,
@@ -296,14 +292,9 @@ where
     C: Deref,
     C::Target: ConvolutionAlgorithm<R>,
 {
-    type PreparedConvolutionOperand =
-        <C::Target as ConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
+    type PreparedConvolutionOperand = <C::Target as ConvolutionAlgorithm<R>>::PreparedConvolutionOperand;
 
-    fn compute_convolution<
-        S: RingStore<Type = R> + Copy,
-        V1: VectorView<R::Element>,
-        V2: VectorView<R::Element>,
-    >(
+    fn compute_convolution<S: RingStore<Type = R> + Copy, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(
         &self,
         lhs: V1,
         rhs: V2,
@@ -313,9 +304,7 @@ where
         (**self).compute_convolution(lhs, rhs, dst, ring)
     }
 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool {
-        (**self).supports_ring(ring)
-    }
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, ring: S) -> bool { (**self).supports_ring(ring) }
 
     fn prepare_convolution_operand<S, V>(
         &self,
@@ -379,9 +368,7 @@ pub const STANDARD_CONVOLUTION: KaratsubaAlgorithm = KaratsubaAlgorithm::new(Glo
 
 impl<A: Allocator> KaratsubaAlgorithm<A> {
     #[stability::unstable(feature = "enable")]
-    pub const fn new(allocator: A) -> Self {
-        Self { allocator }
-    }
+    pub const fn new(allocator: A) -> Self { Self { allocator } }
 }
 
 impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAlgorithm<A> {
@@ -406,9 +393,7 @@ impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAl
         )
     }
 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
-        true
-    }
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool { true }
 }
 
 /// Trait to allow rings to customize the parameters with which [`KaratsubaAlgorithm`] will
@@ -425,9 +410,7 @@ pub trait KaratsubaHint: RingBase {
 }
 
 impl<R: RingBase + ?Sized> KaratsubaHint for R {
-    default fn karatsuba_threshold(&self) -> usize {
-        0
-    }
+    default fn karatsuba_threshold(&self) -> usize { 0 }
 }
 
 #[cfg(test)]
@@ -444,14 +427,7 @@ fn bench_naive_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(
-            10,
-            &mut c[..],
-            &a[..],
-            &b[..],
-            StaticRing::<i32>::RING,
-            &Global,
-        );
+        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &Global);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
@@ -465,14 +441,7 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
     bencher.iter(|| {
         c.clear();
         c.resize(64, 0);
-        karatsuba(
-            4,
-            &mut c[..],
-            &a[..],
-            &b[..],
-            StaticRing::<i32>::RING,
-            &Global,
-        );
+        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &Global);
         assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
         assert_eq!(c[62], 31 * 31);
     });
@@ -503,10 +472,7 @@ pub mod generic_tests {
                 let expected = (0..(lhs_len + rhs_len))
                     .map(|i| {
                         if i < lhs_len + rhs_len {
-                            min(i, lhs_len - 1)
-                                * (min(i, lhs_len - 1) + 1)
-                                * (3 * i - 2 * min(i, lhs_len - 1) - 1)
-                                / 6
+                            min(i, lhs_len - 1) * (min(i, lhs_len - 1) + 1) * (3 * i - 2 * min(i, lhs_len - 1) - 1) / 6
                                 - (i - 1 - min(i, rhs_len - 1))
                                     * (i - min(i, rhs_len - 1))
                                     * (i + 2 * min(i, rhs_len - 1) + 1)
@@ -545,12 +511,10 @@ pub mod generic_tests {
                     .collect::<Vec<_>>();
 
                 let mut actual = Vec::new();
-                actual.extend((0..(lhs_len + rhs_len)).map(|i| {
-                    ring.mul(
-                        ring.int_hom().map(i * i),
-                        ring.pow(ring.clone_el(&scale), 2),
-                    )
-                }));
+                actual.extend(
+                    (0..(lhs_len + rhs_len))
+                        .map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(ring.clone_el(&scale), 2))),
+                );
                 convolution.compute_convolution(&lhs, &rhs, &mut actual, &ring);
                 for i in 0..(lhs_len + rhs_len) {
                     assert_el_eq!(&ring, &expected[i as usize], &actual[i as usize]);
@@ -576,10 +540,7 @@ pub mod generic_tests {
                 let expected = (0..(lhs_len + rhs_len))
                     .map(|i| {
                         if i < lhs_len + rhs_len {
-                            min(i, lhs_len - 1)
-                                * (min(i, lhs_len - 1) + 1)
-                                * (3 * i - 2 * min(i, lhs_len - 1) - 1)
-                                / 6
+                            min(i, lhs_len - 1) * (min(i, lhs_len - 1) + 1) * (3 * i - 2 * min(i, lhs_len - 1) - 1) / 6
                                 - (i - 1 - min(i, rhs_len - 1))
                                     * (i - min(i, rhs_len - 1))
                                     * (i + 2 * min(i, rhs_len - 1) + 1)
@@ -646,9 +607,7 @@ pub mod generic_tests {
                 ];
                 convolution.compute_convolution_sum(
                     data.as_fn()
-                        .map_fn(|(l, l_prep, r, r_prep): &(_, _, _, _)| {
-                            (l, l_prep.as_ref(), r, r_prep.as_ref())
-                        })
+                        .map_fn(|(l, l_prep, r, r_prep): &(_, _, _, _)| (l, l_prep.as_ref(), r, r_prep.as_ref()))
                         .iter(),
                     &mut actual,
                     &ring,

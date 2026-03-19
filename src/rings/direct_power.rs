@@ -34,9 +34,7 @@ pub type DirectPowerRing<R, const N: usize> = RingValue<DirectPowerRingBase<R, N
 
 impl<R: RingStore, const N: usize> DirectPowerRing<R, N> {
     #[stability::unstable(feature = "enable")]
-    pub fn new(base: R) -> Self {
-        Self::from(DirectPowerRingBase { base })
-    }
+    pub fn new(base: R) -> Self { Self::from(DirectPowerRingBase { base }) }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -63,17 +61,13 @@ where
 }
 
 impl<R: RingStore, const N: usize> PartialEq for DirectPowerRingBase<R, N> {
-    fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
 }
 
 impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
     type Element = [El<R>; N];
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        from_fn(|i| self.base.clone_el(&val[i]))
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { from_fn(|i| self.base.clone_el(&val[i])) }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
@@ -111,17 +105,11 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
         }
     }
 
-    fn zero(&self) -> Self::Element {
-        from_fn(|_| self.base.zero())
-    }
+    fn zero(&self) -> Self::Element { from_fn(|_| self.base.zero()) }
 
-    fn one(&self) -> Self::Element {
-        from_fn(|_| self.base.one())
-    }
+    fn one(&self) -> Self::Element { from_fn(|_| self.base.one()) }
 
-    fn neg_one(&self) -> Self::Element {
-        from_fn(|_| self.base.neg_one())
-    }
+    fn neg_one(&self) -> Self::Element { from_fn(|_| self.base.neg_one()) }
 
     fn from_int(&self, value: i32) -> Self::Element {
         let val = self.base.get_ring().from_int(value);
@@ -129,33 +117,19 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        lhs.into_iter()
-            .zip(rhs.into_iter())
-            .all(|(l, r)| self.base.eq_el(l, r))
+        lhs.into_iter().zip(rhs.into_iter()).all(|(l, r)| self.base.eq_el(l, r))
     }
 
-    fn is_zero(&self, value: &Self::Element) -> bool {
-        value.into_iter().all(|v| self.base.is_zero(v))
-    }
+    fn is_zero(&self, value: &Self::Element) -> bool { value.into_iter().all(|v| self.base.is_zero(v)) }
 
-    fn is_one(&self, value: &Self::Element) -> bool {
-        value.into_iter().all(|v| self.base.is_one(v))
-    }
-    fn is_neg_one(&self, value: &Self::Element) -> bool {
-        value.into_iter().all(|v| self.base.is_neg_one(v))
-    }
+    fn is_one(&self, value: &Self::Element) -> bool { value.into_iter().all(|v| self.base.is_one(v)) }
+    fn is_neg_one(&self, value: &Self::Element) -> bool { value.into_iter().all(|v| self.base.is_neg_one(v)) }
 
-    fn is_commutative(&self) -> bool {
-        self.base.is_commutative()
-    }
+    fn is_commutative(&self) -> bool { self.base.is_commutative() }
 
-    fn is_noetherian(&self) -> bool {
-        self.base.is_noetherian()
-    }
+    fn is_noetherian(&self) -> bool { self.base.is_noetherian() }
 
-    fn is_approximate(&self) -> bool {
-        self.base.get_ring().is_approximate()
-    }
+    fn is_approximate(&self) -> bool { self.base.get_ring().is_approximate() }
 
     fn dbg_within<'a>(
         &self,
@@ -231,17 +205,11 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
 impl<R: RingStore, const N: usize> RingExtension for DirectPowerRingBase<R, N> {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        &self.base
-    }
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base }
 
-    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        self.from_ref(&x)
-    }
+    fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.from_ref(&x) }
 
-    fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
-        from_fn(|_| self.base.clone_el(x))
-    }
+    fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element { from_fn(|_| self.base.clone_el(x)) }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
         for tgt in lhs.into_iter() {
@@ -261,8 +229,7 @@ impl<R: RingStore, const N: usize> RingExtension for DirectPowerRingBase<R, N> {
     }
 }
 
-impl<S: RingStore, R: RingStore, const N: usize> CanHomFrom<DirectPowerRingBase<S, N>>
-    for DirectPowerRingBase<R, N>
+impl<S: RingStore, R: RingStore, const N: usize> CanHomFrom<DirectPowerRingBase<S, N>> for DirectPowerRingBase<R, N>
 where
     R::Type: CanHomFrom<S::Type>,
 {
@@ -292,16 +259,11 @@ where
         el: &<DirectPowerRingBase<S, N> as RingBase>::Element,
         hom: &Self::Homomorphism,
     ) -> Self::Element {
-        from_fn(|i| {
-            self.base
-                .get_ring()
-                .map_in_ref(from.base.get_ring(), &el[i], hom)
-        })
+        from_fn(|i| self.base.get_ring().map_in_ref(from.base.get_ring(), &el[i], hom))
     }
 }
 
-impl<S: RingStore, R: RingStore, const N: usize> CanIsoFromTo<DirectPowerRingBase<S, N>>
-    for DirectPowerRingBase<R, N>
+impl<S: RingStore, R: RingStore, const N: usize> CanIsoFromTo<DirectPowerRingBase<S, N>> for DirectPowerRingBase<R, N>
 where
     R::Type: CanIsoFromTo<S::Type>,
 {
@@ -372,11 +334,7 @@ where
     R::Type: FiniteRingSpecializable,
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        struct BaseRingCase<
-            R: RingStore,
-            O: FiniteRingOperation<DirectPowerRingBase<R, N>>,
-            const N: usize,
-        > {
+        struct BaseRingCase<R: RingStore, O: FiniteRingOperation<DirectPowerRingBase<R, N>>, const N: usize> {
             op: O,
             ring: PhantomData<R>,
         }
@@ -390,46 +348,29 @@ where
             {
                 self.op.execute()
             }
-            fn fallback(self) -> Self::Output {
-                self.op.fallback()
-            }
+            fn fallback(self) -> Self::Output { self.op.fallback() }
         }
-        <R::Type as FiniteRingSpecializable>::specialize(BaseRingCase {
-            op,
-            ring: PhantomData,
-        })
+        <R::Type as FiniteRingSpecializable>::specialize(BaseRingCase { op, ring: PhantomData })
     }
 }
 
 impl<'a, 'b, R: RingStore, const N: usize> Copy for DirectPowerRingElCreator<'a, R, N> {}
 
 impl<'a, 'b, R: RingStore, const N: usize> Clone for DirectPowerRingElCreator<'a, R, N> {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
-impl<'a, 'b, R: RingStore, const N: usize> FnOnce<(&'b [El<R>],)>
-    for DirectPowerRingElCreator<'a, R, N>
-{
+impl<'a, 'b, R: RingStore, const N: usize> FnOnce<(&'b [El<R>],)> for DirectPowerRingElCreator<'a, R, N> {
     type Output = [El<R>; N];
 
-    extern "rust-call" fn call_once(self, args: (&'b [El<R>],)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_once(self, args: (&'b [El<R>],)) -> Self::Output { self.call(args) }
 }
 
-impl<'a, 'b, R: RingStore, const N: usize> FnMut<(&'b [El<R>],)>
-    for DirectPowerRingElCreator<'a, R, N>
-{
-    extern "rust-call" fn call_mut(&mut self, args: (&'b [El<R>],)) -> Self::Output {
-        self.call(args)
-    }
+impl<'a, 'b, R: RingStore, const N: usize> FnMut<(&'b [El<R>],)> for DirectPowerRingElCreator<'a, R, N> {
+    extern "rust-call" fn call_mut(&mut self, args: (&'b [El<R>],)) -> Self::Output { self.call(args) }
 }
 
-impl<'a, 'b, R: RingStore, const N: usize> Fn<(&'b [El<R>],)>
-    for DirectPowerRingElCreator<'a, R, N>
-{
+impl<'a, 'b, R: RingStore, const N: usize> Fn<(&'b [El<R>],)> for DirectPowerRingElCreator<'a, R, N> {
     extern "rust-call" fn call(&self, args: (&'b [El<R>],)) -> Self::Output {
         assert_eq!(N, args.0.len());
         from_fn(|i| self.ring.base.clone_el(&args.0[i]))
@@ -468,8 +409,7 @@ where
     {
         let base_size = self.base.size(ZZ)?;
         if ZZ.get_ring().representable_bits().is_none()
-            || ZZ.get_ring().representable_bits().unwrap()
-                >= ZZ.abs_log2_ceil(&base_size).unwrap_or(0) * N
+            || ZZ.get_ring().representable_bits().unwrap() >= ZZ.abs_log2_ceil(&base_size).unwrap_or(0) * N
         {
             return Some(ZZ.pow(base_size, N));
         } else {
@@ -562,10 +502,7 @@ where
     {
         SerializableNewtypeStruct::new(
             "DirectPowerRingEl",
-            SerializableSeq::new_with_len(
-                (0..N).map(|i| SerializeWithRing::new(&el[i], self.base_ring())),
-                N,
-            ),
+            SerializableSeq::new_with_len((0..N).map(|i| SerializeWithRing::new(&el[i], self.base_ring())), N),
         )
         .serialize(serializer)
     }

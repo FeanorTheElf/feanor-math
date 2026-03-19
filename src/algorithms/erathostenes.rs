@@ -44,10 +44,7 @@ fn test_enumerate_primes() {
     assert_eq!(vec![2], erathostenes(3));
     assert_eq!(vec![2, 3], erathostenes(4));
     assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19], erathostenes(20));
-    assert_eq!(
-        vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31],
-        erathostenes(32)
-    );
+    assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31], erathostenes(32));
 }
 
 #[test]

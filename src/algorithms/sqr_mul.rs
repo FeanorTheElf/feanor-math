@@ -160,11 +160,7 @@ where
 
     let bitlen = int_ring.abs_highest_set_bit(power).unwrap() + 1;
     if bitlen < LOG2_BOUND {
-        let power = int_cast(
-            int_ring.clone_el(&power),
-            StaticRing::<i32>::RING,
-            &int_ring,
-        ) as usize;
+        let power = int_cast(int_ring.clone_el(&power), StaticRing::<i32>::RING, &int_ring) as usize;
         eval_power_using_table(power, &mut mul, &mut double, &mut table, &mut mult_count)?;
         return Ok(table.into_iter().nth(power).unwrap().unwrap());
     }
@@ -173,20 +169,10 @@ where
         .filter(|j| int_ring.abs_is_bit_set(power, *j + bitlen - LOG2_BOUND))
         .map(|j| 1 << j)
         .sum::<usize>();
-    eval_power_using_table(
-        start_power,
-        &mut mul,
-        &mut double,
-        &mut table,
-        &mut mult_count,
-    )?;
+    eval_power_using_table(start_power, &mut mul, &mut double, &mut table, &mut mult_count)?;
     let mut current = clone(table[start_power].as_ref().unwrap());
 
-    for i in (0..=(bitlen - LOG2_BOUND))
-        .rev()
-        .step_by(LOG2_BOUND)
-        .skip(1)
-    {
+    for i in (0..=(bitlen - LOG2_BOUND)).rev().step_by(LOG2_BOUND).skip(1) {
         for _ in 0..LOG2_BOUND {
             current = double(&current)?;
             mult_count += 1;
@@ -196,13 +182,7 @@ where
             .map(|j| 1 << j)
             .sum::<usize>();
         if local_power != 0 {
-            eval_power_using_table(
-                local_power,
-                &mut mul,
-                &mut double,
-                &mut table,
-                &mut mult_count,
-            )?;
+            eval_power_using_table(local_power, &mut mul, &mut double, &mut table, &mut mult_count)?;
             current = mul(&current, table[local_power].as_ref().unwrap())?;
             mult_count += 1;
         }
@@ -213,13 +193,7 @@ where
             .filter(|j| int_ring.abs_is_bit_set(power, *j))
             .map(|j| 1 << j)
             .sum::<usize>();
-        eval_power_using_table(
-            final_power,
-            &mut mul,
-            &mut double,
-            &mut table,
-            &mut mult_count,
-        )?;
+        eval_power_using_table(final_power, &mut mul, &mut double, &mut table, &mut mult_count)?;
 
         for _ in 0..(bitlen % LOG2_BOUND) {
             current = double(&current)?;
@@ -354,10 +328,7 @@ fn test_generic_pow_shortest_chain_table() {
 #[test]
 fn test_shortest_addition_chain_table() {
     for i in 0..SHORTEST_ADDITION_CHAINS.len() {
-        assert_eq!(
-            i,
-            SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1
-        );
+        assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
     }
 }
 

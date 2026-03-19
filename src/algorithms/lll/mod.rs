@@ -27,10 +27,7 @@ where
     V: AsPointerToSlice<El<I>>,
     I: RingStore,
 {
-    <_ as RingStore>::sum(
-        &ring,
-        (0..col.len()).map(|i| ring.mul_ref(col.at(i), col.at(i))),
-    )
+    <_ as RingStore>::sum(&ring, (0..col.len()).map(|i| ring.mul_ref(col.at(i), col.at(i))))
 }
 
 #[cfg(test)]
@@ -111,19 +108,19 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
     let n = lhs.row_count();
     assert_eq!(n, rhs.row_count());
     let hom = large_ring.can_hom(&small_ring).unwrap();
-    let den_lcm = lhs
-        .row_iter()
-        .chain(rhs.row_iter())
-        .flat_map(|r| r.iter())
-        .fold(large_ring.base_ring().one(), |a, b| {
-            signed_lcm(
-                a,
-                large_ring
-                    .base_ring()
-                    .clone_el(large_ring.get_ring().den(&hom.map_ref(b))),
-                large_ring.base_ring(),
-            )
-        });
+    let den_lcm =
+        lhs.row_iter()
+            .chain(rhs.row_iter())
+            .flat_map(|r| r.iter())
+            .fold(large_ring.base_ring().one(), |a, b| {
+                signed_lcm(
+                    a,
+                    large_ring
+                        .base_ring()
+                        .clone_el(large_ring.get_ring().den(&hom.map_ref(b))),
+                    large_ring.base_ring(),
+                )
+            });
     let mut A: OwnedMatrix<_> = OwnedMatrix::zero(n, lhs.col_count(), large_ring.base_ring());
     let mut B: OwnedMatrix<_> = OwnedMatrix::zero(n, rhs.col_count(), large_ring.base_ring());
     for i in 0..n {
@@ -133,10 +130,7 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
                 .mul_ref_snd_map(hom.map_ref(lhs.at(i, j)), &den_lcm);
             *A.at_mut(i, j) = large_ring
                 .base_ring()
-                .checked_div(
-                    large_ring.get_ring().num(&value),
-                    large_ring.get_ring().den(&value),
-                )
+                .checked_div(large_ring.get_ring().num(&value), large_ring.get_ring().den(&value))
                 .unwrap();
         }
         for j in 0..rhs.col_count() {
@@ -145,15 +139,11 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
                 .mul_ref_snd_map(hom.map_ref(rhs.at(i, j)), &den_lcm);
             *B.at_mut(i, j) = large_ring
                 .base_ring()
-                .checked_div(
-                    large_ring.get_ring().num(&value),
-                    large_ring.get_ring().den(&value),
-                )
+                .checked_div(large_ring.get_ring().num(&value), large_ring.get_ring().den(&value))
                 .unwrap();
         }
     }
-    let mut U: OwnedMatrix<_> =
-        OwnedMatrix::zero(lhs.col_count(), rhs.col_count(), large_ring.base_ring());
+    let mut U: OwnedMatrix<_> = OwnedMatrix::zero(lhs.col_count(), rhs.col_count(), large_ring.base_ring());
     assert!(
         solve_right_using_pre_smith(
             large_ring.base_ring(),
@@ -164,8 +154,7 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
         )
         .is_solved()
     );
-    let mut U: OwnedMatrix<_> =
-        OwnedMatrix::zero(rhs.col_count(), lhs.col_count(), large_ring.base_ring());
+    let mut U: OwnedMatrix<_> = OwnedMatrix::zero(rhs.col_count(), lhs.col_count(), large_ring.base_ring());
     assert!(
         solve_right_using_pre_smith(
             large_ring.base_ring(),

@@ -124,11 +124,7 @@ pub fn test___gmpz_add() {
         let mut integer = UNINIT_MPZ;
         __gmpz_init(&mut integer as mpz_ptr);
         __gmpz_set_si(&mut integer as mpz_ptr, 14);
-        __gmpz_add(
-            &mut integer as mpz_ptr,
-            &integer as mpz_srcptr,
-            &integer as mpz_srcptr,
-        );
+        __gmpz_add(&mut integer as mpz_ptr, &integer as mpz_srcptr, &integer as mpz_srcptr);
         let result = __gmpz_get_si(&integer as mpz_srcptr);
         assert_eq!(14 + 14, result);
         __gmpz_clear(&mut integer as mpz_ptr);
@@ -141,11 +137,7 @@ pub fn test___gmpz_mul() {
         let mut integer = UNINIT_MPZ;
         __gmpz_init(&mut integer as mpz_ptr);
         __gmpz_set_si(&mut integer as mpz_ptr, 14);
-        __gmpz_mul(
-            &mut integer as mpz_ptr,
-            &integer as mpz_srcptr,
-            &integer as mpz_srcptr,
-        );
+        __gmpz_mul(&mut integer as mpz_ptr, &integer as mpz_srcptr, &integer as mpz_srcptr);
         let result = __gmpz_get_si(&integer as mpz_srcptr);
         assert_eq!(14 * 14, result);
         __gmpz_clear(&mut integer as mpz_ptr);
@@ -175,11 +167,7 @@ pub fn test___gmpz_addmul() {
         let mut integer = UNINIT_MPZ;
         __gmpz_init(&mut integer as mpz_ptr);
         __gmpz_set_si(&mut integer as mpz_ptr, 14);
-        __gmpz_addmul(
-            &mut integer as mpz_ptr,
-            &integer as mpz_srcptr,
-            &integer as mpz_srcptr,
-        );
+        __gmpz_addmul(&mut integer as mpz_ptr, &integer as mpz_srcptr, &integer as mpz_srcptr);
         let result = __gmpz_get_si(&integer as mpz_srcptr);
         assert_eq!(14 + 14 * 14, result);
         __gmpz_clear(&mut integer as mpz_ptr);
@@ -208,12 +196,7 @@ pub fn test___gmpz_tdiv_qr() {
         __gmpz_init(&mut b as mpz_ptr);
         __gmpz_set_si(&mut a as mpz_ptr, 14);
         __gmpz_set_si(&mut b as mpz_ptr, 5);
-        __gmpz_tdiv_qr(
-            &mut a as mpz_ptr,
-            &mut b as mpz_ptr,
-            &a as mpz_srcptr,
-            &b as mpz_srcptr,
-        );
+        __gmpz_tdiv_qr(&mut a as mpz_ptr, &mut b as mpz_ptr, &a as mpz_srcptr, &b as mpz_srcptr);
         let a_res = __gmpz_get_si(&a as mpz_srcptr);
         let b_res = __gmpz_get_si(&b as mpz_srcptr);
         assert_eq!(2, a_res);

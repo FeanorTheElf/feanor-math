@@ -70,9 +70,7 @@ pub trait VectorView<T: ?Sized> {
     ///
     /// Same as for [`slice::get_unchecked()`]. More concretely, calling this method with an
     /// out-of-bounds index is undefined behavior even if the resulting reference is not used.
-    unsafe fn at_unchecked<'a>(&self, i: usize) -> &T {
-        self.at(i)
-    }
+    unsafe fn at_unchecked<'a>(&self, i: usize) -> &T { self.at(i) }
 
     /// Calls `op` with `self` if this vector view supports sparse access.
     /// Otherwise, `()` is returned.
@@ -80,10 +78,7 @@ pub trait VectorView<T: ?Sized> {
     /// This is basically a workaround that enables users to specialize on
     /// `V: VectorViewSparse`, even though specialization currently does not support
     /// this.
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(
-        &'a self,
-        _op: Op,
-    ) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, _op: Op) -> Result<Op::Output<'a>, ()> {
         Err(())
     }
 
@@ -92,14 +87,10 @@ pub trait VectorView<T: ?Sized> {
     /// NB: Not called `iter()` to prevent name conflicts, since many containers (e.g. `Vec<T>`)
     /// have a function `iter()` and implement [`VectorView`]. As a result, whenever [`VectorView`]
     /// is in scope, calling any one `iter()` would require fully-qualified call syntax.
-    fn as_iter<'a>(&'a self) -> VectorFnIter<VectorViewFn<'a, Self, T>, &'a T> {
-        VectorFnIter::new(self.as_fn())
-    }
+    fn as_iter<'a>(&'a self) -> VectorFnIter<VectorViewFn<'a, Self, T>, &'a T> { VectorFnIter::new(self.as_fn()) }
 
     /// Converts this vector into a [`VectorFn`] that yields references `&T`.
-    fn as_fn<'a>(&'a self) -> VectorViewFn<'a, Self, T> {
-        VectorViewFn::new(self)
-    }
+    fn as_fn<'a>(&'a self) -> VectorViewFn<'a, Self, T> { VectorViewFn::new(self) }
 
     /// If the underlying data of this [`VectorView`] can be represented as a slice,
     /// returns it. Otherwise, `None` is returned.
@@ -344,22 +335,13 @@ pub trait SelfSubvectorView<T: ?Sized>: Sized + VectorView<T> {
 }
 
 impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
-    fn len(&self) -> usize {
-        (**self).len()
-    }
+    fn len(&self) -> usize { (**self).len() }
 
-    fn at(&self, i: usize) -> &T {
-        (**self).at(i)
-    }
+    fn at(&self, i: usize) -> &T { (**self).at(i) }
 
-    unsafe fn at_unchecked(&self, i: usize) -> &T {
-        unsafe { (**self).at_unchecked(i) }
-    }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { (**self).at_unchecked(i) } }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(
-        &'a self,
-        op: Op,
-    ) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
         (**self).specialize_sparse(op)
     }
 
@@ -372,13 +354,9 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
 }
 
 impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        (**self).at_mut(i)
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { (**self).at_mut(i) }
 
-    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        unsafe { (**self).at_unchecked_mut(i) }
-    }
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { (**self).at_unchecked_mut(i) } }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
     where
@@ -395,28 +373,17 @@ impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for Box<V> 
         Self: 'b,
         T: 'b;
 
-    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
-        (**self).nontrivial_entries()
-    }
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> { (**self).nontrivial_entries() }
 }
 
 impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
-    fn len(&self) -> usize {
-        (**self).len()
-    }
+    fn len(&self) -> usize { (**self).len() }
 
-    fn at(&self, i: usize) -> &T {
-        (**self).at(i)
-    }
+    fn at(&self, i: usize) -> &T { (**self).at(i) }
 
-    unsafe fn at_unchecked(&self, i: usize) -> &T {
-        unsafe { (**self).at_unchecked(i) }
-    }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { (**self).at_unchecked(i) } }
 
-    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(
-        &'b self,
-        op: Op,
-    ) -> Result<Op::Output<'b>, ()> {
+    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
     }
 
@@ -435,28 +402,17 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a
         Self: 'b,
         T: 'b;
 
-    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
-        (**self).nontrivial_entries()
-    }
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> { (**self).nontrivial_entries() }
 }
 
 impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
-    fn len(&self) -> usize {
-        (**self).len()
-    }
+    fn len(&self) -> usize { (**self).len() }
 
-    fn at(&self, i: usize) -> &T {
-        (**self).at(i)
-    }
+    fn at(&self, i: usize) -> &T { (**self).at(i) }
 
-    unsafe fn at_unchecked(&self, i: usize) -> &T {
-        unsafe { (**self).at_unchecked(i) }
-    }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { (**self).at_unchecked(i) } }
 
-    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(
-        &'b self,
-        op: Op,
-    ) -> Result<Op::Output<'b>, ()> {
+    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
         (**self).specialize_sparse(op)
     }
 
@@ -469,13 +425,9 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
 }
 
 impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V {
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        (**self).at_mut(i)
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { (**self).at_mut(i) }
 
-    unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T {
-        unsafe { (**self).at_unchecked_mut(i) }
-    }
+    unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T { unsafe { (**self).at_unchecked_mut(i) } }
 
     fn as_slice_mut<'b>(&'b mut self) -> Option<&'b mut [T]>
     where
@@ -492,15 +444,11 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a
         Self: 'b,
         T: 'b;
 
-    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> {
-        (**self).nontrivial_entries()
-    }
+    fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> { (**self).nontrivial_entries() }
 }
 
 impl<'a, T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMut<T> for &'a mut V {
-    fn swap(&mut self, i: usize, j: usize) {
-        (**self).swap(i, j)
-    }
+    fn swap(&mut self, i: usize, j: usize) { (**self).swap(i, j) }
 }
 
 /// A trait for [`VectorView`]s that allow mutable access to one element at a time.
@@ -513,11 +461,7 @@ impl<'a, T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMu
 pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
     fn at_mut(&mut self, i: usize) -> &mut T;
 
-    fn map_mut<
-        F_const: for<'a> Fn(&'a T) -> &'a U,
-        F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U,
-        U,
-    >(
+    fn map_mut<F_const: for<'a> Fn(&'a T) -> &'a U, F_mut: for<'a> FnMut(&'a mut T) -> &'a mut U, U>(
         self,
         map_const: F_const,
         map_mut: F_mut,
@@ -544,9 +488,7 @@ pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
     ///
     /// Same as for [`slice::get_unchecked_mut()`]. More concretely, calling this method with an
     /// out-of-bounds index is undefined behavior even if the resulting reference is not used.
-    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        self.at_mut(i)
-    }
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { self.at_mut(i) }
 }
 
 /// A trait for [`VectorViewMut`]s that support swapping of two elements.
@@ -617,9 +559,7 @@ pub trait VectorFn<T> {
     /// Produces an iterator over the elements of this [`VectorFn`].
     ///
     /// See also [`VectorFn::into_iter()`] if a transfer of ownership is required.
-    fn iter<'a>(&'a self) -> VectorFnIter<&'a Self, T> {
-        self.into_iter()
-    }
+    fn iter<'a>(&'a self) -> VectorFnIter<&'a Self, T> { self.into_iter() }
 
     /// NB: Named `map_fn` to avoid conflicts with `map` of [`Iterator`]
     fn map_fn<F: Fn(T) -> U, U>(self, func: F) -> VectorFnMap<Self, T, U, F>
@@ -698,27 +638,17 @@ pub trait SelfSubvectorFn<T>: Sized + VectorFn<T> {
 }
 
 impl<'a, T, V: ?Sized + VectorFn<T>> VectorFn<T> for &'a V {
-    fn len(&self) -> usize {
-        (**self).len()
-    }
+    fn len(&self) -> usize { (**self).len() }
 
-    fn at(&self, i: usize) -> T {
-        (**self).at(i)
-    }
+    fn at(&self, i: usize) -> T { (**self).at(i) }
 }
 
 impl<T> VectorView<T> for [T] {
-    fn len(&self) -> usize {
-        <[T]>::len(self)
-    }
+    fn len(&self) -> usize { <[T]>::len(self) }
 
-    fn at(&self, i: usize) -> &T {
-        &self[i]
-    }
+    fn at(&self, i: usize) -> &T { &self[i] }
 
-    unsafe fn at_unchecked(&self, i: usize) -> &T {
-        unsafe { self.get_unchecked(i) }
-    }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { self.get_unchecked(i) } }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
     where
@@ -729,25 +659,17 @@ impl<T> VectorView<T> for [T] {
 }
 
 impl<'a, T> SelfSubvectorView<T> for &'a [T] {
-    fn restrict_full(self, range: Range<usize>) -> Self {
-        &self[range]
-    }
+    fn restrict_full(self, range: Range<usize>) -> Self { &self[range] }
 }
 
 impl<'a, T> SelfSubvectorView<T> for &'a mut [T] {
-    fn restrict_full(self, range: Range<usize>) -> Self {
-        &mut self[range]
-    }
+    fn restrict_full(self, range: Range<usize>) -> Self { &mut self[range] }
 }
 
 impl<T> VectorViewMut<T> for [T] {
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        &mut self[i]
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { &mut self[i] }
 
-    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        unsafe { self.get_unchecked_mut(i) }
-    }
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { self.get_unchecked_mut(i) } }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
     where
@@ -758,23 +680,15 @@ impl<T> VectorViewMut<T> for [T] {
 }
 
 impl<T> SwappableVectorViewMut<T> for [T] {
-    fn swap(&mut self, i: usize, j: usize) {
-        <[T]>::swap(self, i, j)
-    }
+    fn swap(&mut self, i: usize, j: usize) { <[T]>::swap(self, i, j) }
 }
 
 impl<T, A: Allocator> VectorView<T> for Vec<T, A> {
-    fn len(&self) -> usize {
-        <[T]>::len(self)
-    }
+    fn len(&self) -> usize { <[T]>::len(self) }
 
-    fn at(&self, i: usize) -> &T {
-        &self[i]
-    }
+    fn at(&self, i: usize) -> &T { &self[i] }
 
-    unsafe fn at_unchecked(&self, i: usize) -> &T {
-        unsafe { self.get_unchecked(i) }
-    }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { self.get_unchecked(i) } }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
     where
@@ -785,13 +699,9 @@ impl<T, A: Allocator> VectorView<T> for Vec<T, A> {
 }
 
 impl<T, A: Allocator> VectorViewMut<T> for Vec<T, A> {
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        &mut self[i]
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { &mut self[i] }
 
-    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        unsafe { self.get_unchecked_mut(i) }
-    }
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { self.get_unchecked_mut(i) } }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
     where
@@ -802,23 +712,15 @@ impl<T, A: Allocator> VectorViewMut<T> for Vec<T, A> {
 }
 
 impl<T, A: Allocator> SwappableVectorViewMut<T> for Vec<T, A> {
-    fn swap(&mut self, i: usize, j: usize) {
-        <[T]>::swap(self, i, j)
-    }
+    fn swap(&mut self, i: usize, j: usize) { <[T]>::swap(self, i, j) }
 }
 
 impl<T, const N: usize> VectorView<T> for [T; N] {
-    fn len(&self) -> usize {
-        N
-    }
+    fn len(&self) -> usize { N }
 
-    fn at(&self, i: usize) -> &T {
-        &self[i]
-    }
+    fn at(&self, i: usize) -> &T { &self[i] }
 
-    unsafe fn at_unchecked(&self, i: usize) -> &T {
-        unsafe { self.get_unchecked(i) }
-    }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { self.get_unchecked(i) } }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
     where
@@ -829,13 +731,9 @@ impl<T, const N: usize> VectorView<T> for [T; N] {
 }
 
 impl<T, const N: usize> VectorViewMut<T> for [T; N] {
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        &mut self[i]
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { &mut self[i] }
 
-    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T {
-        unsafe { self.get_unchecked_mut(i) }
-    }
+    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { self.get_unchecked_mut(i) } }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
     where
@@ -846,9 +744,7 @@ impl<T, const N: usize> VectorViewMut<T> for [T; N] {
 }
 
 impl<T, const N: usize> SwappableVectorViewMut<T> for [T; N] {
-    fn swap(&mut self, i: usize, j: usize) {
-        <[T]>::swap(self, i, j)
-    }
+    fn swap(&mut self, i: usize, j: usize) { <[T]>::swap(self, i, j) }
 }
 
 /// # Why no impl for `Range<i64>` etc?
@@ -864,9 +760,7 @@ impl VectorFn<usize> for Range<usize> {
         self.start + i
     }
 
-    fn len(&self) -> usize {
-        self.end - self.start
-    }
+    fn len(&self) -> usize { self.end - self.start }
 }
 
 /// A wrapper around a [`RingStore`] that is callable with signature `(&El<R>) -> El<R>`,
@@ -881,41 +775,29 @@ pub struct CloneRingEl<R: RingStore>(pub R);
 impl<'a, R: RingStore> FnOnce<(&'a El<R>,)> for CloneRingEl<R> {
     type Output = El<R>;
 
-    extern "rust-call" fn call_once(self, args: (&'a El<R>,)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_once(self, args: (&'a El<R>,)) -> Self::Output { self.call(args) }
 }
 
 impl<'a, R: RingStore> FnMut<(&'a El<R>,)> for CloneRingEl<R> {
-    extern "rust-call" fn call_mut(&mut self, args: (&'a El<R>,)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_mut(&mut self, args: (&'a El<R>,)) -> Self::Output { self.call(args) }
 }
 
 impl<'a, R: RingStore> Fn<(&'a El<R>,)> for CloneRingEl<R> {
-    extern "rust-call" fn call(&self, args: (&'a El<R>,)) -> Self::Output {
-        self.0.clone_el(args.0)
-    }
+    extern "rust-call" fn call(&self, args: (&'a El<R>,)) -> Self::Output { self.0.clone_el(args.0) }
 }
 
 impl<'a, R: RingStore> FnOnce<(usize, &'a El<R>)> for CloneRingEl<R> {
     type Output = El<R>;
 
-    extern "rust-call" fn call_once(self, args: (usize, &'a El<R>)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_once(self, args: (usize, &'a El<R>)) -> Self::Output { self.call(args) }
 }
 
 impl<'a, R: RingStore> FnMut<(usize, &'a El<R>)> for CloneRingEl<R> {
-    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a El<R>)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a El<R>)) -> Self::Output { self.call(args) }
 }
 
 impl<'a, R: RingStore> Fn<(usize, &'a El<R>)> for CloneRingEl<R> {
-    extern "rust-call" fn call(&self, args: (usize, &'a El<R>)) -> Self::Output {
-        self.0.clone_el(args.1)
-    }
+    extern "rust-call" fn call(&self, args: (usize, &'a El<R>)) -> Self::Output { self.0.clone_el(args.1) }
 }
 
 /// Callable struct that wraps [`Clone::clone()`].
@@ -925,21 +807,15 @@ pub struct CloneValue;
 impl<'a, T: Clone> FnOnce<(&'a T,)> for CloneValue {
     type Output = T;
 
-    extern "rust-call" fn call_once(self, args: (&'a T,)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_once(self, args: (&'a T,)) -> Self::Output { self.call(args) }
 }
 
 impl<'a, T: Clone> FnMut<(&'a T,)> for CloneValue {
-    extern "rust-call" fn call_mut(&mut self, args: (&'a T,)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_mut(&mut self, args: (&'a T,)) -> Self::Output { self.call(args) }
 }
 
 impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
-    extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output {
-        args.0.clone()
-    }
+    extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output { args.0.clone() }
 }
 
 #[test]

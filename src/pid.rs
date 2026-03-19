@@ -41,9 +41,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     ///     Z6.annihilator(&Z6.int_hom().map(2))
     /// );
     /// ```
-    fn annihilator(&self, val: &Self::Element) -> Self::Element {
-        self.checked_div_min(&self.zero(), val).unwrap()
-    }
+    fn annihilator(&self, val: &Self::Element) -> Self::Element { self.checked_div_min(&self.zero(), val).unwrap() }
 
     /// Computes a Bezout identity for the generator `g` of the ideal `(lhs, rhs)`
     /// as `g = s * lhs + t * rhs`.
@@ -62,11 +60,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// Creates a matrix `A` of unit determinant such that `A * (a, b)^T = (d, 0)`.
     /// Returns `(A, d)`.
     #[stability::unstable(feature = "enable")]
-    fn create_elimination_matrix(
-        &self,
-        a: &Self::Element,
-        b: &Self::Element,
-    ) -> ([Self::Element; 4], Self::Element) {
+    fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
         assert!(self.is_commutative());
         let old_gcd = self.ideal_gen(a, b);
         let new_a = self.checked_div_min(a, &old_gcd).unwrap();
@@ -75,10 +69,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
         debug_assert!(self.is_unit(&gcd_new));
 
         let subtract_factor = self
-            .checked_left_div(
-                &self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)),
-                &gcd_new,
-            )
+            .checked_left_div(&self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)), &gcd_new)
             .unwrap();
         // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a
         // subtraction step, we are done
@@ -144,9 +135,7 @@ where
     delegate! { PrincipalIdealRing, fn lcm(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 
     /// Alias for [`PrincipalIdealRingStore::ideal_gen()`].
-    fn gcd(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> {
-        self.ideal_gen(lhs, rhs)
-    }
+    fn gcd(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> { self.ideal_gen(lhs, rhs) }
 }
 
 impl<R> PrincipalIdealRingStore for R
@@ -181,11 +170,7 @@ pub trait EuclideanRing: PrincipalIdealRing {
     /// In general, the euclidean division of `lhs` by `rhs` is a tuple `(q, r)` such that
     /// `lhs = q * rhs + r`, and `r` is "smaller" than "rhs". The notion of smallness is
     /// given by the smallness of the euclidean degree function [`EuclideanRing::euclidean_deg()`].
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element);
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
 
     /// Defines how "small" an element is. For details, see [`EuclideanRing`].
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize>;
@@ -238,10 +223,8 @@ pub mod generic_tests {
     use crate::primitive_int::StaticRing;
     use crate::ring::El;
 
-    pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(
-        ring: R,
-        edge_case_elements: I,
-    ) where
+    pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where
         R::Type: EuclideanRing,
     {
         assert!(ring.is_commutative());
@@ -255,18 +238,15 @@ pub mod generic_tests {
                 let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
                 assert!(
                     ring.euclidean_deg(b).is_none()
-                        || ring.euclidean_deg(&r).unwrap_or(usize::MAX)
-                            < ring.euclidean_deg(b).unwrap()
+                        || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap()
                 );
                 assert_el_eq!(ring, a, ring.add(ring.mul(q, ring.clone_el(b)), r));
             }
         }
     }
 
-    pub fn test_principal_ideal_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(
-        ring: R,
-        edge_case_elements: I,
-    ) where
+    pub fn test_principal_ideal_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where
         R::Type: PrincipalIdealRing,
     {
         assert!(ring.is_commutative());
@@ -317,11 +297,7 @@ pub mod generic_tests {
                         ring.format(a),
                         ring.format(&g)
                     );
-                    assert_el_eq!(
-                        ring,
-                        g,
-                        ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2))
-                    );
+                    assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
                 }
             }
         }
@@ -338,32 +314,20 @@ pub mod generic_tests {
                     ring.format(&g2),
                     ring.format(&g)
                 );
-                assert_el_eq!(
-                    ring,
-                    g,
-                    ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2))
-                );
+                assert_el_eq!(ring, g, ring.add(ring.mul_ref(&s, &g1), ring.mul_ref(&t, &g2)));
             }
         }
 
         let ZZbig = BigIntRing::RING;
         let char = ring.characteristic(ZZbig).unwrap();
         if !ZZbig.is_zero(&char) && ZZbig.is_leq(&char, &ZZbig.power_of_two(30)) {
-            let p = factor(ZZbig, ZZbig.clone_el(&char))
-                .into_iter()
-                .next()
-                .unwrap()
-                .0;
+            let p = factor(ZZbig, ZZbig.clone_el(&char)).into_iter().next().unwrap().0;
             let expected = ring.int_hom().map(int_cast(
                 ZZbig.checked_div(&char, &p).unwrap(),
                 StaticRing::<i32>::RING,
                 ZZbig,
             ));
-            let ann_p = ring.annihilator(&ring.int_hom().map(int_cast(
-                p,
-                StaticRing::<i32>::RING,
-                ZZbig,
-            )));
+            let ann_p = ring.annihilator(&ring.int_hom().map(int_cast(p, StaticRing::<i32>::RING, ZZbig)));
             assert!(ring.checked_div(&ann_p, &expected).is_some());
             assert!(ring.checked_div(&expected, &ann_p).is_some());
         }

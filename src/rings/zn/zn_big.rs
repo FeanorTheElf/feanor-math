@@ -93,9 +93,7 @@ impl<I: RingStore> Zn<I>
 where
     I::Type: IntegerRing,
 {
-    pub fn new(integer_ring: I, modulus: El<I>) -> Self {
-        RingValue::from(ZnBase::new(integer_ring, modulus))
-    }
+    pub fn new(integer_ring: I, modulus: El<I>) -> Self { RingValue::from(ZnBase::new(integer_ring, modulus)) }
 }
 
 impl<I: RingStore> ZnBase<I>
@@ -116,10 +114,7 @@ where
         let inverse_modulus = integer_ring.euclidean_div(mod_square_bound, &modulus);
 
         // check that this expression does not overflow
-        _ = integer_ring.mul_ref_snd(
-            integer_ring.pow(integer_ring.clone_el(&modulus), 2),
-            &inverse_modulus,
-        );
+        _ = integer_ring.mul_ref_snd(integer_ring.pow(integer_ring.clone_el(&modulus), 2), &inverse_modulus);
 
         return ZnBase {
             twice_modulus: integer_ring.add_ref(&modulus, &modulus),
@@ -132,20 +127,15 @@ where
 
     fn bounded_reduce(&self, n: &mut El<I>) {
         debug_assert!(
-            self.integer_ring.is_leq(
-                &n,
-                &self
-                    .integer_ring
-                    .mul_ref(&self.twice_modulus, &self.twice_modulus)
-            )
+            self.integer_ring
+                .is_leq(&n, &self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus))
         );
         debug_assert!(!self.integer_ring.is_neg(&n));
 
         let mut subtract = self.integer_ring.mul_ref(&n, &self.inverse_modulus);
         self.integer_ring
             .euclidean_div_pow_2(&mut subtract, self.inverse_modulus_bitshift);
-        self.integer_ring
-            .mul_assign_ref(&mut subtract, &self.modulus);
+        self.integer_ring.mul_assign_ref(&mut subtract, &self.modulus);
         self.integer_ring.sub_assign(n, subtract);
 
         debug_assert!(self.integer_ring.is_lt(&n, &self.twice_modulus));
@@ -174,9 +164,7 @@ where
     El<I>: Clone + Debug,
     I::Type: IntegerRing,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("ZnEl").field(&self.0).finish()
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_tuple("ZnEl").field(&self.0).finish() }
 }
 
 impl<I: RingStore> Clone for ZnEl<I>
@@ -184,9 +172,7 @@ where
     El<I>: Clone,
     I::Type: IntegerRing,
 {
-    fn clone(&self) -> Self {
-        ZnEl(self.0.clone())
-    }
+    fn clone(&self) -> Self { ZnEl(self.0.clone()) }
 }
 
 impl<I: RingStore> Copy for ZnEl<I>
@@ -202,9 +188,7 @@ where
 {
     type Element = ZnEl<I>;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        ZnEl(self.integer_ring().clone_el(&val.0))
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { ZnEl(self.integer_ring().clone_el(&val.0)) }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
@@ -212,8 +196,7 @@ where
 
         self.integer_ring.add_assign_ref(&mut lhs.0, &rhs.0);
         if self.integer_ring.is_geq(&lhs.0, &self.twice_modulus) {
-            self.integer_ring
-                .sub_assign_ref(&mut lhs.0, &self.twice_modulus);
+            self.integer_ring.sub_assign_ref(&mut lhs.0, &self.twice_modulus);
         }
 
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
@@ -225,8 +208,7 @@ where
 
         self.integer_ring.add_assign(&mut lhs.0, rhs.0);
         if self.integer_ring.is_geq(&lhs.0, &self.twice_modulus) {
-            self.integer_ring
-                .sub_assign_ref(&mut lhs.0, &self.twice_modulus);
+            self.integer_ring.sub_assign_ref(&mut lhs.0, &self.twice_modulus);
         }
 
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
@@ -238,8 +220,7 @@ where
 
         self.integer_ring.sub_assign_ref(&mut lhs.0, &rhs.0);
         if self.integer_ring.is_neg(&lhs.0) {
-            self.integer_ring
-                .add_assign_ref(&mut lhs.0, &self.twice_modulus);
+            self.integer_ring.add_assign_ref(&mut lhs.0, &self.twice_modulus);
         }
 
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
@@ -250,8 +231,7 @@ where
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
 
         self.integer_ring.negate_inplace(&mut lhs.0);
-        self.integer_ring
-            .add_assign_ref(&mut lhs.0, &self.twice_modulus);
+        self.integer_ring.add_assign_ref(&mut lhs.0, &self.twice_modulus);
 
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
         debug_assert!(!self.integer_ring.is_neg(&lhs.0));
@@ -273,9 +253,7 @@ where
         self.bounded_reduce(&mut lhs.0);
     }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        RingRef::new(self).coerce(&StaticRing::<i32>::RING, value)
-    }
+    fn from_int(&self, value: i32) -> Self::Element { RingRef::new(self).coerce(&StaticRing::<i32>::RING, value) }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
@@ -284,9 +262,7 @@ where
         if self.integer_ring.eq_el(&lhs.0, &rhs.0) {
             return true;
         }
-        let difference = self
-            .integer_ring
-            .abs(self.integer_ring.sub_ref(&lhs.0, &rhs.0));
+        let difference = self.integer_ring.abs(self.integer_ring.sub_ref(&lhs.0, &rhs.0));
         return self.integer_ring.eq_el(&difference, &self.modulus)
             || self.integer_ring.eq_el(&difference, &self.twice_modulus);
     }
@@ -305,18 +281,12 @@ where
         self.integer_ring.is_one(&value.0)
             || self.integer_ring.eq_el(
                 &value.0,
-                &self
-                    .integer_ring
-                    .add_ref_fst(&self.modulus, self.integer_ring.one()),
+                &self.integer_ring.add_ref_fst(&self.modulus, self.integer_ring.one()),
             )
     }
 
-    fn is_commutative(&self) -> bool {
-        true
-    }
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_commutative(&self) -> bool { true }
+    fn is_noetherian(&self) -> bool { true }
 
     fn dbg_within<'a>(
         &self,
@@ -327,9 +297,7 @@ where
         if self.integer_ring.is_geq(&value.0, &self.modulus) {
             let reduced_value = self.integer_ring.sub_ref(&value.0, &self.modulus);
             if self.integer_ring.eq_el(&reduced_value, &self.modulus) {
-                self.integer_ring
-                    .get_ring()
-                    .dbg(&self.integer_ring.zero(), out)
+                self.integer_ring.get_ring().dbg(&self.integer_ring.zero(), out)
             } else {
                 self.integer_ring.get_ring().dbg(&reduced_value, out)
             }
@@ -345,9 +313,7 @@ where
         self.size(ZZ)
     }
 
-    fn is_approximate(&self) -> bool {
-        false
-    }
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl<I: RingStore> Clone for ZnBase<I>
@@ -401,10 +367,7 @@ where
         ext_ring.inclusion().map(el)
     }
 
-    fn interpolation_points<'a>(
-        &'a self,
-        count: usize,
-    ) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
         let points = ring.elements().take(count).collect();
         return (ring, points);
@@ -499,9 +462,7 @@ where
 {
     type Homomorphism = <zn_64::ZnBase as CanIsoFromTo<ZnBase<I>>>::Isomorphism;
 
-    fn has_canonical_hom(&self, from: &zn_64::ZnBase) -> Option<Self::Homomorphism> {
-        from.has_canonical_iso(self)
-    }
+    fn has_canonical_hom(&self, from: &zn_64::ZnBase) -> Option<Self::Homomorphism> { from.has_canonical_iso(self) }
 
     fn map_in(
         &self,
@@ -519,9 +480,7 @@ where
 {
     type Isomorphism = <zn_64::ZnBase as CanHomFrom<ZnBase<I>>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &zn_64::ZnBase) -> Option<Self::Isomorphism> {
-        from.has_canonical_hom(self)
-    }
+    fn has_canonical_iso(&self, from: &zn_64::ZnBase) -> Option<Self::Isomorphism> { from.has_canonical_hom(self) }
 
     fn map_out(
         &self,
@@ -597,11 +556,7 @@ where
             from,
             self,
             self.integer_ring.get_ring(),
-            Some(
-                &self
-                    .integer_ring
-                    .mul_ref(&self.twice_modulus, &self.twice_modulus),
-            ),
+            Some(&self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus)),
         )
     }
 
@@ -618,12 +573,8 @@ where
             },
             |mut n| {
                 debug_assert!(
-                    self.integer_ring.is_lt(
-                        &n,
-                        &self
-                            .integer_ring
-                            .mul_ref(&self.twice_modulus, &self.twice_modulus)
-                    )
+                    self.integer_ring
+                        .is_lt(&n, &self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus))
                 );
                 self.bounded_reduce(&mut n);
                 ZnEl(n)
@@ -662,11 +613,7 @@ where
     type Item = ZnEl<I>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self
-            .ring
-            .integer_ring()
-            .is_lt(&self.current, self.ring.modulus())
-        {
+        if self.ring.integer_ring().is_lt(&self.current, self.ring.modulus()) {
             let result = self.ring.integer_ring().clone_el(&self.current);
             self.ring
                 .integer_ring()
@@ -735,11 +682,8 @@ where
             .get_ring()
             .deserialize(deserializer)
             .and_then(|x| {
-                if self.integer_ring().is_neg(&x) || self.integer_ring().is_geq(&x, self.modulus())
-                {
-                    Err(Error::custom(
-                        "ring element value out of bounds for ring Z/nZ",
-                    ))
+                if self.integer_ring().is_neg(&x) || self.integer_ring().is_geq(&x, self.modulus()) {
+                    Err(Error::custom("ring element value out of bounds for ring Z/nZ"))
                 } else {
                     Ok(x)
                 }
@@ -782,8 +726,7 @@ where
         J::Type: IntegerRing,
     {
         if ZZ.get_ring().representable_bits().is_none()
-            || self.integer_ring().abs_log2_ceil(self.modulus())
-                < ZZ.get_ring().representable_bits()
+            || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits()
         {
             Some(int_cast(
                 self.integer_ring().clone_el(self.modulus()),
@@ -810,10 +753,7 @@ where
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
         let (s, t, d) = self.integer_ring().extended_ideal_gen(&lhs.0, &rhs.0);
-        let quo = RingRef::new(self)
-            .into_can_hom(self.integer_ring())
-            .ok()
-            .unwrap();
+        let quo = RingRef::new(self).into_can_hom(self.integer_ring()).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
 }
@@ -823,9 +763,7 @@ where
     I: RingStore,
     I::Type: IntegerRing,
 {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        op.execute()
-    }
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.execute() }
 }
 
 impl<I: RingStore> ZnRing for ZnBase<I>
@@ -835,13 +773,9 @@ where
     type IntegerRingBase = I::Type;
     type IntegerRing = I;
 
-    fn integer_ring(&self) -> &Self::IntegerRing {
-        &self.integer_ring
-    }
+    fn integer_ring(&self) -> &Self::IntegerRing { &self.integer_ring }
 
-    fn modulus(&self) -> &El<Self::IntegerRing> {
-        &self.modulus
-    }
+    fn modulus(&self) -> &El<Self::IntegerRing> { &self.modulus }
 
     fn smallest_positive_lift(&self, mut el: Self::Element) -> El<Self::IntegerRing> {
         if self.integer_ring.eq_el(&el.0, &self.twice_modulus) {
@@ -884,11 +818,7 @@ fn test_project() {
     const ZZ: StaticRing<i64> = StaticRing::RING;
     let Z17 = Zn::new(ZZ, 17);
     for k in 0..289 {
-        assert_el_eq!(
-            Z17,
-            Z17.int_hom().map((289 - k) % 17),
-            Z17.coerce(&ZZ, -k as i64)
-        );
+        assert_el_eq!(Z17, Z17.int_hom().map((289 - k) % 17), Z17.coerce(&ZZ, -k as i64));
     }
 }
 
@@ -910,10 +840,7 @@ fn test_canonical_iso_axioms_zn_big() {
     let to = Zn::new(BigIntRing::RING, BigIntRing::RING.int_hom().map(7 * 11));
     crate::ring::generic_tests::test_hom_axioms(&from, &to, from.elements());
     crate::ring::generic_tests::test_iso_axioms(&from, &to, from.elements());
-    assert!(
-        from.can_hom(&Zn::new(StaticRing::<i64>::RING, 19))
-            .is_none()
-    );
+    assert!(from.can_hom(&Zn::new(StaticRing::<i64>::RING, 19)).is_none());
 }
 
 #[test]
@@ -976,18 +903,9 @@ fn test_canonical_iso_axioms_zn_64() {
 
 #[test]
 fn test_finite_field_axioms() {
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(
-        &StaticRing::<i64>::RING,
-        128,
-    ));
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(
-        &StaticRing::<i64>::RING,
-        15,
-    ));
-    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(
-        &StaticRing::<i128>::RING,
-        1 << 32,
-    ));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 128));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i64>::RING, 15));
+    crate::rings::finite::generic_tests::test_finite_ring_axioms(&Zn::new(&StaticRing::<i128>::RING, 1 << 32));
 }
 
 #[test]
@@ -1031,12 +949,8 @@ fn test_unreduced() {
 
 #[test]
 fn test_serialize_deserialize() {
-    crate::serialization::generic_tests::test_serialize_deserialize(
-        Zn::new(StaticRing::<i64>::RING, 128).into(),
-    );
-    crate::serialization::generic_tests::test_serialize_deserialize(
-        Zn::new(StaticRing::<i64>::RING, 129).into(),
-    );
+    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(StaticRing::<i64>::RING, 128).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(Zn::new(StaticRing::<i64>::RING, 129).into());
     crate::serialization::generic_tests::test_serialize_deserialize(
         Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(10)).into(),
     );

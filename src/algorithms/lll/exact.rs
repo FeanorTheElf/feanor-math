@@ -41,10 +41,7 @@ fn size_reduce<R, I, V, T>(
         col_ops.subtract(ring, j, target_j, &factor);
         ring.sub_assign_ref(target.at_mut(j, 0), &factor);
         for k in 0..j {
-            ring.sub_assign(
-                target.at_mut(k, 0),
-                ring.mul_ref(gso_part.at(k, j), &factor),
-            );
+            ring.sub_assign(target.at_mut(k, 0), ring.mul_ref(gso_part.at(k, j), &factor));
         }
     }
 }
@@ -77,10 +74,7 @@ where
     let col_count = gso.col_count();
 
     // swap the columns
-    let (mut col_i, mut col_i1) = gso
-        .reborrow()
-        .restrict_cols(i..(i + 2))
-        .split_cols(0..1, 1..2);
+    let (mut col_i, mut col_i1) = gso.reborrow().restrict_cols(i..(i + 2)).split_cols(0..1, 1..2);
     for k in 0..i {
         std::mem::swap(col_i.at_mut(k, 0), col_i1.at_mut(k, 0));
     }
@@ -95,8 +89,7 @@ where
     let mu = ring.clone_el(gso.at(i, i + 1));
     let mu_sqr = ring.pow(ring.clone_el(&mu), 2);
 
-    let new_bi_star_norm_sqr =
-        ring.add_ref_fst(&bi1_star_norm_sqr, ring.mul_ref(&mu_sqr, &bi_star_norm_sqr));
+    let new_bi_star_norm_sqr = ring.add_ref_fst(&bi1_star_norm_sqr, ring.mul_ref(&mu_sqr, &bi_star_norm_sqr));
     // `gamma := |b_(i + 1)*|^2 / |bnew_i*|^2`
     let gamma = if ring.is_leq(&new_bi_star_norm_sqr, &bi1_star_norm_sqr) {
         // in this case, we must have `|bnew_i*|^2 = |b_(i + 1)*|^2`
@@ -118,17 +111,11 @@ where
         // this is why we cannot work with floats here, since this might cause a huge error
         ring.div(&ring.mul_ref(&mu, &bi_star_norm_sqr), &new_bi_star_norm_sqr)
     };
-    let (row_i, row_i1) = gso
-        .reborrow()
-        .restrict_rows(i..(i + 2))
-        .split_rows(0..1, 1..2);
+    let (row_i, row_i1) = gso.reborrow().restrict_rows(i..(i + 2)).split_rows(0..1, 1..2);
     let row_i = row_i.into_row_mut_at(0);
     let row_i1 = row_i1.into_row_mut_at(0);
     for k in (i + 2)..col_count {
-        let new_mu_j_i = ring.add(
-            ring.mul_ref(&new_mu, row_i.at(k)),
-            ring.mul_ref(&gamma, row_i1.at(k)),
-        );
+        let new_mu_j_i = ring.add(ring.mul_ref(&new_mu, row_i.at(k)), ring.mul_ref(&gamma, row_i1.at(k)));
         let new_mu_j_i1 = ring.sub_ref_fst(row_i.at(k), ring.mul_ref(&mu, row_i1.at(k)));
         *row_i.at_mut(k) = new_mu_j_i;
         *row_i1.at_mut(k) = new_mu_j_i1;
@@ -225,9 +212,7 @@ pub fn lll<R, I, V1, V2, A>(
 
     let mut tmp = OwnedMatrix::zero_in(n, matrix.row_count(), ring, &allocator);
     let mut compute_gram_matrix = |matrix: Submatrix<_, _>, gram_matrix: SubmatrixMut<_, _>| {
-        let mut tmp_data = tmp
-            .data_mut()
-            .submatrix(0..matrix.col_count(), 0..matrix.row_count());
+        let mut tmp_data = tmp.data_mut().submatrix(0..matrix.col_count(), 0..matrix.row_count());
         STANDARD_MATMUL.matmul(
             TransposableSubmatrix::from(matrix).transpose(),
             TransposableSubmatrix::from(quadratic_form),
@@ -391,12 +376,7 @@ fn test_swap_gso_cols() {
         DerefArray::from([0, 3 / 2, 1 / 4]),
         DerefArray::from([0, 0, 1])
     );
-    let expected = matrix!(
-        QQ.inclusion(),
-        [2, 1 / 2, 31 / 80],
-        [0, 3 / 2, 11 / 40],
-        [0, 0, 1]
-    );
+    let expected = matrix!(QQ.inclusion(), [2, 1 / 2, 31 / 80], [0, 3 / 2, 11 / 40], [0, 0, 1]);
     let matrix_view = SubmatrixMut::from_2d(&mut matrix);
 
     swap_gso_cols(&QQ, matrix_view, 0, 1);
@@ -408,11 +388,7 @@ fn test_swap_gso_cols() {
 fn test_lll_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
-    let original = matrix!(
-        QQ.inclusion(),
-        DerefArray::from([5, 9]),
-        DerefArray::from([11, 20])
-    );
+    let original = matrix!(QQ.inclusion(), DerefArray::from([5, 9]), DerefArray::from([11, 20]));
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll(
@@ -441,11 +417,7 @@ fn test_lll_2d() {
         norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
     );
 
-    let original = matrix!(
-        QQ.inclusion(),
-        DerefArray::from([10, 8]),
-        DerefArray::from([27, 22])
-    );
+    let original = matrix!(QQ.inclusion(), DerefArray::from([10, 8]), DerefArray::from([27, 22]));
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll(
@@ -551,16 +523,8 @@ fn test_lll_generating_set() {
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
-    );
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(1)));
     assert_el_eq!(
         QQ,
         QQ.int_hom().map(5),
@@ -580,8 +544,7 @@ fn test_lll_generating_set() {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(
-        QQ.inclusion()
-            .compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
         DerefArray::from([-4, 8, -54, -1, 42, 15, -23, -259]),
         DerefArray::from([-3, 10, -36, 18, -48, -473, -1200, -6493]),
         DerefArray::from([5, -13, 62, -15, 17, 398, 1043, 5721]),
@@ -602,27 +565,10 @@ fn test_lll_generating_set() {
         true,
     );
 
-    assert_rational_lattice_isomorphic(
-        &QQ,
-        &QQ,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(1))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(2))
-    );
+    assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
     assert_el_eq!(
         QQ,
         QQ.int_hom().map(1),
@@ -650,8 +596,7 @@ fn test_lll_generating_set() {
     );
 
     let original = matrix!(
-        QQ.inclusion()
-            .compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
         DerefArray::from([
             -60725263117,
             -448122081513,
@@ -717,27 +662,10 @@ fn test_lll_generating_set() {
         true,
     );
 
-    assert_rational_lattice_isomorphic(
-        &QQ,
-        &QQ,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(1))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.zero(),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(2))
-    );
+    assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
     assert_el_eq!(
         QQ,
         QQ.int_hom().map(1),
@@ -772,8 +700,7 @@ fn bench_lll_10d(bencher: &mut Bencher) {
 
     bencher.iter(|| {
         let original = matrix!(
-            QQ.inclusion()
-                .compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
+            QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
             DerefArray::from([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
             DerefArray::from([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]),
             DerefArray::from([0, 0, 1, 0, 0, 0, 0, 0, 0, 0]),
@@ -784,8 +711,7 @@ fn bench_lll_10d(bencher: &mut Bencher) {
             DerefArray::from([2, 2, 2, 2, 0, 0, 1, 4, 0, 0]),
             DerefArray::from([4, 3, 3, 3, 1, 2, 1, 0, 5, 0]),
             DerefArray::from([
-                3433883, 14315221, 24549008, 6570781, 32725387, 33674813, 27390657, 15726308,
-                43003827, 43364304
+                3433883, 14315221, 24549008, 6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304
             ])
         );
         let mut reduced = original.clone();
@@ -803,12 +729,7 @@ fn bench_lll_10d(bencher: &mut Bencher) {
             true,
         );
 
-        assert_rational_lattice_isomorphic(
-            &QQ,
-            &QQ,
-            Submatrix::from_2d(&original),
-            reduced_matrix.as_const(),
-        );
+        assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
         assert!(QQ.is_geq(
             &QQ.int_hom().map(16 * 16),
             &norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))

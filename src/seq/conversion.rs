@@ -60,9 +60,7 @@ impl<V: VectorFn<T>, T> Iterator for VectorFnIter<V, T> {
         }
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {
-        (self.len(), Some(self.len()))
-    }
+    fn size_hint(&self) -> (usize, Option<usize>) { (self.len(), Some(self.len())) }
 }
 
 impl<V: VectorFn<T>, T> DoubleEndedIterator for VectorFnIter<V, T> {
@@ -88,9 +86,7 @@ impl<V: VectorFn<T>, T> DoubleEndedIterator for VectorFnIter<V, T> {
 }
 
 impl<V: VectorFn<T>, T> ExactSizeIterator for VectorFnIter<V, T> {
-    fn len(&self) -> usize {
-        self.end - self.begin
-    }
+    fn len(&self) -> usize { self.end - self.begin }
 }
 
 /// A [`VectorFn`] that produces its elements by cloning the elements of an underlying
@@ -140,13 +136,9 @@ impl<V: SelfSubvectorView<T>, T, F: Fn(&T) -> T> SelfSubvectorFn<T> for CloneElF
 }
 
 impl<V: VectorView<T>, T, F: Fn(&T) -> T> VectorFn<T> for CloneElFn<V, T, F> {
-    fn at(&self, i: usize) -> T {
-        (self.clone_el)(self.content.at(i))
-    }
+    fn at(&self, i: usize) -> T { (self.clone_el)(self.content.at(i)) }
 
-    fn len(&self) -> usize {
-        self.content.len()
-    }
+    fn len(&self) -> usize { self.content.len() }
 }
 
 /// Wrapper around [`VectorView`] that interprets it as a [`VectorFn`]. The elements it provides are
@@ -159,9 +151,7 @@ pub struct VectorViewFn<'a, V: ?Sized + VectorView<T>, T: ?Sized> {
 }
 
 impl<'a, V: ?Sized + VectorView<T>, T: ?Sized> Clone for VectorViewFn<'a, V, T> {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<'a, V: ?Sized + VectorView<T>, T: ?Sized> Copy for VectorViewFn<'a, V, T> {}
@@ -178,11 +168,7 @@ impl<'a, V: ?Sized + VectorView<T>, T: ?Sized> VectorViewFn<'a, V, T> {
 }
 
 impl<'a, V: ?Sized + VectorView<T>, T: ?Sized> VectorFn<&'a T> for VectorViewFn<'a, V, T> {
-    fn at(&self, i: usize) -> &'a T {
-        self.content.at(i)
-    }
+    fn at(&self, i: usize) -> &'a T { self.content.at(i) }
 
-    fn len(&self) -> usize {
-        self.content.len()
-    }
+    fn len(&self) -> usize { self.content.len() }
 }

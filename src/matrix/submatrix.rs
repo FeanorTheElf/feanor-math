@@ -62,35 +62,25 @@ pub struct DerefArray<T, const SIZE: usize> {
 }
 
 impl<T: std::fmt::Debug, const SIZE: usize> std::fmt::Debug for DerefArray<T, SIZE> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
 }
 
 impl<T, const SIZE: usize> From<[T; SIZE]> for DerefArray<T, SIZE> {
-    fn from(value: [T; SIZE]) -> Self {
-        Self { data: value }
-    }
+    fn from(value: [T; SIZE]) -> Self { Self { data: value } }
 }
 
 impl<'a, T, const SIZE: usize> From<&'a [T; SIZE]> for &'a DerefArray<T, SIZE> {
-    fn from(value: &'a [T; SIZE]) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    fn from(value: &'a [T; SIZE]) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
 impl<'a, T, const SIZE: usize> From<&'a mut [T; SIZE]> for &'a mut DerefArray<T, SIZE> {
-    fn from(value: &'a mut [T; SIZE]) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    fn from(value: &'a mut [T; SIZE]) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
 impl<T, const SIZE: usize> Deref for DerefArray<T, SIZE> {
     type Target = [T];
 
-    fn deref(&self) -> &Self::Target {
-        &self.data[..]
-    }
+    fn deref(&self) -> &Self::Target { &self.data[..] }
 }
 
 unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
@@ -110,9 +100,7 @@ unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
 pub struct AsFirstElement<T>(T);
 
 unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
-    unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
-        unsafe { std::mem::transmute(self_) }
-    }
+    unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> { unsafe { std::mem::transmute(self_) } }
 }
 
 /// A submatrix that works on raw pointers, thus does not care about mutability
@@ -187,9 +175,7 @@ impl<V, T> Clone for SubmatrixRaw<V, T>
 where
     V: AsPointerToSlice<T>,
 {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<V, T> Copy for SubmatrixRaw<V, T> where V: AsPointerToSlice<T> {}
@@ -237,8 +223,8 @@ where
         // row_step)` are valid for `0 <= i < row_count`. Technically, this is not
         // completely legal, as in the case `rows.start == rows.end == row_count`, the
         // resulting pointer might point outside of the allocated area
-        // - this is legal only when we are exactly one byte after it, but if `row_step` has a weird
-        //   value, this does
+        // - this is legal only when we are exactly one byte after it, but if `row_step` has a weird value,
+        //   this does
         // not work. However, `row_step` has suitable values in all safe interfaces.
         unsafe {
             self.row_count = rows.end - rows.start;
@@ -264,9 +250,7 @@ where
         // point to a valid element of `V`
         let row_ref = unsafe { V::get_pointer(self.rows.offset(row as isize * self.row_step)) };
         // similarly safe by constructor requirements
-        unsafe {
-            NonNull::slice_from_raw_parts(row_ref.offset(self.col_start as isize), self.col_count)
-        }
+        unsafe { NonNull::slice_from_raw_parts(row_ref.offset(self.col_start as isize), self.col_count) }
     }
 
     /// Returns a pointer to the `(row, col)`-th entry of the matrix.
@@ -341,9 +325,7 @@ impl<'a, V, T> Clone for Column<'a, V, T>
 where
     V: AsPointerToSlice<T>,
 {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<'a, V, T> Copy for Column<'a, V, T> where V: AsPointerToSlice<T> {}
@@ -352,9 +334,7 @@ impl<'a, V, T> VectorView<T> for Column<'a, V, T>
 where
     V: AsPointerToSlice<T>,
 {
-    fn len(&self) -> usize {
-        self.raw_data.row_count
-    }
+    fn len(&self) -> usize { self.raw_data.row_count }
 
     fn at(&self, i: usize) -> &T {
         // safe since we assume that there are no mutable references to `raw_data`
@@ -377,9 +357,7 @@ impl<'a, V, T: Debug> Debug for ColumnMut<'a, V, T>
 where
     V: AsPointerToSlice<T>,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.as_const().fmt(f)
-    }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.as_const().fmt(f) }
 }
 
 impl<'a, V, T> ColumnMut<'a, V, T>
@@ -450,9 +428,7 @@ impl<'a, V, T> VectorView<T> for ColumnMut<'a, V, T>
 where
     V: AsPointerToSlice<T>,
 {
-    fn len(&self) -> usize {
-        self.raw_data.row_count
-    }
+    fn len(&self) -> usize { self.raw_data.row_count }
 
     fn at(&self, i: usize) -> &T {
         // safe since we assume that there are no other references to `raw_data`
@@ -498,9 +474,7 @@ where
     type Item = &'a mut T;
     type IntoIter = ColumnMutIter<'a, V, T>;
 
-    fn into_iter(self) -> ColumnMutIter<'a, V, T> {
-        ColumnMutIter { column_mut: self }
-    }
+    fn into_iter(self) -> ColumnMutIter<'a, V, T> { ColumnMutIter { column_mut: self } }
 }
 
 impl<'a, V, T> VectorViewMut<T> for ColumnMut<'a, V, T>
@@ -573,14 +547,10 @@ where
     /// In most cases, you will use [`Submatrix::at()`] instead, but in rare occasions,
     /// `into_at()` might be necessary to provide a reference whose lifetime is not
     /// coupled to the lifetime of the submatrix object.
-    pub fn into_at(self, i: usize, j: usize) -> &'a T {
-        &self.into_row_at(i)[j]
-    }
+    pub fn into_at(self, i: usize, j: usize) -> &'a T { &self.into_row_at(i)[j] }
 
     /// Returns a reference to the `(i, j)`-th entry of this matrix.
-    pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T {
-        &self.row_at(i)[j]
-    }
+    pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T { &self.row_at(i)[j] }
 
     /// Returns the submatrix that references only the entries whose column indices are within the
     /// given range.
@@ -659,14 +629,10 @@ where
     }
 
     /// Returns the number of columns of this matrix.
-    pub fn col_count(&self) -> usize {
-        self.raw_data.col_count
-    }
+    pub fn col_count(&self) -> usize { self.raw_data.col_count }
 
     /// Returns the number of rows of this matrix.
-    pub fn row_count(&self) -> usize {
-        self.raw_data.row_count
-    }
+    pub fn row_count(&self) -> usize { self.raw_data.row_count }
 }
 
 impl<'a, V, T: Debug> Debug for Submatrix<'a, V, T>
@@ -686,9 +652,7 @@ impl<'a, V, T> Clone for Submatrix<'a, V, T>
 where
     V: 'a + AsPointerToSlice<T>,
 {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<'a, V, T> Copy for Submatrix<'a, V, T> where V: 'a + AsPointerToSlice<T> {}
@@ -799,24 +763,16 @@ where
     /// In most cases, you will use [`SubmatrixMut::at_mut()`] instead, but in rare occasions,
     /// `into_at_mut()` might be necessary to provide a reference whose lifetime is not
     /// coupled to the lifetime of the submatrix object.
-    pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T {
-        &mut self.into_row_mut_at(i)[j]
-    }
+    pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T { &mut self.into_row_mut_at(i)[j] }
 
     /// Returns a mutable reference to the `(i, j)`-th entry of this matrix.
-    pub fn at_mut<'b>(&'b mut self, i: usize, j: usize) -> &'b mut T {
-        &mut self.row_mut_at(i)[j]
-    }
+    pub fn at_mut<'b>(&'b mut self, i: usize, j: usize) -> &'b mut T { &mut self.row_mut_at(i)[j] }
 
     /// Returns a reference to the `(i, j)`-th entry of this matrix.
-    pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T {
-        self.as_const().into_at(i, j)
-    }
+    pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T { self.as_const().into_at(i, j) }
 
     /// Returns a view onto the `i`-th row of this matrix.
-    pub fn row_at<'b>(&'b self, i: usize) -> &'b [T] {
-        self.as_const().into_row_at(i)
-    }
+    pub fn row_at<'b>(&'b self, i: usize) -> &'b [T] { self.as_const().into_row_at(i) }
 
     /// Consumes the submatrix and produces a reference to its `i`-th row.
     ///
@@ -829,14 +785,10 @@ where
     }
 
     /// Returns a mutable view onto the `i`-th row of this matrix.
-    pub fn row_mut_at<'b>(&'b mut self, i: usize) -> &'b mut [T] {
-        self.reborrow().into_row_mut_at(i)
-    }
+    pub fn row_mut_at<'b>(&'b mut self, i: usize) -> &'b mut [T] { self.reborrow().into_row_mut_at(i) }
 
     /// Returns a view onto the `i`-th column of this matrix.
-    pub fn col_at<'b>(&'b self, j: usize) -> Column<'b, V, T> {
-        self.as_const().into_col_at(j)
-    }
+    pub fn col_at<'b>(&'b self, j: usize) -> Column<'b, V, T> { self.as_const().into_col_at(j) }
 
     /// Returns a mutable view onto the `j`-th row of this matrix.
     pub fn col_mut_at<'b>(&'b mut self, j: usize) -> ColumnMut<'b, V, T> {
@@ -869,23 +821,17 @@ where
     }
 
     /// Returns the number of columns of this matrix.
-    pub fn col_count(&self) -> usize {
-        self.raw_data.col_count
-    }
+    pub fn col_count(&self) -> usize { self.raw_data.col_count }
 
     /// Returns the number of rows of this matrix.
-    pub fn row_count(&self) -> usize {
-        self.raw_data.row_count
-    }
+    pub fn row_count(&self) -> usize { self.raw_data.row_count }
 }
 
 impl<'a, V, T: Debug> Debug for SubmatrixMut<'a, V, T>
 where
     V: 'a + AsPointerToSlice<T>,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.as_const().fmt(f)
-    }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { self.as_const().fmt(f) }
 }
 
 impl<'a, T> SubmatrixMut<'a, AsFirstElement<T>, T> {
@@ -1002,12 +948,7 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
 }
 
 #[cfg(test)]
-fn assert_submatrix_eq<
-    V: AsPointerToSlice<T>,
-    T: PartialEq + Debug,
-    const N: usize,
-    const M: usize,
->(
+fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: usize, const M: usize>(
     expected: [[T; M]; N],
     actual: &mut SubmatrixMut<V, T>,
 ) {
@@ -1026,11 +967,7 @@ fn with_testmatrix_vec<F>(f: F)
 where
     F: FnOnce(SubmatrixMut<Vec<i64>, i64>),
 {
-    let mut data = vec![
-        vec![1, 2, 3, 4, 5],
-        vec![6, 7, 8, 9, 10],
-        vec![11, 12, 13, 14, 15],
-    ];
+    let mut data = vec![vec![1, 2, 3, 4, 5], vec![6, 7, 8, 9, 10], vec![11, 12, 13, 14, 15]];
     let matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut data[..]);
     f(matrix)
 }
@@ -1083,19 +1020,10 @@ where
 
 #[cfg(test)]
 fn test_submatrix<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]],
-        &mut matrix,
-    );
-    assert_submatrix_eq(
-        [[2, 3], [7, 8]],
-        &mut matrix.reborrow().submatrix(0..2, 1..3),
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], &mut matrix);
+    assert_submatrix_eq([[2, 3], [7, 8]], &mut matrix.reborrow().submatrix(0..2, 1..3));
     assert_submatrix_eq([[8, 9, 10]], &mut matrix.reborrow().submatrix(1..2, 2..5));
-    assert_submatrix_eq(
-        [[8, 9, 10], [13, 14, 15]],
-        &mut matrix.reborrow().submatrix(1..3, 2..5),
-    );
+    assert_submatrix_eq([[8, 9, 10], [13, 14, 15]], &mut matrix.reborrow().submatrix(1..3, 2..5));
 
     let (mut left, mut right) = matrix.split_cols(0..3, 3..5);
     assert_submatrix_eq([[1, 2, 3], [6, 7, 8], [11, 12, 13]], &mut left);
@@ -1112,10 +1040,7 @@ fn test_submatrix_wrapper() {
 
 #[cfg(test)]
 fn test_submatrix_mutate<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], &mut matrix);
     let (mut left, mut right) = matrix.split_cols(0..3, 3..5);
     assert_submatrix_eq([[1, 2, 3], [6, 7, 8], [11, 12, 13]], &mut left);
     assert_submatrix_eq([[4, 5], [9, 10], [14, 15]], &mut right);
@@ -1146,10 +1071,7 @@ fn test_submatrix_mutate_wrapper() {
 
 #[cfg(test)]
 fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], &mut matrix);
     {
         let mut it = matrix.reborrow().col_iter();
         assert_eq!(
@@ -1176,15 +1098,9 @@ fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
         for x in last_col.reborrow() {
             *x *= 2;
         }
-        assert_eq!(
-            vec![10, 20, 30],
-            last_col.into_iter().map(|x| *x).collect::<Vec<_>>()
-        );
+        assert_eq!(vec![10, 20, 30], last_col.into_iter().map(|x| *x).collect::<Vec<_>>());
     }
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 10], [6, 7, 8, 9, 20], [11, 12, 13, 14, 30]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 10], [6, 7, 8, 9, 20], [11, 12, 13, 14, 30]], &mut matrix);
 
     let (left, _right) = matrix.reborrow().split_cols(0..2, 3..4);
     {
@@ -1192,14 +1108,8 @@ fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
         let mut col1 = it.next().unwrap();
         let mut col2 = it.next().unwrap();
         assert!(it.next().is_none());
-        assert_eq!(
-            vec![1, 6, 11],
-            col1.as_iter().map(|x| *x).collect::<Vec<_>>()
-        );
-        assert_eq!(
-            vec![2, 7, 12],
-            col2.as_iter().map(|x| *x).collect::<Vec<_>>()
-        );
+        assert_eq!(vec![1, 6, 11], col1.as_iter().map(|x| *x).collect::<Vec<_>>());
+        assert_eq!(vec![2, 7, 12], col2.as_iter().map(|x| *x).collect::<Vec<_>>());
         assert_eq!(
             vec![1, 6, 11],
             col1.reborrow().into_iter().map(|x| *x).collect::<Vec<_>>()
@@ -1210,26 +1120,17 @@ fn test_submatrix_col_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
         );
         *col1.into_iter().skip(1).next().unwrap() += 5;
     }
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 10], [11, 7, 8, 9, 20], [11, 12, 13, 14, 30]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 10], [11, 7, 8, 9, 20], [11, 12, 13, 14, 30]], &mut matrix);
 
     let (_left, right) = matrix.reborrow().split_cols(0..2, 3..4);
     {
         let mut it = right.col_iter();
         let mut col = it.next().unwrap();
         assert!(it.next().is_none());
-        assert_eq!(
-            vec![4, 9, 14],
-            col.reborrow().as_iter().map(|x| *x).collect::<Vec<_>>()
-        );
+        assert_eq!(vec![4, 9, 14], col.reborrow().as_iter().map(|x| *x).collect::<Vec<_>>());
         *col.into_iter().next().unwrap() += 3;
     }
-    assert_submatrix_eq(
-        [[1, 2, 3, 7, 10], [11, 7, 8, 9, 20], [11, 12, 13, 14, 30]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 7, 10], [11, 7, 8, 9, 20], [11, 12, 13, 14, 30]], &mut matrix);
 }
 
 #[test]
@@ -1242,10 +1143,7 @@ fn test_submatrix_col_iter_wrapper() {
 
 #[cfg(test)]
 fn test_submatrix_row_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], &mut matrix);
     {
         let mut it = matrix.reborrow().row_iter();
         assert_eq!(&[6, 7, 8, 9, 10], it.by_ref().skip(1).next().unwrap());
@@ -1254,10 +1152,7 @@ fn test_submatrix_row_iter<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V,
         row[1] += 6;
         row[4] *= 2;
     }
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 18, 13, 14, 30]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 18, 13, 14, 30]], &mut matrix);
     let (mut left, mut right) = matrix.reborrow().split_cols(0..2, 3..4);
     {
         let mut it = left.reborrow().row_iter();
@@ -1301,22 +1196,14 @@ fn test_submatrix_row_iter_wrapper() {
 
 #[cfg(test)]
 fn test_submatrix_col_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], &mut matrix);
     assert_eq!(
         &[2, 7, 12],
         &matrix.col_at(1).as_iter().copied().collect::<Vec<_>>()[..]
     );
     assert_eq!(
         &[2, 7, 12],
-        &matrix
-            .as_const()
-            .col_at(1)
-            .as_iter()
-            .copied()
-            .collect::<Vec<_>>()[..]
+        &matrix.as_const().col_at(1).as_iter().copied().collect::<Vec<_>>()[..]
     );
     assert_eq!(
         &[5, 10, 15],
@@ -1324,83 +1211,36 @@ fn test_submatrix_col_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
     );
     assert_eq!(
         &[5, 10, 15],
-        &matrix
-            .as_const()
-            .col_at(4)
-            .as_iter()
-            .copied()
-            .collect::<Vec<_>>()[..]
+        &matrix.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]
     );
 
     {
         let (mut top, mut bottom) = matrix.reborrow().restrict_rows(0..2).split_rows(0..1, 1..2);
+        assert_eq!(&[1], &top.col_mut_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
         assert_eq!(
             &[1],
-            &top.col_mut_at(0).as_iter().copied().collect::<Vec<_>>()[..]
+            &top.as_const().col_at(0).as_iter().copied().collect::<Vec<_>>()[..]
         );
-        assert_eq!(
-            &[1],
-            &top.as_const()
-                .col_at(0)
-                .as_iter()
-                .copied()
-                .collect::<Vec<_>>()[..]
-        );
-        assert_eq!(
-            &[1],
-            &top.col_at(0).as_iter().copied().collect::<Vec<_>>()[..]
-        );
+        assert_eq!(&[1], &top.col_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[5], &top.col_mut_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
         assert_eq!(
             &[5],
-            &top.col_mut_at(4).as_iter().copied().collect::<Vec<_>>()[..]
+            &top.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]
         );
-        assert_eq!(
-            &[5],
-            &top.as_const()
-                .col_at(4)
-                .as_iter()
-                .copied()
-                .collect::<Vec<_>>()[..]
-        );
-        assert_eq!(
-            &[5],
-            &top.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]
-        );
+        assert_eq!(&[5], &top.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
 
+        assert_eq!(&[6], &bottom.col_mut_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
         assert_eq!(
             &[6],
-            &bottom.col_mut_at(0).as_iter().copied().collect::<Vec<_>>()[..]
+            &bottom.as_const().col_at(0).as_iter().copied().collect::<Vec<_>>()[..]
         );
-        assert_eq!(
-            &[6],
-            &bottom
-                .as_const()
-                .col_at(0)
-                .as_iter()
-                .copied()
-                .collect::<Vec<_>>()[..]
-        );
-        assert_eq!(
-            &[6],
-            &bottom.col_at(0).as_iter().copied().collect::<Vec<_>>()[..]
-        );
+        assert_eq!(&[6], &bottom.col_at(0).as_iter().copied().collect::<Vec<_>>()[..]);
+        assert_eq!(&[10], &bottom.col_mut_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
         assert_eq!(
             &[10],
-            &bottom.col_mut_at(4).as_iter().copied().collect::<Vec<_>>()[..]
+            &bottom.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]
         );
-        assert_eq!(
-            &[10],
-            &bottom
-                .as_const()
-                .col_at(4)
-                .as_iter()
-                .copied()
-                .collect::<Vec<_>>()[..]
-        );
-        assert_eq!(
-            &[10],
-            &bottom.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]
-        );
+        assert_eq!(&[10], &bottom.col_at(4).as_iter().copied().collect::<Vec<_>>()[..]);
     }
 }
 
@@ -1414,22 +1254,14 @@ fn test_submatrix_col_at_wrapper() {
 
 #[cfg(test)]
 fn test_submatrix_row_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i64>) {
-    assert_submatrix_eq(
-        [[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]],
-        &mut matrix,
-    );
+    assert_submatrix_eq([[1, 2, 3, 4, 5], [6, 7, 8, 9, 10], [11, 12, 13, 14, 15]], &mut matrix);
     assert_eq!(
         &[2, 7, 12],
         &matrix.col_at(1).as_iter().copied().collect::<Vec<_>>()[..]
     );
     assert_eq!(
         &[2, 7, 12],
-        &matrix
-            .as_const()
-            .col_at(1)
-            .as_iter()
-            .copied()
-            .collect::<Vec<_>>()[..]
+        &matrix.as_const().col_at(1).as_iter().copied().collect::<Vec<_>>()[..]
     );
     assert_eq!(
         &[5, 10, 15],
@@ -1437,12 +1269,7 @@ fn test_submatrix_row_at<V: AsPointerToSlice<i64>>(mut matrix: SubmatrixMut<V, i
     );
     assert_eq!(
         &[5, 10, 15],
-        &matrix
-            .as_const()
-            .col_at(4)
-            .as_iter()
-            .copied()
-            .collect::<Vec<_>>()[..]
+        &matrix.as_const().col_at(4).as_iter().copied().collect::<Vec<_>>()[..]
     );
 
     {

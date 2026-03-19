@@ -51,10 +51,7 @@ pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], bl
         }
     }
     let new_highest_set_block = highest_set_block(&lhs);
-    debug_assert!(
-        new_highest_set_block.is_none()
-            || max(prev_len, new_highest_set_block.unwrap() + 1) == lhs.len()
-    );
+    debug_assert!(new_highest_set_block.is_none() || max(prev_len, new_highest_set_block.unwrap() + 1) == lhs.len());
 }
 
 #[stability::unstable(feature = "enable")]
@@ -69,10 +66,7 @@ pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
 
 #[stability::unstable(feature = "enable")]
 pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
-    match (
-        highest_set_block(lhs.as_ref()),
-        highest_set_block(rhs.as_ref()),
-    ) {
+    match (highest_set_block(lhs.as_ref()), highest_set_block(rhs.as_ref())) {
         (None, None) => return Ordering::Equal,
         (Some(_), None) => return Ordering::Greater,
         (None, Some(_)) => return Ordering::Less,
@@ -98,9 +92,7 @@ pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
     match highest_set_block(lhs.as_ref()) {
         None => 0.cmp(&rhs),
         Some(0) => (lhs[0] as DoubleBlockInt).cmp(&rhs),
-        Some(1) => {
-            (((lhs[1] as DoubleBlockInt) << BLOCK_BITS) | (lhs[0] as DoubleBlockInt)).cmp(&rhs)
-        }
+        Some(1) => (((lhs[1] as DoubleBlockInt) << BLOCK_BITS) | (lhs[0] as DoubleBlockInt)).cmp(&rhs),
         Some(_) => Ordering::Greater,
     }
 }
@@ -231,8 +223,7 @@ pub fn bigint_fma<A: Allocator, A2: Allocator>(
         }
     }
     debug_assert!(
-        highest_set_block(&out).is_none()
-            || highest_set_block(&out).unwrap() as isize >= out.len() as isize - 2
+        highest_set_block(&out).is_none() || highest_set_block(&out).unwrap() as isize >= out.len() as isize - 2
     );
     return out;
 }
@@ -331,9 +322,9 @@ fn division_step<A: Allocator>(
     // the basic idea is as follows:
     // we know that for a and b, have a - a//(b+1) * b <= b + a/(b+1)
     // Hence, we perform two steps:
-    //  - by choosing a and b as the top two blocks of lhs resp. lhs, achieve that a - a//(b+1) * b
-    //    <= b + 2^k (where k = BLOCK_BITS); hence, lhs - a//(b+1) * rhs <= rhs + 2^k, and so
-    //    possibly subtracting rhs achieves new_lhs <= rhs
+    //  - by choosing a and b as the top two blocks of lhs resp. lhs, achieve that a - a//(b+1) * b <= b
+    //    + 2^k (where k = BLOCK_BITS); hence, lhs - a//(b+1) * rhs <= rhs + 2^k, and so possibly
+    //    subtracting rhs achieves new_lhs <= rhs
     //  - by choosing a as the top two blocks and b as only the top block of lhs resp. lhs (now b <
     //    2^k), achieve that lhs - a//(b+1) * rhs < 2^k + 2^k = 2 * 2^k, and so after possibly
     //    subtracting rhs we find that the top block of lhs is cleared
@@ -343,10 +334,8 @@ fn division_step<A: Allocator>(
 
     // first step
     {
-        let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS)
-            | (lhs[lhs_high - 1] as DoubleBlockInt);
-        let rhs_high_blocks = ((rhs[rhs_high] as DoubleBlockInt) << BLOCK_BITS)
-            | (rhs[rhs_high - 1] as DoubleBlockInt);
+        let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
+        let rhs_high_blocks = ((rhs[rhs_high] as DoubleBlockInt) << BLOCK_BITS) | (rhs[rhs_high - 1] as DoubleBlockInt);
 
         if rhs_high_blocks != DoubleBlockInt::MAX && lhs_high_blocks >= (rhs_high_blocks + 1) {
             let mut quotient = (lhs_high_blocks / (rhs_high_blocks + 1)) as u64;
@@ -355,8 +344,8 @@ fn division_step<A: Allocator>(
             bigint_mul_small(tmp, quotient);
             bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high);
 
-            let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS)
-                | (lhs[lhs_high - 1] as DoubleBlockInt);
+            let lhs_high_blocks =
+                ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
 
             if lhs_high_blocks > rhs_high_blocks {
                 bigint_sub(lhs, rhs.as_ref(), lhs_high - rhs_high);
@@ -366,15 +355,13 @@ fn division_step<A: Allocator>(
         }
 
         // this is what we wanted to achieve in the first step
-        let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS)
-            | (lhs[lhs_high - 1] as DoubleBlockInt);
+        let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
         debug_assert!(lhs_high_blocks <= rhs_high_blocks);
     }
 
     // second step
     {
-        let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS)
-            | (lhs[lhs_high - 1] as DoubleBlockInt);
+        let lhs_high_blocks = ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
         let rhs_high_block = rhs[rhs_high] as DoubleBlockInt;
 
         if lhs[lhs_high] != 0 {
@@ -428,8 +415,7 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(
             expand(&mut out, d - k + 1);
             while d > k {
                 if lhs[d] != 0 {
-                    let (quo_upper, quo_lower, quo_power) =
-                        division_step(lhs, rhs.as_ref(), d, k, &mut tmp);
+                    let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs.as_ref(), d, k, &mut tmp);
                     *out.at_mut(quo_power) = quo_lower;
                     bigint_add(&mut out, &[quo_upper][..], quo_power + 1);
                     debug_assert!(lhs[d] == 0);
@@ -462,10 +448,7 @@ pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
         *lhs.at_mut(highest_block) = quo;
         for i in (0..highest_block).rev() {
             buffer = (buffer << BLOCK_BITS) | (lhs[i] as DoubleBlockInt);
-            let (quo, rem) = (
-                buffer / rhs as DoubleBlockInt,
-                buffer % rhs as DoubleBlockInt,
-            );
+            let (quo, rem) = (buffer / rhs as DoubleBlockInt, buffer % rhs as DoubleBlockInt);
             debug_assert!(quo <= BlockInt::MAX as DoubleBlockInt);
             *lhs.at_mut(i) = quo as BlockInt;
             buffer = rem;
@@ -484,10 +467,7 @@ pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
 /// The main difference between using this function and `<(bool, &serde_bytes::Bytes)>::deserialize`
 /// is that this function can accept a byte array with a shorter lifetime.
 #[stability::unstable(feature = "enable")]
-pub fn deserialize_bigint_from_bytes<'de, D, F, T>(
-    deserializer: D,
-    from_bytes: F,
-) -> Result<(bool, T), D::Error>
+pub fn deserialize_bigint_from_bytes<'de, D, F, T>(deserializer: D, from_bytes: F) -> Result<(bool, T), D::Error>
 where
     D: Deserializer<'de>,
     F: FnOnce(&[u8]) -> T,
@@ -505,10 +485,7 @@ where
         type Value = (bool, T);
 
         fn expecting(&self, f: &mut fmt::Formatter) -> fmt::Result {
-            write!(
-                f,
-                "a sign bit as `bool` and a list of bytes in little endian order"
-            )
+            write!(f, "a sign bit as `bool` and a list of bytes in little endian order")
         }
 
         fn visit_seq<A>(self, mut seq: A) -> Result<Self::Value, A::Error>
@@ -671,10 +648,7 @@ fn test_fma() {
         "325350159908777866468983871740437853305599423427707736569559476320508903561720075798",
         10,
     );
-    assert_eq!(
-        truncate_zeros(z),
-        truncate_zeros(bigint_fma(&x, &y, a, Global))
-    );
+    assert_eq!(truncate_zeros(z), truncate_zeros(bigint_fma(&x, &y, a, Global)));
 }
 
 #[test]

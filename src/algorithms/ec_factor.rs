@@ -59,9 +59,7 @@ where
         let Zn_new = zn_big::Zn::new(
             BigIntRing::RING,
             int_cast(
-                Zn.integer_ring()
-                    .checked_div(Zn.modulus(), &factor_of_n)
-                    .unwrap(),
+                Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(),
                 BigIntRing::RING,
                 Zn.integer_ring(),
             ),
@@ -85,16 +83,8 @@ where
             }
         } else if !point_eq(
             &Zn_new,
-            &(
-                red_map.map_ref(&P.0),
-                red_map.map_ref(&P.1),
-                red_map.map_ref(&P.2),
-            ),
-            &(
-                red_map.map_ref(&Q.0),
-                red_map.map_ref(&Q.1),
-                red_map.map_ref(&Q.2),
-            ),
+            &(red_map.map_ref(&P.0), red_map.map_ref(&P.1), red_map.map_ref(&P.2)),
+            &(red_map.map_ref(&Q.0), red_map.map_ref(&Q.1), red_map.map_ref(&Q.2)),
         ) {
             return false;
         }
@@ -122,16 +112,8 @@ where
             }
         } else if !point_eq(
             &Zn_new,
-            &(
-                red_map.map_ref(&P.0),
-                red_map.map_ref(&P.1),
-                red_map.map_ref(&P.2),
-            ),
-            &(
-                red_map.map_ref(&Q.0),
-                red_map.map_ref(&Q.1),
-                red_map.map_ref(&Q.2),
-            ),
+            &(red_map.map_ref(&P.0), red_map.map_ref(&P.1), red_map.map_ref(&P.2)),
+            &(red_map.map_ref(&Q.0), red_map.map_ref(&Q.1), red_map.map_ref(&Q.2)),
         ) {
             return false;
         }
@@ -235,10 +217,7 @@ where
     let z_sqr = square(Zn, z);
     Zn.eq_el(
         &Zn.mul_ref_snd(Zn.add_ref(&x_sqr, &y_sqr), &z_sqr),
-        &Zn.add(
-            Zn.mul_ref(&z_sqr, &z_sqr),
-            Zn.mul_ref_fst(d, Zn.mul(x_sqr, y_sqr)),
-        ),
+        &Zn.add(Zn.mul_ref(&z_sqr, &z_sqr), Zn.mul_ref_fst(d, Zn.mul(x_sqr, y_sqr))),
     )
 }
 
@@ -302,17 +281,14 @@ where
             let log2_B = ln_B / 2f64.ln();
             assert!(log2_B <= i128::MAX as f64);
 
-            let primes = algorithms::erathostenes::enumerate_primes(
-                &StaticRing::<i128>::RING,
-                &(1i128 << (log2_B as u64)),
-            );
+            let primes =
+                algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
             let power_factorization = primes
                 .iter()
                 .map(|p| {
                     (
                         *p,
-                        log2_B.ceil() as usize
-                            / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap(),
+                        log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -334,9 +310,7 @@ where
                 .join_many((0..attempts).map_fn(move |_| {
                     move |handle: ShortCircuitingComputationHandle<_, _>| {
                         let mut rng = oorandom::Rand64::new(
-                            ((rng_seed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
-                                as u128)
-                                << 64)
+                            ((rng_seed_ref.fetch_add(1, std::sync::atomic::Ordering::Relaxed) as u128) << 64)
                                 | base_rng_value as u128,
                         );
                         let (x, y) = (
@@ -344,10 +318,9 @@ where
                             Zn.random_element(|| rng.rand_u64()),
                         );
                         let (x_sqr, y_sqr) = (square(&Zn, &x), square(&Zn, &y));
-                        if let Some(d) = Zn.checked_div(
-                            &Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()),
-                            &Zn.mul(x_sqr, y_sqr),
-                        ) {
+                        if let Some(d) =
+                            Zn.checked_div(&Zn.sub(Zn.add_ref(&x_sqr, &y_sqr), Zn.one()), &Zn.mul(x_sqr, y_sqr))
+                        {
                             let P = (x, y, Zn.one());
                             debug_assert!(is_on_curve(&Zn, &d, &P));
                             let result = ec_pow(&P, &d, power_ref, &Zn).0;
@@ -405,19 +378,13 @@ where
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
     for log2_size in (16..min_factor_bound_log2).step_by(8) {
-        if let Some(factor) =
-            lenstra_ec_factor_base(Zn, log2_size, || rng.rand_u64(), controller.clone())?
-        {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, log2_size, || rng.rand_u64(), controller.clone())? {
             return Ok(Some(factor));
         }
     }
     for _ in 0..repetitions {
-        if let Some(factor) = lenstra_ec_factor_base(
-            Zn,
-            min_factor_bound_log2,
-            || rng.rand_u64(),
-            controller.clone(),
-        )? {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, min_factor_bound_log2, || rng.rand_u64(), controller.clone())?
+        {
             return Ok(Some(factor));
         }
     }
@@ -443,17 +410,13 @@ where
 
     // we first try to find smaller factors
     for log2_size in (16..(log2_N / 2)).step_by(8) {
-        if let Some(factor) =
-            lenstra_ec_factor_base(Zn, log2_size, || rng.rand_u64(), controller.clone())?
-        {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, log2_size, || rng.rand_u64(), controller.clone())? {
             return Ok(factor);
         }
     }
     // this is now the general case
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        if let Some(factor) =
-            lenstra_ec_factor_base(Zn, log2_N / 2, || rng.rand_u64(), controller.clone())?
-        {
+        if let Some(factor) = lenstra_ec_factor_base(Zn, log2_N / 2, || rng.rand_u64(), controller.clone())? {
             return Ok(factor);
         }
     }

@@ -36,8 +36,7 @@ where
         return vec![(squarefree_part, 1)];
     } else {
         let square_part = poly_ring.checked_div(&poly, &squarefree_part).unwrap();
-        let square_part_decomposition =
-            poly_power_decomposition_finite_field(poly_ring, &square_part, controller);
+        let square_part_decomposition = poly_power_decomposition_finite_field(poly_ring, &square_part, controller);
         let mut result = square_part_decomposition;
         let mut degree = 0;
         for (g, k) in &mut result {
@@ -48,11 +47,7 @@ where
             let remaining_part = poly_ring
                 .checked_div(
                     &poly,
-                    &poly_ring.prod(
-                        result
-                            .iter()
-                            .map(|(g, e)| poly_ring.pow(poly_ring.clone_el(g), *e)),
-                    ),
+                    &poly_ring.prod(result.iter().map(|(g, e)| poly_ring.pow(poly_ring.clone_el(g), *e))),
                 )
                 .unwrap();
             result.insert(0, (poly_ring.normalize(remaining_part), 1));
@@ -67,11 +62,7 @@ where
 /// The returned polynomial is always monic, and with this restriction, it
 /// is unique.
 #[stability::unstable(feature = "enable")]
-pub fn poly_squarefree_part_finite_field<P, Controller>(
-    poly_ring: P,
-    poly: &El<P>,
-    controller: Controller,
-) -> El<P>
+pub fn poly_squarefree_part_finite_field<P, Controller>(poly_ring: P, poly: &El<P>, controller: Controller) -> El<P>
 where
     P: RingStore,
     P::Type: PolyRing + PrincipalIdealRing,
@@ -122,10 +113,7 @@ where
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field,
 {
     if ring.is_zero(&lhs) || ring.is_zero(&rhs) {
-        return (
-            [ring.one(), ring.zero(), ring.zero(), ring.one()],
-            [lhs, rhs],
-        );
+        return ([ring.one(), ring.zero(), ring.zero(), ring.one()], [lhs, rhs]);
     }
     let (mut a, mut b) = (ring.clone_el(&lhs), ring.clone_el(&rhs));
     let (mut sa, mut ta) = (ring.one(), ring.zero());
@@ -138,14 +126,8 @@ where
     }
 
     while ring.degree(&a).unwrap() > target_deg && !ring.is_zero(&b) {
-        debug_assert!(ring.eq_el(
-            &a,
-            &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))
-        ));
-        debug_assert!(ring.eq_el(
-            &b,
-            &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))
-        ));
+        debug_assert!(ring.eq_el(&a, &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))));
+        debug_assert!(ring.eq_el(&b, &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))));
 
         let (quo, rem) = ring.euclidean_div_rem(a, &b);
         ta = ring.sub(ta, ring.mul_ref(&quo, &tb));
@@ -207,34 +189,25 @@ where
     {
         if poly_ring.is_zero(&lhs) || poly_ring.is_zero(&rhs) {
             return (
-                [
-                    poly_ring.one(),
-                    poly_ring.zero(),
-                    poly_ring.zero(),
-                    poly_ring.one(),
-                ],
+                [poly_ring.one(), poly_ring.zero(), poly_ring.zero(), poly_ring.one()],
                 [lhs, rhs],
             );
         }
         let ldeg = poly_ring.degree(&lhs).unwrap();
         let rdeg = poly_ring.degree(&rhs).unwrap();
-        if ldeg < target_deg + FAST_POLY_EEA_THRESHOLD
-            || rdeg < target_deg + FAST_POLY_EEA_THRESHOLD
-        {
+        if ldeg < target_deg + FAST_POLY_EEA_THRESHOLD || rdeg < target_deg + FAST_POLY_EEA_THRESHOLD {
             log_progress!(controller, ".");
             return partial_eea(poly_ring, lhs, rhs, target_deg);
         } else if ldeg >= 2 * rdeg {
             let (mut q, r) = poly_ring.euclidean_div_rem(lhs, &rhs);
             poly_ring.negate_inplace(&mut q);
-            let (transform, rest) =
-                fast_poly_eea_impl(poly_ring, r, rhs, target_deg, controller, memory);
+            let (transform, rest) = fast_poly_eea_impl(poly_ring, r, rhs, target_deg, controller, memory);
             let mut transform: (_, _, _, _) = transform.into();
             transform.1 = poly_ring.fma(&q, &transform.0, transform.1);
             transform.3 = poly_ring.fma(&q, &transform.2, transform.3);
             return (transform.into(), rest);
         } else if rdeg >= 2 * ldeg {
-            let (transform, rest) =
-                fast_poly_eea_impl(poly_ring, rhs, lhs, target_deg, controller, memory);
+            let (transform, rest) = fast_poly_eea_impl(poly_ring, rhs, lhs, target_deg, controller, memory);
             let transform: (_, _, _, _) = transform.into();
             return ([transform.1, transform.0, transform.3, transform.2], rest);
         }
@@ -293,17 +266,10 @@ where
             ),
             target_deg
         );
-        let (snd_transform, rest) = fast_poly_eea_impl(
-            poly_ring, lhs_rest, rhs_rest, target_deg, controller, memory,
-        );
+        let (snd_transform, rest) = fast_poly_eea_impl(poly_ring, lhs_rest, rhs_rest, target_deg, controller, memory);
 
         // multiply snd_transform * fst_transform
-        let mut result = [
-            poly_ring.zero(),
-            poly_ring.zero(),
-            poly_ring.zero(),
-            poly_ring.zero(),
-        ];
+        let mut result = [poly_ring.zero(), poly_ring.zero(), poly_ring.zero(), poly_ring.zero()];
         dispatch_strassen_impl::<_, _, _, _, false, _, _, _>(
             1,
             0,
@@ -387,24 +353,18 @@ where
                     .base_ring()
                     .is_unit(&poly_ring.base_ring().ideal_gen(&content_rhs, &content_ann))
                 {
-                    return Err(poly_ring.base_ring().annihilator(
-                        &poly_ring.base_ring().ideal_gen(&content_rhs, &content_ann),
-                    ));
+                    return Err(poly_ring
+                        .base_ring()
+                        .annihilator(&poly_ring.base_ring().ideal_gen(&content_rhs, &content_ann)));
                 }
-                let mod_content_gcd = poly_gcd_finite_reduced(
-                    poly_ring,
-                    poly_ring.inclusion().mul_ref_map(&lhs, &content_rhs),
-                    rhs,
-                )?;
+                let mod_content_gcd =
+                    poly_gcd_finite_reduced(poly_ring, poly_ring.inclusion().mul_ref_map(&lhs, &content_rhs), rhs)?;
                 debug_assert!(
                     poly_ring
                         .terms(&mod_content_gcd)
                         .all(|(c, _)| poly_ring.base_ring().divides(c, &content_rhs))
                 );
-                return Ok(poly_ring.add(
-                    poly_ring.inclusion().mul_ref_map(&lhs, &content_ann),
-                    mod_content_gcd,
-                ));
+                return Ok(poly_ring.add(poly_ring.inclusion().mul_ref_map(&lhs, &content_ann), mod_content_gcd));
             }
         }
     }
@@ -434,8 +394,7 @@ fn test_poly_gcd_finite_reduced() {
         StaticRing::<i64>::RING,
     );
     let poly_ring = DensePolyRing::new(&base_ring, "X");
-    let component_poly_rings: [_; 4] =
-        std::array::from_fn(|i| DensePolyRing::new(base_ring.at(i), "X"));
+    let component_poly_rings: [_; 4] = std::array::from_fn(|i| DensePolyRing::new(base_ring.at(i), "X"));
 
     let [f0, g0, expected0] = component_poly_rings[0].with_wrapped_indeterminate(|X| {
         [
@@ -446,8 +405,8 @@ fn test_poly_gcd_finite_reduced() {
     });
 
     let f1 = component_poly_rings[1].zero();
-    let [g1, expected1] = component_poly_rings[1]
-        .with_wrapped_indeterminate(|X| [X.pow_ref(3) + X + 1, X.pow_ref(3) + X + 1]);
+    let [g1, expected1] =
+        component_poly_rings[1].with_wrapped_indeterminate(|X| [X.pow_ref(3) + X + 1, X.pow_ref(3) + X + 1]);
 
     let f2 = component_poly_rings[2].int_hom().map(1);
     let g2 = component_poly_rings[2].zero();
@@ -486,30 +445,21 @@ fn test_poly_gcd_finite_reduced() {
         &component_poly_rings,
         &poly_ring,
     );
-    let actual =
-        poly_gcd_finite_reduced(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g))
-            .ok()
-            .unwrap();
+    let actual = poly_gcd_finite_reduced(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g))
+        .ok()
+        .unwrap();
 
     assert!(
-        poly_checked_div_finite_reduced(
-            &poly_ring,
-            poly_ring.clone_el(&actual),
-            poly_ring.clone_el(&expected)
-        )
-        .ok()
-        .unwrap()
-        .is_some()
+        poly_checked_div_finite_reduced(&poly_ring, poly_ring.clone_el(&actual), poly_ring.clone_el(&expected))
+            .ok()
+            .unwrap()
+            .is_some()
     );
     assert!(
-        poly_checked_div_finite_reduced(
-            &poly_ring,
-            poly_ring.clone_el(&expected),
-            poly_ring.clone_el(&actual)
-        )
-        .ok()
-        .unwrap()
-        .is_some()
+        poly_checked_div_finite_reduced(&poly_ring, poly_ring.clone_el(&expected), poly_ring.clone_el(&actual))
+            .ok()
+            .unwrap()
+            .is_some()
     );
 }
 
@@ -525,12 +475,7 @@ fn test_partial_eea() {
     });
 
     for k in (1..10).rev() {
-        let ([s1, t1, s2, t2], [a, b]) = partial_eea(
-            &poly_ring,
-            poly_ring.clone_el(&f),
-            poly_ring.clone_el(&g),
-            k,
-        );
+        let ([s1, t1, s2, t2], [a, b]) = partial_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), k);
         assert_el_eq!(
             &poly_ring,
             poly_ring.add(poly_ring.mul_ref(&s1, &f), poly_ring.mul_ref(&t1, &g)),
@@ -543,22 +488,10 @@ fn test_partial_eea() {
         );
         assert_eq!(k, poly_ring.degree(&a).unwrap());
         assert_eq!(k - 1, poly_ring.degree(&b).unwrap());
-        assert!(
-            poly_ring.degree(&s1).is_none()
-                || poly_ring.degree(&s1).unwrap() < 10 - poly_ring.degree(&a).unwrap()
-        );
-        assert!(
-            poly_ring.degree(&t1).is_none()
-                || poly_ring.degree(&t1).unwrap() < 9 - poly_ring.degree(&a).unwrap()
-        );
-        assert!(
-            poly_ring.degree(&s2).is_none()
-                || poly_ring.degree(&s2).unwrap() < 10 - poly_ring.degree(&b).unwrap()
-        );
-        assert!(
-            poly_ring.degree(&t2).is_none()
-                || poly_ring.degree(&t2).unwrap() < 9 - poly_ring.degree(&b).unwrap()
-        );
+        assert!(poly_ring.degree(&s1).is_none() || poly_ring.degree(&s1).unwrap() < 10 - poly_ring.degree(&a).unwrap());
+        assert!(poly_ring.degree(&t1).is_none() || poly_ring.degree(&t1).unwrap() < 9 - poly_ring.degree(&a).unwrap());
+        assert!(poly_ring.degree(&s2).is_none() || poly_ring.degree(&s2).unwrap() < 10 - poly_ring.degree(&b).unwrap());
+        assert!(poly_ring.degree(&t2).is_none() || poly_ring.degree(&t2).unwrap() < 9 - poly_ring.degree(&b).unwrap());
     }
 }
 
@@ -573,12 +506,7 @@ fn test_fast_poly_eea() {
         ]
     });
 
-    let (s, t, d) = fast_poly_eea(
-        &poly_ring,
-        poly_ring.clone_el(&f),
-        poly_ring.clone_el(&g),
-        LOG_PROGRESS,
-    );
+    let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), LOG_PROGRESS);
     assert!(poly_ring.is_unit(&d));
     assert_el_eq!(
         &poly_ring,
@@ -593,12 +521,7 @@ fn test_fast_poly_eea() {
         ]
     });
 
-    let (s, t, d) = fast_poly_eea(
-        &poly_ring,
-        poly_ring.clone_el(&f),
-        poly_ring.clone_el(&g),
-        LOG_PROGRESS,
-    );
+    let (s, t, d) = fast_poly_eea(&poly_ring, poly_ring.clone_el(&f), poly_ring.clone_el(&g), LOG_PROGRESS);
     assert!(poly_ring.is_unit(&d));
     assert_el_eq!(
         &poly_ring,

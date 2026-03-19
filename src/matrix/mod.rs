@@ -16,12 +16,7 @@ pub use transpose::*;
 pub mod transform;
 
 #[stability::unstable(feature = "enable")]
-pub fn format_matrix<'a, M, R>(
-    row_count: usize,
-    col_count: usize,
-    matrix: M,
-    ring: R,
-) -> impl 'a + Display
+pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ring: R) -> impl 'a + Display
 where
     R: 'a + RingStore,
     El<R>: 'a,
@@ -93,114 +88,62 @@ pub mod matrix_compare {
     }
 
     impl<T, const ROWS: usize, const COLS: usize> MatrixCompare<T> for [[T; COLS]; ROWS] {
-        fn col_count(&self) -> usize {
-            COLS
-        }
-        fn row_count(&self) -> usize {
-            ROWS
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            &self[i][j]
-        }
+        fn col_count(&self) -> usize { COLS }
+        fn row_count(&self) -> usize { ROWS }
+        fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
     }
 
     impl<T, const ROWS: usize, const COLS: usize> MatrixCompare<T> for [DerefArray<T, COLS>; ROWS] {
-        fn col_count(&self) -> usize {
-            COLS
-        }
-        fn row_count(&self) -> usize {
-            ROWS
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            &self[i][j]
-        }
+        fn col_count(&self) -> usize { COLS }
+        fn row_count(&self) -> usize { ROWS }
+        fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
     }
 
     impl<'a, V: AsPointerToSlice<T>, T> MatrixCompare<T> for Submatrix<'a, V, T> {
-        fn col_count(&self) -> usize {
-            Submatrix::col_count(self)
-        }
-        fn row_count(&self) -> usize {
-            Submatrix::row_count(self)
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            Submatrix::at(self, i, j)
-        }
+        fn col_count(&self) -> usize { Submatrix::col_count(self) }
+        fn row_count(&self) -> usize { Submatrix::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { Submatrix::at(self, i, j) }
     }
 
     impl<'a, V: AsPointerToSlice<T>, T> MatrixCompare<T> for SubmatrixMut<'a, V, T> {
-        fn col_count(&self) -> usize {
-            SubmatrixMut::col_count(self)
-        }
-        fn row_count(&self) -> usize {
-            SubmatrixMut::row_count(self)
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            self.as_const().into_at(i, j)
-        }
+        fn col_count(&self) -> usize { SubmatrixMut::col_count(self) }
+        fn row_count(&self) -> usize { SubmatrixMut::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { self.as_const().into_at(i, j) }
     }
 
     impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> MatrixCompare<T>
         for TransposableSubmatrix<'a, V, T, TRANSPOSED>
     {
-        fn col_count(&self) -> usize {
-            TransposableSubmatrix::col_count(self)
-        }
-        fn row_count(&self) -> usize {
-            TransposableSubmatrix::row_count(self)
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            TransposableSubmatrix::at(self, i, j)
-        }
+        fn col_count(&self) -> usize { TransposableSubmatrix::col_count(self) }
+        fn row_count(&self) -> usize { TransposableSubmatrix::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { TransposableSubmatrix::at(self, i, j) }
     }
 
     impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> MatrixCompare<T>
         for TransposableSubmatrixMut<'a, V, T, TRANSPOSED>
     {
-        fn col_count(&self) -> usize {
-            TransposableSubmatrixMut::col_count(self)
-        }
-        fn row_count(&self) -> usize {
-            TransposableSubmatrixMut::row_count(self)
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            self.as_const().into_at(i, j)
-        }
+        fn col_count(&self) -> usize { TransposableSubmatrixMut::col_count(self) }
+        fn row_count(&self) -> usize { TransposableSubmatrixMut::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { self.as_const().into_at(i, j) }
     }
 
     impl<T> MatrixCompare<T> for OwnedMatrix<T> {
-        fn col_count(&self) -> usize {
-            OwnedMatrix::col_count(self)
-        }
-        fn row_count(&self) -> usize {
-            OwnedMatrix::row_count(self)
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            OwnedMatrix::at(self, i, j)
-        }
+        fn col_count(&self) -> usize { OwnedMatrix::col_count(self) }
+        fn row_count(&self) -> usize { OwnedMatrix::row_count(self) }
+        fn at(&self, i: usize, j: usize) -> &T { OwnedMatrix::at(self, i, j) }
     }
 
     impl<'a, T, M: MatrixCompare<T>> MatrixCompare<T> for &'a M {
-        fn col_count(&self) -> usize {
-            (**self).col_count()
-        }
-        fn row_count(&self) -> usize {
-            (**self).row_count()
-        }
-        fn at(&self, i: usize, j: usize) -> &T {
-            (**self).at(i, j)
-        }
+        fn col_count(&self) -> usize { (**self).col_count() }
+        fn row_count(&self) -> usize { (**self).row_count() }
+        fn at(&self, i: usize, j: usize) -> &T { (**self).at(i, j) }
     }
 
     /// Checks whether two matrices are equal.
     ///
     /// The prime use case is [`crate::assert_matrix_eq!`], which should be applicable
     /// to all types that are, in some sense, interpretable as matrices.
-    pub fn is_matrix_eq<
-        R: ?Sized + RingBase,
-        M1: MatrixCompare<R::Element>,
-        M2: MatrixCompare<R::Element>,
-    >(
+    pub fn is_matrix_eq<R: ?Sized + RingBase, M1: MatrixCompare<R::Element>, M2: MatrixCompare<R::Element>>(
         ring: &R,
         lhs: &M1,
         rhs: &M2,
@@ -242,26 +185,18 @@ macro_rules! assert_matrix_eq {
         match (&$ring, &$lhs, &$rhs) {
             (ring_val, lhs_val, rhs_val) => {
                 assert!(
-                    $crate::matrix::matrix_compare::is_matrix_eq(
-                        ring_val.get_ring(),
-                        lhs_val,
-                        rhs_val
-                    ),
+                    $crate::matrix::matrix_compare::is_matrix_eq(ring_val.get_ring(), lhs_val, rhs_val),
                     "Assertion failed: Expected\n{}\nto be\n{}",
                     $crate::matrix::format_matrix(
                         <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::row_count(lhs_val),
                         <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::col_count(lhs_val),
-                        |i, j| <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::at(
-                            lhs_val, i, j
-                        ),
+                        |i, j| <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::at(lhs_val, i, j),
                         ring_val
                     ),
                     $crate::matrix::format_matrix(
                         <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::row_count(rhs_val),
                         <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::col_count(rhs_val),
-                        |i, j| <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::at(
-                            rhs_val, i, j
-                        ),
+                        |i, j| <_ as $crate::matrix::matrix_compare::MatrixCompare<_>>::at(rhs_val, i, j),
                         ring_val
                     )
                 );

@@ -29,11 +29,7 @@ fn compute_cum_binomial(n: usize, k: usize) -> u64 {
 
 /// Returns the index of the given monomial within the list of all degree-d monomials, ordered by
 /// DegRevLex
-fn enumeration_index_degrevlex<V>(
-    d: Exponent,
-    mon: V,
-    cum_binomial_lookup_table: &[Vec<u64>],
-) -> u64
+fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table: &[Vec<u64>]) -> u64
 where
     V: VectorFn<Exponent>,
 {
@@ -52,13 +48,8 @@ where
 }
 
 /// Inverse to [`enumeration_index_degrevlex()`].
-fn nth_monomial_degrevlex<F>(
-    n: usize,
-    d: Exponent,
-    mut index: u64,
-    cum_binomial_lookup_table: &[Vec<u64>],
-    mut out: F,
-) where
+fn nth_monomial_degrevlex<F>(n: usize, d: Exponent, mut index: u64, cum_binomial_lookup_table: &[Vec<u64>], mut out: F)
+where
     F: FnMut(usize, Exponent),
 {
     for i in 0..n {
@@ -73,17 +64,13 @@ fn nth_monomial_degrevlex<F>(
             debug_assert!(d == check_degree);
             return;
         }
-        let remaining_degree_minus_one =
-            match cum_binomial_lookup_table[n - i - 2].binary_search(&index) {
-                Ok(idx) => idx,
-                Err(idx) => idx - 1,
-            };
+        let remaining_degree_minus_one = match cum_binomial_lookup_table[n - i - 2].binary_search(&index) {
+            Ok(idx) => idx,
+            Err(idx) => idx - 1,
+        };
         index -= cum_binomial_lookup_table[n - i - 2][remaining_degree_minus_one];
         let new_remaining_degree = remaining_degree_minus_one + 1;
-        out(
-            n - 1 - i,
-            (remaining_degree - new_remaining_degree) as Exponent,
-        );
+        out(n - 1 - i, (remaining_degree - new_remaining_degree) as Exponent);
         check_degree += (remaining_degree - new_remaining_degree) as Exponent;
         remaining_degree = new_remaining_degree;
     }
@@ -114,9 +101,7 @@ struct InternalMonomialIdentifier {
 }
 
 impl InternalMonomialIdentifier {
-    fn wrap(self) -> MonomialIdentifier {
-        MonomialIdentifier { data: self }
-    }
+    fn wrap(self) -> MonomialIdentifier { MonomialIdentifier { data: self } }
 }
 
 impl PartialEq for InternalMonomialIdentifier {
@@ -129,17 +114,11 @@ impl PartialEq for InternalMonomialIdentifier {
 impl Eq for InternalMonomialIdentifier {}
 
 impl Ord for InternalMonomialIdentifier {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.deg
-            .cmp(&other.deg)
-            .then_with(|| self.order.cmp(&other.order))
-    }
+    fn cmp(&self, other: &Self) -> Ordering { self.deg.cmp(&other.deg).then_with(|| self.order.cmp(&other.order)) }
 }
 
 impl PartialOrd for InternalMonomialIdentifier {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
-    }
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 
 /// An element of [`MultivariatePolyRingImpl`].
@@ -157,9 +136,7 @@ where
     El<R>: Debug,
     A: Allocator + Clone,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}", self.data)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.data) }
 }
 
 /// Implementation of multivariate polynomial rings.
@@ -302,14 +279,10 @@ where
     A: Clone + Allocator + Send,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn allocator(&self) -> &A {
-        &self.allocator
-    }
+    pub fn allocator(&self) -> &A { &self.allocator }
 
     #[inline(always)]
-    fn tmp_monomials(&self) -> (RefMut<'_, [u16]>, RefMut<'_, [u16]>) {
-        (self.tmp_monomial1(), self.tmp_monomial2())
-    }
+    fn tmp_monomials(&self) -> (RefMut<'_, [u16]>, RefMut<'_, [u16]>) { (self.tmp_monomial1(), self.tmp_monomial2()) }
 
     /// We have to temporary monomials that are used as follows:
     ///  - `tmp_monomial2` for `create_monomial()`
@@ -415,12 +388,8 @@ where
         cum_binomial_lookup_table: &[Vec<u64>],
     ) -> Vec<Vec<u64>> {
         debug_assert!(lhs_deg <= rhs_deg);
-        let lhs_max_deg = (0..variable_count)
-            .map(|_| lhs_deg as usize)
-            .collect::<Vec<_>>();
-        let rhs_max_deg = (0..variable_count)
-            .map(|_| rhs_deg as usize)
-            .collect::<Vec<_>>();
+        let lhs_max_deg = (0..variable_count).map(|_| lhs_deg as usize).collect::<Vec<_>>();
+        let rhs_max_deg = (0..variable_count).map(|_| rhs_deg as usize).collect::<Vec<_>>();
         let mut lhs_i = 0;
         let mut rhs_i = 0;
         // `multiset_combinations()` iterates through the values in descending lex order, so by
@@ -443,11 +412,7 @@ where
         .collect::<Vec<_>>()
     }
 
-    fn try_get_multiplication_table<'a>(
-        &'a self,
-        lhs_deg: Exponent,
-        rhs_deg: Exponent,
-    ) -> Option<&'a Vec<Vec<u64>>> {
+    fn try_get_multiplication_table<'a>(&'a self, lhs_deg: Exponent, rhs_deg: Exponent) -> Option<&'a Vec<Vec<u64>>> {
         debug_assert!(lhs_deg <= rhs_deg);
         if lhs_deg as usize >= self.monomial_multiplication_table.len()
             || rhs_deg as usize >= self.monomial_multiplication_table[lhs_deg as usize].len()
@@ -457,18 +422,9 @@ where
         Some(&self.monomial_multiplication_table[lhs_deg as usize][rhs_deg as usize])
     }
 
-    fn compare_degrevlex(
-        &self,
-        lhs: &InternalMonomialIdentifier,
-        rhs: &InternalMonomialIdentifier,
-    ) -> Ordering {
-        let res = lhs
-            .deg
-            .cmp(&rhs.deg)
-            .then_with(|| lhs.order.cmp(&rhs.order));
-        debug_assert!(
-            res == DegRevLex.compare(RingRef::new(self), &lhs.clone().wrap(), &rhs.clone().wrap())
-        );
+    fn compare_degrevlex(&self, lhs: &InternalMonomialIdentifier, rhs: &InternalMonomialIdentifier) -> Ordering {
+        let res = lhs.deg.cmp(&rhs.deg).then_with(|| lhs.order.cmp(&rhs.order));
+        debug_assert!(res == DegRevLex.compare(RingRef::new(self), &lhs.clone().wrap(), &rhs.clone().wrap()));
         return res;
     }
 
@@ -597,17 +553,11 @@ where
         )
     }
 
-    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        *lhs = self.add_ref(lhs, rhs);
-    }
+    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { *lhs = self.add_ref(lhs, rhs); }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         debug_assert!(self.is_valid(&rhs.data));
-        *lhs = self.add_terms(
-            &lhs,
-            rhs.data.into_iter(),
-            Vec::new_in(self.allocator.clone()),
-        );
+        *lhs = self.add_terms(&lhs, rhs.data.into_iter(), Vec::new_in(self.allocator.clone()));
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -631,54 +581,46 @@ where
         }
     }
 
-    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.mul_assign_ref(lhs, &rhs);
-    }
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.mul_assign_ref(lhs, &rhs); }
 
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        *lhs = self.mul_ref(lhs, rhs);
-    }
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { *lhs = self.mul_ref(lhs, rhs); }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let mut tmp = Vec::new_in(self.allocator.clone());
         if lhs.data.len() > rhs.data.len() {
-            rhs.data
-                .iter()
-                .fold(self.zero(), |mut current, (r_c, r_m)| {
-                    let mut new = self.add_terms(
-                        &current,
-                        lhs.data.iter().map(|(c, m)| {
-                            (
-                                self.base_ring().mul_ref(c, r_c),
-                                self.monomial_mul(m.data.clone().wrap(), r_m),
-                            )
-                        }),
-                        std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())),
-                    );
-                    std::mem::swap(&mut new, &mut current);
-                    std::mem::swap(&mut new.data, &mut tmp);
-                    current
-                })
+            rhs.data.iter().fold(self.zero(), |mut current, (r_c, r_m)| {
+                let mut new = self.add_terms(
+                    &current,
+                    lhs.data.iter().map(|(c, m)| {
+                        (
+                            self.base_ring().mul_ref(c, r_c),
+                            self.monomial_mul(m.data.clone().wrap(), r_m),
+                        )
+                    }),
+                    std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())),
+                );
+                std::mem::swap(&mut new, &mut current);
+                std::mem::swap(&mut new.data, &mut tmp);
+                current
+            })
         } else {
             // we duplicate it to work better with noncommutative rings (not that this is currently
             // of relevance...)
-            lhs.data
-                .iter()
-                .fold(self.zero(), |mut current, (l_c, l_m)| {
-                    let mut new = self.add_terms(
-                        &current,
-                        rhs.data.iter().map(|(c, m)| {
-                            (
-                                self.base_ring().mul_ref(l_c, c),
-                                self.monomial_mul(m.data.clone().wrap(), l_m),
-                            )
-                        }),
-                        std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())),
-                    );
-                    std::mem::swap(&mut new, &mut current);
-                    std::mem::swap(&mut new.data, &mut tmp);
-                    current
-                })
+            lhs.data.iter().fold(self.zero(), |mut current, (l_c, l_m)| {
+                let mut new = self.add_terms(
+                    &current,
+                    rhs.data.iter().map(|(c, m)| {
+                        (
+                            self.base_ring().mul_ref(l_c, c),
+                            self.monomial_mul(m.data.clone().wrap(), l_m),
+                        )
+                    }),
+                    std::mem::replace(&mut tmp, Vec::new_in(self.allocator.clone())),
+                );
+                std::mem::swap(&mut new, &mut current);
+                std::mem::swap(&mut new.data, &mut tmp);
+                current
+            })
         }
     }
 
@@ -688,9 +630,7 @@ where
         }
     }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        self.from(self.base_ring().get_ring().from_int(value))
-    }
+    fn from_int(&self, value: i32) -> Self::Element { self.from(self.base_ring().get_ring().from_int(value)) }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         debug_assert!(self.is_valid(&lhs.data));
@@ -708,9 +648,7 @@ where
         return true;
     }
 
-    fn is_zero(&self, value: &Self::Element) -> bool {
-        value.data.len() == 0
-    }
+    fn is_zero(&self, value: &Self::Element) -> bool { value.data.len() == 0 }
 
     fn is_one(&self, value: &Self::Element) -> bool {
         debug_assert!(self.is_valid(&value.data));
@@ -728,12 +666,8 @@ where
         value.data[0].1.data.deg == 0 && self.base_ring().is_neg_one(&value.data[0].0)
     }
 
-    fn is_commutative(&self) -> bool {
-        self.base_ring().is_commutative()
-    }
-    fn is_noetherian(&self) -> bool {
-        self.base_ring().is_noetherian()
-    }
+    fn is_commutative(&self) -> bool { self.base_ring().is_commutative() }
+    fn is_noetherian(&self) -> bool { self.base_ring().is_noetherian() }
 
     fn dbg(&self, value: &Self::Element, out: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
@@ -755,9 +689,7 @@ where
         self.base_ring().characteristic(ZZ)
     }
 
-    fn is_approximate(&self) -> bool {
-        self.base_ring().get_ring().is_approximate()
-    }
+    fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
 }
 
 /// Iterator over the terms of a [`MultivariatePolyRingEl`].
@@ -774,9 +706,7 @@ where
 {
     type Item = (&'a El<R>, &'a MonomialIdentifier);
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base_iter.next().map(|(c, m)| (c, m))
-    }
+    fn next(&mut self) -> Option<Self::Item> { self.base_iter.next().map(|(c, m)| (c, m)) }
 }
 
 impl<R, A> RingExtension for MultivariatePolyRingImplBase<R, A>
@@ -786,9 +716,7 @@ where
 {
     type BaseRing = R;
 
-    fn base_ring<'b>(&'b self) -> &'b Self::BaseRing {
-        &self.base_ring
-    }
+    fn base_ring<'b>(&'b self) -> &'b Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         if !self.base_ring().get_ring().is_approximate() && self.base_ring().is_zero(&x) {
@@ -819,9 +747,7 @@ where
     where
         Self: 'a;
 
-    fn indeterminate_count(&self) -> usize {
-        self.variable_count
-    }
+    fn indeterminate_count(&self) -> usize { self.variable_count }
 
     fn create_monomial<I>(&self, exponents: I) -> Self::Monomial
     where
@@ -855,9 +781,7 @@ where
         };
     }
 
-    fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
-        mon.data.clone().wrap()
-    }
+    fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial { mon.data.clone().wrap() }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, terms: I)
     where
@@ -956,11 +880,7 @@ where
         }
     }
 
-    fn coefficient_at<'a>(
-        &'a self,
-        f: &'a Self::Element,
-        m: &Self::Monomial,
-    ) -> &'a El<Self::BaseRing> {
+    fn coefficient_at<'a>(&'a self, f: &'a Self::Element, m: &Self::Monomial) -> &'a El<Self::BaseRing> {
         match f
             .data
             .binary_search_by(|(_, fm)| self.compare_degrevlex(&fm.data, &m.data))
@@ -1002,9 +922,7 @@ where
         }
     }
 
-    fn monomial_deg(&self, mon: &Self::Monomial) -> usize {
-        mon.data.deg as usize
-    }
+    fn monomial_deg(&self, mon: &Self::Monomial) -> usize { mon.data.deg as usize }
 
     fn LT<'a, O: MonomialOrder>(
         &'a self,
@@ -1038,12 +956,9 @@ where
             assert!({
                 let expected = self
                     .terms(f)
-                    .filter(|(_, m)| {
-                        order.compare(RingRef::new(self), m, lt_than) == Ordering::Less
-                    })
+                    .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
                     .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1));
-                (res.is_none() && expected.is_none())
-                    || std::ptr::eq(res.unwrap().0, expected.unwrap().0)
+                (res.is_none() && expected.is_none()) || std::ptr::eq(res.unwrap().0, expected.unwrap().0)
             });
             return res;
         } else {
@@ -1075,35 +990,24 @@ where
                 };
             }
         }
-        return self.exponent_wise_bivariate_monomial_operation(
-            lhs.data,
-            rhs.data.clone(),
-            |a, b| a + b,
-        );
+        return self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), |a, b| a + b);
     }
 
     fn monomial_lcm(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
-        self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), |a, b| {
-            max(a, b)
-        })
+        self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), |a, b| max(a, b))
     }
 
-    fn monomial_div(
-        &self,
-        lhs: Self::Monomial,
-        rhs: &Self::Monomial,
-    ) -> Result<Self::Monomial, Self::Monomial> {
+    fn monomial_div(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Result<Self::Monomial, Self::Monomial> {
         let mut failed = false;
-        let result =
-            self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), |a, b| {
-                match a.checked_sub(b) {
-                    Some(x) => x,
-                    None => {
-                        failed = true;
-                        0
-                    }
+        let result = self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), |a, b| {
+            match a.checked_sub(b) {
+                Some(x) => x,
+                None => {
+                    failed = true;
+                    0
                 }
-            });
+            }
+        });
         if failed { Err(result) } else { Ok(result) }
     }
 
@@ -1129,9 +1033,7 @@ where
         let mut result = new_ring.from_terms(self.terms(f).map(|(c, m)| {
             (
                 hom.map_ref(c),
-                new_ring.create_monomial(
-                    (0..self.indeterminate_count()).map(|i| self.exponent_at(m, i)),
-                ),
+                new_ring.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(m, i))),
             )
         }));
         for i in 0..self.indeterminate_count() {
@@ -1166,21 +1068,11 @@ where
         }
     }
 
-    fn map_in(
-        &self,
-        from: &P,
-        el: <P as RingBase>::Element,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &P, el: <P as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 
-    fn map_in_ref(
-        &self,
-        from: &P,
-        el: &<P as RingBase>::Element,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in_ref(&self, from: &P, el: &<P as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| {
             (
                 self.base_ring()
@@ -1217,22 +1109,13 @@ where
         }
     }
 
-    fn map_out(
-        &self,
-        from: &P,
-        el: Self::Element,
-        iso: &Self::Isomorphism,
-    ) -> <P as RingBase>::Element {
+    fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> <P as RingBase>::Element {
         RingRef::new(from).from_terms(self.terms(&el).map(|(c, m)| {
             (
-                self.base_ring().get_ring().map_out(
-                    from.base_ring().get_ring(),
-                    self.base_ring().clone_el(c),
-                    iso,
-                ),
-                from.create_monomial(
-                    (0..self.indeterminate_count()).map(|i| self.exponent_at(m, i)),
-                ),
+                self.base_ring()
+                    .get_ring()
+                    .map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
+                from.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(m, i))),
             )
         }))
     }
@@ -1294,20 +1177,12 @@ fn test_multivariate_axioms() {
 #[test]
 fn test_enumeration_index_degrevlex() {
     let cum_binomial_lookup_table = (0..4)
-        .map(|n| {
-            (0..7)
-                .map(|k| compute_cum_binomial(n, k))
-                .collect::<Vec<_>>()
-        })
+        .map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>())
         .collect::<Vec<_>>();
 
     assert_eq!(
         0,
-        enumeration_index_degrevlex(
-            0,
-            [0, 0, 0, 0].clone_els_by(|x| *x),
-            &cum_binomial_lookup_table
-        )
+        enumeration_index_degrevlex(0, [0, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table)
     );
     let mut check = [0, 0, 0, 0];
     nth_monomial_degrevlex(4, 0, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
@@ -1315,11 +1190,7 @@ fn test_enumeration_index_degrevlex() {
 
     assert_eq!(
         0,
-        enumeration_index_degrevlex(
-            1,
-            [0, 0, 0, 1].clone_els_by(|x| *x),
-            &cum_binomial_lookup_table
-        )
+        enumeration_index_degrevlex(1, [0, 0, 0, 1].clone_els_by(|x| *x), &cum_binomial_lookup_table)
     );
     let mut check = [0, 0, 0, 0];
     nth_monomial_degrevlex(4, 1, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
@@ -1327,11 +1198,7 @@ fn test_enumeration_index_degrevlex() {
 
     assert_eq!(
         3,
-        enumeration_index_degrevlex(
-            1,
-            [1, 0, 0, 0].clone_els_by(|x| *x),
-            &cum_binomial_lookup_table
-        )
+        enumeration_index_degrevlex(1, [1, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table)
     );
     let mut check = [0, 0, 0, 0];
     nth_monomial_degrevlex(4, 1, 3, &cum_binomial_lookup_table, |i, x| check[i] = x);
@@ -1365,16 +1232,10 @@ fn test_enumeration_index_degrevlex() {
     for i in 0..all_monomials.len() {
         assert_eq!(
             i as u64,
-            enumeration_index_degrevlex(
-                6,
-                (&all_monomials[i]).clone_els_by(|x| *x),
-                &cum_binomial_lookup_table
-            )
+            enumeration_index_degrevlex(6, (&all_monomials[i]).clone_els_by(|x| *x), &cum_binomial_lookup_table)
         );
         let mut check = [0, 0, 0, 0];
-        nth_monomial_degrevlex(4, 6, i as u64, &cum_binomial_lookup_table, |i, x| {
-            check[i] = x
-        });
+        nth_monomial_degrevlex(4, 6, i as u64, &cum_binomial_lookup_table, |i, x| check[i] = x);
         assert_eq!(&all_monomials[i], &check);
     }
 }
@@ -1382,11 +1243,7 @@ fn test_enumeration_index_degrevlex() {
 #[test]
 fn test_create_multiplication_table() {
     let cum_binomial_lookup_table = (0..3)
-        .map(|n| {
-            (0..7)
-                .map(|k| compute_cum_binomial(n, k))
-                .collect::<Vec<_>>()
-        })
+        .map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>())
         .collect::<Vec<_>>();
     let mul_table = MultivariatePolyRingImplBase::<StaticRing<i64>>::create_multiplication_table(
         3,
@@ -1407,20 +1264,10 @@ fn test_create_multiplication_table() {
     for lhs in &deg3_monomials {
         for rhs in &deg4_monomials {
             assert_eq!(
-                enumeration_index_degrevlex(
-                    7,
-                    (0..3).map_fn(|i| lhs[i] + rhs[i]),
-                    &cum_binomial_lookup_table
-                ),
-                mul_table[enumeration_index_degrevlex(
-                    3,
-                    (0..3).map_fn(|i| lhs[i]),
-                    &cum_binomial_lookup_table
-                ) as usize][enumeration_index_degrevlex(
-                    4,
-                    (0..3).map_fn(|i| rhs[i]),
-                    &cum_binomial_lookup_table
-                ) as usize]
+                enumeration_index_degrevlex(7, (0..3).map_fn(|i| lhs[i] + rhs[i]), &cum_binomial_lookup_table),
+                mul_table
+                    [enumeration_index_degrevlex(3, (0..3).map_fn(|i| lhs[i]), &cum_binomial_lookup_table) as usize]
+                    [enumeration_index_degrevlex(4, (0..3).map_fn(|i| rhs[i]), &cum_binomial_lookup_table) as usize]
             );
         }
     }
@@ -1434,13 +1281,7 @@ fn test_monomial_small() {
 #[test]
 fn test_new_many_variables() {
     for m in 1..32 {
-        let ring = MultivariatePolyRingImpl::new_with_mult_table(
-            StaticRing::<i64>::RING,
-            m,
-            32,
-            (2, 3),
-            Global,
-        );
+        let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, m, 32, (2, 3), Global);
         assert_eq!(m, ring.indeterminate_count());
     }
 }
@@ -1452,30 +1293,19 @@ fn test_evaluate_approximate_ring() {
     let x = 0.47312;
     let y = -1.43877;
     assert!(
-        Real64::RING.abs(
-            (x * x * y - y * y)
-                - ring.evaluate(&f, [x, y].clone_els_by(|x| *x), &Real64::RING.identity())
-        ) <= 0.000000001
+        Real64::RING
+            .abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].clone_els_by(|x| *x), &Real64::RING.identity()))
+            <= 0.000000001
     );
 }
 
 #[test]
 fn test_evaluate_many_variables() {
-    let ring = MultivariatePolyRingImpl::new_with_mult_table(
-        StaticRing::<i64>::RING,
-        20,
-        16,
-        (4, 6),
-        Global,
-    );
+    let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, 20, 16, (4, 6), Global);
     let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
     assert_eq!(
         1 + 6 + 20,
-        ring.evaluate(
-            &f,
-            (1..21).map_fn(|x| x as i64),
-            StaticRing::<i64>::RING.identity()
-        )
+        ring.evaluate(&f, (1..21).map_fn(|x| x as i64), StaticRing::<i64>::RING.identity())
     );
 }
 

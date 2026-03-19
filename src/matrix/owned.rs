@@ -117,25 +117,17 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     }
 
     /// Returns a reference to the `(i, j)`-th entry of this matrix.
-    pub fn at(&self, i: usize, j: usize) -> &T {
-        &self.data[i * self.col_count + j]
-    }
+    pub fn at(&self, i: usize, j: usize) -> &T { &self.data[i * self.col_count + j] }
 
     /// Returns a mutable reference to the `(i, j)`-th entry of this matrix.
-    pub fn at_mut(&mut self, i: usize, j: usize) -> &mut T {
-        &mut self.data[i * self.col_count + j]
-    }
+    pub fn at_mut(&mut self, i: usize, j: usize) -> &mut T { &mut self.data[i * self.col_count + j] }
 
     /// Returns the number of rows of this matrix.
-    pub fn row_count(&self) -> usize {
-        self.row_count
-    }
+    pub fn row_count(&self) -> usize { self.row_count }
 
     ////
     /// Returns the number of columns of this matrix.
-    pub fn col_count(&self) -> usize {
-        self.col_count
-    }
+    pub fn col_count(&self) -> usize { self.col_count }
 
     /// Creates the `row_count x col_count` zero matrix over the given ring.
     #[stability::unstable(feature = "enable")]
@@ -154,12 +146,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
 
     /// Creates the `row_count x col_count` identity matrix over the given ring.
     #[stability::unstable(feature = "enable")]
-    pub fn identity_in<R: RingStore>(
-        row_count: usize,
-        col_count: usize,
-        ring: R,
-        allocator: A,
-    ) -> Self
+    pub fn identity_in<R: RingStore>(row_count: usize, col_count: usize, ring: R, allocator: A) -> Self
     where
         R::Type: RingBase<Element = T>,
     {
@@ -182,10 +169,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         R::Type: RingBase<Element = T>,
         A: Clone,
     {
-        let mut result = Vec::with_capacity_in(
-            self.row_count() * self.col_count(),
-            self.data.allocator().clone(),
-        );
+        let mut result = Vec::with_capacity_in(self.row_count() * self.col_count(), self.data.allocator().clone());
         for i in 0..self.row_count() {
             for j in 0..self.col_count() {
                 result.push(ring.clone_el(self.at(i, j)));
@@ -199,15 +183,12 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     where
         F: FnMut() -> T,
     {
-        self.data
-            .resize_with(new_count * self.col_count(), new_entries);
+        self.data.resize_with(new_count * self.col_count(), new_entries);
     }
 }
 
 impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.data().fmt(f)
-    }
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.data().fmt(f) }
 }
 
 #[cfg(test)]

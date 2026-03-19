@@ -173,9 +173,7 @@ where
     T: Deref,
     T::Target: FFTAlgorithm<R>,
 {
-    fn len(&self) -> usize {
-        self.deref().len()
-    }
+    fn len(&self) -> usize { self.deref().len() }
 
     fn root_of_unity<S>(&self, ring: S) -> &R::Element
     where
@@ -184,13 +182,9 @@ where
         self.deref().root_of_unity(ring)
     }
 
-    fn unordered_fft_permutation(&self, i: usize) -> usize {
-        self.deref().unordered_fft_permutation(i)
-    }
+    fn unordered_fft_permutation(&self, i: usize) -> usize { self.deref().unordered_fft_permutation(i) }
 
-    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
-        self.deref().unordered_fft_permutation_inv(i)
-    }
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize { self.deref().unordered_fft_permutation_inv(i) }
 
     fn fft<V, S>(&self, values: V, ring: S)
     where

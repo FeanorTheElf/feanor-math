@@ -2,8 +2,8 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use super::{
-    SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut,
-    VectorFn, VectorView, VectorViewMut, VectorViewSparse,
+    SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut, VectorFn, VectorView,
+    VectorViewMut, VectorViewSparse,
 };
 
 pub struct SubvectorView<V: VectorView<T>, T: ?Sized> {
@@ -43,14 +43,9 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
         self.base.at(i + self.begin)
     }
 
-    fn len(&self) -> usize {
-        self.end - self.begin
-    }
+    fn len(&self) -> usize { self.end - self.begin }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(
-        &'a self,
-        op: Op,
-    ) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
         struct WrapSubvector<T: ?Sized, Op: SparseVectorViewOperation<T>> {
             op: Op,
             element: PhantomData<T>,
@@ -58,9 +53,7 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
             end: usize,
         }
 
-        impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T>
-            for WrapSubvector<T, Op>
-        {
+        impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T> for WrapSubvector<T, Op> {
             type Output<'a>
                 = Op::Output<'a>
             where
@@ -87,9 +80,7 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
     where
         T: Sized,
     {
-        self.base
-            .as_slice()
-            .map(|slice| &slice[self.begin..self.end])
+        self.base.as_slice().map(|slice| &slice[self.begin..self.end])
     }
 }
 
@@ -154,9 +145,7 @@ impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for SubvectorView<V, T> {
     where
         T: Sized,
     {
-        self.base
-            .as_slice_mut()
-            .map(|slice| &mut slice[self.begin..self.end])
+        self.base.as_slice_mut().map(|slice| &mut slice[self.begin..self.end])
     }
 }
 
@@ -215,9 +204,7 @@ impl<V: VectorFn<T>, T> VectorFn<T> for SubvectorFn<V, T> {
         self.base.at(i + self.begin)
     }
 
-    fn len(&self) -> usize {
-        self.end - self.begin
-    }
+    fn len(&self) -> usize { self.end - self.begin }
 }
 
 impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
@@ -309,8 +296,7 @@ fn test_subvector_sparse() {
         fn execute<'a, V: 'a + VectorViewSparse<i64>>(self, vector: V) -> Self::Output<'a> {
             assert!(
                 vec![(20, &20), (256, &256)] == vector.nontrivial_entries().collect::<Vec<_>>()
-                    || vec![(256, &256), (20, &20)]
-                        == vector.nontrivial_entries().collect::<Vec<_>>()
+                    || vec![(256, &256), (20, &20)] == vector.nontrivial_entries().collect::<Vec<_>>()
             );
         }
     }

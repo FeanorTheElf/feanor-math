@@ -117,10 +117,7 @@ where
             mus.clear();
             for j in 0..i {
                 mus.push(self.div(
-                    &<_ as ComputeInnerProduct>::inner_product_ref(
-                        self,
-                        (0..m).map(|k| (matrix.at(k, i), q.at(k, j))),
-                    ),
+                    &<_ as ComputeInnerProduct>::inner_product_ref(self, (0..m).map(|k| (matrix.at(k, i), q.at(k, j)))),
                     &result[j],
                 ));
             }
@@ -215,10 +212,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
         return result;
     }
 
-    default fn ldl_decomposition<V>(
-        &self,
-        matrix: SubmatrixMut<V, Self::Element>,
-    ) -> Vec<Self::Element>
+    default fn ldl_decomposition<V>(&self, matrix: SubmatrixMut<V, Self::Element>) -> Vec<Self::Element>
     where
         V: AsPointerToSlice<Self::Element>,
     {
@@ -246,10 +240,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
 
         let mut householder_vector = Vec::with_capacity(m);
         for i in 0..min(n, m) {
-            let norm_sqr = <_ as RingStore>::sum(
-                &ring,
-                (i..m).map(|k| ring.pow(ring.clone_el(matrix.at(k, i)), 2)),
-            );
+            let norm_sqr = <_ as RingStore>::sum(&ring, (i..m).map(|k| ring.pow(ring.clone_el(matrix.at(k, i)), 2)));
             let norm = self.sqrt(self.clone_el(&norm_sqr));
             let alpha = if self.is_neg(matrix.at(i, i)) {
                 self.clone_el(&norm)
@@ -273,10 +264,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
                     (0..(m - i)).map(|k| (&householder_vector[k], rest.at(k, j))),
                 );
                 for k in 0..(m - i) {
-                    ring.sub_assign(
-                        rest.at_mut(k, j),
-                        ring.mul_ref(&inner_product, &householder_vector[k]),
-                    );
+                    ring.sub_assign(rest.at_mut(k, j), ring.mul_ref(&inner_product, &householder_vector[k]));
                 }
             }
 
@@ -288,10 +276,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
                     (0..(m - i)).map(|k| (&householder_vector[k], rest.at(j, k))),
                 );
                 for k in 0..(m - i) {
-                    ring.sub_assign(
-                        rest.at_mut(j, k),
-                        ring.mul_ref(&inner_product, &householder_vector[k]),
-                    );
+                    ring.sub_assign(rest.at_mut(j, k), ring.mul_ref(&inner_product, &householder_vector[k]));
                 }
             }
 
@@ -325,11 +310,8 @@ use crate::rings::approx_real::float::Real64;
 use crate::rings::fraction::FractionFieldStore;
 
 #[cfg(test)]
-fn assert_is_correct_qr<V1, V2, V3>(
-    original: Submatrix<V1, f64>,
-    q: Submatrix<V2, f64>,
-    r: Submatrix<V3, f64>,
-) where
+fn assert_is_correct_qr<V1, V2, V3>(original: Submatrix<V1, f64>, q: Submatrix<V2, f64>, r: Submatrix<V3, f64>)
+where
     V1: AsPointerToSlice<f64>,
     V2: AsPointerToSlice<f64>,
     V3: AsPointerToSlice<f64>,
@@ -357,10 +339,7 @@ fn assert_is_correct_qr<V1, V2, V3>(
                 println!("and");
                 println!("{}", format_matrix(m, n, |i, j| r.at(i, j), Real64::RING));
                 println!("the product is");
-                println!(
-                    "{}",
-                    format_matrix(m, n, |i, j| product.at(i, j), Real64::RING)
-                );
+                println!("{}", format_matrix(m, n, |i, j| product.at(i, j), Real64::RING));
                 panic!();
             }
         }
@@ -375,10 +354,7 @@ fn assert_is_correct_qr<V1, V2, V3>(
     for i in 0..m {
         for j in 0..m {
             let expected = if i == j { 1. } else { 0. };
-            if !(Real64::RING
-                .get_ring()
-                .is_approx_eq(expected, *product.at(i, j), 100))
-            {
+            if !(Real64::RING.get_ring().is_approx_eq(expected, *product.at(i, j), 100)) {
                 println!("Q is not orthogonal");
                 println!("{}", format_matrix(m, m, |i, j| q.at(i, j), Real64::RING));
                 panic!();
@@ -424,10 +400,7 @@ where
                 println!("product does not match; L is");
                 println!("{}", format_matrix(n, n, |i, j| l.at(i, j), Real64::RING));
                 println!("D is diag{:?} and the product LDL^T is", d);
-                println!(
-                    "{}",
-                    format_matrix(n, n, |i, j| product.at(i, j), Real64::RING)
-                );
+                println!("{}", format_matrix(n, n, |i, j| product.at(i, j), Real64::RING));
                 panic!();
             }
         }
@@ -489,9 +462,7 @@ fn test_float_qdr() {
     let a = OwnedMatrix::new_with_shape((1..10).map(|c| c as f64).collect(), 3, 3);
     let mut r = a.clone_matrix(RR);
     let mut q = OwnedMatrix::zero(3, 3, RR);
-    let diags = RR
-        .get_ring()
-        .scaled_qr_decomposition(r.data_mut(), q.data_mut());
+    let diags = RR.get_ring().scaled_qr_decomposition(r.data_mut(), q.data_mut());
     for i in 0..3 {
         for j in 0..3 {
             if i == j {
@@ -538,11 +509,7 @@ fn test_float_ldl() {
 #[test]
 fn test_rational_qdr() {
     let QQ = RationalField::new(StaticRing::<i64>::RING);
-    let mut actual_r = OwnedMatrix::new_with_shape(
-        (1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(),
-        3,
-        3,
-    );
+    let mut actual_r = OwnedMatrix::new_with_shape((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
     let mut actual_q = OwnedMatrix::zero(3, 3, &QQ);
     let diags = QQ
         .get_ring()
@@ -563,8 +530,6 @@ fn test_rational_qdr() {
         [23855993, -613242, 69108],
     ];
     let expected_q_den = 443 * 1099;
-    let expected_q = OwnedMatrix::from_fn(3, 3, |i, j| {
-        QQ.from_fraction(expected_q_num[i][j], expected_q_den)
-    });
+    let expected_q = OwnedMatrix::from_fn(3, 3, |i, j| QQ.from_fraction(expected_q_num[i][j], expected_q_den));
     assert_matrix_eq!(&QQ, expected_q, actual_q);
 }

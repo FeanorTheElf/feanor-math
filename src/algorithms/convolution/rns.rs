@@ -63,10 +63,8 @@ pub struct RNSConvolutionZn<
 
 /// A prepared convolution operand for a [`RNSConvolution`].
 #[stability::unstable(feature = "enable")]
-pub struct PreparedConvolutionOperand<
-    R,
-    C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>,
-> where
+pub struct PreparedConvolutionOperand<R, C = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>>>
+where
     R: ?Sized + RingBase,
     C: ConvolutionAlgorithm<ZnBase>,
 {
@@ -93,13 +91,10 @@ where
     A: Allocator + Clone,
     CreateC: Fn(Zn) -> C,
 {
-    fn from(value: RNSConvolutionZn<I, C, A, CreateC>) -> Self {
-        value.base
-    }
+    fn from(value: RNSConvolutionZn<I, C, A, CreateC>) -> Self { value.base }
 }
 
-impl<'a, I, C, A, CreateC> From<&'a RNSConvolutionZn<I, C, A, CreateC>>
-    for &'a RNSConvolution<I, C, A, CreateC>
+impl<'a, I, C, A, CreateC> From<&'a RNSConvolutionZn<I, C, A, CreateC>> for &'a RNSConvolution<I, C, A, CreateC>
 where
     I: RingStore + Clone,
     I::Type: IntegerRing,
@@ -107,9 +102,7 @@ where
     A: Allocator + Clone,
     CreateC: Fn(Zn) -> C,
 {
-    fn from(value: &'a RNSConvolutionZn<I, C, A, CreateC>) -> Self {
-        &value.base
-    }
+    fn from(value: &'a RNSConvolutionZn<I, C, A, CreateC>) -> Self { &value.base }
 }
 
 impl<I, C, A, CreateC> From<RNSConvolution<I, C, A, CreateC>> for RNSConvolutionZn<I, C, A, CreateC>
@@ -120,13 +113,10 @@ where
     A: Allocator + Clone,
     CreateC: Fn(Zn) -> C,
 {
-    fn from(value: RNSConvolution<I, C, A, CreateC>) -> Self {
-        RNSConvolutionZn { base: value }
-    }
+    fn from(value: RNSConvolution<I, C, A, CreateC>) -> Self { RNSConvolutionZn { base: value } }
 }
 
-impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>>
-    for &'a RNSConvolutionZn<I, C, A, CreateC>
+impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RNSConvolutionZn<I, C, A, CreateC>
 where
     I: RingStore + Clone,
     I::Type: IntegerRing,
@@ -134,17 +124,13 @@ where
     A: Allocator + Clone,
     CreateC: Fn(Zn) -> C,
 {
-    fn from(value: &'a RNSConvolution<I, C, A, CreateC>) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    fn from(value: &'a RNSConvolution<I, C, A, CreateC>) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
 impl CreateNTTConvolution<Global> {
     /// Creates a new [`CreateNTTConvolution`].
     #[stability::unstable(feature = "enable")]
-    pub const fn new() -> Self {
-        Self { allocator: Global }
-    }
+    pub const fn new() -> Self { Self { allocator: Global } }
 }
 
 impl<A> FnOnce<(Zn,)> for CreateNTTConvolution<A>
@@ -153,18 +139,14 @@ where
 {
     type Output = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>, A>;
 
-    extern "rust-call" fn call_once(self, args: (Zn,)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_once(self, args: (Zn,)) -> Self::Output { self.call(args) }
 }
 
 impl<A> FnMut<(Zn,)> for CreateNTTConvolution<A>
 where
     A: Allocator + Clone,
 {
-    extern "rust-call" fn call_mut(&mut self, args: (Zn,)) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_mut(&mut self, args: (Zn,)) -> Self::Output { self.call(args) }
 }
 
 impl<A> Fn<(Zn,)> for CreateNTTConvolution<A>
@@ -234,8 +216,7 @@ where
         };
         let initial_ring = zn_rns::Zn::new_with_alloc(
             vec![Zn::new(
-                Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1)
-                    .unwrap() as u64,
+                Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1).unwrap() as u64,
             )],
             result.integer_ring.clone(),
             result.allocator.clone(),
@@ -259,23 +240,19 @@ where
     }
 
     fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::Zn<Zn, I, A> {
-        self.rns_rings
-            .get_or_init_incremental(moduli_count - 1, |_, prev| {
-                zn_rns::Zn::new_with_alloc(
-                    prev.as_iter()
-                        .cloned()
-                        .chain([Zn::new(
-                            Self::sample_next_prime(
-                                self.required_root_of_unity_log2,
-                                *prev.at(prev.len() - 1).modulus(),
-                            )
+        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| {
+            zn_rns::Zn::new_with_alloc(
+                prev.as_iter()
+                    .cloned()
+                    .chain([Zn::new(
+                        Self::sample_next_prime(self.required_root_of_unity_log2, *prev.at(prev.len() - 1).modulus())
                             .unwrap() as u64,
-                        )])
-                        .collect(),
-                    self.integer_ring.clone(),
-                    self.allocator.clone(),
-                )
-            })
+                    )])
+                    .collect(),
+                self.integer_ring.clone(),
+                self.allocator.clone(),
+            )
+        })
     }
 
     fn get_rns_factor(&self, i: usize) -> &Zn {
@@ -400,15 +377,8 @@ where
             return;
         }
 
-        let input_size_log2 = self.get_log2_input_size(
-            &lhs,
-            lhs_prep,
-            &rhs,
-            rhs_prep,
-            ring,
-            &mut to_int,
-            ring_log2_el_size,
-        );
+        let input_size_log2 =
+            self.get_log2_input_size(&lhs, lhs_prep, &rhs, rhs_prep, ring, &mut to_int, ring_log2_el_size);
         let width = self.compute_required_width(input_size_log2, lhs.len(), rhs.len(), 1);
         let len = lhs.len() + rhs.len() - 1;
 
@@ -419,11 +389,7 @@ where
         let mut lhs_tmp = Vec::with_capacity_in(lhs.len(), self.allocator.clone());
         let mut rhs_tmp = Vec::with_capacity_in(rhs.len(), self.allocator.clone());
         for i in 0..width {
-            let hom = self
-                .get_rns_factor(i)
-                .into_can_hom(&self.integer_ring)
-                .ok()
-                .unwrap();
+            let hom = self.get_rns_factor(i).into_can_hom(&self.integer_ring).ok().unwrap();
             lhs_tmp.clear();
             lhs_tmp.extend(lhs.as_iter().map(|x| hom.map(to_int(x))));
             rhs_tmp.clear();
@@ -483,64 +449,53 @@ where
         let mut rhs_tmp = Vec::new_in(self.allocator.clone());
 
         // the algorithm is as follows:
-        //  - we keep track of the current "width" (i.e. number of RNS factors) to represent the
-        //    result
+        //  - we keep track of the current "width" (i.e. number of RNS factors) to represent the result
         //  - we collect iterator elements, until the current width is not sufficient anymore
-        //  - then we do `merge_current()`: forward all collected samples to the child convolutions,
-        //    add the result to `dst`, and clear the buffers; continue with updated width
+        //  - then we do `merge_current()`: forward all collected samples to the child convolutions, add the
+        //    result to `dst`, and clear the buffers; continue with updated width
 
-        let mut merge_current = |current_width: usize,
-                                 lhs_tmp: &mut Vec<
-            (Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>),
-            _,
-        >,
-                                 rhs_tmp: &mut Vec<
-            (Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>),
-            _,
-        >| {
-            if current_width == 0 {
+        let mut merge_current =
+            |current_width: usize,
+             lhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>,
+             rhs_tmp: &mut Vec<(Vec<El<Zn>, _>, Option<&'a PreparedConvolutionOperand<R, C>>), _>| {
+                if current_width == 0 {
+                    lhs_tmp.clear();
+                    rhs_tmp.clear();
+                    return;
+                }
+                res_data.clear();
+                for i in 0..current_width {
+                    res_data.extend((0..out_len).map(|_| self.get_rns_factor(i).zero()));
+                    self.get_convolution(i).compute_convolution_sum(
+                        lhs_tmp
+                            .iter()
+                            .zip(rhs_tmp.iter())
+                            .map(|((lhs, lhs_prep), (rhs, rhs_prep))| {
+                                let lhs_data =
+                                    &lhs[(i * lhs.len() / current_width)..((i + 1) * lhs.len() / current_width)];
+                                let rhs_data =
+                                    &rhs[(i * rhs.len() / current_width)..((i + 1) * rhs.len() / current_width)];
+                                (
+                                    lhs_data,
+                                    lhs_prep.map(|lhs_prep| self.get_prepared_operand(lhs_data, lhs_prep, i, ring)),
+                                    rhs_data,
+                                    rhs_prep.map(|rhs_prep| self.get_prepared_operand(rhs_data, rhs_prep, i, ring)),
+                                )
+                            }),
+                        &mut res_data[(i * out_len)..((i + 1) * out_len)],
+                        self.get_rns_factor(i),
+                    );
+                }
                 lhs_tmp.clear();
                 rhs_tmp.clear();
-                return;
-            }
-            res_data.clear();
-            for i in 0..current_width {
-                res_data.extend((0..out_len).map(|_| self.get_rns_factor(i).zero()));
-                self.get_convolution(i).compute_convolution_sum(
-                    lhs_tmp
-                        .iter()
-                        .zip(rhs_tmp.iter())
-                        .map(|((lhs, lhs_prep), (rhs, rhs_prep))| {
-                            let lhs_data = &lhs[(i * lhs.len() / current_width)
-                                ..((i + 1) * lhs.len() / current_width)];
-                            let rhs_data = &rhs[(i * rhs.len() / current_width)
-                                ..((i + 1) * rhs.len() / current_width)];
-                            (
-                                lhs_data,
-                                lhs_prep.map(|lhs_prep| {
-                                    self.get_prepared_operand(lhs_data, lhs_prep, i, ring)
-                                }),
-                                rhs_data,
-                                rhs_prep.map(|rhs_prep| {
-                                    self.get_prepared_operand(rhs_data, rhs_prep, i, ring)
-                                }),
-                            )
-                        }),
-                    &mut res_data[(i * out_len)..((i + 1) * out_len)],
-                    self.get_rns_factor(i),
-                );
-            }
-            lhs_tmp.clear();
-            rhs_tmp.clear();
-            for j in 0..out_len {
-                let add =
-                    self.get_rns_ring(current_width)
-                        .smallest_lift(self.get_rns_ring(current_width).from_congruence(
-                            (0..current_width).map(|i| res_data[i * out_len + j]),
-                        ));
-                ring.add_assign(&mut dst[j], from_int(add));
-            }
-        };
+                for j in 0..out_len {
+                    let add = self.get_rns_ring(current_width).smallest_lift(
+                        self.get_rns_ring(current_width)
+                            .from_congruence((0..current_width).map(|i| res_data[i * out_len + j])),
+                    );
+                    ring.add_assign(&mut dst[j], from_int(add));
+                }
+            };
 
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
             if lhs.len() == 0 || rhs.len() == 0 {
@@ -549,24 +504,12 @@ where
             assert!(out_len >= lhs.len() + rhs.len() - 1);
             current_input_size_log2 = max(
                 current_input_size_log2,
-                self.get_log2_input_size(
-                    &lhs,
-                    lhs_prep,
-                    &rhs,
-                    rhs_prep,
-                    ring,
-                    &mut to_int,
-                    ring_log2_el_size,
-                ),
+                self.get_log2_input_size(&lhs, lhs_prep, &rhs, rhs_prep, ring, &mut to_int, ring_log2_el_size),
             );
             lhs_max_len = max(lhs_max_len, lhs.len());
             rhs_max_len = max(rhs_max_len, rhs.len());
-            let required_width = self.compute_required_width(
-                current_input_size_log2,
-                lhs_max_len,
-                rhs_max_len,
-                inner_product_length,
-            );
+            let required_width =
+                self.compute_required_width(current_input_size_log2, lhs_max_len, rhs_max_len, inner_product_length);
 
             if required_width > current_width {
                 merge_current(current_width, &mut lhs_tmp, &mut rhs_tmp);
@@ -582,11 +525,7 @@ where
                 rhs_prep,
             ));
             for i in 0..current_width {
-                let hom = self
-                    .get_rns_factor(i)
-                    .into_can_hom(&self.integer_ring)
-                    .ok()
-                    .unwrap();
+                let hom = self.get_rns_factor(i).into_can_hom(&self.integer_ring).ok().unwrap();
                 lhs_tmp
                     .last_mut()
                     .unwrap()
@@ -667,9 +606,7 @@ where
         )
     }
 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
-        true
-    }
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool { true }
 
     fn prepare_convolution_operand<S, V>(
         &self,
@@ -785,9 +722,7 @@ where
         )
     }
 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
-        true
-    }
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool { true }
 
     fn prepare_convolution_operand<S, V>(
         &self,
@@ -887,13 +822,8 @@ use super::STANDARD_CONVOLUTION;
 #[test]
 fn test_convolution_integer() {
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with_convolution(
-        7,
-        usize::MAX,
-        BigIntRing::RING,
-        Global,
-        NTTConvolution::new,
-    );
+    let convolution =
+        RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -915,32 +845,21 @@ fn test_convolution_zn() {
 #[test]
 fn test_convolution_sum() {
     let ring = StaticRing::<i128>::RING;
-    let convolution =
-        RNSConvolution::new_with_convolution(7, 20, BigIntRing::RING, Global, NTTConvolution::new);
+    let convolution = RNSConvolution::new_with_convolution(7, 20, BigIntRing::RING, Global, NTTConvolution::new);
 
     let data = (0..40usize).map(|i| {
         (
-            (0..(5 + i % 5))
-                .map(|x| (1 << i) * (x as i128 - 2))
-                .collect::<Vec<_>>(),
+            (0..(5 + i % 5)).map(|x| (1 << i) * (x as i128 - 2)).collect::<Vec<_>>(),
             (0..(13 - i % 7))
                 .map(|x| (1 << i) * (x as i128 + 1))
                 .collect::<Vec<_>>(),
         )
     });
     let mut expected = (0..22).map(|_| 0).collect::<Vec<_>>();
-    STANDARD_CONVOLUTION.compute_convolution_sum(
-        data.clone().map(|(l, r)| (l, None, r, None)),
-        &mut expected,
-        ring,
-    );
+    STANDARD_CONVOLUTION.compute_convolution_sum(data.clone().map(|(l, r)| (l, None, r, None)), &mut expected, ring);
 
     let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
-    convolution.compute_convolution_sum(
-        data.clone().map(|(l, r)| (l, None, r, None)),
-        &mut actual,
-        ring,
-    );
+    convolution.compute_convolution_sum(data.clone().map(|(l, r)| (l, None, r, None)), &mut actual, ring);
     assert_eq!(&expected[..21], actual);
 
     let data_prep = data

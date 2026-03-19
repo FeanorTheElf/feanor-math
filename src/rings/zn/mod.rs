@@ -46,9 +46,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// The only requirement is that `m` is a valid element of the integer ring, in particular that
     /// it fits within the required amount of bits, if [`ZnRing::IntegerRing`] is a fixed-size
     /// integer ring.
-    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
-        self.smallest_positive_lift(el)
-    }
+    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> { self.smallest_positive_lift(el) }
 
     /// If the given integer is within `{ 0, ..., n - 1 }`, returns the corresponding
     /// element in `Z/nZ`. Any other input is considered a logic error.
@@ -81,9 +79,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     }
 
     /// Returns whether this ring is a field, i.e. whether `n` is prime.
-    fn is_field(&self) -> bool {
-        algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10)
-    }
+    fn is_field(&self) -> bool { algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10) }
 }
 
 /// Trait for implementations of [`ZnRing`] that can be created (possibly with a
@@ -133,11 +129,7 @@ pub mod generic_impls {
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns
     /// `None`.
     #[stability::unstable(feature = "enable")]
-    pub fn has_canonical_hom_from_bigint<
-        I: ?Sized + IntegerRing,
-        J: ?Sized + IntegerRing,
-        R: ?Sized + ZnRing,
-    >(
+    pub fn has_canonical_hom_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(
         from: &I,
         to: &R,
         to_large_int_ring: &J,
@@ -201,13 +193,7 @@ pub mod generic_impls {
     /// a problem if the primitive integer rings `StaticRing::<ixx>::RING` are used, or if `B >=
     /// 2n`.
     #[stability::unstable(feature = "enable")]
-    pub fn map_in_from_bigint<
-        I: ?Sized + IntegerRing,
-        J: ?Sized + IntegerRing,
-        R: ?Sized + ZnRing,
-        F,
-        G,
-    >(
+    pub fn map_in_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(
         from: &I,
         to: &R,
         to_large_int_ring: &J,
@@ -250,11 +236,8 @@ pub mod generic_impls {
     pub fn random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
         ring.map_in(
             ring.integer_ring().get_ring(),
-            ring.integer_ring()
-                .get_uniformly_random(ring.modulus(), rng),
-            &ring
-                .has_canonical_hom(ring.integer_ring().get_ring())
-                .unwrap(),
+            ring.integer_ring().get_uniformly_random(ring.modulus(), rng),
+            &ring.has_canonical_hom(ring.integer_ring().get_ring()).unwrap(),
         )
     }
 
@@ -292,10 +275,7 @@ pub mod generic_impls {
         let rhs_ann = int_ring
             .checked_div(
                 ring.modulus(),
-                &int_ring.ideal_gen(
-                    ring.modulus(),
-                    &ring.smallest_positive_lift(ring.clone_el(rhs)),
-                ),
+                &int_ring.ideal_gen(ring.modulus(), &ring.smallest_positive_lift(ring.clone_el(rhs))),
             )
             .unwrap();
         let some_sol = ring.smallest_positive_lift(ring.checked_div(lhs, rhs)?);
@@ -314,11 +294,7 @@ pub mod generic_impls {
         R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
     {
         let ZZbig = BigIntRing::RING;
-        let modulus = int_cast(
-            ring.integer_ring().clone_el(ring.modulus()),
-            ZZbig,
-            ring.integer_ring(),
-        );
+        let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
         let count = int_cast(count.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING);
         let degree = int_bisect::find_root_floor(StaticRing::<i64>::RING, 1, |d| {
             if *d > 0 && ZZbig.is_gt(&ZZbig.pow(ZZbig.clone_el(&modulus), *d as usize), &count) {
@@ -328,12 +304,7 @@ pub mod generic_impls {
             }
         }) + 1;
         assert!(degree >= 1);
-        return GaloisField::new_with_convolution(
-            ring,
-            degree as usize,
-            Global,
-            STANDARD_CONVOLUTION,
-        );
+        return GaloisField::new_with_convolution(ring, degree as usize, Global, STANDARD_CONVOLUTION);
     }
 }
 
@@ -431,10 +402,7 @@ where
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
         f.call(zn_64::Zn::new(StaticRing::<i64>::RING.coerce(&ZZ, n) as u64))
     } else {
-        f.call(zn_big::Zn::new(
-            BigIntRing::RING,
-            int_cast(n, &BigIntRing::RING, &ZZ),
-        ))
+        f.call(zn_big::Zn::new(BigIntRing::RING, int_cast(n, &BigIntRing::RING, &ZZ)))
     }
 }
 
@@ -514,9 +482,7 @@ where
                 if to.integer_ring().get_ring().representable_bits().is_none()
                     || BigIntRing::RING.is_lt(
                         &from_char,
-                        &BigIntRing::RING.power_of_two(
-                            to.integer_ring().get_ring().representable_bits().unwrap(),
-                        ),
+                        &BigIntRing::RING.power_of_two(to.integer_ring().get_ring().representable_bits().unwrap()),
                     )
                 {
                     ReductionMapRequirements::SmallestLift
@@ -530,10 +496,7 @@ where
                     from.integer_ring(),
                     to.integer_ring(),
                 ),
-                to_from_int: to
-                    .get_ring()
-                    .has_canonical_hom(to.integer_ring().get_ring())
-                    .unwrap(),
+                to_from_int: to.get_ring().has_canonical_hom(to.integer_ring().get_ring()).unwrap(),
                 from_from_int: from
                     .get_ring()
                     .has_canonical_hom(from.integer_ring().get_ring())
@@ -570,8 +533,7 @@ where
     /// );
     /// ```
     pub fn mul_quotient_fraction(&self, x: El<S>) -> El<R> {
-        self.from
-            .mul_ref_snd(self.any_preimage(x), &self.fraction_of_quotients)
+        self.from.mul_ref_snd(self.any_preimage(x), &self.fraction_of_quotients)
     }
 
     /// Computes the smallest preimage under the reduction map `Z/nZ -> Z/mZ`, where
@@ -613,9 +575,7 @@ where
         self.smallest_lift(x)
     }
 
-    pub fn smallest_lift_ref(&self, x: &El<S>) -> El<R> {
-        self.smallest_lift(self.codomain().clone_el(x))
-    }
+    pub fn smallest_lift_ref(&self, x: &El<S>) -> El<R> { self.smallest_lift(self.codomain().clone_el(x)) }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for ZnReductionMap<R, S>
@@ -643,13 +603,9 @@ where
         )
     }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.from
-    }
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
 }
 
 #[cfg(any(test, feature = "generic_tests"))]
@@ -661,8 +617,7 @@ pub mod generic_tests {
     pub fn test_zn_axioms<R: RingStore>(R: R)
     where
         R::Type: ZnRing,
-        <R::Type as ZnRing>::IntegerRingBase:
-            CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i32>>,
+        <R::Type as ZnRing>::IntegerRingBase: CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i32>>,
     {
         let ZZ = R.integer_ring();
         let n = R.modulus();
@@ -704,11 +659,7 @@ fn test_reduction_map_large_value() {
     let ring1 = zn_64::Zn::new(1 << 42);
     let ring2 = zn_big::Zn::new(BigIntRing::RING, BigIntRing::RING.power_of_two(666));
     let reduce = ZnReductionMap::new(&ring2, ring1).unwrap();
-    assert_el_eq!(
-        ring1,
-        ring1.zero(),
-        reduce.map(ring2.pow(ring2.int_hom().map(2), 665))
-    );
+    assert_el_eq!(ring1, ring1.zero(), reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
 }
 
 #[test]

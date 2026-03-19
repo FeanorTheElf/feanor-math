@@ -60,9 +60,7 @@ where
 
 impl<R: RingStore> RingElementWrapper<R> {
     /// Creates a new [`RingElementWrapper`] wrapping the given element of the given ring.
-    pub const fn new(ring: R, element: El<R>) -> Self {
-        Self { ring, element }
-    }
+    pub const fn new(ring: R, element: El<R>) -> Self { Self { ring, element } }
 
     /// Raises the stored element to the given power.
     ///
@@ -87,40 +85,28 @@ impl<R: RingStore> RingElementWrapper<R> {
     }
 
     /// Returns the stored element.
-    pub fn unwrap(self) -> El<R> {
-        self.element
-    }
+    pub fn unwrap(self) -> El<R> { self.element }
 
     /// Returns the stored element as reference.
-    pub fn unwrap_ref(&self) -> &El<R> {
-        &self.element
-    }
+    pub fn unwrap_ref(&self) -> &El<R> { &self.element }
 
     /// Returns a reference to the ring that this element belongs to.
-    pub fn parent(&self) -> &R {
-        &self.ring
-    }
+    pub fn parent(&self) -> &R { &self.ring }
 
     /// Returns `true` if this element is zero.
     ///
     /// Equivalent to `self.parent().is_zero(self.unwrap_ref())`.
-    pub fn is_zero(&self) -> bool {
-        self.parent().is_zero(self.unwrap_ref())
-    }
+    pub fn is_zero(&self) -> bool { self.parent().is_zero(self.unwrap_ref()) }
 
     /// Returns `true` if this element is one.
     ///
     /// Equivalent to `self.parent().is_one(self.unwrap_ref())`.
-    pub fn is_one(&self) -> bool {
-        self.parent().is_one(self.unwrap_ref())
-    }
+    pub fn is_one(&self) -> bool { self.parent().is_one(self.unwrap_ref()) }
 
     /// Returns `true` if this element is negative one.
     ///
     /// Equivalent to `self.parent().is_neg_one(self.unwrap_ref())`.
-    pub fn is_neg_one(&self) -> bool {
-        self.parent().is_neg_one(self.unwrap_ref())
-    }
+    pub fn is_neg_one(&self) -> bool { self.parent().is_neg_one(self.unwrap_ref()) }
 }
 
 macro_rules! impl_xassign_trait {
@@ -179,9 +165,7 @@ macro_rules! impl_trait {
             }
         }
 
-        impl<'a, 'b, R: RingStore + Clone> $trait_name<&'a RingElementWrapper<R>>
-            for &'b RingElementWrapper<R>
-        {
+        impl<'a, 'b, R: RingStore + Clone> $trait_name<&'a RingElementWrapper<R>> for &'b RingElementWrapper<R> {
             type Output = RingElementWrapper<R>;
 
             fn $fn_name(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
@@ -276,9 +260,7 @@ macro_rules! impl_trait_int {
 
             fn $fn_name(self, rhs: i32) -> Self::Output {
                 RingElementWrapper {
-                    element: self
-                        .ring
-                        .$fn_name(self.element, self.ring.int_hom().map(rhs)),
+                    element: self.ring.$fn_name(self.element, self.ring.int_hom().map(rhs)),
                     ring: self.ring,
                 }
             }
@@ -300,10 +282,9 @@ macro_rules! impl_trait_int {
 
             fn $fn_name(self, rhs: i32) -> Self::Output {
                 RingElementWrapper {
-                    element: self.ring.$fn_name(
-                        self.ring.clone_el(&self.element),
-                        self.ring.int_hom().map(rhs),
-                    ),
+                    element: self
+                        .ring
+                        .$fn_name(self.ring.clone_el(&self.element), self.ring.int_hom().map(rhs)),
                     ring: self.ring.clone(),
                 }
             }
@@ -314,10 +295,9 @@ macro_rules! impl_trait_int {
 
             fn $fn_name(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
                 RingElementWrapper {
-                    element: rhs.ring.$fn_name(
-                        rhs.ring.int_hom().map(self),
-                        rhs.ring.clone_el(&rhs.element),
-                    ),
+                    element: rhs
+                        .ring
+                        .$fn_name(rhs.ring.int_hom().map(self), rhs.ring.clone_el(&rhs.element)),
                     ring: rhs.ring.clone(),
                 }
             }
@@ -414,46 +394,34 @@ impl<R: RingStore> PartialEq<i32> for RingElementWrapper<R> {
             0 => self.is_zero(),
             1 => self.is_one(),
             -1 => self.is_neg_one(),
-            x => self
-                .parent()
-                .eq_el(self.unwrap_ref(), &self.parent().int_hom().map(x)),
+            x => self.parent().eq_el(self.unwrap_ref(), &self.parent().int_hom().map(x)),
         }
     }
 }
 
 impl<R: RingStore> PartialEq<RingElementWrapper<R>> for i32 {
-    fn eq(&self, other: &RingElementWrapper<R>) -> bool {
-        other == self
-    }
+    fn eq(&self, other: &RingElementWrapper<R>) -> bool { other == self }
 }
 
 impl<R: RingStore> Hash for RingElementWrapper<R>
 where
     R::Type: HashableElRing,
 {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.ring.hash(&self.element, state)
-    }
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.ring.hash(&self.element, state) }
 }
 
 impl<R: RingStore> Display for RingElementWrapper<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.get_ring().dbg(&self.element, f)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.ring.get_ring().dbg(&self.element, f) }
 }
 
 impl<R: RingStore> Debug for RingElementWrapper<R> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.get_ring().dbg(&self.element, f)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.ring.get_ring().dbg(&self.element, f) }
 }
 
 impl<R: RingStore> Deref for RingElementWrapper<R> {
     type Target = El<R>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.element
-    }
+    fn deref(&self) -> &Self::Target { &self.element }
 }
 
 #[cfg(test)]
@@ -498,11 +466,7 @@ fn test_arithmetic_expression_int() {
                 let x = RingElementWrapper::new(&ring, x);
                 let y = RingElementWrapper::new(&ring, y);
                 let z = RingElementWrapper::new(&ring, z);
-                assert_el_eq!(
-                    ring,
-                    expected,
-                    (x * 8 * y + (1 + x + 2 * z) * (y - z * 2) + 5).unwrap()
-                );
+                assert_el_eq!(ring, expected, (x * 8 * y + (1 + x + 2 * z) * (y - z * 2) + 5).unwrap());
             }
         }
     }

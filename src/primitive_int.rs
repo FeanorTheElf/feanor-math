@@ -18,8 +18,7 @@ use crate::ring::*;
 use crate::serialization::SerializableElementRing;
 use crate::specialization::*;
 use crate::{
-    algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero,
-    impl_poly_gcd_locally_for_ZZ,
+    algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
 };
 
 /// Trait for `i8` to `i128`.
@@ -63,71 +62,41 @@ pub trait PrimitiveInt:
 impl PrimitiveInt for i8 {
     type Larger = i16;
 
-    fn bits() -> usize {
-        Self::BITS as usize
-    }
-    fn overflowing_mul(self, rhs: Self) -> Self {
-        i8::overflowing_mul(self, rhs).0
-    }
-    fn overflowing_sub(self, rhs: Self) -> Self {
-        i8::overflowing_sub(self, rhs).0
-    }
+    fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i8::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i8::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i16 {
     type Larger = i32;
 
-    fn bits() -> usize {
-        Self::BITS as usize
-    }
-    fn overflowing_mul(self, rhs: Self) -> Self {
-        i16::overflowing_mul(self, rhs).0
-    }
-    fn overflowing_sub(self, rhs: Self) -> Self {
-        i16::overflowing_sub(self, rhs).0
-    }
+    fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i16::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i16::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i32 {
     type Larger = i64;
 
-    fn bits() -> usize {
-        Self::BITS as usize
-    }
-    fn overflowing_mul(self, rhs: Self) -> Self {
-        i32::overflowing_mul(self, rhs).0
-    }
-    fn overflowing_sub(self, rhs: Self) -> Self {
-        i32::overflowing_sub(self, rhs).0
-    }
+    fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i32::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i32::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i64 {
     type Larger = i128;
 
-    fn bits() -> usize {
-        Self::BITS as usize
-    }
-    fn overflowing_mul(self, rhs: Self) -> Self {
-        i64::overflowing_mul(self, rhs).0
-    }
-    fn overflowing_sub(self, rhs: Self) -> Self {
-        i64::overflowing_sub(self, rhs).0
-    }
+    fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i64::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i64::overflowing_sub(self, rhs).0 }
 }
 
 impl PrimitiveInt for i128 {
     type Larger = i128;
 
-    fn bits() -> usize {
-        Self::BITS as usize
-    }
-    fn overflowing_mul(self, rhs: Self) -> Self {
-        i128::overflowing_mul(self, rhs).0
-    }
-    fn overflowing_sub(self, rhs: Self) -> Self {
-        i128::overflowing_sub(self, rhs).0
-    }
+    fn bits() -> usize { Self::BITS as usize }
+    fn overflowing_mul(self, rhs: Self) -> Self { i128::overflowing_mul(self, rhs).0 }
+    fn overflowing_sub(self, rhs: Self) -> Self { i128::overflowing_sub(self, rhs).0 }
 }
 
 macro_rules! specialize_int_cast {
@@ -184,12 +153,8 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         }
         return match <T as Into<i128>>::into(*x) {
             0 => PrimitiveIntPreparedDivisorData(T::from(0)),
-            1 => PrimitiveIntPreparedDivisorData(
-                T::try_from((1i128 << (T::bits() - 1)) - 1).ok().unwrap(),
-            ),
-            -1 => PrimitiveIntPreparedDivisorData(
-                T::try_from((-1i128 << (T::bits() - 1)) + 1).ok().unwrap(),
-            ),
+            1 => PrimitiveIntPreparedDivisorData(T::try_from((1i128 << (T::bits() - 1)) - 1).ok().unwrap()),
+            -1 => PrimitiveIntPreparedDivisorData(T::try_from((-1i128 << (T::bits() - 1)) + 1).ok().unwrap()),
             val => PrimitiveIntPreparedDivisorData(
                 <T as TryFrom<i128>>::try_from((1i128 << (T::bits() - 1)) / val)
                     .ok()
@@ -210,11 +175,7 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
             return self.checked_left_div(lhs, &rhs);
         }
         if *rhs == T::from(0) {
-            if *lhs == T::from(0) {
-                Some(T::from(0))
-            } else {
-                None
-            }
+            if *lhs == T::from(0) { Some(T::from(0)) } else { None }
         } else {
             let mut prod = <T as Into<T::Larger>>::into(*lhs);
             prod *= <T as Into<T::Larger>>::into(rhs_prep.0);
@@ -263,11 +224,7 @@ impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
 }
 
 impl<T: PrimitiveInt> EuclideanRing for StaticRingBase<T> {
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         (lhs / *rhs, lhs % *rhs)
     }
 
@@ -306,9 +263,7 @@ impl<T> FiniteRingSpecializable for StaticRingBase<T>
 where
     T: PrimitiveInt,
 {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        op.fallback()
-    }
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
 }
 
 impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
@@ -320,9 +275,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn from_float_approx(&self, value: f64) -> Option<Self::Element> {
-        Some(
-            RingRef::new(self).coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, value as i128),
-        )
+        Some(RingRef::new(self).coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, value as i128))
     }
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool {
@@ -382,22 +335,15 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
         );
     }
 
-    fn get_uniformly_random_bits<G: FnMut() -> u64>(
-        &self,
-        log2_bound_exclusive: usize,
-        mut rng: G,
-    ) -> Self::Element {
+    fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
         assert!(log2_bound_exclusive <= T::bits() - 1);
         RingRef::new(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING,
-            ((((rng() as u128) << u64::BITS) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1))
-                as i128,
+            ((((rng() as u128) << u64::BITS) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128,
         )
     }
 
-    fn representable_bits(&self) -> Option<usize> {
-        Some(T::bits() - 1)
-    }
+    fn representable_bits(&self) -> Option<usize> { Some(T::bits() - 1) }
 }
 
 impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
@@ -419,65 +365,41 @@ pub struct StaticRingBase<T> {
 }
 
 impl<T> Debug for StaticRingBase<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Z")
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Z") }
 }
 
 impl<T> PartialEq for StaticRingBase<T> {
-    fn eq(&self, _: &Self) -> bool {
-        true
-    }
+    fn eq(&self, _: &Self) -> bool { true }
 }
 
 impl<T: PrimitiveInt> RingValue<StaticRingBase<T>> {
     /// The singleton ring instance of [`StaticRing`].
-    pub const RING: StaticRing<T> = RingValue::from(StaticRingBase {
-        element: PhantomData,
-    });
+    pub const RING: StaticRing<T> = RingValue::from(StaticRingBase { element: PhantomData });
 }
 
 impl<T> Copy for StaticRingBase<T> {}
 
 impl<T> Clone for StaticRingBase<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     type Element = T;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        *val
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
 
-    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        *lhs += rhs;
-    }
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
 
-    fn negate_inplace(&self, lhs: &mut Self::Element) {
-        *lhs = -*lhs;
-    }
+    fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
 
-    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        *lhs *= rhs;
-    }
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        T::try_from(value).map_err(|_| ()).unwrap()
-    }
+    fn from_int(&self, value: i32) -> Self::Element { T::try_from(value).map_err(|_| ()).unwrap() }
 
-    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        *lhs == *rhs
-    }
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
 
-    fn is_commutative(&self) -> bool {
-        true
-    }
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_commutative(&self) -> bool { true }
+    fn is_noetherian(&self) -> bool { true }
 
     fn dbg_within<'a>(
         &self,
@@ -513,69 +435,47 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
         )
     }
 
-    fn is_approximate(&self) -> bool {
-        false
-    }
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl KaratsubaHint for StaticRingBase<i8> {
-    fn karatsuba_threshold(&self) -> usize {
-        4
-    }
+    fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
 impl KaratsubaHint for StaticRingBase<i16> {
-    fn karatsuba_threshold(&self) -> usize {
-        4
-    }
+    fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
 impl KaratsubaHint for StaticRingBase<i32> {
-    fn karatsuba_threshold(&self) -> usize {
-        4
-    }
+    fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
 impl KaratsubaHint for StaticRingBase<i64> {
-    fn karatsuba_threshold(&self) -> usize {
-        4
-    }
+    fn karatsuba_threshold(&self) -> usize { 4 }
 }
 
 impl KaratsubaHint for StaticRingBase<i128> {
-    fn karatsuba_threshold(&self) -> usize {
-        3
-    }
+    fn karatsuba_threshold(&self) -> usize { 3 }
 }
 
 impl StrassenHint for StaticRingBase<i8> {
-    fn strassen_threshold(&self) -> usize {
-        6
-    }
+    fn strassen_threshold(&self) -> usize { 6 }
 }
 
 impl StrassenHint for StaticRingBase<i16> {
-    fn strassen_threshold(&self) -> usize {
-        6
-    }
+    fn strassen_threshold(&self) -> usize { 6 }
 }
 
 impl StrassenHint for StaticRingBase<i32> {
-    fn strassen_threshold(&self) -> usize {
-        6
-    }
+    fn strassen_threshold(&self) -> usize { 6 }
 }
 
 impl StrassenHint for StaticRingBase<i64> {
-    fn strassen_threshold(&self) -> usize {
-        6
-    }
+    fn strassen_threshold(&self) -> usize { 6 }
 }
 
 impl StrassenHint for StaticRingBase<i128> {
-    fn strassen_threshold(&self) -> usize {
-        5
-    }
+    fn strassen_threshold(&self) -> usize { 5 }
 }
 
 impl<T: PrimitiveInt> SerializableElementRing for StaticRingBase<T> {
@@ -618,9 +518,7 @@ impl<'de, T: PrimitiveInt> Deserialize<'de> for StaticRingBase<T> {
 pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 
 impl<T: PrimitiveInt> Default for StaticRingBase<T> {
-    fn default() -> Self {
-        StaticRing::RING.into()
-    }
+    fn default() -> Self { StaticRing::RING.into() }
 }
 
 #[test]
@@ -700,10 +598,7 @@ fn test_euclidean_ring_axioms() {
 
 #[test]
 fn test_principal_ideal_ring_ring_axioms() {
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
-        StaticRing::<i8>::RING,
-        [-2, -1, 0, 1, 2].into_iter(),
-    );
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2].into_iter());
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(
         StaticRing::<i16>::RING,
         [-2, -1, 0, 1, 2, 3, 4].into_iter(),
@@ -728,14 +623,8 @@ fn test_lowest_set_bit() {
     assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&3));
     assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
     assert_eq!(None, StaticRing::<i128>::RING.abs_lowest_set_bit(&0));
-    assert_eq!(
-        Some(127),
-        StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MIN)
-    );
-    assert_eq!(
-        Some(0),
-        StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MAX)
-    );
+    assert_eq!(Some(127), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MIN));
+    assert_eq!(Some(0), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MAX));
 }
 
 #[test]
@@ -784,7 +673,5 @@ fn test_serialization() {
     crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i16>::RING.into());
     crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i32>::RING.into());
     crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i64>::RING.into());
-    crate::serialization::generic_tests::test_serialize_deserialize(
-        StaticRing::<i128>::RING.into(),
-    );
+    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i128>::RING.into());
 }

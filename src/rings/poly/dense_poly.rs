@@ -92,8 +92,7 @@ impl<R: RingStore + Clone, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Debug
-    for DensePolyRingBase<R, A, C>
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Debug for DensePolyRingBase<R, A, C>
 where
     R::Type: Debug,
 {
@@ -106,8 +105,7 @@ where
 
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of
 /// coefficients. For details, see [`DensePolyRingBase`].
-pub type DensePolyRing<R, A = Global, C = KaratsubaAlgorithm> =
-    RingValue<DensePolyRingBase<R, A, C>>;
+pub type DensePolyRing<R, A = Global, C = KaratsubaAlgorithm> = RingValue<DensePolyRingBase<R, A, C>>;
 
 impl<R: RingStore> DensePolyRing<R> {
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
@@ -134,13 +132,9 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Dense
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>>
-    DensePolyRingBase<R, A, C>
-{
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, A, C> {
     #[stability::unstable(feature = "enable")]
-    pub fn into_base_ring(self) -> R {
-        self.base_ring
-    }
+    pub fn into_base_ring(self) -> R { self.base_ring }
 }
 
 /// An element of [`DensePolyRing`].
@@ -154,14 +148,10 @@ where
     A: Allocator + Clone,
     El<R>: Debug,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.data.fmt(f)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
 }
 
-impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingBase
-    for DensePolyRingBase<R, A, C>
-{
+impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingBase for DensePolyRingBase<R, A, C> {
     type Element = DensePolyRingEl<R, A>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
@@ -172,28 +162,22 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         for i in 0..min(lhs.data.len(), rhs.data.len()) {
-            self.base_ring
-                .add_assign_ref(&mut lhs.data[i], &rhs.data[i]);
+            self.base_ring.add_assign_ref(&mut lhs.data[i], &rhs.data[i]);
         }
         for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
             lhs.data.push(self.base_ring().clone_el(&rhs.data[i]));
         }
     }
 
-    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.add_assign_ref(lhs, &rhs);
-    }
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.add_assign_ref(lhs, &rhs); }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         for i in 0..min(lhs.data.len(), rhs.data.len()) {
-            self.base_ring
-                .sub_assign_ref(&mut lhs.data[i], &rhs.data[i]);
+            self.base_ring.sub_assign_ref(&mut lhs.data[i], &rhs.data[i]);
         }
         for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
-            lhs.data.push(
-                self.base_ring()
-                    .negate(self.base_ring().clone_el(&rhs.data[i])),
-            );
+            lhs.data
+                .push(self.base_ring().negate(self.base_ring().clone_el(&rhs.data[i])));
         }
     }
 
@@ -203,13 +187,9 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         }
     }
 
-    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.mul_assign_ref(lhs, &rhs);
-    }
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.mul_assign_ref(lhs, &rhs); }
 
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        *lhs = self.mul_ref(lhs, rhs);
-    }
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { *lhs = self.mul_ref(lhs, rhs); }
 
     fn zero(&self) -> Self::Element {
         DensePolyRingEl {
@@ -219,9 +199,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
 
     fn from_int(&self, value: i32) -> Self::Element {
         let mut result = self.zero();
-        result
-            .data
-            .push(self.base_ring().get_ring().from_int(value));
+        result.data.push(self.base_ring().get_ring().from_int(value));
         return result;
     }
 
@@ -231,11 +209,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
                 return false;
             }
         }
-        let longer = if lhs.data.len() > rhs.data.len() {
-            lhs
-        } else {
-            rhs
-        };
+        let longer = if lhs.data.len() > rhs.data.len() { lhs } else { rhs };
         for i in min(lhs.data.len(), rhs.data.len())..longer.data.len() {
             if !self.base_ring.is_zero(&longer.data[i]) {
                 return false;
@@ -244,9 +218,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         return true;
     }
 
-    fn is_commutative(&self) -> bool {
-        self.base_ring.is_commutative()
-    }
+    fn is_commutative(&self) -> bool { self.base_ring.is_commutative() }
 
     fn is_noetherian(&self) -> bool {
         // by Hilbert's basis theorem
@@ -262,17 +234,11 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
     }
 
-    fn dbg<'a>(
-        &self,
-        value: &Self::Element,
-        out: &mut std::fmt::Formatter<'a>,
-    ) -> std::fmt::Result {
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
-    fn square(&self, value: &mut Self::Element) {
-        *value = self.mul_ref(&value, &value);
-    }
+    fn square(&self, value: &mut Self::Element) { *value = self.mul_ref(&value, &value); }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let lhs_len = if self.base_ring().get_ring().is_approximate() {
@@ -298,9 +264,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
         for i in 0..lhs.data.len() {
-            self.base_ring()
-                .int_hom()
-                .mul_assign_map(lhs.data.at_mut(i), rhs);
+            self.base_ring().int_hom().mul_assign_map(lhs.data.at_mut(i), rhs);
         }
     }
 
@@ -336,9 +300,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         return elements.into_iter().next().unwrap();
     }
 
-    fn is_approximate(&self) -> bool {
-        self.base_ring().get_ring().is_approximate()
-    }
+    fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
 }
 
 impl<R, A, C> PartialEq for DensePolyRingBase<R, A, C>
@@ -347,9 +309,7 @@ where
     A: Allocator + Clone,
     C: ConvolutionAlgorithm<R::Type>,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.base_ring.get_ring() == other.base_ring.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base_ring.get_ring() == other.base_ring.get_ring() }
 }
 
 /// Marker trait to signal that for this polynomial ring `P`, we want to use the
@@ -382,8 +342,7 @@ where
     }
 }
 
-impl<R1, A1, R2, A2, C1, C2> CanHomFrom<DensePolyRingBase<R1, A1, C1>>
-    for DensePolyRingBase<R2, A2, C2>
+impl<R1, A1, R2, A2, C1, C2> CanHomFrom<DensePolyRingBase<R1, A1, C1>> for DensePolyRingBase<R2, A2, C2>
 where
     R1: RingStore,
     A1: Allocator + Clone,
@@ -395,10 +354,7 @@ where
 {
     type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
 
-    fn has_canonical_hom(
-        &self,
-        from: &DensePolyRingBase<R1, A1, C1>,
-    ) -> Option<Self::Homomorphism> {
+    fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, A1, C1>) -> Option<Self::Homomorphism> {
         self.base_ring()
             .get_ring()
             .has_canonical_hom(from.base_ring().get_ring())
@@ -412,11 +368,9 @@ where
     ) -> Self::Element {
         RingRef::new(self).from_terms((0..el.data.len()).map(|i| {
             (
-                self.base_ring().get_ring().map_in_ref(
-                    from.base_ring().get_ring(),
-                    &el.data[i],
-                    hom,
-                ),
+                self.base_ring()
+                    .get_ring()
+                    .map_in_ref(from.base_ring().get_ring(), &el.data[i], hom),
                 i,
             )
         }))
@@ -432,8 +386,7 @@ where
     }
 }
 
-impl<R1, A1, R2, A2, C1, C2> CanIsoFromTo<DensePolyRingBase<R1, A1, C1>>
-    for DensePolyRingBase<R2, A2, C2>
+impl<R1, A1, R2, A2, C1, C2> CanIsoFromTo<DensePolyRingBase<R1, A1, C1>> for DensePolyRingBase<R2, A2, C2>
 where
     R1: RingStore,
     A1: Allocator + Clone,
@@ -496,9 +449,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        &self.base_ring
-    }
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result = self.zero();
@@ -506,16 +457,10 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
         return result;
     }
 
-    fn fma_base(
-        &self,
-        lhs: &Self::Element,
-        rhs: &El<Self::BaseRing>,
-        summand: Self::Element,
-    ) -> Self::Element {
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
         let lhs_len = self.degree(lhs).map(|d| d + 1).unwrap_or(0);
         let summand_len = self.degree(&summand).map(|d| d + 1).unwrap_or(0);
-        let mut result =
-            Vec::with_capacity_in(max(lhs_len, summand_len), self.element_allocator.clone());
+        let mut result = Vec::with_capacity_in(max(lhs_len, summand_len), self.element_allocator.clone());
         let mut summand_it = summand.data.into_iter();
         result.extend(
             summand_it
@@ -525,10 +470,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
                 .map(|(i, x)| self.base_ring().fma(&lhs.data[i], rhs, x)),
         );
         result.extend(summand_it.take(summand_len - min(summand_len, lhs_len)));
-        result.extend(
-            (min(summand_len, lhs_len)..lhs_len)
-                .map(|i| self.base_ring().mul_ref(&lhs.data[i], rhs)),
-        );
+        result.extend((min(summand_len, lhs_len)..lhs_len).map(|i| self.base_ring().mul_ref(&lhs.data[i], rhs)));
         return DensePolyRingEl { data: result };
     }
 
@@ -576,8 +518,7 @@ where
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> HashableElRing
-    for DensePolyRingBase<R, A, C>
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> HashableElRing for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
     R::Type: HashableElRing,
@@ -586,15 +527,12 @@ where
         let len = self.degree(el).map(|d| d + 1).unwrap_or(0);
         h.write_length_prefix(len);
         for i in 0..len {
-            self.base_ring()
-                .get_ring()
-                .hash(self.coefficient_at(el, i), h);
+            self.base_ring().get_ring().hash(self.coefficient_at(el, i), h);
         }
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElementRing
-    for DensePolyRingBase<R, A, C>
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElementRing for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
     R::Type: SerializableElementRing,
@@ -626,8 +564,7 @@ where
         SerializableNewtypeStruct::new(
             "DensePoly",
             SerializableSeq::new_with_len(
-                (0..len)
-                    .map(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())),
+                (0..len).map(|i| SerializeWithRing::new(self.coefficient_at(el, i), self.base_ring())),
                 len,
             ),
         )
@@ -635,8 +572,7 @@ where
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing
-    for DensePolyRingBase<R, A, C>
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> PolyRing for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
 {
@@ -685,9 +621,7 @@ where
     }
 
     fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
-        _ = lhs
-            .data
-            .splice(0..0, (0..rhs_power).map(|_| self.base_ring().zero()));
+        _ = lhs.data.splice(0..0, (0..rhs_power).map(|_| self.base_ring().zero()));
     }
 
     fn degree(&self, f: &Self::Element) -> Option<usize> {
@@ -699,11 +633,7 @@ where
         return None;
     }
 
-    fn div_rem_monic(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(
             self.base_ring()
                 .is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap()))
@@ -741,13 +671,10 @@ where
 impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> FiniteRingSpecializable
     for DensePolyRingBase<R, A, C>
 {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        op.fallback()
-    }
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyRing
-    for DensePolyRingBase<R, A, C>
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyRing for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
     R::Type: InterpolationBaseRing,
@@ -778,10 +705,7 @@ where
         }
     }
 
-    fn local_computation<'ring>(
-        &'ring self,
-        ln_pseudo_norm: f64,
-    ) -> Self::LocalComputationData<'ring> {
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm: f64) -> Self::LocalComputationData<'ring> {
         let required_points = ln_pseudo_norm.ceil() as usize + 1;
         ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points)
     }
@@ -793,11 +717,7 @@ where
         data.1.len()
     }
 
-    fn local_ring_at<'ring>(
-        &self,
-        data: &Self::LocalComputationData<'ring>,
-        i: usize,
-    ) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, data: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
     where
         Self: 'ring,
     {
@@ -813,11 +733,7 @@ where
     where
         Self: 'ring,
     {
-        return data
-            .1
-            .iter()
-            .map(|x| self.evaluate(el, x, &data.0))
-            .collect::<Vec<_>>();
+        return data.1.iter().map(|x| self.evaluate(el, x, &data.0)).collect::<Vec<_>>();
     }
 
     fn lift_combine<'ring>(
@@ -845,8 +761,7 @@ where
     }
 }
 
-impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Domain
-    for DensePolyRingBase<R, A, C>
+impl<R, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> Domain for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
     R::Type: Domain,
@@ -864,12 +779,10 @@ where
             if d == 0 {
                 let rhs = self.coefficient_at(rhs, 0);
                 return RingRef::new(self)
-                    .try_from_terms(self.terms(lhs).map(|(c, i)| {
-                        self.base_ring()
-                            .checked_left_div(c, rhs)
-                            .map(|c| (c, i))
-                            .ok_or(())
-                    }))
+                    .try_from_terms(
+                        self.terms(lhs)
+                            .map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())),
+                    )
                     .ok();
             } else {
                 let lc = &rhs.data[d];
@@ -981,15 +894,8 @@ where
     R::Type: Field + PolyTFracGCDRing,
     C: ConvolutionAlgorithm<R::Type>,
 {
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
-        let lc_inv = self
-            .base_ring
-            .invert(&rhs.data[self.degree(rhs).unwrap()])
-            .unwrap();
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
         let (quo, rem) = fast_poly_div_rem(
             RingRef::new(self),
             lhs,
@@ -1043,29 +949,11 @@ where
         poly_ring.from_terms([].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(1), 0),
-                (base_ring.int_hom().map(1), 1),
-            ]
-            .into_iter(),
-        ),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(-1), 0),
-                (base_ring.int_hom().map(1), 1),
-            ]
-            .into_iter(),
-        ),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(1), 0),
-                (base_ring.int_hom().map(-1), 1),
-            ]
-            .into_iter(),
-        ),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
     ]
     .into_iter()
 }
@@ -1075,9 +963,8 @@ fn test_prod() {
     let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
     assert_el_eq!(&poly_ring, poly_ring.one(), poly_ring.prod([].into_iter()));
 
-    let product = poly_ring.prod(
-        (0..10).map(|n| poly_ring.add(poly_ring.indeterminate(), poly_ring.inclusion().map(n))),
-    );
+    let product =
+        poly_ring.prod((0..10).map(|n| poly_ring.add(poly_ring.indeterminate(), poly_ring.inclusion().map(n))));
     assert_eq!(Some(10), poly_ring.degree(&product));
     for i in 0..10 {
         let expected = multiset_combinations(&[1; 10], 10 - i, |indices| {
@@ -1096,8 +983,7 @@ fn test_prod() {
 #[test]
 fn test_fma_base() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    let [f, g, h] = poly_ring
-        .with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
+    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
     assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
 
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
@@ -1111,16 +997,13 @@ fn test_fma_base() {
     assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
 
     let poly_ring = DensePolyRing::new(zn_64::Zn::new(7), "X");
-    let [f, g] =
-        poly_ring.with_wrapped_indeterminate(|X| [3 * X.pow_ref(2) + 5, 5 * X.pow_ref(2) + 6]);
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [3 * X.pow_ref(2) + 5, 5 * X.pow_ref(2) + 6]);
     assert_el_eq!(
         &poly_ring,
         g,
-        poly_ring.get_ring().fma_base(
-            &f,
-            &poly_ring.base_ring().int_hom().map(4),
-            poly_ring.zero()
-        )
+        poly_ring
+            .get_ring()
+            .fma_base(&f, &poly_ring.base_ring().int_hom().map(4), poly_ring.zero())
     );
 }
 
@@ -1145,60 +1028,35 @@ fn test_poly_ring_axioms() {
 #[test]
 fn test_divisibility_ring_axioms() {
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::divisibility::generic_tests::test_divisibility_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_canonical_iso_axioms_different_base_ring() {
     let poly_ring1 = DensePolyRing::new(zn_big::Zn::new(StaticRing::<i128>::RING, 7), "X");
     let poly_ring2 = DensePolyRing::new(zn_64::Zn::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(
-        &poly_ring1,
-        &poly_ring2,
-        edge_case_elements(&poly_ring1),
-    );
-    crate::ring::generic_tests::test_iso_axioms(
-        &poly_ring1,
-        &poly_ring2,
-        edge_case_elements(&poly_ring1),
-    );
+    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
 }
 
 #[test]
 fn test_canonical_iso_sparse_poly_ring() {
     let poly_ring1 = SparsePolyRing::new(zn_64::Zn::new(7), "X");
     let poly_ring2 = DensePolyRing::new(zn_64::Zn::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(
-        &poly_ring1,
-        &poly_ring2,
-        edge_case_elements(&poly_ring1),
-    );
-    crate::ring::generic_tests::test_iso_axioms(
-        &poly_ring1,
-        &poly_ring2,
-        edge_case_elements(&poly_ring1),
-    );
+    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
 }
 
 #[test]
@@ -1213,10 +1071,7 @@ fn test_print() {
         ]
         .into_iter(),
     );
-    assert_eq!(
-        "(4X^2 + 3)Y^2 + 2X^2 + 1",
-        format!("{}", poly_ring.format(&poly))
-    );
+    assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.format(&poly)));
 
     let poly = poly_ring.from_terms(
         [
@@ -1238,10 +1093,7 @@ fn test_expensive_prod() {
 
     let start = Instant::now();
     let product = poly_ring.prod((0..2048).scan(ring.clone_el(&a), |current, _| {
-        let result = poly_ring.sub(
-            poly_ring.indeterminate(),
-            poly_ring.inclusion().map_ref(&current),
-        );
+        let result = poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map_ref(&current));
         *current = ring.pow(std::mem::replace(current, ring.zero()), 17);
         return Some(result);
     }));
@@ -1257,10 +1109,7 @@ fn test_expensive_prod() {
 #[test]
 fn test_serialize() {
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    crate::serialization::generic_tests::test_serialization(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::serialization::generic_tests::test_serialization(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
@@ -1268,10 +1117,7 @@ fn test_evaluate_approximate_ring() {
     let ring = DensePolyRing::new(Real64::RING, "X");
     let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
     let x = 0.47312;
-    assert!(
-        Real64::RING.abs((x * x * x - x + 1.) - ring.evaluate(&f, &x, &Real64::RING.identity()))
-            <= 0.000000001
-    );
+    assert!(Real64::RING.abs((x * x * x - x + 1.) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001);
 }
 
 #[bench]

@@ -1,8 +1,6 @@
 /// The absolute error in the expression `exp(2 * pi * i * (x / y))`.
 #[stability::unstable(feature = "enable")]
-pub fn root_of_unity_error() -> f64 {
-    6. * f64::EPSILON
-}
+pub fn root_of_unity_error() -> f64 { 6. * f64::EPSILON }
 
 /// Trait for operations that perform float-point computations, and thus must
 /// care about precision. Currently only used for [`crate::algorithms::fft::FFTAlgorithm`].

@@ -25,12 +25,19 @@ pub struct ProbablyNotSquarefree;
 /// If the given polynomial is square-free, this will succeed, except with probability
 /// `2^-attempts`. If it is not square-free, this will always fail (i.e. return `Err`).
 #[stability::unstable(feature = "enable")]
-pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempts: usize, controller: Controller) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
-    where P: RingStore,
-        P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
-        Controller: ComputationController
+pub fn poly_factor_squarefree_extension<P, Controller>(
+    LX: P,
+    f: &El<P>,
+    attempts: usize,
+    controller: Controller,
+) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
+where
+    P: RingStore,
+    P::Type: PolyRing + EuclideanRing,
+    <<P::Type as RingExtension>::BaseRing as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
+    <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type:
+        PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
+    Controller: ComputationController,
 {
     controller.run_computation(
         format_args!(
@@ -102,38 +109,22 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
             let mut rng = oorandom::Rand64::new(1);
 
             for _ in 0..attempts {
-                let k = StaticRing::<i32>::RING
-                    .get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());
-                let lin_transform = LX.from_terms(
-                    [
-                        (L.mul(L.canonical_gen(), L.int_hom().map(k)), 0),
-                        (L.one(), 1),
-                    ]
-                    .into_iter(),
-                );
+                let k = StaticRing::<i32>::RING.get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());
+                let lin_transform =
+                    LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
                 let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
 
                 let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
                 log_progress!(controller, "(norm)");
                 let degree = KX.degree(&norm_f_transformed).unwrap();
-                let squarefree_part =
-                    <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
+                let squarefree_part = <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
                 log_progress!(controller, "(squarefree)");
 
                 if KX.degree(&squarefree_part).unwrap() == degree {
-                    let lin_transform_rev = LX.from_terms(
-                        [
-                            (L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0),
-                            (L.one(), 1),
-                        ]
-                        .into_iter(),
-                    );
+                    let lin_transform_rev =
+                        LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
                     let (factorization, _unit) =
-                        <_ as FactorPolyField>::factor_poly_with_controller(
-                            &KX,
-                            &squarefree_part,
-                            controller.clone(),
-                        );
+                        <_ as FactorPolyField>::factor_poly_with_controller(&KX, &squarefree_part, controller.clone());
                     log_progress!(controller, "(factored)");
 
                     return Ok(factorization
@@ -158,22 +149,29 @@ pub fn poly_factor_squarefree_extension<P, Controller>(LX: P, f: &El<P>, attempt
 /// Factors a polynomial with coefficients in a field `K` that is a simple, finite-degree
 /// field extension of a base field that supports polynomial factorization.
 #[stability::unstable(feature = "enable")]
-pub fn poly_factor_extension<P, Controller>(poly_ring: P, f: &El<P>, controller: Controller) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
-    where P: RingStore,
-        P::Type: PolyRing + EuclideanRing,
-        <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
-        <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
-        Controller: ComputationController
+pub fn poly_factor_extension<P, Controller>(
+    poly_ring: P,
+    f: &El<P>,
+    controller: Controller,
+) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
+where
+    P: RingStore,
+    P::Type: PolyRing + EuclideanRing,
+    <<P::Type as RingExtension>::BaseRing as RingStore>::Type:
+        FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
+    <<<<P::Type as RingExtension>::BaseRing as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type:
+        PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
+    Controller: ComputationController,
 {
     let KX = &poly_ring;
     let K = KX.base_ring();
 
     // We use the approach outlined in Cohen's "a course in computational algebraic number theory".
     //  - Use square-free reduction to assume wlog that `f` is square-free
-    //  - Observe that the factorization of `f` is the product over `gcd(f, g)` where `g` runs
-    //    through the factors of `N(f)` over `QQ[X]` - assuming that `N(f)` is square-free! Here
-    //    `N(f)` is the "norm" of `f`, i.e. the product `prod_sigma sigma(f)` where `sigma` runs
-    //    through the embeddings `K -> CC`.
+    //  - Observe that the factorization of `f` is the product over `gcd(f, g)` where `g` runs through
+    //    the factors of `N(f)` over `QQ[X]` - assuming that `N(f)` is square-free! Here `N(f)` is the
+    //    "norm" of `f`, i.e. the product `prod_sigma sigma(f)` where `sigma` runs through the
+    //    embeddings `K -> CC`.
     //  - It is now left to actually compute `N(f)`, which is not so simple as we do not known the
     //    `sigma`. As it turns out, this is the resultant of `f` and `MiPo(theta)` where `theta`
     //    generates `K`
@@ -181,14 +179,10 @@ pub fn poly_factor_extension<P, Controller>(poly_ring: P, f: &El<P>, controller:
     assert!(!KX.is_zero(f));
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     for (non_irred_factor, k) in <_ as PolyTFracGCDRing>::power_decomposition(KX, f) {
-        for factor in poly_factor_squarefree_extension(
-            KX,
-            &non_irred_factor,
-            MAX_PROBABILISTIC_REPETITIONS,
-            controller.clone(),
-        )
-        .ok()
-        .unwrap()
+        for factor in
+            poly_factor_squarefree_extension(KX, &non_irred_factor, MAX_PROBABILISTIC_REPETITIONS, controller.clone())
+                .ok()
+                .unwrap()
         {
             if let Some((i, _)) = result
                 .iter()

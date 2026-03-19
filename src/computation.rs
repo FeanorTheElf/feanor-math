@@ -11,14 +11,10 @@ use crate::unstable_sealed::UnstableSealed;
 /// ```rust
 /// # #![feature(never_type)]
 /// # use feanor_math::computation::*;
-/// fn some_computation() -> Result<&'static str, !> {
-///     Ok("this computation does not fail")
-/// }
+/// fn some_computation() -> Result<&'static str, !> { Ok("this computation does not fail") }
 /// println!("{}", some_computation().unwrap_or_else(no_error));
 /// ```
-pub fn no_error<T>(error: !) -> T {
-    error
-}
+pub fn no_error<T>(error: !) -> T { error }
 
 /// Trait for objects that observe and control a potentially long-running computation.
 ///
@@ -75,9 +71,7 @@ pub trait ComputationController: Clone + UnstableSealed {
     /// Called by algorithms in (more or less) regular time intervals, can provide
     /// e.g. early aborts or tracking progress.
     #[stability::unstable(feature = "enable")]
-    fn checkpoint(&self, _description: Arguments) -> Result<(), Self::Abort> {
-        Ok(())
-    }
+    fn checkpoint(&self, _description: Arguments) -> Result<(), Self::Abort> { Ok(()) }
 
     /// Runs the given closure with a clone of this iterator, possibly adding a log
     /// message before and/or after the computation starts/finishes.
@@ -163,15 +157,10 @@ where
     Controller: ComputationController,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn controller(&self) -> &Controller {
-        &self.controller
-    }
+    pub fn controller(&self) -> &Controller { &self.controller }
 
     #[stability::unstable(feature = "enable")]
-    pub fn checkpoint(
-        &self,
-        description: Arguments,
-    ) -> Result<(), ShortCircuitingComputationAbort<Controller::Abort>> {
+    pub fn checkpoint(&self, description: Arguments) -> Result<(), ShortCircuitingComputationAbort<Controller::Abort>> {
         if self.executor.finished.load(Ordering::Relaxed) {
             return Err(ShortCircuitingComputationAbort::Finished);
         } else if let Err(e) = self.controller.checkpoint(description) {
@@ -182,9 +171,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn log(&self, description: Arguments) {
-        self.controller.log(description)
-    }
+    pub fn log(&self, description: Arguments) { self.controller.log(description) }
 
     #[stability::unstable(feature = "enable")]
     pub fn join_many<V, F>(self, operations: V)
@@ -205,8 +192,7 @@ where
             V: VectorFn<F> + Sync,
             F: FnOnce(
                 ShortCircuitingComputationHandle<'a, T, Controller>,
-            )
-                -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>>,
+            ) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>>,
         {
             if executor.finished.load(Ordering::Relaxed) {
                 return;
@@ -220,15 +206,11 @@ where
                     }) {
                         Ok(Some(result)) => {
                             executor.finished.store(true, Ordering::Relaxed);
-                            executor
-                                .result
-                                .store(Some(Box::new(result)), Ordering::AcqRel);
+                            executor.result.store(Some(Box::new(result)), Ordering::AcqRel);
                         }
                         Err(ShortCircuitingComputationAbort::Abort(abort)) => {
                             executor.finished.store(true, Ordering::Relaxed);
-                            executor
-                                .abort
-                                .store(Some(Box::new(abort)), Ordering::AcqRel);
+                            executor.abort.store(Some(Box::new(abort)), Ordering::AcqRel);
                         }
                         Err(ShortCircuitingComputationAbort::Finished) | Ok(None) => {}
                     }
@@ -236,44 +218,27 @@ where
             } else {
                 let mid = (from + to) / 2;
                 controller.join(
-                    move |controller| {
-                        join_many_internal(controller, executor, tasks, from, mid, batch_tasks)
-                    },
-                    move |controller| {
-                        join_many_internal(controller, executor, tasks, mid, to, batch_tasks)
-                    },
+                    move |controller| join_many_internal(controller, executor, tasks, from, mid, batch_tasks),
+                    move |controller| join_many_internal(controller, executor, tasks, mid, to, batch_tasks),
                 );
             }
         }
-        join_many_internal(
-            self.controller,
-            self.executor,
-            &operations,
-            0,
-            operations.len(),
-            1,
-        )
+        join_many_internal(self.controller, self.executor, &operations, 0, operations.len(), 1)
     }
 
     #[stability::unstable(feature = "enable")]
     pub fn join<A, B>(self, oper_a: A, oper_b: B)
     where
-        A: FnOnce(Self) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>>
-            + Send,
-        B: FnOnce(Self) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>>
-            + Send,
+        A: FnOnce(Self) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>> + Send,
+        B: FnOnce(Self) -> Result<Option<T>, ShortCircuitingComputationAbort<Controller::Abort>> + Send,
     {
         let success_fn = |value: T| {
             self.executor.finished.store(true, Ordering::Relaxed);
-            self.executor
-                .result
-                .store(Some(Box::new(value)), Ordering::AcqRel);
+            self.executor.result.store(Some(Box::new(value)), Ordering::AcqRel);
         };
         let abort_fn = |abort: Controller::Abort| {
             self.executor.finished.store(true, Ordering::Relaxed);
-            self.executor
-                .abort
-                .store(Some(Box::new(abort)), Ordering::AcqRel);
+            self.executor.abort.store(Some(Box::new(abort)), Ordering::AcqRel);
         };
         self.controller.join(
             |controller| {
@@ -323,10 +288,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn handle<'a>(
-        &'a self,
-        controller: Controller,
-    ) -> ShortCircuitingComputationHandle<'a, T, Controller> {
+    pub fn handle<'a>(&'a self, controller: Controller) -> ShortCircuitingComputationHandle<'a, T, Controller> {
         ShortCircuitingComputationHandle {
             controller,
             executor: self,
@@ -442,18 +404,15 @@ mod parallel_controller {
         type Abort = Rest::Abort;
 
         #[stability::unstable(feature = "enable")]
-        fn checkpoint(&self, description: Arguments) -> Result<(), Self::Abort> {
-            self.rest.checkpoint(description)
-        }
+        fn checkpoint(&self, description: Arguments) -> Result<(), Self::Abort> { self.rest.checkpoint(description) }
 
         #[stability::unstable(feature = "enable")]
         fn run_computation<F, T>(self, description: Arguments, computation: F) -> T
         where
             F: FnOnce(Self) -> T,
         {
-            self.rest.run_computation(description, |rest| {
-                computation(ExecuteMultithreaded { rest })
-            })
+            self.rest
+                .run_computation(description, |rest| computation(ExecuteMultithreaded { rest }))
         }
 
         #[stability::unstable(feature = "enable")]
@@ -476,8 +435,7 @@ mod parallel_controller {
         ExecuteMultithreaded { rest: LOG_PROGRESS };
     #[stability::unstable(feature = "enable")]
     #[allow(non_upper_case_globals)]
-    pub static RunMultithreaded: ExecuteMultithreaded<DontObserve> =
-        ExecuteMultithreaded { rest: DontObserve };
+    pub static RunMultithreaded: ExecuteMultithreaded<DontObserve> = ExecuteMultithreaded { rest: DontObserve };
 }
 
 #[cfg(feature = "parallel")]

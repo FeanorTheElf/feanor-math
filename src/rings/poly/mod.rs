@@ -65,11 +65,7 @@ pub trait PolyRing: RingExtension {
     /// Concretely, if `rhs` is a monic polynomial (polynomial with highest coefficient equal to 1),
     /// then there exist unique `q, r` such that `lhs = rhs * q + r` and `deg(r) < deg(rhs)`.
     /// These are returned. This function panics if `rhs` is not monic.
-    fn div_rem_monic(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element);
+    fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element);
 
     /// Truncates the monomials of the given polynomial from the given position on, i.e.
     /// computes the remainder of the polynomial division of `lhs` by `X^truncated_at_inclusive`.
@@ -159,18 +155,12 @@ where
     delegate! { PolyRing, fn truncate_monomials(&self, lhs: &mut El<Self>, truncated_at_degree: usize) -> () }
 
     /// See [`PolyRing::coefficient_at()`].
-    fn coefficient_at<'a>(
-        &'a self,
-        f: &'a El<Self>,
-        i: usize,
-    ) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
+    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<<Self::Type as RingExtension>::BaseRing> {
         self.get_ring().coefficient_at(f, i)
     }
 
     /// See [`PolyRing::terms()`].
-    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as PolyRing>::TermsIterator<'a> {
-        self.get_ring().terms(f)
-    }
+    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as PolyRing>::TermsIterator<'a> { self.get_ring().terms(f) }
 
     /// Computes the polynomial from the given terms.
     ///
@@ -217,10 +207,7 @@ where
 
     /// Returns a reference to the leading coefficient of the given polynomial, or `None` if the
     /// polynomial is zero.
-    fn lc<'a>(
-        &'a self,
-        f: &'a El<Self>,
-    ) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
+    fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<<Self::Type as RingExtension>::BaseRing>> {
         Some(self.coefficient_at(f, self.degree(f)?))
     }
 
@@ -285,11 +272,7 @@ where
                 <<Self::Type as RingExtension>::BaseRing as RingStore>::Type,
             >,
     {
-        CoefficientHom {
-            from,
-            to: self,
-            hom,
-        }
+        CoefficientHom { from, to: self, hom }
     }
 
     /// Lifts the given homomorphism of base rings `S -> R` to the corresponding
@@ -432,22 +415,14 @@ where
     type DomainStore = PFrom;
     type CodomainStore = PTo;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.from
-    }
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
 
-    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
-        self.map_ref(&x)
-    }
+    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element { self.map_ref(&x) }
 
     fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
-        self.to
-            .get_ring()
-            .map_terms(self.from.get_ring(), x, &self.hom)
+        self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
     }
 }
 
@@ -482,19 +457,15 @@ pub mod generic_impls {
 
     #[allow(type_alias_bounds)]
     #[stability::unstable(feature = "enable")]
-    pub type Homomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
+    pub type Homomorphism<P1: PolyRing, P2: PolyRing> =
+        <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
 
     #[stability::unstable(feature = "enable")]
-    pub fn has_canonical_hom<P1: PolyRing, P2: PolyRing>(
-        from: &P1,
-        to: &P2,
-    ) -> Option<Homomorphism<P1, P2>>
+    pub fn has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<Homomorphism<P1, P2>>
     where
         <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>,
     {
-        to.base_ring()
-            .get_ring()
-            .has_canonical_hom(from.base_ring().get_ring())
+        to.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
 
     #[stability::unstable(feature = "enable")]
@@ -512,11 +483,9 @@ pub mod generic_impls {
             &mut result,
             from.terms(&el).map(|(c, i)| {
                 (
-                    to.base_ring().get_ring().map_in(
-                        from.base_ring().get_ring(),
-                        from.base_ring().clone_el(c),
-                        hom,
-                    ),
+                    to.base_ring()
+                        .get_ring()
+                        .map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom),
                     i,
                 )
             }),
@@ -526,7 +495,8 @@ pub mod generic_impls {
 
     #[allow(type_alias_bounds)]
     #[stability::unstable(feature = "enable")]
-    pub type Isomorphism<P1: PolyRing, P2: PolyRing> = <<P2::BaseRing as RingStore>::Type as CanIsoFromTo<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
+    pub type Isomorphism<P1: PolyRing, P2: PolyRing> =
+        <<P2::BaseRing as RingStore>::Type as CanIsoFromTo<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
 
     #[stability::unstable(feature = "enable")]
     pub fn map_out<P1: PolyRing, P2: PolyRing>(
@@ -543,11 +513,9 @@ pub mod generic_impls {
             &mut result,
             to.terms(&el).map(|(c, i)| {
                 (
-                    to.base_ring().get_ring().map_out(
-                        from.base_ring().get_ring(),
-                        to.base_ring().clone_el(c),
-                        iso,
-                    ),
+                    to.base_ring()
+                        .get_ring()
+                        .map_out(from.base_ring().get_ring(), to.base_ring().clone_el(c), iso),
                     i,
                 )
             }),
@@ -574,13 +542,9 @@ pub mod generic_impls {
         let second_term = terms.next();
         let use_parenthesis = (env > EnvBindingStrength::Sum && second_term.is_some())
             || (env > EnvBindingStrength::Product
-                && !(ring.base_ring().is_one(&first_term.as_ref().unwrap().0)
-                    && first_term.as_ref().unwrap().1 == 1))
+                && !(ring.base_ring().is_one(&first_term.as_ref().unwrap().0) && first_term.as_ref().unwrap().1 == 1))
             || env == EnvBindingStrength::Strongest;
-        let mut terms = first_term
-            .into_iter()
-            .chain(second_term.into_iter())
-            .chain(terms);
+        let mut terms = first_term.into_iter().chain(second_term.into_iter()).chain(terms);
         if use_parenthesis {
             write!(out, "(")?;
         }
@@ -595,8 +559,7 @@ pub mod generic_impls {
             }
         };
         if let Some((c, i)) = terms.next() {
-            if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0
-            {
+            if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
                 ring.base_ring().get_ring().dbg_within(
                     c,
                     out,
@@ -613,8 +576,7 @@ pub mod generic_impls {
         }
         while let Some((c, i)) = terms.next() {
             write!(out, " + ")?;
-            if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0
-            {
+            if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
                 ring.base_ring().get_ring().dbg_within(
                     c,
                     out,
@@ -672,10 +634,7 @@ pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> imp
 pub mod generic_tests {
     use super::*;
 
-    pub fn test_poly_ring_axioms<
-        R: PolyRingStore,
-        I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>,
-    >(
+    pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<<R::Type as RingExtension>::BaseRing>>>(
         ring: R,
         interesting_base_ring_elements: I,
     ) where
@@ -698,8 +657,7 @@ pub mod generic_tests {
                             ring.mul_ref_snd(ring.inclusion().map_ref(d), &x),
                         );
                         assert!(
-                            ring.eq_el(&a_bx, &c_dx)
-                                == (ring.base_ring().eq_el(a, c) && ring.base_ring().eq_el(b, d))
+                            ring.eq_el(&a_bx, &c_dx) == (ring.base_ring().eq_el(a, c) && ring.base_ring().eq_el(b, d))
                         );
                     }
                 }
@@ -736,10 +694,7 @@ pub mod generic_tests {
                                 ),
                                 ring.mul(
                                     ring.inclusion().map_ref(b),
-                                    ring.mul(
-                                        ring.inclusion().map_ref(d),
-                                        ring.pow(ring.clone_el(&x), 2),
-                                    ),
+                                    ring.mul(ring.inclusion().map_ref(d), ring.pow(ring.clone_el(&x), 2)),
                                 ),
                             ]
                             .into_iter(),
@@ -775,10 +730,7 @@ pub mod generic_tests {
                     assert_el_eq!(
                         ring,
                         f,
-                        ring.from_terms(
-                            ring.terms(&f)
-                                .map(|(c, i)| (ring.base_ring().clone_el(c), i))
-                        )
+                        ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i)))
                     );
                 }
             }
@@ -788,13 +740,8 @@ pub mod generic_tests {
         for a in &elements {
             for b in &elements {
                 for c in &elements {
-                    let f = ring.from_terms(
-                        [
-                            (ring.base_ring().clone_el(a), 0),
-                            (ring.base_ring().clone_el(b), 3),
-                        ]
-                        .into_iter(),
-                    );
+                    let f = ring
+                        .from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(b), 3)].into_iter());
                     let g = ring.from_terms(
                         [
                             (ring.base_ring().negate(ring.base_ring().clone_el(c)), 0),
@@ -810,10 +757,8 @@ pub mod generic_tests {
                             [(
                                 ring.base_ring().add_ref_fst(
                                     a,
-                                    ring.base_ring().mul_ref_fst(
-                                        b,
-                                        ring.base_ring().pow(ring.base_ring().clone_el(c), 3)
-                                    )
+                                    ring.base_ring()
+                                        .mul_ref_fst(b, ring.base_ring().pow(ring.base_ring().clone_el(c), 3))
                                 ),
                                 0
                             )]
@@ -840,11 +785,8 @@ pub mod generic_tests {
                     ring.truncate_monomials(&mut a_trunc, i);
                     assert_el_eq!(
                         &ring,
-                        ring.div_rem_monic(
-                            ring.clone_el(&a),
-                            &ring.from_terms([(ring.base_ring().one(), i)])
-                        )
-                        .1,
+                        ring.div_rem_monic(ring.clone_el(&a), &ring.from_terms([(ring.base_ring().one(), i)]))
+                            .1,
                         a_trunc
                     );
                 }
@@ -883,8 +825,7 @@ use crate::primitive_int::StaticRing;
 #[test]
 fn test_dbg_poly() {
     let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-    let [f1, f2, f3, f4] =
-        ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1, 2 * X + 1, 2 * X]);
+    let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1, 2 * X + 1, 2 * X]);
 
     fn to_str(
         ring: &DensePolyRing<StaticRing<i64>>,

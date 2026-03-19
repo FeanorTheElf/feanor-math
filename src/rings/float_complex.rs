@@ -37,13 +37,9 @@ impl Complex64 {
 }
 
 impl Complex64Base {
-    pub fn abs(&self, Complex64El(re, im): Complex64El) -> f64 {
-        (re * re + im * im).sqrt()
-    }
+    pub fn abs(&self, Complex64El(re, im): Complex64El) -> f64 { (re * re + im * im).sqrt() }
 
-    pub fn conjugate(&self, Complex64El(re, im): Complex64El) -> Complex64El {
-        Complex64El(re, -im)
-    }
+    pub fn conjugate(&self, Complex64El(re, im): Complex64El) -> Complex64El { Complex64El(re, -im) }
 
     pub fn exp(&self, Complex64El(exp_re, exp_im): Complex64El) -> Complex64El {
         let angle = exp_im;
@@ -59,21 +55,11 @@ impl Complex64Base {
         Complex64El(self.abs(Complex64El(re, im)).ln(), im.atan2(re))
     }
 
-    pub fn is_absolute_approx_eq(
-        &self,
-        lhs: Complex64El,
-        rhs: Complex64El,
-        absolute_threshold: f64,
-    ) -> bool {
+    pub fn is_absolute_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, absolute_threshold: f64) -> bool {
         self.abs(self.sub(lhs, rhs)) < absolute_threshold
     }
 
-    pub fn is_relative_approx_eq(
-        &self,
-        lhs: Complex64El,
-        rhs: Complex64El,
-        relative_limit: f64,
-    ) -> bool {
+    pub fn is_relative_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, relative_limit: f64) -> bool {
         self.is_absolute_approx_eq(lhs, rhs, self.abs(lhs) * relative_limit)
     }
 
@@ -86,100 +72,55 @@ impl Complex64Base {
         }
     }
 
-    pub fn from_f64(&self, x: f64) -> Complex64El {
-        Complex64El(x, 0.)
-    }
+    pub fn from_f64(&self, x: f64) -> Complex64El { Complex64El(x, 0.) }
 
     pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El {
-        self.exp(self.mul(
-            self.from_f64((i as f64 / n as f64) * (2. * PI)),
-            Complex64::I,
-        ))
+        self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2. * PI)), Complex64::I))
     }
 
-    pub fn re(&self, Complex64El(re, _im): Complex64El) -> f64 {
-        re
-    }
+    pub fn re(&self, Complex64El(re, _im): Complex64El) -> f64 { re }
 
-    pub fn im(&self, Complex64El(_re, im): Complex64El) -> f64 {
-        im
-    }
+    pub fn im(&self, Complex64El(_re, im): Complex64El) -> f64 { im }
 }
 
 impl Complex64 {
-    pub fn abs(&self, val: Complex64El) -> f64 {
-        self.get_ring().abs(val)
+    pub fn abs(&self, val: Complex64El) -> f64 { self.get_ring().abs(val) }
+
+    pub fn conjugate(&self, val: Complex64El) -> Complex64El { self.get_ring().conjugate(val) }
+
+    pub fn exp(&self, exp: Complex64El) -> Complex64El { self.get_ring().exp(exp) }
+
+    pub fn closest_gaussian_int(&self, val: Complex64El) -> (i64, i64) { self.get_ring().closest_gaussian_int(val) }
+
+    pub fn ln_main_branch(&self, val: Complex64El) -> Complex64El { self.get_ring().ln_main_branch(val) }
+
+    pub fn is_absolute_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, absolute_threshold: f64) -> bool {
+        self.get_ring().is_absolute_approx_eq(lhs, rhs, absolute_threshold)
     }
 
-    pub fn conjugate(&self, val: Complex64El) -> Complex64El {
-        self.get_ring().conjugate(val)
-    }
-
-    pub fn exp(&self, exp: Complex64El) -> Complex64El {
-        self.get_ring().exp(exp)
-    }
-
-    pub fn closest_gaussian_int(&self, val: Complex64El) -> (i64, i64) {
-        self.get_ring().closest_gaussian_int(val)
-    }
-
-    pub fn ln_main_branch(&self, val: Complex64El) -> Complex64El {
-        self.get_ring().ln_main_branch(val)
-    }
-
-    pub fn is_absolute_approx_eq(
-        &self,
-        lhs: Complex64El,
-        rhs: Complex64El,
-        absolute_threshold: f64,
-    ) -> bool {
-        self.get_ring()
-            .is_absolute_approx_eq(lhs, rhs, absolute_threshold)
-    }
-
-    pub fn is_relative_approx_eq(
-        &self,
-        lhs: Complex64El,
-        rhs: Complex64El,
-        relative_limit: f64,
-    ) -> bool {
-        self.get_ring()
-            .is_relative_approx_eq(lhs, rhs, relative_limit)
+    pub fn is_relative_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, relative_limit: f64) -> bool {
+        self.get_ring().is_relative_approx_eq(lhs, rhs, relative_limit)
     }
 
     pub fn is_approx_eq(&self, lhs: Complex64El, rhs: Complex64El, precision: u64) -> bool {
         self.get_ring().is_approx_eq(lhs, rhs, precision)
     }
 
-    pub fn from_f64(&self, x: f64) -> Complex64El {
-        self.get_ring().from_f64(x)
-    }
+    pub fn from_f64(&self, x: f64) -> Complex64El { self.get_ring().from_f64(x) }
 
-    pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El {
-        self.get_ring().root_of_unity(i, n)
-    }
+    pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El { self.get_ring().root_of_unity(i, n) }
 
-    pub fn re(&self, x: Complex64El) -> f64 {
-        self.get_ring().re(x)
-    }
+    pub fn re(&self, x: Complex64El) -> f64 { self.get_ring().re(x) }
 
-    pub fn im(&self, x: Complex64El) -> f64 {
-        self.get_ring().im(x)
-    }
+    pub fn im(&self, x: Complex64El) -> f64 { self.get_ring().im(x) }
 }
 
 impl RingBase for Complex64Base {
     type Element = Complex64El;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        *val
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
 
-    fn add_assign(
-        &self,
-        Complex64El(lhs_re, lhs_im): &mut Self::Element,
-        Complex64El(rhs_re, rhs_im): Self::Element,
-    ) {
+    fn add_assign(&self, Complex64El(lhs_re, lhs_im): &mut Self::Element, Complex64El(rhs_re, rhs_im): Self::Element) {
         *lhs_re += rhs_re;
         *lhs_im += rhs_im;
     }
@@ -189,50 +130,30 @@ impl RingBase for Complex64Base {
         *im = -*im;
     }
 
-    fn mul_assign(
-        &self,
-        Complex64El(lhs_re, lhs_im): &mut Self::Element,
-        Complex64El(rhs_re, rhs_im): Self::Element,
-    ) {
+    fn mul_assign(&self, Complex64El(lhs_re, lhs_im): &mut Self::Element, Complex64El(rhs_re, rhs_im): Self::Element) {
         let new_im = *lhs_re * rhs_im + *lhs_im * rhs_re;
         *lhs_re = *lhs_re * rhs_re - *lhs_im * rhs_im;
         *lhs_im = new_im;
     }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        Complex64El(value as f64, 0.)
-    }
+    fn from_int(&self, value: i32) -> Self::Element { Complex64El(value as f64, 0.) }
 
     fn eq_el(&self, _: &Self::Element, _: &Self::Element) -> bool {
         panic!("Cannot provide equality on approximate rings")
     }
 
-    fn pow_gen<R: IntegerRingStore>(
-        &self,
-        x: Self::Element,
-        power: &El<R>,
-        integers: R,
-    ) -> Self::Element
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
     where
         R::Type: IntegerRing,
     {
-        self.exp(self.mul(
-            self.ln_main_branch(x),
-            Complex64El(integers.to_float_approx(power), 0.),
-        ))
+        self.exp(self.mul(self.ln_main_branch(x), Complex64El(integers.to_float_approx(power), 0.)))
     }
 
-    fn is_commutative(&self) -> bool {
-        true
-    }
+    fn is_commutative(&self) -> bool { true }
 
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_noetherian(&self) -> bool { true }
 
-    fn is_approximate(&self) -> bool {
-        true
-    }
+    fn is_approximate(&self) -> bool { true }
 
     fn dbg_within<'a>(
         &self,
@@ -247,11 +168,7 @@ impl RingBase for Complex64Base {
         }
     }
 
-    fn dbg<'a>(
-        &self,
-        value: &Self::Element,
-        out: &mut std::fmt::Formatter<'a>,
-    ) -> std::fmt::Result {
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
@@ -290,11 +207,7 @@ impl PrincipalIdealRing for Complex64Base {
 }
 
 impl EuclideanRing for Complex64Base {
-    fn euclidean_div_rem(
-        &self,
-        _lhs: Self::Element,
-        _rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, _lhs: Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 
@@ -312,13 +225,9 @@ impl Field for Complex64Base {
 impl RingExtension for Complex64Base {
     type BaseRing = Real64;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        &Real64::RING
-    }
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &Real64::RING }
 
-    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        self.from_f64(x)
-    }
+    fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.from_f64(x) }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
         lhs.0 *= *rhs;
@@ -329,25 +238,13 @@ impl RingExtension for Complex64Base {
 impl<I: ?Sized + IntegerRing> CanHomFrom<I> for Complex64Base {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _from: &I) -> Option<Self::Homomorphism> {
-        Some(())
-    }
+    fn has_canonical_hom(&self, _from: &I) -> Option<Self::Homomorphism> { Some(()) }
 
-    fn map_in(
-        &self,
-        from: &I,
-        el: <I as RingBase>::Element,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &I, el: <I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 
-    fn map_in_ref(
-        &self,
-        from: &I,
-        el: &<I as RingBase>::Element,
-        _hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
         self.from_f64(from.to_float_approx(el))
     }
 }
@@ -399,11 +296,7 @@ fn test_pow() {
     ));
 
     let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2. * PI / 7.)));
-    assert!(CC.is_approx_eq(
-        CC.pow(seventh_root_of_unity, 7 * 100 + 1),
-        seventh_root_of_unity,
-        1000
-    ));
+    assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
 }
 
 #[test]

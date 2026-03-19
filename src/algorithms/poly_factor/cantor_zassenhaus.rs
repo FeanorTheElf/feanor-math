@@ -108,19 +108,14 @@ where
                 current_deg += 1;
                 x_power_Q_mod_f = mod_f_ring.pow_gen(x_power_Q_mod_f, &q, ZZ);
                 let fq_defining_poly_mod_f = poly_ring.sub(
-                    mod_f_ring.poly_repr(
-                        &poly_ring,
-                        &x_power_Q_mod_f,
-                        &poly_ring.base_ring().identity(),
-                    ),
+                    mod_f_ring.poly_repr(&poly_ring, &x_power_Q_mod_f, &poly_ring.base_ring().identity()),
                     poly_ring.indeterminate(),
                 );
-                let deg_i_factor =
-                    poly_ring.normalize(poly_ring.get_ring().ideal_gen_with_controller(
-                        &f,
-                        &fq_defining_poly_mod_f,
-                        controller.clone(),
-                    ));
+                let deg_i_factor = poly_ring.normalize(poly_ring.get_ring().ideal_gen_with_controller(
+                    &f,
+                    &fq_defining_poly_mod_f,
+                    controller.clone(),
+                ));
                 f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
                 result.push(deg_i_factor);
                 log_progress!(controller, ".");
@@ -175,11 +170,7 @@ where
 /// assert!(!FpX.is_unit(&factorization[3])); // factorization[3] is some scalar multiple of (X^3 + 2 X^2 + 1) (X^3 + 2 X + 1)
 /// ```
 #[stability::unstable(feature = "enable")]
-pub fn distinct_degree_factorization<P, Controller>(
-    poly_ring: P,
-    mut f: El<P>,
-    controller: Controller,
-) -> Vec<El<P>>
+pub fn distinct_degree_factorization<P, Controller>(poly_ring: P, mut f: El<P>, controller: Controller) -> Vec<El<P>>
 where
     P: RingStore,
     P::Type: PolyRing + EuclideanRing,
@@ -192,11 +183,9 @@ where
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| {
-            poly_ring.base_ring().negate(
-                poly_ring
-                    .base_ring()
-                    .clone_el(poly_ring.coefficient_at(&f, i)),
-            )
+            poly_ring
+                .base_ring()
+                .negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))
         })
         .collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
@@ -209,12 +198,7 @@ where
 /// As [`cantor_zassenhaus()`], but takes `f` in the form of the ring `R[X]/(f)`, which is the
 /// internal representation that is used to actually compute the factorization.
 #[stability::unstable(feature = "enable")]
-pub fn cantor_zassenhaus_base<P, R, Controller>(
-    poly_ring: P,
-    mod_f_ring: R,
-    d: usize,
-    controller: Controller,
-) -> El<P>
+pub fn cantor_zassenhaus_base<P, R, Controller>(poly_ring: P, mod_f_ring: R, d: usize, controller: Controller) -> El<P>
 where
     P: RingStore,
     P::Type: PolyRing + EuclideanRing,
@@ -245,8 +229,7 @@ where
 
             for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
                 let T = mod_f_ring.from_canonical_basis(
-                    (0..mod_f_ring.rank())
-                        .map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())),
+                    (0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())),
                 );
                 let G = mod_f_ring.sub(mod_f_ring.pow_gen(T, &exp, ZZ), mod_f_ring.one());
                 let g = poly_ring.get_ring().ideal_gen(
@@ -288,12 +271,7 @@ where
 /// other is not is approximately 1/2. This also does not change if we replace the polynomia
 /// `T` of very large degree with `T mod f`, i.e. with a random polynomial of degree `d - 1`.
 #[stability::unstable(feature = "enable")]
-pub fn cantor_zassenhaus<P, Controller>(
-    poly_ring: P,
-    mut f: El<P>,
-    d: usize,
-    controller: Controller,
-) -> El<P>
+pub fn cantor_zassenhaus<P, Controller>(poly_ring: P, mut f: El<P>, d: usize, controller: Controller) -> El<P>
 where
     P: RingStore,
     P::Type: PolyRing + EuclideanRing,
@@ -304,11 +282,9 @@ where
     f = poly_ring.normalize(f);
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| {
-            poly_ring.base_ring().negate(
-                poly_ring
-                    .base_ring()
-                    .clone_el(poly_ring.coefficient_at(&f, i)),
-            )
+            poly_ring
+                .base_ring()
+                .negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))
         })
         .collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
@@ -346,21 +322,14 @@ where
     let e = ZZ.abs_log2_ceil(&q).unwrap();
     assert_el_eq!(ZZ, ZZ.power_of_two(e), q);
 
-    let mut rng =
-        oorandom::Rand64::new((ZZ.default_hash(&q) as u128) | ((seed as u128) << u64::BITS));
+    let mut rng = oorandom::Rand64::new((ZZ.default_hash(&q) as u128) | ((seed as u128) << u64::BITS));
     let zeta3 = get_prim_root_of_unity(&Fq, 3).unwrap();
     let exp = if (d * e) % 2 == 0 {
-        ZZ.checked_div(
-            &ZZ.sub(ZZ.power_of_two(d * e), ZZ.one()),
-            &ZZ.int_hom().map(3),
-        )
-        .unwrap()
+        ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(d * e), ZZ.one()), &ZZ.int_hom().map(3))
+            .unwrap()
     } else {
-        ZZ.checked_div(
-            &ZZ.sub(ZZ.power_of_two(2 * d * e), ZZ.one()),
-            &ZZ.int_hom().map(3),
-        )
-        .unwrap()
+        ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(2 * d * e), ZZ.one()), &ZZ.int_hom().map(3))
+            .unwrap()
     };
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
@@ -410,8 +379,7 @@ where
     R::Type: FreeAlgebra,
     <<R as RingStore>::Type as RingExtension>::BaseRing:
         RingStore<Type = <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type>,
-    <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type:
-        FiniteRing + Field + SelfIso,
+    <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso,
     Controller: ComputationController,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
@@ -443,9 +411,7 @@ where
                     ),
                 ));
                 let new_x_pow_rank = mod_f_ring
-                    .wrt_canonical_basis(
-                        &mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank()),
-                    )
+                    .wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank()))
                     .into_iter()
                     .map(|x| new_base_ring.inclusion().map(x))
                     .collect::<Vec<_>>();
@@ -465,14 +431,13 @@ where
                 // extension, but that factor only induces a trivial factor over the
                 // base ring; in this case repeat
                 for seed in 0..u64::MAX {
-                    let factor =
-                        new_poly_ring.normalize(cantor_zassenhaus_even_base_with_root_of_unity(
-                            &new_poly_ring,
-                            &new_mod_f_ring,
-                            d,
-                            seed,
-                            controller.clone(),
-                        ));
+                    let factor = new_poly_ring.normalize(cantor_zassenhaus_even_base_with_root_of_unity(
+                        &new_poly_ring,
+                        &new_mod_f_ring,
+                        d,
+                        seed,
+                        controller.clone(),
+                    ));
 
                     if new_poly_ring
                         .terms(&factor)
@@ -488,15 +453,13 @@ where
                         assert!(d % 2 == 0);
                         // if d is even, the factor might only live in `new_base_ring`, but we can
                         // just use its norm; the automorphism is X -> X^2
-                        let factor_conjugate =
-                            new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
-                                let c_vec = new_base_ring.wrt_canonical_basis(c);
-                                let new_c = new_base_ring.from_canonical_basis(
-                                    [Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))]
-                                        .into_iter(),
-                                );
-                                (new_c, i)
-                            }));
+                        let factor_conjugate = new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
+                            let c_vec = new_base_ring.wrt_canonical_basis(c);
+                            let new_c = new_base_ring.from_canonical_basis(
+                                [Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter(),
+                            );
+                            (new_c, i)
+                        }));
                         let factor_norm = new_poly_ring.mul(factor, factor_conjugate);
                         let factor_norm_Fq = poly_ring.from_terms(
                             new_poly_ring
@@ -515,9 +478,7 @@ where
                 }
                 unreachable!()
             } else {
-                return cantor_zassenhaus_even_base_with_root_of_unity(
-                    poly_ring, mod_f_ring, d, 0, controller,
-                );
+                return cantor_zassenhaus_even_base_with_root_of_unity(poly_ring, mod_f_ring, d, 0, controller);
             }
         },
     )
@@ -526,28 +487,20 @@ where
 /// Finds a nontrivial factor of a square-free polynomial over `Fq` for `q` a power of two,
 /// assuming all its irreducible factors have degree `d`.
 #[stability::unstable(feature = "enable")]
-pub fn cantor_zassenhaus_even<P, Controller>(
-    poly_ring: P,
-    mut f: El<P>,
-    d: usize,
-    controller: Controller,
-) -> El<P>
+pub fn cantor_zassenhaus_even<P, Controller>(poly_ring: P, mut f: El<P>, d: usize, controller: Controller) -> El<P>
 where
     P: RingStore,
     P::Type: PolyRing + EuclideanRing,
     <<P as RingStore>::Type as RingExtension>::BaseRing: RingStore + FieldStore,
-    <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type:
-        FiniteRing + Field + SelfIso,
+    <<<P as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso,
     Controller: ComputationController,
 {
     f = poly_ring.normalize(f);
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| {
-            poly_ring.base_ring().negate(
-                poly_ring
-                    .base_ring()
-                    .clone_el(poly_ring.coefficient_at(&f, i)),
-            )
+            poly_ring
+                .base_ring()
+                .negate(poly_ring.base_ring().clone_el(poly_ring.coefficient_at(&f, i)))
         })
         .collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new_with_convolution(
@@ -572,10 +525,7 @@ fn test_distinct_degree_factorization() {
 
     // one degree 3 factor
     let a0 = ring.one();
-    let a1 = ring.mul(
-        ring.indeterminate(),
-        ring.from_terms([(1, 0), (1, 1)].into_iter()),
-    );
+    let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
     let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
     let a3 = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
     let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| ring.clone_el(x)));
@@ -588,10 +538,7 @@ fn test_distinct_degree_factorization() {
 
     // two degree 3 factors
     let a0 = ring.one();
-    let a1 = ring.mul(
-        ring.indeterminate(),
-        ring.from_terms([(1, 0), (1, 1)].into_iter()),
-    );
+    let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
     let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
     let a3 = ring.mul(
         ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter()),
@@ -628,22 +575,10 @@ fn test_is_irreducible() {
                 .collect::<Vec<_>>(),
         )
     };
-    assert_eq!(
-        false,
-        squarefree_is_irreducible_base(&ring, create_extension_ring(&f1))
-    );
-    assert_eq!(
-        true,
-        squarefree_is_irreducible_base(&ring, create_extension_ring(&f2))
-    );
-    assert_eq!(
-        false,
-        squarefree_is_irreducible_base(&ring, create_extension_ring(&f3))
-    );
-    assert_eq!(
-        true,
-        squarefree_is_irreducible_base(&ring, create_extension_ring(&f4))
-    );
+    assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f1)));
+    assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f2)));
+    assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f3)));
+    assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f4)));
 }
 
 #[test]
@@ -691,23 +626,13 @@ fn test_cantor_zassenhaus_even_extension_field() {
 
     // (X^4 + X + 1) = (X + a) (X + a + 1) (X + a^2) (X + a^2 + 1)
     let f1 = ring.from_terms([(Fq.canonical_gen(), 0), (Fq.one(), 1)].into_iter());
-    let f2 =
-        ring.from_terms([(Fq.add(Fq.canonical_gen(), Fq.one()), 0), (Fq.one(), 1)].into_iter());
+    let f2 = ring.from_terms([(Fq.add(Fq.canonical_gen(), Fq.one()), 0), (Fq.one(), 1)].into_iter());
     let f3 = ring.from_terms([(Fq.pow(Fq.canonical_gen(), 2), 0), (Fq.one(), 1)].into_iter());
-    let f4 = ring.from_terms(
-        [
-            (Fq.add(Fq.pow(Fq.canonical_gen(), 2), Fq.one()), 0),
-            (Fq.one(), 1),
-        ]
-        .into_iter(),
-    );
+    let f4 = ring.from_terms([(Fq.add(Fq.pow(Fq.canonical_gen(), 2), Fq.one()), 0), (Fq.one(), 1)].into_iter());
     let h = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
     let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1, DontObserve));
     assert!(
-        ring.eq_el(&factor, &f1)
-            || ring.eq_el(&factor, &f2)
-            || ring.eq_el(&factor, &f3)
-            || ring.eq_el(&factor, &f4)
+        ring.eq_el(&factor, &f1) || ring.eq_el(&factor, &f2) || ring.eq_el(&factor, &f3) || ring.eq_el(&factor, &f4)
     );
 
     let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 3, [1, 1, 0])

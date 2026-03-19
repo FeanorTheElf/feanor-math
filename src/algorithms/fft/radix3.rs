@@ -42,10 +42,7 @@ where
 
     let stride = ZZ.pow(3, log3_n - step - 1) as usize;
     assert!(data.len() % (3 * stride) == 0);
-    assert_eq!(
-        twiddles.as_chunks::<2>().0.len(),
-        data.chunks_mut(3 * stride).len()
-    );
+    assert_eq!(twiddles.as_chunks::<2>().0.len(), data.chunks_mut(3 * stride).len());
 
     if stride == 1 {
         for ([twiddle1, twiddle2], butterfly_data) in twiddles
@@ -58,19 +55,12 @@ where
             butterfly(a, b, c, twiddle1, twiddle2);
         }
     } else {
-        for ([twiddle1, twiddle2], butterfly_data) in twiddles
-            .as_chunks::<2>()
-            .0
-            .iter()
-            .zip(data.chunks_mut(3 * stride))
+        for ([twiddle1, twiddle2], butterfly_data) in
+            twiddles.as_chunks::<2>().0.iter().zip(data.chunks_mut(3 * stride))
         {
             let (first, rest) = butterfly_data.split_at_mut(stride);
             let (second, third) = rest.split_at_mut(stride);
-            for ((a, b), c) in first
-                .iter_mut()
-                .zip(second.iter_mut())
-                .zip(third.iter_mut())
-            {
+            for ((a, b), c) in first.iter_mut().zip(second.iter_mut()).zip(third.iter_mut()) {
                 butterfly(a, b, c, twiddle1, twiddle2);
             }
         }
@@ -103,11 +93,7 @@ where
     {
         let n = ZZ.pow(3, log3_n);
         let root_of_unity = get_prim_root_of_unity_zn(&ring, n as usize)?;
-        return Some(Self::new_with_hom(
-            ring.into_identity(),
-            root_of_unity,
-            log3_n,
-        ));
+        return Some(Self::new_with_hom(ring.into_identity(), root_of_unity, log3_n));
     }
 }
 
@@ -177,11 +163,7 @@ where
             main_root_of_unity: hom.map(root_of_unity_pow(1)),
             log3_n,
             twiddles: Self::create_twiddle_list(hom.domain(), log3_n, &mut root_of_unity_pow),
-            inv_twiddles: Self::create_inv_twiddle_list(
-                hom.domain(),
-                log3_n,
-                &mut root_of_unity_pow,
-            ),
+            inv_twiddles: Self::create_inv_twiddle_list(hom.domain(), log3_n, &mut root_of_unity_pow),
             third_root_of_unity: root_of_unity_pow(2 * n as i64 / 3),
             hom,
             allocator,
@@ -213,8 +195,7 @@ where
             ));
             new_hom.map(root_of_unity)
         } else {
-            let root_of_unity =
-                &self.inv_twiddles[self.log3_n - 1][threeadic_reverse(1, self.log3_n - 1)];
+            let root_of_unity = &self.inv_twiddles[self.log3_n - 1][threeadic_reverse(1, self.log3_n - 1)];
             debug_assert!(self.ring().eq_el(
                 &self.hom.map_ref(root_of_unity),
                 self.root_of_unity(self.hom.codomain())
@@ -222,10 +203,7 @@ where
             new_hom.map_ref(root_of_unity)
         };
         assert!(ring.is_commutative());
-        assert!(
-            ring.get_ring().is_approximate()
-                || is_prim_root_of_unity(&ring, &root_of_unity, self.len())
-        );
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity, self.len()));
 
         return (
             CooleyTukeyRadix3FFT {
@@ -243,15 +221,11 @@ where
 
     /// Returns the ring over which this object can compute FFTs.
     #[stability::unstable(feature = "enable")]
-    pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
-        self.hom.codomain()
-    }
+    pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore { self.hom.codomain() }
 
     /// Returns a reference to the allocator currently used for temporary allocations by this FFT.
     #[stability::unstable(feature = "enable")]
-    pub fn allocator(&self) -> &A {
-        &self.allocator
-    }
+    pub fn allocator(&self) -> &A { &self.allocator }
 
     /// Replaces the allocator used for temporary allocations by this FFT.
     #[stability::unstable(feature = "enable")]
@@ -273,15 +247,9 @@ where
     /// Returns a reference to the homomorphism that is used to map the stored twiddle
     /// factors into main ring, over which FFTs are computed.
     #[stability::unstable(feature = "enable")]
-    pub fn hom<'a>(&'a self) -> &'a H {
-        &self.hom
-    }
+    pub fn hom<'a>(&'a self) -> &'a H { &self.hom }
 
-    fn create_twiddle_list<F>(
-        ring: &H::DomainStore,
-        log3_n: usize,
-        mut pow_zeta: F,
-    ) -> Vec<Vec<R_twiddle::Element>>
+    fn create_twiddle_list<F>(ring: &H::DomainStore, log3_n: usize, mut pow_zeta: F) -> Vec<Vec<R_twiddle::Element>>
     where
         F: FnMut(i64) -> R_twiddle::Element,
     {
@@ -299,11 +267,7 @@ where
         return result;
     }
 
-    fn create_inv_twiddle_list<F>(
-        ring: &H::DomainStore,
-        log3_n: usize,
-        mut pow_zeta: F,
-    ) -> Vec<Vec<R_twiddle::Element>>
+    fn create_inv_twiddle_list<F>(ring: &H::DomainStore, log3_n: usize, mut pow_zeta: F) -> Vec<Vec<R_twiddle::Element>>
     where
         F: FnMut(i64) -> R_twiddle::Element,
     {
@@ -327,35 +291,29 @@ where
         };
         let third_root_of_unity = &self.third_root_of_unity;
         // let start = std::time::Instant::now();
-        butterfly_loop(
-            self.log3_n,
-            data,
-            step,
-            twiddles,
-            |x, y, z, twiddle1, twiddle2| {
-                if INV {
-                    <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::inv_butterfly(
-                        &self.hom,
-                        x,
-                        y,
-                        z,
-                        &third_root_of_unity,
-                        twiddle1,
-                        twiddle2,
-                    )
-                } else {
-                    <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::butterfly(
-                        &self.hom,
-                        x,
-                        y,
-                        z,
-                        &third_root_of_unity,
-                        twiddle1,
-                        twiddle2,
-                    )
-                }
-            },
-        );
+        butterfly_loop(self.log3_n, data, step, twiddles, |x, y, z, twiddle1, twiddle2| {
+            if INV {
+                <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::inv_butterfly(
+                    &self.hom,
+                    x,
+                    y,
+                    z,
+                    &third_root_of_unity,
+                    twiddle1,
+                    twiddle2,
+                )
+            } else {
+                <R_main as CooleyTukeyRadix3Butterfly<R_twiddle>>::butterfly(
+                    &self.hom,
+                    x,
+                    y,
+                    z,
+                    &third_root_of_unity,
+                    twiddle1,
+                    twiddle2,
+                )
+            }
+        });
         // let end = std::time::Instant::now();
         // BUTTERFLY_RADIX3_TIMES[step].fetch_add((end - start).as_micros() as usize,
         // std::sync::atomic::Ordering::Relaxed);
@@ -443,10 +401,7 @@ where
         V: SwappableVectorViewMut<R_main::Element>,
         S: RingStore<Type = R_main> + Copy,
     {
-        assert!(
-            ring.get_ring() == self.hom.codomain().get_ring(),
-            "unsupported ring"
-        );
+        assert!(ring.get_ring() == self.hom.codomain().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
         if let Some(data) = values.as_slice_mut() {
             self.fft_impl(data);
@@ -465,10 +420,7 @@ where
         V: SwappableVectorViewMut<R_main::Element>,
         S: RingStore<Type = R_main> + Copy,
     {
-        assert!(
-            ring.get_ring() == self.hom.codomain().get_ring(),
-            "unsupported ring"
-        );
+        assert!(ring.get_ring() == self.hom.codomain().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
         if let Some(data) = values.as_slice_mut() {
             self.inv_fft_impl(data);
@@ -486,20 +438,13 @@ where
     where
         S: RingStore<Type = R_main> + Copy,
     {
-        assert!(
-            ring.get_ring() == self.hom.codomain().get_ring(),
-            "unsupported ring"
-        );
+        assert!(ring.get_ring() == self.hom.codomain().get_ring(), "unsupported ring");
         &self.main_root_of_unity
     }
 
-    fn unordered_fft_permutation(&self, i: usize) -> usize {
-        threeadic_reverse(i, self.log3_n)
-    }
+    fn unordered_fft_permutation(&self, i: usize) -> usize { threeadic_reverse(i, self.log3_n) }
 
-    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
-        threeadic_reverse(i, self.log3_n)
-    }
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize { threeadic_reverse(i, self.log3_n) }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -619,8 +564,7 @@ where
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // the butterfly performs two multiplications with roots of unity, and then two additions
-        let multiply_absolute_error =
-            2. * input_bound * root_of_unity_error() + input_bound * f64::EPSILON;
+        let multiply_absolute_error = 2. * input_bound * root_of_unity_error() + input_bound * f64::EPSILON;
         let addition_absolute_error = 2. * input_bound * f64::EPSILON;
         let butterfly_absolute_error = multiply_absolute_error + addition_absolute_error;
         // the operator inf-norm of the FFT is its length
@@ -658,10 +602,7 @@ fn test_radix3_butterflies() {
     let expected_std_order = |step: usize, group_idx: usize, value_idx: usize| {
         ring.sum((0..ZZ.pow(3, step)).map(|k| {
             ring.mul(
-                ring.pow(
-                    zeta_inv,
-                    value_idx * (k * ZZ.pow(3, log3_n - step)) as usize,
-                ),
+                ring.pow(zeta_inv, value_idx * (k * ZZ.pow(3, log3_n - step)) as usize),
                 data[group_idx + (k * ZZ.pow(3, log3_n - step)) as usize],
             )
         }))
@@ -735,11 +676,7 @@ fn test_size_1_fft() {
 pub mod generic_tests {
     use super::*;
 
-    pub fn test_cooley_tuckey_radix3_butterfly<
-        R: RingStore,
-        S: RingStore,
-        I: Iterator<Item = El<R>>,
-    >(
+    pub fn test_cooley_tuckey_radix3_butterfly<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(
         ring: R,
         base: S,
         edge_case_elements: I,
@@ -761,20 +698,10 @@ pub mod generic_tests {
         for a in &elements {
             for b in &elements {
                 for c in &elements {
-                    let [mut x, mut y, mut z] =
-                        [ring.clone_el(a), ring.clone_el(b), ring.clone_el(c)];
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(
-                        ring.get_ring(),
-                        &mut x,
-                    );
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(
-                        ring.get_ring(),
-                        &mut y,
-                    );
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(
-                        ring.get_ring(),
-                        &mut z,
-                    );
+                    let [mut x, mut y, mut z] = [ring.clone_el(a), ring.clone_el(b), ring.clone_el(c)];
+                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(ring.get_ring(), &mut x);
+                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(ring.get_ring(), &mut y);
+                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(ring.get_ring(), &mut z);
                     <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::butterfly(
                         &hom,
                         &mut x,
@@ -787,43 +714,25 @@ pub mod generic_tests {
                     let mut t = hom.map_ref(&test_twiddle);
                     assert_el_eq!(
                         ring,
-                        ring.add_ref_fst(
-                            a,
-                            ring.mul_ref_snd(ring.add_ref_fst(b, ring.mul_ref(c, &t)), &t)
-                        ),
+                        ring.add_ref_fst(a, ring.mul_ref_snd(ring.add_ref_fst(b, ring.mul_ref(c, &t)), &t)),
                         &x
                     );
                     ring.mul_assign(&mut t, hom.map_ref(&test_zeta));
                     assert_el_eq!(
                         ring,
-                        ring.add_ref_fst(
-                            a,
-                            ring.mul_ref_snd(ring.add_ref_fst(b, ring.mul_ref(c, &t)), &t)
-                        ),
+                        ring.add_ref_fst(a, ring.mul_ref_snd(ring.add_ref_fst(b, ring.mul_ref(c, &t)), &t)),
                         &y
                     );
                     ring.mul_assign(&mut t, hom.map_ref(&test_zeta));
                     assert_el_eq!(
                         ring,
-                        ring.add_ref_fst(
-                            a,
-                            ring.mul_ref_snd(ring.add_ref_fst(b, ring.mul_ref(c, &t)), &t)
-                        ),
+                        ring.add_ref_fst(a, ring.mul_ref_snd(ring.add_ref_fst(b, ring.mul_ref(c, &t)), &t)),
                         &z
                     );
 
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(
-                        ring.get_ring(),
-                        &mut x,
-                    );
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(
-                        ring.get_ring(),
-                        &mut y,
-                    );
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(
-                        ring.get_ring(),
-                        &mut z,
-                    );
+                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(ring.get_ring(), &mut x);
+                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(ring.get_ring(), &mut y);
+                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(ring.get_ring(), &mut z);
                     <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::inv_butterfly(
                         &hom,
                         &mut x,
@@ -845,11 +754,5 @@ pub mod generic_tests {
 #[test]
 fn test_butterfly() {
     let ring = Fp::<109>::RING;
-    generic_tests::test_cooley_tuckey_radix3_butterfly(
-        ring,
-        ring,
-        ring.elements().step_by(10),
-        &63,
-        &97,
-    );
+    generic_tests::test_cooley_tuckey_radix3_butterfly(ring, ring, ring.elements().step_by(10), &63, &97);
 }

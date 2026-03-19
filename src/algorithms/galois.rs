@@ -35,9 +35,7 @@ pub fn compute_galois_closure<Controller: ComputationController>(
             &gen_poly,
             &poly_ring.sub(
                 poly_ring.indeterminate(),
-                poly_ring
-                    .inclusion()
-                    .map(poly_ring.base_ring().canonical_gen()),
+                poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
             ),
         )
         .unwrap();
@@ -151,10 +149,8 @@ where
     /// Returns true if this is the identity map.
     #[stability::unstable(feature = "enable")]
     pub fn is_identity(&self) -> bool {
-        self.field.eq_el(
-            &self.image_of_canonical_gen_powers[1],
-            &self.field.canonical_gen(),
-        )
+        self.field
+            .eq_el(&self.image_of_canonical_gen_powers[1], &self.field.canonical_gen())
     }
 
     /// Returns the inverse of this automorphism
@@ -165,8 +161,7 @@ where
     }
 }
 
-impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>>
-    for GaloisAutomorphism<K, Impl, I>
+impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>> for GaloisAutomorphism<K, Impl, I>
 where
     K: RingStore<Type = NumberFieldBase<Impl, I>>,
     Impl: RingStore,
@@ -178,13 +173,9 @@ where
     type DomainStore = K;
     type CodomainStore = K;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.field
-    }
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.field }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.field
-    }
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.field }
 
     fn map_ref(
         &self,
@@ -219,10 +210,7 @@ where
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("GaloisAutomorphism")
-            .field(
-                "gen_image",
-                &self.field.format(&self.image_of_canonical_gen_powers[1]),
-            )
+            .field("gen_image", &self.field.format(&self.image_of_canonical_gen_powers[1]))
             .finish()
     }
 }
@@ -287,8 +275,7 @@ where
     I::Type: IntegerRing,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.field
-            .hash(&self.image_of_canonical_gen_powers[1], state)
+        self.field.hash(&self.image_of_canonical_gen_powers[1], state)
     }
 }
 
@@ -299,10 +286,7 @@ where
 pub fn compute_galois_group<K, Controller>(
     field: K,
     controller: Controller,
-) -> Result<
-    Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>,
-    FreeAlgebraHom<K, NumberField>,
->
+) -> Result<Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>, FreeAlgebraHom<K, NumberField>>
 where
     K: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
     Controller: ComputationController,
@@ -310,9 +294,7 @@ where
     match compute_galois_closure(RingValue::from_ref(field.get_ring()).clone(), controller) {
         Ok(embedding) => {
             let (_, target, image) = embedding.destruct();
-            return Err(FreeAlgebraHom::promise_is_well_defined(
-                field, target, image,
-            ));
+            return Err(FreeAlgebraHom::promise_is_well_defined(field, target, image));
         }
         Err((_, conjugates)) => {
             let mut result: Vec<_> = conjugates
@@ -346,11 +328,7 @@ where
     K3: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
 {
     assert!(complex_embedding.domain().get_ring() == field.get_ring());
-    assert!(
-        galois_group
-            .iter()
-            .all(|g| g.domain().get_ring() == field.get_ring())
-    );
+    assert!(galois_group.iter().all(|g| g.domain().get_ring() == field.get_ring()));
     assert_eq!(field.rank(), galois_group.len());
 
     let CC = complex_embedding.codomain();
@@ -362,10 +340,7 @@ where
         let dist = CC.abs(CC.sub(target, image));
         let error = complex_embedding.absolute_error_bound_at(&conj);
         if dist <= error {
-            assert!(
-                result.is_none(),
-                "not enough precision to separate all complex roots"
-            );
+            assert!(result.is_none(), "not enough precision to separate all complex roots");
             result = Some(g);
         }
     }
@@ -383,9 +358,7 @@ fn test_compute_galois_closure() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2]);
     let number_field = NumberField::new(&ZZX, &f);
-    let (number_field, conjugates) = compute_galois_closure(number_field, TEST_LOG_PROGRESS)
-        .err()
-        .unwrap();
+    let (number_field, conjugates) = compute_galois_closure(number_field, TEST_LOG_PROGRESS).err().unwrap();
     assert_el_eq!(&number_field, number_field.canonical_gen(), &conjugates[0]);
     assert_el_eq!(
         &number_field,
@@ -395,9 +368,7 @@ fn test_compute_galois_closure() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
     let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let into_closure = compute_galois_closure(number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let number_field = into_closure.domain();
     assert_eq!(8, into_closure.codomain().rank());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(
@@ -405,17 +376,13 @@ fn test_compute_galois_closure() {
         (0..8).map(|i| number_field.pow(number_field.canonical_gen(), i)),
     );
     let KX = DensePolyRing::new(into_closure.codomain(), "X");
-    let (factors, _) = <_ as FactorPolyField>::factor_poly(
-        &KX,
-        &number_field.generating_poly(&KX, KX.base_ring().inclusion()),
-    );
+    let (factors, _) =
+        <_ as FactorPolyField>::factor_poly(&KX, &number_field.generating_poly(&KX, KX.base_ring().inclusion()));
     assert_eq!(4, factors.len());
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let into_closure = compute_galois_closure(number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let number_field = into_closure.domain();
     assert_eq!(6, into_closure.codomain().rank());
     crate::homomorphism::generic_tests::test_homomorphism_axioms(
@@ -423,10 +390,8 @@ fn test_compute_galois_closure() {
         (0..6).map(|i| number_field.pow(number_field.canonical_gen(), i)),
     );
     let KX = DensePolyRing::new(into_closure.codomain(), "X");
-    let (factors, _) = <_ as FactorPolyField>::factor_poly(
-        &KX,
-        &number_field.generating_poly(&KX, KX.base_ring().inclusion()),
-    );
+    let (factors, _) =
+        <_ as FactorPolyField>::factor_poly(&KX, &number_field.generating_poly(&KX, KX.base_ring().inclusion()));
     assert_eq!(3, factors.len());
 }
 
@@ -437,9 +402,7 @@ fn test_compute_galois_group() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) - 6 * X + 7]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     assert_eq!(3, galois_group.len());
     assert!(galois_group[0].is_identity());
     let g = &galois_group[1];
@@ -448,23 +411,19 @@ fn test_compute_galois_group() {
 
     // the galois group in this case is C12
     let [f] = ZZX.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(12) - X.pow_ref(11) + 3 * X.pow_ref(10) - 4 * X.pow_ref(9)
-                + 9 * X.pow_ref(8)
-                + 2 * X.pow_ref(7)
-                + 12 * X.pow_ref(6)
-                + X.pow_ref(5)
-                + 25 * X.pow_ref(4)
-                - 11 * X.pow_ref(3)
-                + 5 * X.pow_ref(2)
-                - 2 * X
-                + 1,
-        ]
+        [X.pow_ref(12) - X.pow_ref(11) + 3 * X.pow_ref(10) - 4 * X.pow_ref(9)
+            + 9 * X.pow_ref(8)
+            + 2 * X.pow_ref(7)
+            + 12 * X.pow_ref(6)
+            + X.pow_ref(5)
+            + 25 * X.pow_ref(4)
+            - 11 * X.pow_ref(3)
+            + 5 * X.pow_ref(2)
+            - 2 * X
+            + 1]
     });
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     assert_eq!(12, galois_group.len());
     let g = galois_group
         .iter()
@@ -478,16 +437,10 @@ fn test_compute_galois_group() {
 
     // the galois group in this case is D5
     let [f] = ZZX.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(10) - 2 * X.pow_ref(8) - 9 * X.pow_ref(6) + 57 * X.pow_ref(4)
-                - 69 * X.pow_ref(2)
-                + 47,
-        ]
+        [X.pow_ref(10) - 2 * X.pow_ref(8) - 9 * X.pow_ref(6) + 57 * X.pow_ref(4) - 69 * X.pow_ref(2) + 47]
     });
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     assert_eq!(10, galois_group.len());
     let id = &galois_group[0];
     assert!(id.is_identity());
@@ -495,17 +448,9 @@ fn test_compute_galois_group() {
     assert!(!g1.is_identity());
     let subgroup: Vec<_> = [id.clone()]
         .into_iter()
-        .chain(
-            (1..)
-                .map(|i| g1.clone().pow(i))
-                .take_while(|g| !g.is_identity()),
-        )
+        .chain((1..).map(|i| g1.clone().pow(i)).take_while(|g| !g.is_identity()))
         .collect();
-    let mut g2 = galois_group
-        .iter()
-        .filter(|g| !subgroup.contains(g))
-        .next()
-        .unwrap();
+    let mut g2 = galois_group.iter().filter(|g| !subgroup.contains(g)).next().unwrap();
     if g1.clone().pow(2).is_identity() {
         std::mem::swap(&mut g1, &mut g2);
     }
@@ -514,10 +459,7 @@ fn test_compute_galois_group() {
     assert!(!g2.is_identity());
     assert!(g1.clone().pow(5).is_identity());
     assert!(g2.clone().pow(2).is_identity());
-    assert_eq!(
-        g2.clone().compose_gal(&g1).compose_gal(&g2),
-        g1.clone().invert()
-    );
+    assert_eq!(g2.clone().compose_gal(&g1).compose_gal(&g2), g1.clone().invert());
 }
 
 #[test]
@@ -527,9 +469,7 @@ fn test_complex_conjugation() {
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let complex_embedding = number_field.choose_complex_embedding();
     let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
     assert_el_eq!(
@@ -538,12 +478,9 @@ fn test_complex_conjugation() {
         conjugation.map(number_field.canonical_gen())
     );
 
-    let [f] =
-        ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
+    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
     let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS)
-        .ok()
-        .unwrap();
+    let galois_group = compute_galois_group(&number_field, TEST_LOG_PROGRESS).ok().unwrap();
     let complex_embedding = number_field.choose_complex_embedding();
     let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
     assert_el_eq!(

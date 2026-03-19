@@ -121,11 +121,10 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         F: FnMut(El<R>) -> Option<El<R>>,
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) =
-            algorithms::poly_div::poly_div_rem(RingRef::new(self), lhs_val, rhs, |x| {
-                left_div_lc(self.base_ring().clone_el(x)).ok_or(())
-            })
-            .ok()?;
+        let (quo, rem) = algorithms::poly_div::poly_div_rem(RingRef::new(self), lhs_val, rhs, |x| {
+            left_div_lc(self.base_ring().clone_el(x)).ok_or(())
+        })
+        .ok()?;
         *lhs = rem;
         return Some(quo);
     }
@@ -140,19 +139,13 @@ impl<R: RingStore> Debug for SparsePolyRingEl<R>
 where
     El<R>: Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        self.data.fmt(f)
-    }
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.data.fmt(f) }
 }
 
 impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     type Element = SparsePolyRingEl<R>;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        SparsePolyRingEl {
-            data: val.data.clone(),
-        }
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { SparsePolyRingEl { data: val.data.clone() } }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         lhs.data.set_len(max(lhs.data.len(), rhs.data.len()));
@@ -162,9 +155,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.degree_truncate(&mut lhs.data);
     }
 
-    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.add_assign_ref(lhs, &rhs);
-    }
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.add_assign_ref(lhs, &rhs); }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         lhs.data.set_len(max(lhs.data.len(), rhs.data.len()));
@@ -174,17 +165,11 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.degree_truncate(&mut lhs.data);
     }
 
-    fn negate_inplace(&self, lhs: &mut Self::Element) {
-        lhs.data.scan(|_, c| self.base_ring.negate_inplace(c));
-    }
+    fn negate_inplace(&self, lhs: &mut Self::Element) { lhs.data.scan(|_, c| self.base_ring.negate_inplace(c)); }
 
-    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.mul_assign_ref(lhs, &rhs);
-    }
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.mul_assign_ref(lhs, &rhs); }
 
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        *lhs = self.mul_ref(lhs, rhs);
-    }
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { *lhs = self.mul_ref(lhs, rhs); }
 
     fn zero(&self) -> Self::Element {
         SparsePolyRingEl {
@@ -192,9 +177,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         }
     }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        self.from(self.base_ring().get_ring().from_int(value))
-    }
+    fn from_int(&self, value: i32) -> Self::Element { self.from(self.base_ring().get_ring().from_int(value)) }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         if lhs.data.len() != rhs.data.len() {
@@ -213,21 +196,14 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         return true;
     }
 
-    fn is_commutative(&self) -> bool {
-        self.base_ring.is_commutative()
-    }
+    fn is_commutative(&self) -> bool { self.base_ring.is_commutative() }
 
     fn is_noetherian(&self) -> bool {
         // by Hilbert's basis theorem
         self.base_ring.is_noetherian()
     }
 
-    fn dbg_within<'a>(
-        &self,
-        value: &Self::Element,
-        out: &mut Formatter<'a>,
-        env: EnvBindingStrength,
-    ) -> Result {
+    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut Formatter<'a>, env: EnvBindingStrength) -> Result {
         super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
     }
 
@@ -235,16 +211,13 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
-    fn square(&self, value: &mut Self::Element) {
-        *value = self.mul_ref(&value, &value);
-    }
+    fn square(&self, value: &mut Self::Element) { *value = self.mul_ref(&value, &value); }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         if lhs.data.len() == 0 || rhs.data.len() == 0 {
             return self.zero();
         }
-        let mut result =
-            SparseMapVector::new(lhs.data.len() + rhs.data.len() - 1, self.base_ring.clone());
+        let mut result = SparseMapVector::new(lhs.data.len() + rhs.data.len() - 1, self.base_ring.clone());
         for (i, c1) in lhs.data.nontrivial_entries() {
             for (j, c2) in rhs.data.nontrivial_entries() {
                 self.base_ring
@@ -260,8 +233,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         if rhs == 0 {
             *lhs = self.zero();
         } else {
-            lhs.data
-                .scan(|_, c| self.base_ring.int_hom().mul_assign_map(c, rhs));
+            lhs.data.scan(|_, c| self.base_ring.int_hom().mul_assign_map(c, rhs));
         }
     }
 
@@ -272,26 +244,20 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.base_ring().characteristic(ZZ)
     }
 
-    fn is_approximate(&self) -> bool {
-        self.base_ring().get_ring().is_approximate()
-    }
+    fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
 }
 
 impl<R> PartialEq for SparsePolyRingBase<R>
 where
     R: RingStore,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.base_ring.get_ring() == other.base_ring.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base_ring.get_ring() == other.base_ring.get_ring() }
 }
 
 impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        &self.base_ring
-    }
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result = self.zero();
@@ -352,10 +318,10 @@ where
     ) -> Self::Element {
         let mut result = SparseMapVector::new(el.data.len(), self.base_ring.clone());
         for (j, c) in el.data.nontrivial_entries() {
-            *result.at_mut(j) =
-                self.base_ring()
-                    .get_ring()
-                    .map_in_ref(from.base_ring().get_ring(), c, hom);
+            *result.at_mut(j) = self
+                .base_ring()
+                .get_ring()
+                .map_in_ref(from.base_ring().get_ring(), c, hom);
         }
         return SparsePolyRingEl { data: result };
     }
@@ -411,11 +377,10 @@ where
     ) -> SparsePolyRingEl<R1> {
         let mut result = SparseMapVector::new(el.data.len(), from.base_ring.clone());
         for (j, c) in el.data.nontrivial_entries() {
-            *result.at_mut(j) = self.base_ring().get_ring().map_out(
-                from.base_ring().get_ring(),
-                self.base_ring().clone_el(c),
-                iso,
-            );
+            *result.at_mut(j) =
+                self.base_ring()
+                    .get_ring()
+                    .map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso);
         }
         return SparsePolyRingEl { data: result };
     }
@@ -486,15 +451,9 @@ where
         }
     }
 
-    fn degree(&self, f: &Self::Element) -> Option<usize> {
-        f.data.len().checked_sub(1)
-    }
+    fn degree(&self, f: &Self::Element) -> Option<usize> { f.data.len().checked_sub(1) }
 
-    fn div_rem_monic(
-        &self,
-        mut lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn div_rem_monic(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(
             self.base_ring()
                 .is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap()))
@@ -520,14 +479,8 @@ where
         if let Some(d) = self.degree(rhs) {
             let lc = rhs.data.at(d);
             let mut lhs_copy = self.clone_el(&lhs);
-            let quo = self.poly_div(&mut lhs_copy, rhs, |x| {
-                self.base_ring().checked_left_div(&x, lc)
-            })?;
-            if self.is_zero(&lhs_copy) {
-                Some(quo)
-            } else {
-                None
-            }
+            let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
+            if self.is_zero(&lhs_copy) { Some(quo) } else { None }
         } else if self.is_zero(lhs) {
             Some(self.zero())
         } else {
@@ -574,19 +527,10 @@ where
     R: RingStore,
     R::Type: Field + PolyTFracGCDRing,
 {
-    fn euclidean_div_rem(
-        &self,
-        mut lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
-        let lc_inv = self
-            .base_ring
-            .invert(rhs.data.at(self.degree(rhs).unwrap()))
-            .unwrap();
+    fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        let lc_inv = self.base_ring.invert(rhs.data.at(self.degree(rhs).unwrap())).unwrap();
         let quo = self
-            .poly_div(&mut lhs, rhs, |x| {
-                Some(self.base_ring().mul_ref_snd(x, &lc_inv))
-            })
+            .poly_div(&mut lhs, rhs, |x| Some(self.base_ring().mul_ref_snd(x, &lc_inv)))
             .unwrap();
         return (quo, lhs);
     }
@@ -617,43 +561,13 @@ where
         poly_ring.from_terms([].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(1), 0),
-                (base_ring.int_hom().map(1), 1),
-            ]
-            .into_iter(),
-        ),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
         poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(-1), 0),
-                (base_ring.int_hom().map(1), 1),
-            ]
-            .into_iter(),
-        ),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(1), 0),
-                (base_ring.int_hom().map(-1), 1),
-            ]
-            .into_iter(),
-        ),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(-1), 0),
-                (base_ring.int_hom().map(1), 2),
-            ]
-            .into_iter(),
-        ),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(1), 0),
-                (base_ring.int_hom().map(-1), 2),
-            ]
-            .into_iter(),
-        ),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 2)].into_iter()),
+        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 2)].into_iter()),
         poly_ring.from_terms(
             [
                 (base_ring.int_hom().map(1), 0),
@@ -682,57 +596,32 @@ fn test_poly_ring_axioms() {
 fn test_canonical_iso_axioms_different_base_ring() {
     let poly_ring1 = SparsePolyRing::new(zn_big::Zn::new(StaticRing::<i128>::RING, 7), "X");
     let poly_ring2 = SparsePolyRing::new(zn_64::Zn::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(
-        &poly_ring1,
-        &poly_ring2,
-        edge_case_elements(&poly_ring1),
-    );
-    crate::ring::generic_tests::test_iso_axioms(
-        &poly_ring1,
-        &poly_ring2,
-        edge_case_elements(&poly_ring1),
-    );
+    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
 }
 
 #[test]
 fn test_canonical_iso_dense_poly_ring() {
     let poly_ring1 = SparsePolyRing::new(zn_64::Zn::new(7), "X");
     let poly_ring2 = DensePolyRing::new(zn_64::Zn::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(
-        &poly_ring2,
-        &poly_ring1,
-        edge_case_elements(&poly_ring2),
-    );
-    crate::ring::generic_tests::test_iso_axioms(
-        &poly_ring2,
-        &poly_ring1,
-        edge_case_elements(&poly_ring2),
-    );
+    crate::ring::generic_tests::test_hom_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
+    crate::ring::generic_tests::test_iso_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
 }
 
 #[test]
 fn test_divisibility_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::divisibility::generic_tests::test_divisibility_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_euclidean_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
 }

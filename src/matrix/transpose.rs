@@ -7,44 +7,27 @@ pub struct TransposableSubmatrix<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED
     data: Submatrix<'a, V, T>,
 }
 
-impl<'a, V: AsPointerToSlice<T>, T> From<Submatrix<'a, V, T>>
-    for TransposableSubmatrix<'a, V, T, false>
-{
-    fn from(value: Submatrix<'a, V, T>) -> Self {
-        Self { data: value }
-    }
+impl<'a, V: AsPointerToSlice<T>, T> From<Submatrix<'a, V, T>> for TransposableSubmatrix<'a, V, T, false> {
+    fn from(value: Submatrix<'a, V, T>) -> Self { Self { data: value } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrix<'a, V, T, false> {
     #[stability::unstable(feature = "enable")]
-    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, true> {
-        TransposableSubmatrix { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, true> { TransposableSubmatrix { data: self.data } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrix<'a, V, T, true> {
     #[stability::unstable(feature = "enable")]
-    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, false> {
-        TransposableSubmatrix { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, false> { TransposableSubmatrix { data: self.data } }
 }
 
-impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Copy
-    for TransposableSubmatrix<'a, V, T, TRANSPOSED>
-{
+impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Copy for TransposableSubmatrix<'a, V, T, TRANSPOSED> {}
+
+impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Clone for TransposableSubmatrix<'a, V, T, TRANSPOSED> {
+    fn clone(&self) -> Self { *self }
 }
 
-impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Clone
-    for TransposableSubmatrix<'a, V, T, TRANSPOSED>
-{
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool>
-    TransposableSubmatrix<'a, V, T, TRANSPOSED>
-{
+impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatrix<'a, V, T, TRANSPOSED> {
     #[stability::unstable(feature = "enable")]
     pub fn into_base(self) -> Submatrix<'a, V, T> {
         assert!(!TRANSPOSED);
@@ -140,29 +123,19 @@ pub struct TransposableSubmatrixMut<'a, V: AsPointerToSlice<T>, T, const TRANSPO
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrixMut<'a, V, T, false> {
     #[stability::unstable(feature = "enable")]
-    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, true> {
-        TransposableSubmatrixMut { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, true> { TransposableSubmatrixMut { data: self.data } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrixMut<'a, V, T, true> {
     #[stability::unstable(feature = "enable")]
-    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, false> {
-        TransposableSubmatrixMut { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, false> { TransposableSubmatrixMut { data: self.data } }
 }
 
-impl<'a, V: AsPointerToSlice<T>, T> From<SubmatrixMut<'a, V, T>>
-    for TransposableSubmatrixMut<'a, V, T, false>
-{
-    fn from(value: SubmatrixMut<'a, V, T>) -> Self {
-        Self { data: value }
-    }
+impl<'a, V: AsPointerToSlice<T>, T> From<SubmatrixMut<'a, V, T>> for TransposableSubmatrixMut<'a, V, T, false> {
+    fn from(value: SubmatrixMut<'a, V, T>) -> Self { Self { data: value } }
 }
 
-impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool>
-    TransposableSubmatrixMut<'a, V, T, TRANSPOSED>
-{
+impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatrixMut<'a, V, T, TRANSPOSED> {
     #[stability::unstable(feature = "enable")]
     pub fn into_base(self) -> SubmatrixMut<'a, V, T> {
         assert!(!TRANSPOSED);

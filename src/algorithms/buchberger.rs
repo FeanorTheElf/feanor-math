@@ -59,15 +59,11 @@ where
     return (
         (
             l_factor,
-            ring.monomial_div(ring.clone_monomial(&m_m), &l_m)
-                .ok()
-                .unwrap(),
+            ring.monomial_div(ring.clone_monomial(&m_m), &l_m).ok().unwrap(),
         ),
         (
             r_factor,
-            ring.monomial_div(ring.clone_monomial(&m_m), &r_m)
-                .ok()
-                .unwrap(),
+            ring.monomial_div(ring.clone_monomial(&m_m), &r_m).ok().unwrap(),
         ),
         (m_c, m_m),
     );
@@ -95,12 +91,7 @@ where
 
 impl SPoly {
     #[stability::unstable(feature = "enable")]
-    pub fn lcm_term<P, O>(
-        &self,
-        ring: P,
-        basis: &[El<P>],
-        order: O,
-    ) -> (PolyCoeff<P>, PolyMonomial<P>)
+    pub fn lcm_term<P, O>(&self, ring: P, basis: &[El<P>], order: O) -> (PolyCoeff<P>, PolyMonomial<P>)
     where
         P: RingStore + Copy,
         P::Type: MultivariatePolyRing,
@@ -118,10 +109,8 @@ impl SPoly {
                 (
                     ring.base_ring().mul_ref_fst(
                         c,
-                        ring.base_ring().pow(
-                            ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()),
-                            *k,
-                        ),
+                        ring.base_ring()
+                            .pow(ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()), *k),
                     ),
                     ring.clone_monomial(m),
                 )
@@ -156,10 +145,8 @@ impl SPoly {
                 let mut result = ring.clone_el(&basis[*i]);
                 ring.inclusion().mul_assign_map(
                     &mut result,
-                    ring.base_ring().pow(
-                        ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()),
-                        *k,
-                    ),
+                    ring.base_ring()
+                        .pow(ring.base_ring().clone_el(ring.base_ring().max_ideal_gen()), *k),
                 );
                 return result;
             }
@@ -191,10 +178,7 @@ where
         .filter_map(|(i, (reducer, reducer_lm_expanded))| {
             if (0..ring.indeterminate_count()).all(|j| reducer_lm_expanded[j] <= f_lm_expanded[j]) {
                 let (r_lc, r_lm) = ring.LT(reducer, order).unwrap();
-                let quo_m = ring
-                    .monomial_div(ring.clone_monomial(f_lm), r_lm)
-                    .ok()
-                    .unwrap();
+                let quo_m = ring.monomial_div(ring.clone_monomial(f_lm), r_lm).ok().unwrap();
                 if let Some(quo_c) = ring.base_ring().checked_div(f_lc, r_lc) {
                     return Some((i, reducer, quo_c, quo_m));
                 }
@@ -223,10 +207,7 @@ where
             if S_c_val == 0
                 && order.eq_mon(
                     ring,
-                    &ring
-                        .monomial_div(ring.clone_monomial(&S_m), &bi_m)
-                        .ok()
-                        .unwrap(),
+                    &ring.monomial_div(ring.clone_monomial(&S_m), &bi_m).ok().unwrap(),
                     &bk_m,
                 )
             {
@@ -249,8 +230,7 @@ where
                         return Some(j);
                     }
                     if let Ok(quo) = ring.monomial_div(ring.clone_monomial(&S_m), &f_m) {
-                        if f_c_val <= S_c_val && (f_c_val < S_c_val || ring.monomial_deg(&quo) > 0)
-                        {
+                        if f_c_val <= S_c_val && (f_c_val < S_c_val || ring.monomial_deg(&quo) > 0) {
                             return Some(j);
                         }
                     }
@@ -276,12 +256,9 @@ where
                 current = next.unwrap();
             }
             assert!(
-                smallest_elim_coeff_valuation == usize::MAX
-                    || smallest_elim_coeff_valuation + k >= nilpotent_power
+                smallest_elim_coeff_valuation == usize::MAX || smallest_elim_coeff_valuation + k >= nilpotent_power
             );
-            if smallest_elim_coeff_valuation == usize::MAX
-                || smallest_elim_coeff_valuation + k > nilpotent_power
-            {
+            if smallest_elim_coeff_valuation == usize::MAX || smallest_elim_coeff_valuation + k > nilpotent_power {
                 return Some(usize::MAX);
             } else {
                 return None;
@@ -390,10 +367,7 @@ where
             // S-polys remain valid
             let input_basis = inter_reduce(
                 &ring,
-                input_basis
-                    .into_iter()
-                    .map(|f| augment_lm(ring, f, order))
-                    .collect(),
+                input_basis.into_iter().map(|f| augment_lm(ring, f, order)).collect(),
                 order,
             )
             .into_iter()
@@ -417,11 +391,7 @@ where
                 // I have no idea why, but this order seems to give the best results
                 reducers.sort_by(|(lf, _), (rf, _)| {
                     order
-                        .compare(
-                            ring,
-                            &ring.LT(lf, order).unwrap().1,
-                            &ring.LT(rf, order).unwrap().1,
-                        )
+                        .compare(ring, &ring.LT(lf, order).unwrap().1, &ring.LT(rf, order).unwrap().1)
                         .then_with(|| ring.terms(lf).count().cmp(&ring.terms(rf).count()))
                 })
             };
@@ -458,9 +428,7 @@ where
                     .iter()
                     .enumerate()
                     .rev()
-                    .filter(|(_, spoly)| {
-                        ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg
-                    })
+                    .filter(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg)
                     .next()
                     .map(|(i, _)| i + 1)
                     .unwrap_or(0);
@@ -481,12 +449,7 @@ where
                             reduce_poly(
                                 ring,
                                 &mut f,
-                                || {
-                                    reducers_ref
-                                        .iter()
-                                        .chain(new_polys_ref.iter())
-                                        .map(|(f, lmf)| (f, lmf))
-                                },
+                                || reducers_ref.iter().chain(new_polys_ref.iter()).map(|(f, lmf)| (f, lmf)),
                                 order,
                             );
 
@@ -526,8 +489,7 @@ where
                         return Ok(reducers.into_iter().map(|(f, _)| f).collect());
                     }
                 } else if new_polys.len() == 0 {
-                    current_deg =
-                        ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
+                    current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
                     log_progress!(controller, "{{{}}}", current_deg);
                 } else {
                     changed = true;
@@ -562,9 +524,7 @@ where
 
                 // less S-polys if we restart from scratch with reducers
                 if open.len() + filtered_spolys
-                    > reducers.len() * reducers.len() / 2
-                        + reducers.len() * nilpotent_power.unwrap_or(0)
-                        + 1
+                    > reducers.len() * reducers.len() / 2 + reducers.len() * nilpotent_power.unwrap_or(0) + 1
                 {
                     log_progress!(controller, "!");
                     return buchberger::<P, O, _, _, _>(
@@ -635,8 +595,7 @@ where
         let prev_lm = ring.clone_monomial(&ring.LT(to_reduce, order).unwrap().1);
         let mut scaled_reducer = ring.clone_el(reducer);
         ring.mul_assign_monomial(&mut scaled_reducer, ring.clone_monomial(&quo_m));
-        ring.inclusion()
-            .mul_assign_ref_map(&mut scaled_reducer, &quo_c);
+        ring.inclusion().mul_assign_ref_map(&mut scaled_reducer, &quo_c);
         debug_assert!(
             order.compare(
                 ring,
@@ -647,8 +606,7 @@ where
         ring.sub_assign(to_reduce, scaled_reducer);
         debug_assert!(
             ring.is_zero(&to_reduce)
-                || order.compare(ring, &ring.LT(&to_reduce, order).unwrap().1, &prev_lm)
-                    == std::cmp::Ordering::Less
+                || order.compare(ring, &ring.LT(&to_reduce, order).unwrap().1, &prev_lm) == std::cmp::Ordering::Less
         );
     }
 }
@@ -670,11 +628,7 @@ where
     return f;
 }
 
-fn inter_reduce<P, O>(
-    ring: P,
-    mut polys: Vec<(El<P>, ExpandedMonomial)>,
-    order: O,
-) -> Vec<(El<P>, ExpandedMonomial)>
+fn inter_reduce<P, O>(ring: P, mut polys: Vec<(El<P>, ExpandedMonomial)>, order: O) -> Vec<(El<P>, ExpandedMonomial)>
 where
     P: RingStore + Copy,
     P::Type: MultivariatePolyRing,
@@ -730,8 +684,7 @@ where
 {
     let as_local_pir = AsLocalPIR::from_field(ring.base_ring());
     let new_poly_ring = MultivariatePolyRingImpl::new(&as_local_pir, ring.indeterminate_count());
-    let from_ring =
-        new_poly_ring.lifted_hom(ring, WrapHom::to_delegate_ring(as_local_pir.get_ring()));
+    let from_ring = new_poly_ring.lifted_hom(ring, WrapHom::to_delegate_ring(as_local_pir.get_ring()));
     let result = buchberger::<_, _, _, _, _>(
         &new_poly_ring,
         input_basis.into_iter().map(|f| from_ring.map(f)).collect(),
@@ -741,10 +694,7 @@ where
         DontObserve,
     )
     .unwrap_or_else(no_error);
-    let to_ring = ring.lifted_hom(
-        &new_poly_ring,
-        UnwrapHom::from_delegate_ring(as_local_pir.get_ring()),
-    );
+    let to_ring = ring.lifted_hom(&new_poly_ring, UnwrapHom::from_delegate_ring(as_local_pir.get_ring()));
     return result.into_iter().map(|f| to_ring.map(f)).collect();
 }
 
@@ -770,13 +720,7 @@ fn test_buchberger_small() {
         ]
         .into_iter(),
     );
-    let f2 = ring.from_terms(
-        [
-            (1, ring.create_monomial([1, 1])),
-            (15, ring.create_monomial([0, 0])),
-        ]
-        .into_iter(),
-    );
+    let f2 = ring.from_terms([(1, ring.create_monomial([1, 1])), (15, ring.create_monomial([0, 0]))].into_iter());
 
     let actual = buchberger(
         &ring,
@@ -894,9 +838,7 @@ fn test_generic_computation() {
     let var_i = |i: usize| {
         ring.create_term(
             base.one(),
-            ring.create_monomial(
-                (0..ring.indeterminate_count()).map(|j| if i == j { 1 } else { 0 }),
-            ),
+            ring.create_monomial((0..ring.indeterminate_count()).map(|j| if i == j { 1 } else { 0 })),
         )
     };
     let X1 = poly_ring.mul(
@@ -982,10 +924,7 @@ fn test_gb_lex() {
                 + 8 * X.pow_ref(2)
                 + 8 * X
                 + 4,
-            2 * Y + X.pow_ref(6) + 3 * X.pow_ref(5) + 6 * X.pow_ref(4) + X.pow_ref(3)
-                - 7 * X.pow_ref(2)
-                - 12 * X
-                - 2,
+            2 * Y + X.pow_ref(6) + 3 * X.pow_ref(5) + 6 * X.pow_ref(4) + X.pow_ref(3) - 7 * X.pow_ref(2) - 12 * X - 2,
         ]
     });
 
@@ -1015,38 +954,36 @@ fn test_expensive_gb_1() {
     let base = AsLocalPIR::from_zn(zn_static::Zn::<16>::RING).unwrap();
     let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 12);
 
-    let system =
-        ring.with_wrapped_indeterminates(|[Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10, Y11]| {
-            [
-                Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4.pow_ref(2)
-                    + 4 * Y0 * Y1 * Y2 * Y3 * Y4 * Y4 * Y8
-                    + Y0 * Y1 * Y2 * Y5.pow_ref(2) * Y8.pow_ref(2)
-                    + Y0 * Y2 * Y3 * Y4 * Y6
-                    + Y0 * Y1 * Y3 * Y4 * Y7
-                    + Y0 * Y2 * Y5 * Y6 * Y8
-                    + Y0 * Y1 * Y5 * Y7 * Y8
-                    + Y0 * Y2 * Y3 * Y5 * Y10
-                    + Y0 * Y1 * Y3 * Y5 * Y11
-                    + Y0 * Y6 * Y7
-                    + Y3 * Y5 * Y9
-                    - 4,
-                2 * Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4 * Y5
-                    + 2 * Y0 * Y1 * Y2 * Y3 * Y5.pow_ref(2) * Y8
-                    + Y0 * Y2 * Y3 * Y5 * Y6
-                    + Y0 * Y1 * Y3 * Y5 * Y7
-                    + 8,
-                Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y5.pow_ref(2) - 5,
-            ]
-        });
+    let system = ring.with_wrapped_indeterminates(|[Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10, Y11]| {
+        [
+            Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4.pow_ref(2)
+                + 4 * Y0 * Y1 * Y2 * Y3 * Y4 * Y4 * Y8
+                + Y0 * Y1 * Y2 * Y5.pow_ref(2) * Y8.pow_ref(2)
+                + Y0 * Y2 * Y3 * Y4 * Y6
+                + Y0 * Y1 * Y3 * Y4 * Y7
+                + Y0 * Y2 * Y5 * Y6 * Y8
+                + Y0 * Y1 * Y5 * Y7 * Y8
+                + Y0 * Y2 * Y3 * Y5 * Y10
+                + Y0 * Y1 * Y3 * Y5 * Y11
+                + Y0 * Y6 * Y7
+                + Y3 * Y5 * Y9
+                - 4,
+            2 * Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4 * Y5
+                + 2 * Y0 * Y1 * Y2 * Y3 * Y5.pow_ref(2) * Y8
+                + Y0 * Y2 * Y3 * Y5 * Y6
+                + Y0 * Y1 * Y3 * Y5 * Y7
+                + 8,
+            Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y5.pow_ref(2) - 5,
+        ]
+    });
 
-    let part_of_result = ring.with_wrapped_indeterminates(
-        |[_Y0, Y1, Y2, _Y3, _Y4, _Y5, Y6, Y7, _Y8, _Y9, _Y10, _Y11]| {
+    let part_of_result =
+        ring.with_wrapped_indeterminates(|[_Y0, Y1, Y2, _Y3, _Y4, _Y5, Y6, Y7, _Y8, _Y9, _Y10, _Y11]| {
             [
                 4 * Y2.pow_ref(2) * Y6.pow_ref(2) - 4 * Y1.pow_ref(2) * Y7.pow_ref(2),
                 8 * Y2 * Y6 + 8 * Y1 * Y7.clone(),
             ]
-        },
-    );
+        });
 
     let start = std::time::Instant::now();
     let gb = buchberger(
@@ -1063,12 +1000,7 @@ fn test_expensive_gb_1() {
     println!("Computed GB in {} ms", (end - start).as_millis());
 
     for f in &part_of_result {
-        assert!(ring.is_zero(&multivariate_division(
-            &ring,
-            ring.clone_el(f),
-            gb.iter(),
-            DegRevLex
-        )));
+        assert!(ring.is_zero(&multivariate_division(&ring, ring.clone_el(f), gb.iter(), DegRevLex)));
     }
 
     assert_eq!(108, gb.len());
@@ -1243,12 +1175,7 @@ fn test_groebner_cyclic6() {
             x + y + z + t + u + v,
             x * y + y * z + z * t + t * u + x * v + u * v,
             x * y * z + y * z * t + z * t * u + x * y * v + x * u * v + t * u * v,
-            x * y * z * t
-                + y * z * t * u
-                + x * y * z * v
-                + x * y * u * v
-                + x * t * u * v
-                + z * t * u * v,
+            x * y * z * t + y * z * t * u + x * y * z * v + x * y * u * v + x * t * u * v + z * t * u * v,
             x * y * z * t * u
                 + x * y * z * t * v
                 + x * y * z * u * v
@@ -1337,14 +1264,7 @@ fn test_groebner_cyclic8() {
         [
             x + y + z + s + t + u + v + w,
             x * y + y * z + z * s + s * t + t * u + u * v + x * w + v * w,
-            x * y * z
-                + y * z * s
-                + z * s * t
-                + s * t * u
-                + t * u * v
-                + x * y * w
-                + x * v * w
-                + u * v * w,
+            x * y * z + y * z * s + z * s * t + s * t * u + t * u * v + x * y * w + x * v * w + u * v * w,
             x * y * z * s
                 + y * z * s * t
                 + z * s * t * u

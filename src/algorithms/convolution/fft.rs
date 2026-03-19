@@ -37,9 +37,7 @@ where
 
 impl FFTConvolution<Global> {
     #[stability::unstable(feature = "enable")]
-    pub fn new() -> Self {
-        Self::new_with_alloc(Global)
-    }
+    pub fn new() -> Self { Self::new_with_alloc(Global) }
 }
 
 impl<A> FFTConvolution<A>
@@ -54,10 +52,7 @@ where
         }
     }
 
-    fn get_fft_table(
-        &self,
-        log2_len: usize,
-    ) -> &CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>> {
+    fn get_fft_table(&self, log2_len: usize) -> &CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>> {
         return self
             .fft_tables
             .get_or_init(log2_len, || CooleyTuckeyFFT::for_complex(CC, log2_len));
@@ -84,11 +79,7 @@ where
             log2_data_size
         } else {
             data.as_iter()
-                .map(|x| {
-                    StaticRing::<i64>::RING
-                        .abs_log2_ceil(&to_int(x))
-                        .unwrap_or(0)
-                })
+                .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
                 .max()
                 .unwrap()
         };
@@ -97,13 +88,9 @@ where
 
         let mut compute_result = || {
             let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-            result.extend(
-                data.as_iter()
-                    .map(|x| Complex64::RING.from_f64(to_int(x) as f64)),
-            );
+            result.extend(data.as_iter().map(|x| Complex64::RING.from_f64(to_int(x) as f64)));
             result.resize(1 << log2_len, Complex64::RING.zero());
-            self.get_fft_table(log2_len)
-                .unordered_fft(&mut result, Complex64::RING);
+            self.get_fft_table(log2_len).unordered_fft(&mut result, Complex64::RING);
             return result;
         };
 
@@ -124,8 +111,7 @@ where
         let input_size = 2f64.powi(log2_input_size.try_into().unwrap());
         (0.5 / fft_table.expected_absolute_error(
             input_size * input_size,
-            input_size * input_size * f64::EPSILON
-                + fft_table.expected_absolute_error(input_size, 0.),
+            input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.),
         ))
         .floor() as usize
     }
@@ -147,11 +133,7 @@ where
             log2_data_size
         } else {
             data.as_iter()
-                .map(|x| {
-                    StaticRing::<i64>::RING
-                        .abs_log2_ceil(&to_int(x))
-                        .unwrap_or(0)
-                })
+                .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
                 .max()
                 .unwrap()
         };
@@ -164,17 +146,8 @@ where
         // this might avoid confusing performance characteristics when the user does
         // not expect lazy behavior
         if let Some(len) = length_hint {
-            let log2_len = StaticRing::<i64>::RING
-                .abs_log2_ceil(&len.try_into().unwrap())
-                .unwrap();
-            _ = self.get_fft_data(
-                data,
-                Some(&result),
-                ring,
-                log2_len,
-                to_int,
-                ring_log2_el_size,
-            );
+            let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+            _ = self.get_fft_data(data, Some(&result), ring, log2_len, to_int, ring_log2_el_size);
         }
         return result;
     }
@@ -202,26 +175,10 @@ where
         }
         let len = lhs.len() + rhs.len() - 1;
         assert!(dst.len() >= len);
-        let log2_len = StaticRing::<i64>::RING
-            .abs_log2_ceil(&len.try_into().unwrap())
-            .unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
-        let mut lhs_fft = self.get_fft_data(
-            lhs,
-            lhs_prep,
-            ring,
-            log2_len,
-            &mut to_int,
-            ring_log2_el_size,
-        );
-        let mut rhs_fft = self.get_fft_data(
-            rhs,
-            rhs_prep,
-            ring,
-            log2_len,
-            &mut to_int,
-            ring_log2_el_size,
-        );
+        let mut lhs_fft = self.get_fft_data(lhs, lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
+        let mut rhs_fft = self.get_fft_data(rhs, rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
         if rhs_fft.is_owned() {
             std::mem::swap(&mut lhs_fft, &mut rhs_fft);
         }
@@ -231,8 +188,7 @@ where
             CC.mul_assign(&mut lhs_fft[i], rhs_fft[i]);
         }
 
-        self.get_fft_table(log2_len)
-            .unordered_inv_fft(&mut *lhs_fft, CC);
+        self.get_fft_table(log2_len).unordered_inv_fft(&mut *lhs_fft, CC);
 
         for i in 0..len {
             let result = CC.closest_gaussian_int(lhs_fft[i]);
@@ -267,9 +223,7 @@ where
         R: 'a,
     {
         let len = dst.len();
-        let log2_len = StaticRing::<i64>::RING
-            .abs_log2_ceil(&len.try_into().unwrap())
-            .unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize(1 << log2_len, CC.zero());
 
@@ -291,11 +245,7 @@ where
                     current_log2_data_size,
                     lhs.as_iter()
                         .chain(rhs.as_iter())
-                        .map(|x| {
-                            StaticRing::<i64>::RING
-                                .abs_log2_ceil(&to_int(x))
-                                .unwrap_or(0)
-                        })
+                        .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
                         .max()
                         .unwrap(),
                 );
@@ -305,8 +255,7 @@ where
 
             if count_since_last_reduction > current_max_sum_len {
                 count_since_last_reduction = 0;
-                self.get_fft_table(log2_len)
-                    .unordered_inv_fft(&mut *buffer, CC);
+                self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
                 for i in 0..len {
                     let result = CC.closest_gaussian_int(buffer[i]);
                     debug_assert_eq!(0, result.1);
@@ -317,22 +266,8 @@ where
                 }
             }
 
-            let mut lhs_fft = self.get_fft_data(
-                lhs,
-                lhs_prep,
-                ring,
-                log2_len,
-                &mut to_int,
-                ring_log2_el_size,
-            );
-            let mut rhs_fft = self.get_fft_data(
-                rhs,
-                rhs_prep,
-                ring,
-                log2_len,
-                &mut to_int,
-                ring_log2_el_size,
-            );
+            let mut lhs_fft = self.get_fft_data(lhs, lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
+            let mut rhs_fft = self.get_fft_data(rhs, rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
             if rhs_fft.is_owned() {
                 std::mem::swap(&mut lhs_fft, &mut rhs_fft);
             }
@@ -343,8 +278,7 @@ where
             }
             count_since_last_reduction += 1;
         }
-        self.get_fft_table(log2_len)
-            .unordered_inv_fft(&mut *buffer, CC);
+        self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
         for i in 0..len {
             let result = CC.closest_gaussian_int(buffer[i]);
             debug_assert_eq!(0, result.1);
@@ -414,36 +348,28 @@ impl<A> From<FFTConvolutionZn<A>> for FFTConvolution<A>
 where
     A: Allocator,
 {
-    fn from(value: FFTConvolutionZn<A>) -> Self {
-        value.base
-    }
+    fn from(value: FFTConvolutionZn<A>) -> Self { value.base }
 }
 
 impl<'a, A> From<&'a FFTConvolutionZn<A>> for &'a FFTConvolution<A>
 where
     A: Allocator,
 {
-    fn from(value: &'a FFTConvolutionZn<A>) -> Self {
-        &value.base
-    }
+    fn from(value: &'a FFTConvolutionZn<A>) -> Self { &value.base }
 }
 
 impl<A> From<FFTConvolution<A>> for FFTConvolutionZn<A>
 where
     A: Allocator,
 {
-    fn from(value: FFTConvolution<A>) -> Self {
-        FFTConvolutionZn { base: value }
-    }
+    fn from(value: FFTConvolution<A>) -> Self { FFTConvolutionZn { base: value } }
 }
 
 impl<'a, A> From<&'a FFTConvolution<A>> for &'a FFTConvolutionZn<A>
 where
     A: Allocator,
 {
-    fn from(value: &'a FFTConvolution<A>) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    fn from(value: &'a FFTConvolution<A>) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -470,11 +396,7 @@ where
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
 
-    fn compute_convolution<
-        S: RingStore<Type = R>,
-        V1: VectorView<R::Element>,
-        V2: VectorView<R::Element>,
-    >(
+    fn compute_convolution<S: RingStore<Type = R>, V1: VectorView<R::Element>, V2: VectorView<R::Element>>(
         &self,
         lhs: V1,
         rhs: V2,
@@ -494,9 +416,7 @@ where
         )
     }
 
-    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool {
-        true
-    }
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool { true }
 
     fn prepare_convolution_operand<S, V>(
         &self,
@@ -578,11 +498,7 @@ where
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<I, A>;
 
-    fn compute_convolution<
-        S: RingStore<Type = I>,
-        V1: VectorView<I::Element>,
-        V2: VectorView<I::Element>,
-    >(
+    fn compute_convolution<S: RingStore<Type = I>, V1: VectorView<I::Element>, V2: VectorView<I::Element>>(
         &self,
         lhs: V1,
         rhs: V2,
@@ -602,9 +518,7 @@ where
         )
     }
 
-    fn supports_ring<S: RingStore<Type = I> + Copy>(&self, _ring: S) -> bool {
-        true
-    }
+    fn supports_ring<S: RingStore<Type = I> + Copy>(&self, _ring: S) -> bool { true }
 
     fn prepare_convolution_operand<S, V>(
         &self,
@@ -702,9 +616,7 @@ fn test_fft_convolution_not_enough_precision() {
     let ring = Zn::new(1099511627791);
     let lhs = ring.elements().take(1024).collect::<Vec<_>>();
     let rhs = ring.elements().take(1024).collect::<Vec<_>>();
-    let mut actual = (0..(lhs.len() + rhs.len()))
-        .map(|_| ring.zero())
-        .collect::<Vec<_>>();
+    let mut actual = (0..(lhs.len() + rhs.len())).map(|_| ring.zero()).collect::<Vec<_>>();
 
     convolution_algorithm.compute_convolution(&lhs, &rhs, &mut actual, &ring);
 }

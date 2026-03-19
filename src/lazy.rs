@@ -17,9 +17,7 @@ impl<T> LazyVec<T> {
     }
 
     #[allow(unused)]
-    pub fn get(&self, i: usize) -> Option<&T> {
-        self.data[i].get()
-    }
+    pub fn get(&self, i: usize) -> Option<&T> { self.data[i].get() }
 
     #[allow(unused)]
     pub fn get_or_init_incremental<F>(&self, target_index: usize, mut derive_next: F) -> &T
@@ -37,9 +35,7 @@ impl<T> LazyVec<T> {
                 return self.data[target_index].get().unwrap();
             }
         }
-        panic!(
-            "get_or_init_incremental() is only valid when the vector has at least one initialized element"
-        )
+        panic!("get_or_init_incremental() is only valid when the vector has at least one initialized element")
     }
 
     pub fn get_or_init<'a, F>(&'a self, i: usize, init: F) -> &'a T

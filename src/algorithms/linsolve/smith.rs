@@ -57,9 +57,7 @@ where
                     TransformRows(A.reborrow(), ring.get_ring()).subtract(ring, k, i, &quo);
                     L.subtract(ring, k, i, &quo);
                 } else {
-                    let (transform, _) = ring
-                        .get_ring()
-                        .create_elimination_matrix(A.at(k, k), A.at(i, k));
+                    let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(i, k));
                     TransformRows(A.reborrow(), ring.get_ring()).transform(ring, k, i, &transform);
                     L.transform(ring, k, i, &transform);
                 }
@@ -75,9 +73,7 @@ where
                     R.subtract(ring, k, j, &quo);
                 } else {
                     changed_row = true;
-                    let (transform, _) = ring
-                        .get_ring()
-                        .create_elimination_matrix(A.at(k, k), A.at(k, j));
+                    let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(k, j));
                     TransformCols(A.reborrow(), ring.get_ring()).transform(ring, k, j, &transform);
                     R.transform(ring, k, j, &transform);
                 }
@@ -201,11 +197,7 @@ where
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn determinant_using_pre_smith<R, V, A>(
-    ring: R,
-    mut matrix: SubmatrixMut<V, El<R>>,
-    _allocator: A,
-) -> El<R>
+pub fn determinant_using_pre_smith<R, V, A>(ring: R, mut matrix: SubmatrixMut<V, El<R>>, _allocator: A) -> El<R>
 where
     R: RingStore + Copy,
     R::Type: PrincipalIdealRing,
@@ -314,12 +306,7 @@ use crate::rings::zn::zn_static;
 use crate::seq::VectorView;
 
 #[cfg(test)]
-fn multiply<
-    'a,
-    R: RingStore,
-    V: AsPointerToSlice<El<R>>,
-    I: IntoIterator<Item = Submatrix<'a, V, El<R>>>,
->(
+fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(
     matrices: I,
     ring: R,
 ) -> OwnedMatrix<El<R>>
@@ -368,22 +355,13 @@ fn test_smith_integers() {
 
     assert_matrix_eq!(&ring, &[[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 0]], &A);
 
-    assert_matrix_eq!(
-        &ring,
-        &multiply([L.data(), original_A.data(), R.data()], ring),
-        &A
-    );
+    assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
 }
 
 #[test]
 fn test_smith_zn() {
     let ring = zn_static::Zn::<45>::RING;
-    let mut A = OwnedMatrix::new(
-        vec![
-            8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39,
-        ],
-        4,
-    );
+    let mut A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
     let original_A = A.clone_matrix(&ring);
     let mut L: OwnedMatrix<u64> = OwnedMatrix::identity(5, 5, ring);
     let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
@@ -396,36 +374,19 @@ fn test_smith_zn() {
 
     assert_matrix_eq!(
         &ring,
-        &[
-            [8, 0, 0, 0],
-            [0, 3, 0, 0],
-            [0, 0, 0, 0],
-            [0, 0, 0, 15],
-            [0, 0, 0, 0]
-        ],
+        &[[8, 0, 0, 0], [0, 3, 0, 0], [0, 0, 0, 0], [0, 0, 0, 15], [0, 0, 0, 0]],
         &A
     );
 
-    assert_matrix_eq!(
-        &ring,
-        &multiply([L.data(), original_A.data(), R.data()], ring),
-        &A
-    );
+    assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
 }
 
 #[test]
 fn test_solve_zn() {
     let ring = zn_static::Zn::<45>::RING;
-    let A = OwnedMatrix::new(
-        vec![
-            8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39,
-        ],
-        4,
-    );
+    let A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
     let B = OwnedMatrix::new(
-        vec![
-            11, 43, 10, 22, 18, 9, 27, 27, 8, 34, 7, 22, 41, 13, 40, 37, 3, 9, 3, 0,
-        ],
+        vec![11, 43, 10, 22, 18, 9, 27, 27, 8, 34, 7, 22, 41, 13, 40, 37, 3, 9, 3, 0],
         4,
     );
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 4, ring);
@@ -554,24 +515,11 @@ fn test_determinant() {
         type Base = zn_static::ZnBase<45, false>;
         type Element = u64;
 
-        fn get_delegate(&self) -> &Self::Base {
-            zn_static::Zn::RING.get_ring()
-        }
-        fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-            el
-        }
-        fn delegate_mut<'a>(
-            &self,
-            el: &'a mut Self::Element,
-        ) -> &'a mut <Self::Base as RingBase>::Element {
-            el
-        }
-        fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-            el
-        }
-        fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-            el
-        }
+        fn get_delegate(&self) -> &Self::Base { zn_static::Zn::RING.get_ring() }
+        fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+        fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+        fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+        fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
     }
     impl PrincipalIdealRing for TestRing {
         fn extended_ideal_gen(
@@ -582,11 +530,7 @@ fn test_determinant() {
             self.get_delegate().extended_ideal_gen(lhs, rhs)
         }
 
-        fn checked_div_min(
-            &self,
-            lhs: &Self::Element,
-            rhs: &Self::Element,
-        ) -> Option<Self::Element> {
+        fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
             self.get_delegate().checked_div_min(lhs, rhs)
         }
 
@@ -616,11 +560,7 @@ fn test_determinant() {
 fn test_kernel_basis() {
     let ring = StaticRing::<i64>::RING;
     let mut A = OwnedMatrix::identity(2, 2, ring);
-    assert_matrix_eq!(
-        ring,
-        [[], []],
-        kernel_basis_using_pre_smith(ring, A.data_mut(), Global)
-    );
+    assert_matrix_eq!(ring, [[], []], kernel_basis_using_pre_smith(ring, A.data_mut(), Global));
 
     let mut A = OwnedMatrix::zero(2, 2, ring);
     assert_matrix_eq!(
@@ -667,15 +607,12 @@ fn test_kernel_basis() {
 fn time_solve_right_using_pre_smith_galois_field() {
     let n = 100;
     let base_field = Zn::new(257).as_field().ok().unwrap();
-    let allocator = feanor_mempool::AllocRc(Rc::new(
-        feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>()),
-    ));
+    let allocator = feanor_mempool::AllocRc(Rc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(
+        Alignment::of::<u64>(),
+    )));
     let field = GaloisField::new_with_convolution(base_field, 21, allocator, STANDARD_CONVOLUTION);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| {
-        field.pow(
-            field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1),
-            j,
-        )
+        field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j)
     });
 
     let mut inv = OwnedMatrix::zero(n, n, &field);
@@ -695,10 +632,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
         field.one(),
         <_ as ComputeInnerProduct>::inner_product_ref(
             field.get_ring(),
-            inv.data()
-                .col_at(4)
-                .as_iter()
-                .zip(matrix.data().row_at(4).as_iter())
+            inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())
         )
     );
 
@@ -710,15 +644,12 @@ fn time_solve_right_using_pre_smith_galois_field() {
 fn time_solve_right_using_extension() {
     let n = 126;
     let base_field = Zn::new(257).as_field().ok().unwrap();
-    let allocator = feanor_mempool::AllocRc(Rc::new(
-        feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>()),
-    ));
+    let allocator = feanor_mempool::AllocRc(Rc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(
+        Alignment::of::<u64>(),
+    )));
     let field = GaloisField::new_with_convolution(base_field, 21, allocator, STANDARD_CONVOLUTION);
     let matrix = OwnedMatrix::from_fn(n, n, |i, j| {
-        field.pow(
-            field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1),
-            j,
-        )
+        field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j)
     });
 
     let mut inv = OwnedMatrix::zero(n, n, &field);
@@ -738,10 +669,7 @@ fn time_solve_right_using_extension() {
         field.one(),
         <_ as ComputeInnerProduct>::inner_product_ref(
             field.get_ring(),
-            inv.data()
-                .col_at(4)
-                .as_iter()
-                .zip(matrix.data().row_at(4).as_iter())
+            inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())
         )
     );
 
@@ -751,9 +679,9 @@ fn time_solve_right_using_extension() {
 #[bench]
 fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
     let base_field = Zn::new(257).as_field().ok().unwrap();
-    let allocator = feanor_mempool::AllocRc(Rc::new(
-        feanor_mempool::dynsize::DynLayoutMempool::new_global(Alignment::of::<u64>()),
-    ));
+    let allocator = feanor_mempool::AllocRc(Rc::new(feanor_mempool::dynsize::DynLayoutMempool::new_global(
+        Alignment::of::<u64>(),
+    )));
     let field = GaloisField::create(
         FreeAlgebraImpl::new_with_convolution(
             base_field,
@@ -768,10 +696,7 @@ fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
         .unwrap(),
     );
     let matrix = OwnedMatrix::from_fn(10, 10, |i, j| {
-        field.pow(
-            field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1),
-            j,
-        )
+        field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j)
     });
     bencher.iter(|| {
         let mut inv = OwnedMatrix::zero(10, 10, &field);
@@ -789,10 +714,7 @@ fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
             field.one(),
             <_ as ComputeInnerProduct>::inner_product_ref(
                 field.get_ring(),
-                inv.data()
-                    .col_at(4)
-                    .as_iter()
-                    .zip(matrix.data().row_at(4).as_iter())
+                inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())
             )
         );
     });

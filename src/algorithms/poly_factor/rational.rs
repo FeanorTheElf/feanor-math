@@ -16,10 +16,7 @@ pub fn poly_factor_rational<'a, P, I, Controller>(
     poly_ring: P,
     poly: &El<P>,
     controller: Controller,
-) -> (
-    Vec<(El<P>, usize)>,
-    El<<P::Type as RingExtension>::BaseRing>,
-)
+) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
 where
     P: RingStore,
     P::Type: PolyRing + EuclideanRing,
@@ -42,11 +39,8 @@ where
     let ZZX = DensePolyRing::new(ZZ, "X");
     let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| {
         (
-            ZZ.checked_div(
-                &ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)),
-                QQ.get_ring().den(c),
-            )
-            .unwrap(),
+            ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c))
+                .unwrap(),
             i,
         )
     }));

@@ -98,12 +98,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
     ///
     /// For the reason why there are so many quite specific trait bounds here:
     /// See the doc of [`crate::reduce_lift::poly_eval::EvalPolyLocallyRing::LocalRingBase`].
-    type LocalFieldBase<'ring>: ?Sized
-        + PolyTFracGCDRing
-        + FactorPolyField
-        + Field
-        + SelfIso
-        + FiniteRingSpecializable
+    type LocalFieldBase<'ring>: ?Sized + PolyTFracGCDRing + FactorPolyField + Field + SelfIso + FiniteRingSpecializable
     where
         Self: 'ring;
 
@@ -253,11 +248,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
         El<Self::LocalRing<'ring>>: 'element,
         'ring: 'local + 'element;
 
-    fn dbg_ideal<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        out: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result
+    fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
     where
         Self: 'ring;
 }
@@ -268,10 +259,7 @@ pub trait PolyGCDLocallyDomain: Domain + DivisibilityRing + FiniteRingSpecializa
 pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
     /// It would be much preferrable if we could restrict associated types from supertraits,
     /// this is just a workaround (and an ugly one at that)
-    type LocalRingAsZnBase<'ring>: ?Sized
-        + CanIsoFromTo<Self::LocalRingBase<'ring>>
-        + ZnRing
-        + SelfIso
+    type LocalRingAsZnBase<'ring>: ?Sized + CanIsoFromTo<Self::LocalRingBase<'ring>> + ZnRing + SelfIso
     where
         Self: 'ring;
 
@@ -279,15 +267,9 @@ pub trait IntegerPolyGCDRing: PolyGCDLocallyDomain {
     where
         Self: 'ring;
 
-    fn local_ring_as_zn<'a, 'ring>(
-        &self,
-        local_field: &'a Self::LocalRing<'ring>,
-    ) -> &'a Self::LocalRingAsZn<'ring>;
+    fn local_ring_as_zn<'a, 'ring>(&self, local_field: &'a Self::LocalRing<'ring>) -> &'a Self::LocalRingAsZn<'ring>;
 
-    fn local_ring_into_zn<'ring>(
-        &self,
-        local_field: Self::LocalRing<'ring>,
-    ) -> Self::LocalRingAsZn<'ring>;
+    fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>;
 
     fn principal_ideal_generator<'ring>(&self, p: &Self::SuitableIdeal<'ring>) -> El<BigIntRing>
     where
@@ -312,17 +294,11 @@ pub struct IdealDisplayWrapper<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDoma
 
 impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> IdealDisplayWrapper<'a, 'ring, R> {
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: &'a R, ideal: &'a R::SuitableIdeal<'ring>) -> Self {
-        Self { ring, ideal }
-    }
+    pub fn new(ring: &'a R, ideal: &'a R::SuitableIdeal<'ring>) -> Self { Self { ring, ideal } }
 }
 
-impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> Display
-    for IdealDisplayWrapper<'a, 'ring, R>
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring.dbg_ideal(self.ideal, f)
-    }
+impl<'a, 'ring, R: 'ring + ?Sized + PolyGCDLocallyDomain> Display for IdealDisplayWrapper<'a, 'ring, R> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.ring.dbg_ideal(self.ideal, f) }
 }
 
 /// The map `R -> R/m^e`, where `m` is a maximal ideal factor of the ideal `I`,
@@ -371,21 +347,14 @@ where
     type CodomainStore = &'local R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.to.0
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to.0 }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.ring
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
-        self.ring.get_ring().reduce_ring_el(
-            self.ideal,
-            (self.to.0.get_ring(), self.to.1),
-            self.max_ideal_idx,
-            x,
-        )
+        self.ring
+            .get_ring()
+            .reduce_ring_el(self.ideal, (self.to.0.get_ring(), self.to.1), self.max_ideal_idx, x)
     }
 }
 
@@ -431,29 +400,19 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn parent_ring<'a>(&'a self) -> RingRef<'a, R> {
-        RingRef::new(self.ring.get_ring())
-    }
+    pub fn parent_ring<'a>(&'a self) -> RingRef<'a, R> { RingRef::new(self.ring.get_ring()) }
 
     #[stability::unstable(feature = "enable")]
-    pub fn from_e(&self) -> usize {
-        self.from.1
-    }
+    pub fn from_e(&self) -> usize { self.from.1 }
 
     #[stability::unstable(feature = "enable")]
-    pub fn to_e(&self) -> usize {
-        self.to.1
-    }
+    pub fn to_e(&self) -> usize { self.to.1 }
 
     #[stability::unstable(feature = "enable")]
-    pub fn ideal<'a>(&'a self) -> &'a R::SuitableIdeal<'ring> {
-        &self.ideal
-    }
+    pub fn ideal<'a>(&'a self) -> &'a R::SuitableIdeal<'ring> { &self.ideal }
 
     #[stability::unstable(feature = "enable")]
-    pub fn max_ideal_idx(&self) -> usize {
-        self.max_ideal_idx
-    }
+    pub fn max_ideal_idx(&self) -> usize { self.max_ideal_idx }
 }
 
 impl<'ring, 'data, 'local, R> Homomorphism<R::LocalRingBase<'ring>, R::LocalRingBase<'ring>>
@@ -465,18 +424,11 @@ where
     type CodomainStore = &'local R::LocalRing<'ring>;
     type DomainStore = &'local R::LocalRing<'ring>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.to.0
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to.0 }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.from.0
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from.0 }
 
-    fn map(
-        &self,
-        x: <R::LocalRingBase<'ring> as RingBase>::Element,
-    ) -> <R::LocalRingBase<'ring> as RingBase>::Element {
+    fn map(&self, x: <R::LocalRingBase<'ring> as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
         self.ring.get_ring().reduce_partial(
             self.ideal,
             (self.from.0.get_ring(), self.from.1),
@@ -548,13 +500,9 @@ where
     type DomainStore = RingRef<'local, R::LocalRingBase<'ring>>;
     type CodomainStore = RingRef<'local, R::LocalFieldBase<'ring>>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.from
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
 
     fn map(
         &self,
@@ -612,13 +560,9 @@ where
     type DomainStore = RingRef<'local, R::LocalFieldBase<'ring>>;
     type CodomainStore = RingRef<'local, R::LocalRingBase<'ring>>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.from
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
 
     fn map(
         &self,
@@ -680,9 +624,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn ideal(&self) -> &'data R::SuitableIdeal<'ring> {
-        self.ideal
-    }
+    pub fn ideal(&self) -> &'data R::SuitableIdeal<'ring> { self.ideal }
 
     #[stability::unstable(feature = "enable")]
     pub fn main_ring_to_field_reduction<'local>(
@@ -739,9 +681,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn len(&self) -> usize {
-        self.from.len()
-    }
+    pub fn len(&self) -> usize { self.from.len() }
 
     #[stability::unstable(feature = "enable")]
     pub fn reconstruct_ring_el<'local, V>(&self, els: V) -> R::Element
@@ -765,13 +705,7 @@ where
         {
             ring.reconstruct_ring_el(ideal, local_rings.as_fn(), e, els)
         }
-        do_reconstruction(
-            self.ring.get_ring(),
-            self.ideal,
-            &self.from[..],
-            self.from_e,
-            els,
-        )
+        do_reconstruction(self.ring.get_ring(), self.ideal, &self.from[..], self.from_e, els)
     }
 }
 
@@ -1022,11 +956,7 @@ where
         )
     }
 
-    fn local_field_at<'ring>(
-        &self,
-        p: &Self::SuitableIdeal<'ring>,
-        max_ideal_idx: usize,
-    ) -> Self::LocalField<'ring>
+    fn local_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
     where
         Self: 'ring,
     {
@@ -1148,11 +1078,7 @@ where
         )
     }
 
-    fn dbg_ideal<'ring>(
-        &self,
-        p: &Self::SuitableIdeal<'ring>,
-        out: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result
+    fn dbg_ideal<'ring>(&self, p: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
     where
         Self: 'ring,
     {
@@ -1210,9 +1136,7 @@ impl<'a, R> PartialEq for IntegersWithLocalZnQuotient<'a, R>
 where
     R: ?Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + LinSolveRing + Clone,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.integers.get_ring() == other.integers.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.integers.get_ring() == other.integers.get_ring() }
 }
 
 impl<'a, R> DelegateRing for IntegersWithLocalZnQuotient<'a, R>
@@ -1222,25 +1146,12 @@ where
     type Base = <R as ZnRing>::IntegerRingBase;
     type Element = El<<R as ZnRing>::IntegerRing>;
 
-    fn get_delegate(&self) -> &Self::Base {
-        self.integers.get_ring()
-    }
+    fn get_delegate(&self) -> &Self::Base { self.integers.get_ring() }
 
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-        el
-    }
-    fn delegate_mut<'b>(
-        &self,
-        el: &'b mut Self::Element,
-    ) -> &'b mut <Self::Base as RingBase>::Element {
-        el
-    }
-    fn delegate_ref<'b>(&self, el: &'b Self::Element) -> &'b <Self::Base as RingBase>::Element {
-        el
-    }
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-        el
-    }
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+    fn delegate_mut<'b>(&self, el: &'b mut Self::Element) -> &'b mut <Self::Base as RingBase>::Element { el }
+    fn delegate_ref<'b>(&self, el: &'b Self::Element) -> &'b <Self::Base as RingBase>::Element { el }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 }
 
 impl<'a, R> OrderedRing for IntegersWithLocalZnQuotient<'a, R>
@@ -1248,8 +1159,7 @@ where
     R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
 {
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
-        self.get_delegate()
-            .cmp(self.delegate_ref(lhs), self.delegate_ref(rhs))
+        self.get_delegate().cmp(self.delegate_ref(lhs), self.delegate_ref(rhs))
     }
     fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         self.get_delegate()
@@ -1272,21 +1182,26 @@ impl<'a, R> DelegateRingImplEuclideanRing for IntegersWithLocalZnQuotient<'a, R>
 {
 }
 
-impl<'a, R> crate::reduce_lift::poly_eval::EvalPolyLocallyRing
-    for IntegersWithLocalZnQuotient<'a, R>
+impl<'a, R> crate::reduce_lift::poly_eval::EvalPolyLocallyRing for IntegersWithLocalZnQuotient<'a, R>
 where
     R: Sized + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
 {
-    type LocalRingBase<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalRingBase<'ring>
-        where Self: 'ring;
-    type LocalRing<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalRing<'ring>
-        where Self: 'ring;
-    type LocalComputationData<'ring> = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalComputationData<'ring>
-        where Self:'ring;
+    type LocalRingBase<'ring>
+        = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalRingBase<'ring>
+    where
+        Self: 'ring;
+    type LocalRing<'ring>
+        = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalRing<'ring>
+    where
+        Self: 'ring;
+    type LocalComputationData<'ring>
+        = <<Self as DelegateRing>::Base as crate::reduce_lift::poly_eval::EvalPolyLocallyRing>::LocalComputationData<
+        'ring,
+    >
+    where
+        Self: 'ring;
 
-    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
-        self.get_delegate().ln_pseudo_norm(self.delegate_ref(el))
-    }
+    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 { self.get_delegate().ln_pseudo_norm(self.delegate_ref(el)) }
 
     fn reduce<'ring>(
         &self,
@@ -1296,8 +1211,7 @@ where
     where
         Self: 'ring,
     {
-        self.get_delegate()
-            .reduce(computation, self.delegate_ref(el))
+        self.get_delegate().reduce(computation, self.delegate_ref(el))
     }
 
     fn local_ring_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
@@ -1307,25 +1221,14 @@ where
         self.get_delegate().local_ring_count(computation)
     }
 
-    fn local_ring_at<'ring>(
-        &self,
-        computation: &Self::LocalComputationData<'ring>,
-        i: usize,
-    ) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
     where
         Self: 'ring,
     {
-        crate::reduce_lift::poly_eval::EvalPolyLocallyRing::local_ring_at(
-            self.get_delegate(),
-            computation,
-            i,
-        )
+        crate::reduce_lift::poly_eval::EvalPolyLocallyRing::local_ring_at(self.get_delegate(), computation, i)
     }
 
-    fn local_computation<'ring>(
-        &'ring self,
-        ln_pseudo_norm_bound: f64,
-    ) -> Self::LocalComputationData<'ring> {
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
         self.get_delegate().local_computation(ln_pseudo_norm_bound)
     }
 
@@ -1366,17 +1269,8 @@ where
         self.get_delegate()
             .abs_lowest_set_bit(self.delegate_ref(self.rev_element_cast_ref(value)))
     }
-    fn get_uniformly_random_bits<G: FnMut() -> u64>(
-        &self,
-        log2_bound_exclusive: usize,
-        rng: G,
-    ) -> Self::Element {
-        self.element_cast(
-            self.rev_delegate(
-                self.get_delegate()
-                    .get_uniformly_random_bits(log2_bound_exclusive, rng),
-            ),
-        )
+    fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element {
+        self.element_cast(self.rev_delegate(self.get_delegate().get_uniformly_random_bits(log2_bound_exclusive, rng)))
     }
     fn rounded_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
         self.element_cast(self.rev_delegate(self.get_delegate().rounded_div(
@@ -1399,9 +1293,7 @@ where
     fn power_of_two(&self, power: usize) -> Self::Element {
         self.element_cast(self.rev_delegate(self.get_delegate().power_of_two(power)))
     }
-    fn representable_bits(&self) -> Option<usize> {
-        self.get_delegate().representable_bits()
-    }
+    fn representable_bits(&self) -> Option<usize> { self.get_delegate().representable_bits() }
     fn parse(&self, string: &str, base: u32) -> Result<Self::Element, ()> {
         self.get_delegate()
             .parse(string, base)
@@ -1466,7 +1358,10 @@ where
             .unwrap_or(0);
         // this is in no way a rigorous bound, but equals the worst-case bound at least
         // asymptotically (up to constants)
-        return ((log2_max_coeff as f64 + poly_deg as f64) / self.integers.abs_log2_floor(ideal).unwrap_or(1) as f64 * crate::reduce_lift::poly_factor_gcd::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
+        return ((log2_max_coeff as f64 + poly_deg as f64) / self.integers.abs_log2_floor(ideal).unwrap_or(1) as f64
+            * crate::reduce_lift::poly_factor_gcd::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR)
+            .ceil() as usize
+            + 1;
     }
 
     fn random_suitable_ideal<'ring, F>(&'ring self, _rng: F) -> Self::SuitableIdeal<'ring>
@@ -1484,11 +1379,7 @@ where
         1
     }
 
-    fn local_field_at<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        max_ideal_idx: usize,
-    ) -> Self::LocalField<'ring>
+    fn local_field_at<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
     where
         Self: 'ring,
     {
@@ -1510,11 +1401,7 @@ where
         RingValue::from(
             R::from_modulus(|ZZ| {
                 Ok(RingRef::new(ZZ).pow(
-                    int_cast(
-                        self.integers.clone_el(&self.prime),
-                        RingRef::new(ZZ),
-                        &self.integers,
-                    ),
+                    int_cast(self.integers.clone_el(&self.prime), RingRef::new(ZZ), &self.integers),
                     e,
                 ))
             })
@@ -1558,14 +1445,10 @@ where
             &self.integers.pow(self.integers.clone_el(&self.prime), to.1),
             to.0.modulus()
         ));
-        debug_assert!(
-            self.integers.eq_el(
-                &self
-                    .integers
-                    .pow(self.integers.clone_el(&self.prime), from.1),
-                from.0.modulus()
-            )
-        );
+        debug_assert!(self.integers.eq_el(
+            &self.integers.pow(self.integers.clone_el(&self.prime), from.1),
+            from.0.modulus()
+        ));
         RingRef::new(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
     }
 
@@ -1586,14 +1469,10 @@ where
             &self.integers.pow(self.integers.clone_el(&self.prime), to.1),
             to.0.modulus()
         ));
-        debug_assert!(
-            self.integers.eq_el(
-                &self
-                    .integers
-                    .pow(self.integers.clone_el(&self.prime), from.1),
-                from.0.modulus()
-            )
-        );
+        debug_assert!(self.integers.eq_el(
+            &self.integers.pow(self.integers.clone_el(&self.prime), from.1),
+            from.0.modulus()
+        ));
         RingRef::new(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
     }
 
@@ -1654,11 +1533,7 @@ where
         from.at(0).smallest_lift(from.at(0).clone_el(x.at(0)))
     }
 
-    fn dbg_ideal<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        out: &mut std::fmt::Formatter,
-    ) -> std::fmt::Result
+    fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
     where
         Self: 'ring,
     {
@@ -1679,20 +1554,14 @@ where
     where
         Self: 'ring;
 
-    fn local_ring_as_zn<'b, 'ring>(
-        &self,
-        local_field: &'b Self::LocalRing<'ring>,
-    ) -> &'b Self::LocalRingAsZn<'ring>
+    fn local_ring_as_zn<'b, 'ring>(&self, local_field: &'b Self::LocalRing<'ring>) -> &'b Self::LocalRingAsZn<'ring>
     where
         Self: 'ring,
     {
         local_field
     }
 
-    fn local_ring_into_zn<'ring>(
-        &self,
-        local_field: Self::LocalRing<'ring>,
-    ) -> Self::LocalRingAsZn<'ring>
+    fn local_ring_into_zn<'ring>(&self, local_field: Self::LocalRing<'ring>) -> Self::LocalRingAsZn<'ring>
     where
         Self: 'ring,
     {

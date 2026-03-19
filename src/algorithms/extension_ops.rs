@@ -52,17 +52,11 @@ where
     P: RingStore,
     P::Type: PolyRing,
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-    H: Homomorphism<
-            <R::BaseRing as RingStore>::Type,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type,
-        >,
+    H: Homomorphism<<R::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
 {
     let minpoly = minpoly(ring, el, &poly_ring, hom);
     let power = StaticRing::<i64>::RING
-        .checked_div(
-            &(ring.rank() as i64),
-            &(poly_ring.degree(&minpoly).unwrap() as i64),
-        )
+        .checked_div(&(ring.rank() as i64), &(poly_ring.degree(&minpoly).unwrap() as i64))
         .unwrap() as usize;
     return poly_ring.pow(minpoly, power);
 }
@@ -74,10 +68,7 @@ where
     P: RingStore,
     P::Type: PolyRing,
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-    H: Homomorphism<
-            <R::BaseRing as RingStore>::Type,
-            <<P::Type as RingExtension>::BaseRing as RingStore>::Type,
-        >,
+    H: Homomorphism<<R::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
 {
     assert!(!ring.is_zero(el));
     let base_ring = hom.codomain();
@@ -108,12 +99,7 @@ where
                     .chain([(base_ring.one(), d)].into_iter()),
             )
         };
-        match <_ as LinSolveRingStore>::solve_right(
-            base_ring,
-            lhs.data_mut(),
-            rhs.data_mut(),
-            sol.data_mut(),
-        ) {
+        match <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()) {
             SolveResult::NoSolution => -1,
             // I once thought that `FoundUniqueSolution` means we are immediately done;
             // however, that's wrong - it may be that the matrix has a nontrivial kernel,
@@ -238,8 +224,7 @@ fn test_charpoly() {
         )
     );
 
-    let [expected] =
-        poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 4 * X.pow_ref(2) + 4]);
+    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 4 * X.pow_ref(2) + 4]);
     assert_el_eq!(
         &poly_ring,
         &expected,

@@ -42,8 +42,7 @@ where
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + FiniteRing + Field,
     R: RingStore,
     R::Type: FreeAlgebra,
-    <R::Type as RingExtension>::BaseRing:
-        RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
+    <R::Type as RingExtension>::BaseRing: RingStore<Type = <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
     let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f, DontObserve);
@@ -80,28 +79,17 @@ where
         let mut f_body = SparseMapVector::new(degree, poly_ring.base_ring());
         for (c, i) in poly_ring.terms(f) {
             if i != degree {
-                *f_body.at_mut(i) = poly_ring
-                    .base_ring()
-                    .negate(poly_ring.base_ring().clone_el(c));
+                *f_body.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
             }
         }
-        return FreeAlgebraImpl::new_with_convolution(
-            Fp,
-            degree,
-            f_body,
-            "θ",
-            Global,
-            &convolution,
-        );
+        return FreeAlgebraImpl::new_with_convolution(Fp, degree, f_body, "θ", Global, &convolution);
     };
 
     if degree > 3 {
         // first try trinomials, they seem to have a good chance of being irreducible
         for _ in 0..16 {
             let i = (StaticRing::<i64>::RING
-                .get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || {
-                    rng.rand_u64()
-                })
+                .get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
                 + 1) as usize;
             let a = Fp.random_element(|| rng.rand_u64());
             let b = Fp.random_element(|| rng.rand_u64());
@@ -139,10 +127,7 @@ where
             // use a greedy approach, just add a factor to small_d if it makes large_d larger
             for (k, _) in factor(&ZZ, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
                 let new_small_d = small_d * k;
-                let Fq_star_order = ZZbig.sub(
-                    ZZbig.pow(ZZbig.clone_el(&p), new_small_d as usize),
-                    ZZbig.one(),
-                );
+                let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), new_small_d as usize), ZZbig.one());
                 let new_large_d = int_cast(
                     signed_gcd(
                         Fq_star_order,
@@ -166,19 +151,17 @@ where
         }
         small_d = TryInto::<i64>::try_into(degree).unwrap() / large_d;
         if large_d != 1 {
-            let Fq_star_order =
-                ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
             // careful here to not get an infinite generic argument recursion
             let Fq = GaloisField::new_internal(Fp, small_d as usize, Global, &convolution);
             // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d`
             // since `large_d | #Fq*`; hence we can use
             // `MinPoly(primitive_element)(X^large_d)`
-            let primitive_element =
-                if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
-                    Fq.canonical_gen()
-                } else {
-                    get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
-                };
+            let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
+                Fq.canonical_gen()
+            } else {
+                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
+            };
             // I thought for a while that it would be enough to have a primitive `lcm(Fq_star_order,
             // large_d^inf)`-th root of unity, however it is not guaranteed that this
             // would indeed generate the field
@@ -365,8 +348,7 @@ pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<
 
 /// Type alias for the most common instantiation of [`GaloisField`], which
 /// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
-pub type GaloisFieldOver<R, A = Global, C = KaratsubaAlgorithm> =
-    RingValue<GaloisFieldBaseOver<R, A, C>>;
+pub type GaloisFieldOver<R, A = Global, C = KaratsubaAlgorithm> = RingValue<GaloisFieldBaseOver<R, A, C>>;
 
 /// Type alias for the most common instantiation of [`GaloisFieldBase`], which
 /// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
@@ -455,12 +437,7 @@ where
     /// );
     /// ```
     #[stability::unstable(feature = "enable")]
-    pub fn new_with_convolution(
-        base_field: R,
-        degree: usize,
-        allocator: A,
-        convolution_algorithm: C,
-    ) -> Self {
+    pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
         assert!(degree >= 1);
         let poly_ring = DensePolyRing::new(&base_field, "X");
         let mut rng = oorandom::Rand64::new(
@@ -527,10 +504,7 @@ where
     }
 }
 
-impl<A>
-    GaloisFieldBase<
-        AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, A, KaratsubaAlgorithm>>,
-    >
+impl<A> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn>, SparseMapVector<AsField<Zn>>, A, KaratsubaAlgorithm>>>
 where
     A: Allocator + Clone,
 {
@@ -545,10 +519,7 @@ where
     ///
     /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring(
-        &self,
-        e: usize,
-    ) -> AsLocalPIR<FreeAlgebraImpl<Zn, SparseMapVector<Zn>, A, KaratsubaAlgorithm>> {
+    pub fn galois_ring(&self, e: usize) -> AsLocalPIR<FreeAlgebraImpl<Zn, SparseMapVector<Zn>, A, KaratsubaAlgorithm>> {
         self.galois_ring_with(
             Zn::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64),
             self.base.get_ring().get_delegate().allocator().clone(),
@@ -574,24 +545,25 @@ where
     ///
     /// See also [`GaloisFieldBase::galois_ring()`] for a simpler version of this function.
     #[stability::unstable(feature = "enable")]
-    pub fn galois_ring_with<S, A2, C2>(&self, new_base_ring: S, allocator: A2, convolution_algorithm: C2) -> AsLocalPIR<FreeAlgebraImpl<S, SparseMapVector<S>, A2, C2>>
-        where S: RingStore + Clone,
-            S::Type: ZnRing + CanHomFrom<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase>,
-            C2: ConvolutionAlgorithm<S::Type>,
-            A2: Allocator + Clone
+    pub fn galois_ring_with<S, A2, C2>(
+        &self,
+        new_base_ring: S,
+        allocator: A2,
+        convolution_algorithm: C2,
+    ) -> AsLocalPIR<FreeAlgebraImpl<S, SparseMapVector<S>, A2, C2>>
+    where
+        S: RingStore + Clone,
+        S::Type: ZnRing
+            + CanHomFrom<<<<Impl::Type as RingExtension>::BaseRing as RingStore>::Type as ZnRing>::IntegerRingBase>,
+        C2: ConvolutionAlgorithm<S::Type>,
+        A2: Allocator + Clone,
     {
-        let (p, e) = is_prime_power(
-            &BigIntRing::RING,
-            &new_base_ring.size(&BigIntRing::RING).unwrap(),
-        )
-        .unwrap();
+        let (p, e) = is_prime_power(&BigIntRing::RING, &new_base_ring.size(&BigIntRing::RING).unwrap()).unwrap();
         assert!(BigIntRing::RING.eq_el(&p, &self.base_ring().size(&BigIntRing::RING).unwrap()));
         let mut modulus_vec = SparseMapVector::new(self.rank(), new_base_ring.clone());
         let x_pow_deg = RingRef::new(self).pow(self.canonical_gen(), self.rank());
         let x_pow_deg = self.wrt_canonical_basis(&x_pow_deg);
-        let hom = new_base_ring
-            .can_hom(self.base_ring().integer_ring())
-            .unwrap();
+        let hom = new_base_ring.can_hom(self.base_ring().integer_ring()).unwrap();
         for i in 0..self.rank() {
             if !self.base_ring().is_zero(&x_pow_deg.at(i)) {
                 *modulus_vec.at_mut(i) = hom.map(self.base_ring().smallest_lift(x_pow_deg.at(i)));
@@ -605,24 +577,13 @@ where
             allocator,
             convolution_algorithm,
         );
-        let hom = result
-            .base_ring()
-            .can_hom(self.base_ring().integer_ring())
-            .unwrap();
-        let max_ideal_gen = result
-            .inclusion()
-            .map(hom.map_ref(self.base_ring().modulus()));
-        return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(
-            result,
-            max_ideal_gen,
-            Some(e),
-        ));
+        let hom = result.base_ring().can_hom(self.base_ring().integer_ring()).unwrap();
+        let max_ideal_gen = result.inclusion().map(hom.map_ref(self.base_ring().modulus()));
+        return AsLocalPIR::from(AsLocalPIRBase::promise_is_local_pir(result, max_ideal_gen, Some(e)));
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn unwrap_self(self) -> Impl {
-        self.base
-    }
+    pub fn unwrap_self(self) -> Impl { self.base }
 }
 
 impl<Impl> GaloisField<Impl>
@@ -637,9 +598,7 @@ where
     /// must indeed be a field, and this is not checked at runtime. Passing a non-field
     /// is impossible, unless [`AsFieldBase::promise_is_field()`] is used.
     #[stability::unstable(feature = "enable")]
-    pub fn create(base: Impl) -> Self {
-        RingValue::from(GaloisFieldBase { base })
-    }
+    pub fn create(base: Impl) -> Self { RingValue::from(GaloisFieldBase { base }) }
 }
 
 impl<Impl> Clone for GaloisFieldBase<Impl>
@@ -670,9 +629,7 @@ where
     Impl::Type: Field + FreeAlgebra + FiniteRing,
     <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
 }
 
 impl<Impl> DelegateRing for GaloisFieldBase<Impl>
@@ -684,25 +641,12 @@ where
     type Base = Impl::Type;
     type Element = El<Impl>;
 
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-        el
-    }
-    fn delegate_mut<'a>(
-        &self,
-        el: &'a mut Self::Element,
-    ) -> &'a mut <Self::Base as RingBase>::Element {
-        el
-    }
-    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-        el
-    }
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-        el
-    }
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 
-    fn get_delegate(&self) -> &Self::Base {
-        self.base.get_ring()
-    }
+    fn get_delegate(&self) -> &Self::Base { self.base.get_ring() }
 }
 
 impl<Impl> DelegateRingImplFiniteRing for GaloisFieldBase<Impl>
@@ -759,18 +703,12 @@ where
     Impl::Type: Field + FreeAlgebra + FiniteRing,
     <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
 {
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.base.checked_div(&lhs, rhs).unwrap(), self.zero())
     }
 
-    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        if self.is_zero(val) { Some(0) } else { Some(1) }
-    }
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
 
     fn euclidean_rem(&self, _: Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
@@ -841,9 +779,7 @@ where
     Impl::Type: Field + FreeAlgebra + FiniteRing,
     <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
 {
-    fn karatsuba_threshold(&self) -> usize {
-        self.get_delegate().karatsuba_threshold()
-    }
+    fn karatsuba_threshold(&self) -> usize { self.get_delegate().karatsuba_threshold() }
 }
 
 impl<Impl> ComputeInnerProduct for GaloisFieldBase<Impl>
@@ -852,20 +788,14 @@ where
     Impl::Type: Field + FreeAlgebra + FiniteRing,
     <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
 {
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element {
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         self.rev_delegate(
             self.get_delegate()
                 .inner_product(els.map(|(a, b)| (self.delegate(a), self.delegate(b)))),
         )
     }
 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
         Self: 'a,
@@ -876,10 +806,7 @@ where
         )
     }
 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
         Self: 'a,
@@ -897,9 +824,7 @@ where
     Impl::Type: Field + FreeAlgebra + FiniteRing,
     <<Impl::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing + Field,
 {
-    fn strassen_threshold(&self) -> usize {
-        self.get_delegate().strassen_threshold()
-    }
+    fn strassen_threshold(&self) -> usize { self.get_delegate().strassen_threshold() }
 }
 
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
@@ -912,16 +837,9 @@ where
 {
     type Homomorphism = <Impl::Type as CanHomFrom<S>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> {
-        self.base.get_ring().has_canonical_hom(from)
-    }
+    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> { self.base.get_ring().has_canonical_hom(from) }
 
-    fn map_in(
-        &self,
-        from: &S,
-        el: <S as RingBase>::Element,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &S, el: <S as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.base.get_ring().map_in(from, el, hom)
     }
 }
@@ -955,8 +873,7 @@ where
 }
 
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
-impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>>
-    for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
 where
     Impl: RingStore,
     Impl::Type: Field + FreeAlgebra + FiniteRing,
@@ -994,16 +911,9 @@ where
 {
     type Isomorphism = <Impl::Type as CanIsoFromTo<S>>::Isomorphism;
 
-    fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism> {
-        self.base.get_ring().has_canonical_iso(from)
-    }
+    fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism> { self.base.get_ring().has_canonical_iso(from) }
 
-    fn map_out(
-        &self,
-        from: &S,
-        el: Self::Element,
-        iso: &Self::Isomorphism,
-    ) -> <S as RingBase>::Element {
+    fn map_out(&self, from: &S, el: Self::Element, iso: &Self::Isomorphism) -> <S as RingBase>::Element {
         self.base.get_ring().map_out(from, el, iso)
     }
 }
@@ -1037,8 +947,7 @@ where
 }
 
 /// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
-impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>>
-    for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, A, C>>
 where
     Impl: RingStore,
     Impl::Type: Field + FreeAlgebra + FiniteRing,
@@ -1092,10 +1001,7 @@ fn test_can_hom_from() {
         A: Allocator + Clone,
         C: ConvolutionAlgorithm<R::Type>,
     {
-        assert_impl_CanHomFrom::<
-            FreeAlgebraImplBase<R, V, A, C>,
-            AsFieldBase<FreeAlgebraImpl<R, V, A, C>>,
-        >();
+        assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, A, C>, AsFieldBase<FreeAlgebraImpl<R, V, A, C>>>();
     }
 
     #[allow(unused)]
@@ -1161,15 +1067,7 @@ fn test_galois_field_even() {
             STANDARD_CONVOLUTION,
         );
         assert_eq!(degree, field.rank());
-        assert!(
-            field
-                .into()
-                .unwrap_self()
-                .into()
-                .unwrap_self()
-                .as_field()
-                .is_ok()
-        );
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 }
 
@@ -1183,15 +1081,7 @@ fn test_galois_field_odd() {
             STANDARD_CONVOLUTION,
         );
         assert_eq!(degree, field.rank());
-        assert!(
-            field
-                .into()
-                .unwrap_self()
-                .into()
-                .unwrap_self()
-                .as_field()
-                .is_ok()
-        );
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 
     for degree in 1..=9 {
@@ -1202,76 +1092,32 @@ fn test_galois_field_odd() {
             STANDARD_CONVOLUTION,
         );
         assert_eq!(degree, field.rank());
-        assert!(
-            field
-                .into()
-                .unwrap_self()
-                .into()
-                .unwrap_self()
-                .as_field()
-                .is_ok()
-        );
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 }
 
 #[test]
 fn test_galois_field_no_trinomial() {
-    let field = GaloisField::new_with_convolution(
-        Zn::new(2).as_field().ok().unwrap(),
-        24,
-        Global,
-        STANDARD_CONVOLUTION,
-    );
+    let field =
+        GaloisField::new_with_convolution(Zn::new(2).as_field().ok().unwrap(), 24, Global, STANDARD_CONVOLUTION);
     assert_eq!(24, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
-    assert!(
-        field
-            .into()
-            .unwrap_self()
-            .into()
-            .unwrap_self()
-            .as_field()
-            .is_ok()
-    );
+    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with_convolution(
-        Zn::new(3).as_field().ok().unwrap(),
-        30,
-        Global,
-        STANDARD_CONVOLUTION,
-    );
+    let field =
+        GaloisField::new_with_convolution(Zn::new(3).as_field().ok().unwrap(), 30, Global, STANDARD_CONVOLUTION);
     assert_eq!(30, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
-    assert!(
-        field
-            .into()
-            .unwrap_self()
-            .into()
-            .unwrap_self()
-            .as_field()
-            .is_ok()
-    );
+    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
-    let field = GaloisField::new_with_convolution(
-        Zn::new(17).as_field().ok().unwrap(),
-        32,
-        Global,
-        STANDARD_CONVOLUTION,
-    );
+    let field =
+        GaloisField::new_with_convolution(Zn::new(17).as_field().ok().unwrap(), 32, Global, STANDARD_CONVOLUTION);
     assert_eq!(32, field.rank());
     let poly_ring = DensePolyRing::new(field.base_ring(), "X");
     poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
-    assert!(
-        field
-            .into()
-            .unwrap_self()
-            .into()
-            .unwrap_self()
-            .as_field()
-            .is_ok()
-    );
+    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 }
 
 #[bench]

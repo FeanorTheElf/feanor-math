@@ -46,20 +46,13 @@ where
         false
     } else {
         let n_copy = ZZ.clone_el(n);
-        choose_zn_impl(
-            ZZ,
-            n_copy,
-            CheckIsFieldMillerRabin {
-                probability_param: k,
-            },
-        )
+        choose_zn_impl(ZZ, n_copy, CheckIsFieldMillerRabin { probability_param: k })
     }
 }
 
 const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
-    false, true, false, false, false, false, false, true, false, false, false, true, false, true,
-    false, false, false, true, false, true, false, false, false, true, false, false, false, false,
-    false, true,
+    false, true, false, false, false, false, false, true, false, false, false, true, false, true, false, false, false,
+    true, false, true, false, false, false, true, false, false, false, false, false, true,
 ];
 
 fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<El<I>>
@@ -73,9 +66,7 @@ where
     let Zm = zn_64::Zn::new(m as u64);
     let mut n_mod_m = Zm.coerce(&ZZ, ZZ.clone_el(&n));
     let mut diff_to_n = 0;
-    let Zi64_to_Zm = Zm
-        .can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING)
-        .unwrap();
+    let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
     let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
     debug_assert!(ZZ.is_one(&signed_gcd(ZZ.clone_el(&n), Zi64_to_ZZ.map(delta), &ZZ)));
     let Zm_delta = Zi64_to_Zm.map(delta);
@@ -100,9 +91,7 @@ where
     };
 
     while remaining_steps != 0 {
-        while !SMALL_IS_COPRIME_TABLE[Zm.smallest_positive_lift(n_mod_m) as usize]
-            && remaining_steps != 0
-        {
+        while !SMALL_IS_COPRIME_TABLE[Zm.smallest_positive_lift(n_mod_m) as usize] && remaining_steps != 0 {
             diff_to_n += delta;
             Zm.add_assign(&mut n_mod_m, Zm_delta);
             remaining_steps -= 1;
@@ -122,11 +111,7 @@ where
     let mut n = int_cast(n, StaticRing::<i64>::RING, &ZZ);
     assert!(n <= m.try_into().unwrap());
     while n > 0 {
-        if is_prime(
-            &StaticRing::<i64>::RING,
-            &n,
-            DEFAULT_PROBABILISTIC_REPETITIONS,
-        ) {
+        if is_prime(&StaticRing::<i64>::RING, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
             return Some(Zi64_to_ZZ.map(n));
         }
         n += delta;
@@ -264,11 +249,7 @@ fn test_prev_prime() {
     let mut last_prime = 11;
     for i in 12..1000 {
         assert_eq!(Some(last_prime), prev_prime(StaticRing::<i64>::RING, i));
-        if is_prime(
-            StaticRing::<i64>::RING,
-            &i,
-            DEFAULT_PROBABILISTIC_REPETITIONS,
-        ) {
+        if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }
@@ -279,11 +260,7 @@ fn test_next_prime() {
     let mut last_prime = 1009;
     for i in (2..1000).rev() {
         assert_eq!(last_prime, next_prime(StaticRing::<i64>::RING, i));
-        if is_prime(
-            StaticRing::<i64>::RING,
-            &i,
-            DEFAULT_PROBABILISTIC_REPETITIONS,
-        ) {
+        if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }

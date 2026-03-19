@@ -49,9 +49,7 @@ where
     /// of length `<= n`, where `n` is the largest power of two such that the given ring
     /// has a primitive `n`-th root of unity.
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: R) -> Self {
-        Self::new_with_hom(ring.into_identity(), Global)
-    }
+    pub fn new(ring: R) -> Self { Self::new_with_hom(ring.into_identity(), Global) }
 }
 
 impl<R_main, R_twiddle, H, A> NTTConvolution<R_main, R_twiddle, H, A>
@@ -81,15 +79,12 @@ where
 
     /// Returns the ring over which this object can compute convolutions.
     #[stability::unstable(feature = "enable")]
-    pub fn ring(&self) -> RingRef<'_, R_main> {
-        RingRef::new(self.hom.codomain().get_ring())
-    }
+    pub fn ring(&self) -> RingRef<'_, R_main> { RingRef::new(self.hom.codomain().get_ring()) }
 
     fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R_main, R_twiddle, H> {
         self.fft_algos.get_or_init(log2_n, || {
-            CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n).expect(
-                "NTTConvolution was instantiated with parameters that don't support this length",
-            )
+            CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n)
+                .expect("NTTConvolution was instantiated with parameters that don't support this length")
         })
     }
 
@@ -139,19 +134,15 @@ where
         if lhs.len() == 0 || rhs.len() == 0 {
             return MyCow::Owned(Vec::new_in(self.allocator.clone()));
         }
-        let log2_len = StaticRing::<i64>::RING
-            .abs_log2_ceil(&len.try_into().unwrap())
-            .unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         if lhs_prep.is_some()
-            && (lhs_prep.unwrap().significant_entries < len
-                || lhs_prep.unwrap().ntt_data.len() != 1 << log2_len)
+            && (lhs_prep.unwrap().significant_entries < len || lhs_prep.unwrap().ntt_data.len() != 1 << log2_len)
         {
             lhs_prep = None;
         }
         if rhs_prep.is_some()
-            && (rhs_prep.unwrap().significant_entries < len
-                || rhs_prep.unwrap().ntt_data.len() != 1 << log2_len)
+            && (rhs_prep.unwrap().significant_entries < len || rhs_prep.unwrap().ntt_data.len() != 1 << log2_len)
         {
             rhs_prep = None;
         }
@@ -168,17 +159,12 @@ where
         });
 
         for i in 0..len {
-            self.ring()
-                .mul_assign_ref(&mut lhs_ntt_data[i], &rhs_ntt[i]);
+            self.ring().mul_assign_ref(&mut lhs_ntt_data[i], &rhs_ntt[i]);
         }
         return lhs_ntt;
     }
 
-    fn prepare_convolution_impl<V>(
-        &self,
-        data: V,
-        len_hint: Option<usize>,
-    ) -> PreparedConvolutionOperand<R_main, A>
+    fn prepare_convolution_impl<V>(&self, data: V, len_hint: Option<usize>) -> PreparedConvolutionOperand<R_main, A>
     where
         V: VectorView<R_main::Element>,
     {
@@ -217,9 +203,7 @@ where
     {
         assert!(lhs.len() + rhs.len() - 1 <= dst.len());
         let len = lhs.len() + rhs.len() - 1;
-        let log2_len = StaticRing::<i64>::RING
-            .abs_log2_ceil(&len.try_into().unwrap())
-            .unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut lhs_ntt = self.compute_convolution_ntt(lhs, lhs_prep, rhs, rhs_prep, len);
         let lhs_ntt = lhs_ntt.to_mut_with(|_| unreachable!());
@@ -230,12 +214,8 @@ where
         }
     }
 
-    fn compute_convolution_sum_impl<'a, S, I, V1, V2>(
-        &self,
-        values: I,
-        dst: &mut [R_main::Element],
-        ring: S,
-    ) where
+    fn compute_convolution_sum_impl<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R_main::Element], ring: S)
+    where
         S: RingStore<Type = R_main> + Copy,
         I: ExactSizeIterator<
             Item = (
@@ -251,9 +231,7 @@ where
         R_main: 'a,
     {
         let len = dst.len();
-        let log2_len = StaticRing::<i64>::RING
-            .abs_log2_ceil(&len.try_into().unwrap())
-            .unwrap();
+        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize_with(1 << log2_len, || ring.zero());
@@ -274,8 +252,7 @@ where
     }
 }
 
-impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main>
-    for NTTConvolution<R_main, R_twiddle, H, A>
+impl<R_main, R_twiddle, H, A> ConvolutionAlgorithm<R_main> for NTTConvolution<R_main, R_twiddle, H, A>
 where
     R_main: ?Sized + ZnRing,
     R_twiddle: ?Sized + ZnRing,
@@ -334,12 +311,8 @@ where
         self.compute_convolution_impl(lhs, lhs_prep, rhs, rhs_prep, dst)
     }
 
-    fn compute_convolution_sum<'a, S, I, V1, V2>(
-        &self,
-        values: I,
-        dst: &mut [R_main::Element],
-        ring: S,
-    ) where
+    fn compute_convolution_sum<'a, S, I, V1, V2>(&self, values: I, dst: &mut [R_main::Element], ring: S)
+    where
         S: RingStore<Type = R_main> + Copy,
         I: ExactSizeIterator<
             Item = (
@@ -403,13 +376,9 @@ where
         f(
             &mut (0..256).map(|j| {
                 (
-                    (0..256)
-                        .map(|k| hom.map(i * j as i64 * k))
-                        .collect::<Vec<_>>(),
+                    (0..256).map(|k| hom.map(i * j as i64 * k)).collect::<Vec<_>>(),
                     None,
-                    (0..256)
-                        .map(|k| hom.map(i * j as i64 * k))
-                        .collect::<Vec<_>>(),
+                    (0..256).map(|k| hom.map(i * j as i64 * k)).collect::<Vec<_>>(),
                     None,
                 )
             }),

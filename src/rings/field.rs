@@ -114,9 +114,7 @@ where
     R::Type: DivisibilityRing + Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("AsField")
-            .field(&self.base.get_ring())
-            .finish()
+        f.debug_tuple("AsField").field(&self.base.get_ring()).finish()
     }
 }
 
@@ -125,9 +123,7 @@ where
     R: RingStore,
     R::Type: DivisibilityRing,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
 }
 
 /// [`RingStore`] for [`AsFieldBase`].
@@ -154,9 +150,7 @@ where
     El<R>: Clone,
     R::Type: DivisibilityRing,
 {
-    fn clone(&self) -> Self {
-        FieldEl(self.0.clone())
-    }
+    fn clone(&self) -> Self { FieldEl(self.0.clone()) }
 }
 
 impl<R: RingStore> Copy for FieldEl<R>
@@ -208,14 +202,10 @@ where
         }
     }
 
-    pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
-        el.0
-    }
+    pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> { el.0 }
 
     /// Removes the wrapper, returning the underlying base field.
-    pub fn unwrap_self(self) -> R {
-        self.base
-    }
+    pub fn unwrap_self(self) -> R { self.base }
 }
 
 impl<R: RingStore> AsFieldBase<R>
@@ -224,9 +214,7 @@ where
 {
     /// Creates a new [`AsFieldBase`] from a ring that is already known to be a
     /// perfect field.
-    pub fn from_field(base: R) -> Self {
-        Self::promise_is_perfect_field(base)
-    }
+    pub fn from_field(base: R) -> Self { Self::promise_is_perfect_field(base) }
 }
 
 impl<R: RingStore> DelegateRing for AsFieldBase<R>
@@ -236,28 +224,15 @@ where
     type Element = FieldEl<R>;
     type Base = R::Type;
 
-    fn get_delegate(&self) -> &Self::Base {
-        self.base.get_ring()
-    }
+    fn get_delegate(&self) -> &Self::Base { self.base.get_ring() }
 
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-        el.0
-    }
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el.0 }
 
-    fn delegate_mut<'a>(
-        &self,
-        el: &'a mut Self::Element,
-    ) -> &'a mut <Self::Base as RingBase>::Element {
-        &mut el.0
-    }
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { &mut el.0 }
 
-    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-        &el.0
-    }
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { &el.0 }
 
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-        FieldEl(el)
-    }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { FieldEl(el) }
 }
 
 impl<R: RingStore> DelegateRingImplFiniteRing for AsFieldBase<R> where R::Type: DivisibilityRing {}
@@ -270,18 +245,10 @@ where
     type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsFieldBase<S>) -> Option<Self::Homomorphism> {
-        <R::Type as CanHomFrom<S::Type>>::has_canonical_hom(
-            self.get_delegate(),
-            from.get_delegate(),
-        )
+        <R::Type as CanHomFrom<S::Type>>::has_canonical_hom(self.get_delegate(), from.get_delegate())
     }
 
-    fn map_in(
-        &self,
-        from: &AsFieldBase<S>,
-        el: FieldEl<S>,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &AsFieldBase<S>, el: FieldEl<S>, hom: &Self::Homomorphism) -> Self::Element {
         FieldEl(<R::Type as CanHomFrom<S::Type>>::map_in(
             self.get_delegate(),
             from.get_delegate(),
@@ -299,18 +266,10 @@ where
     type Isomorphism = <R::Type as CanIsoFromTo<S::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &AsFieldBase<S>) -> Option<Self::Isomorphism> {
-        <R::Type as CanIsoFromTo<S::Type>>::has_canonical_iso(
-            self.get_delegate(),
-            from.get_delegate(),
-        )
+        <R::Type as CanIsoFromTo<S::Type>>::has_canonical_iso(self.get_delegate(), from.get_delegate())
     }
 
-    fn map_out(
-        &self,
-        from: &AsFieldBase<S>,
-        el: Self::Element,
-        iso: &Self::Isomorphism,
-    ) -> FieldEl<S> {
+    fn map_out(&self, from: &AsFieldBase<S>, el: Self::Element, iso: &Self::Isomorphism) -> FieldEl<S> {
         FieldEl(<R::Type as CanIsoFromTo<S::Type>>::map_out(
             self.get_delegate(),
             from.get_delegate(),
@@ -327,17 +286,10 @@ where
 {
     type Homomorphism = <R::Type as CanHomFrom<S>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> {
-        self.get_delegate().has_canonical_hom(from)
-    }
+    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> { self.get_delegate().has_canonical_hom(from) }
 
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        FieldEl(<R::Type as CanHomFrom<S>>::map_in(
-            self.get_delegate(),
-            from,
-            el,
-            hom,
-        ))
+        FieldEl(<R::Type as CanHomFrom<S>>::map_in(self.get_delegate(), from, el, hom))
     }
 }
 
@@ -361,10 +313,7 @@ where
         el: <AsLocalPIRBase<R1> as RingBase>::Element,
         hom: &Self::Homomorphism,
     ) -> Self::Element {
-        self.rev_delegate(
-            self.get_delegate()
-                .map_in(from.get_delegate(), from.delegate(el), hom),
-        )
+        self.rev_delegate(self.get_delegate().map_in(from.get_delegate(), from.delegate(el), hom))
     }
 }
 
@@ -388,10 +337,7 @@ where
         el: Self::Element,
         iso: &Self::Isomorphism,
     ) -> <AsLocalPIRBase<R1> as RingBase>::Element {
-        from.rev_delegate(
-            self.get_delegate()
-                .map_out(from.get_delegate(), self.delegate(el), iso),
-        )
+        from.rev_delegate(self.get_delegate().map_out(from.get_delegate(), self.delegate(el), iso))
     }
 }
 
@@ -424,13 +370,9 @@ impl<R: RingStore> PrincipalLocalRing for AsFieldBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn max_ideal_gen(&self) -> &Self::Element {
-        &self.zero
-    }
+    fn max_ideal_gen(&self) -> &Self::Element { &self.zero }
 
-    fn nilpotent_power(&self) -> Option<usize> {
-        Some(1)
-    }
+    fn nilpotent_power(&self) -> Option<usize> { Some(1) }
 
     fn valuation(&self, x: &Self::Element) -> Option<usize> {
         if self.is_zero(x) {
@@ -461,9 +403,7 @@ where
         Self: 'a,
         S: RingStore<Type = Self::ExtendedRingBase<'a>>,
     {
-        self.get_delegate()
-            .in_base(ext_ring, el)
-            .map(|x| self.rev_delegate(x))
+        self.get_delegate().in_base(ext_ring, el).map(|x| self.rev_delegate(x))
     }
 
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
@@ -471,14 +411,10 @@ where
         Self: 'a,
         S: RingStore<Type = Self::ExtendedRingBase<'a>>,
     {
-        self.get_delegate()
-            .in_extension(ext_ring, self.delegate(el))
+        self.get_delegate().in_extension(ext_ring, self.delegate(el))
     }
 
-    fn interpolation_points<'a>(
-        &'a self,
-        count: usize,
-    ) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         self.get_delegate().interpolation_points(count)
     }
 }
@@ -487,18 +423,12 @@ impl<R: RingStore> EuclideanRing for AsFieldBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
     }
 
-    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        if self.is_zero(val) { Some(0) } else { Some(1) }
-    }
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
 
     fn euclidean_rem(&self, _: Self::Element, rhs: &Self::Element) -> Self::Element {
         assert!(!self.is_zero(rhs));
@@ -513,11 +443,7 @@ where
     R::Type: DivisibilityRing,
 {
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        FieldEl(
-            self.get_delegate()
-                .checked_left_div(&lhs.0, &rhs.0)
-                .unwrap(),
-        )
+        FieldEl(self.get_delegate().checked_left_div(&lhs.0, &rhs.0).unwrap())
     }
 }
 
@@ -525,29 +451,21 @@ impl<R: RingStore> KaratsubaHint for AsFieldBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn karatsuba_threshold(&self) -> usize {
-        self.get_delegate().karatsuba_threshold()
-    }
+    fn karatsuba_threshold(&self) -> usize { self.get_delegate().karatsuba_threshold() }
 }
 
 impl<R: RingStore> ComputeInnerProduct for AsFieldBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element {
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         self.rev_delegate(
             self.get_delegate()
                 .inner_product(els.map(|(a, b)| (self.delegate(a), self.delegate(b)))),
         )
     }
 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
         Self: 'a,
@@ -558,10 +476,7 @@ where
         )
     }
 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
         Self: 'a,
@@ -577,9 +492,7 @@ impl<R: RingStore> StrassenHint for AsFieldBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn strassen_threshold(&self) -> usize {
-        self.get_delegate().strassen_threshold()
-    }
+    fn strassen_threshold(&self) -> usize { self.get_delegate().strassen_threshold() }
 }
 
 impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
@@ -769,28 +682,19 @@ use crate::rings::zn::zn_big::Zn;
 
 #[test]
 fn test_canonical_hom_axioms_static_int() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17)
-        .as_field()
-        .ok()
-        .unwrap();
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(StaticRing::<i64>::RING, &R, 0..17);
 }
 
 #[test]
 fn test_divisibility_axioms() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17)
-        .as_field()
-        .ok()
-        .unwrap();
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_canonical_hom_axioms_wrap_unwrap() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17)
-        .as_field()
-        .ok()
-        .unwrap();
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::ring::generic_tests::test_hom_axioms(
         RingRef::new(R.get_ring().get_delegate()),
         &R,
@@ -805,19 +709,13 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17)
-        .as_field()
-        .ok()
-        .unwrap();
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
     crate::pid::generic_tests::test_euclidean_ring_axioms(&R, R.elements());
 }
 
 #[test]
 fn test_field_axioms() {
-    let R = Zn::new(StaticRing::<i64>::RING, 17)
-        .as_field()
-        .ok()
-        .unwrap();
+    let R = Zn::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
     crate::field::generic_tests::test_field_axioms(&R, R.elements());
 }

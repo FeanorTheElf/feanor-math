@@ -48,13 +48,7 @@ pub type BigIntRingBase = crate::rings::rust_bigint::RustBigintRingBase;
 /// [`EvalPolyLocallyRing`] so it is at the moment impossible to implement [`IntegerRing`] for a
 /// custom ring type without enabling unstable features. Sorry.
 pub trait IntegerRing:
-    Domain
-    + EuclideanRing
-    + OrderedRing
-    + HashableElRing
-    + IntegerPolyGCDRing
-    + EvalPolyLocallyRing
-    + Debug
+    Domain + EuclideanRing + OrderedRing + HashableElRing + IntegerPolyGCDRing + EvalPolyLocallyRing + Debug
 {
     /// Computes a float value that is "close" to the given integer.
     ///
@@ -164,11 +158,7 @@ pub trait IntegerRing:
 
     /// Computes a uniformly random integer in `[0, 2^log_bound_exclusive - 1]`, assuming that
     /// `rng` provides uniformly random values in the whole range of `u64`.
-    fn get_uniformly_random_bits<G: FnMut() -> u64>(
-        &self,
-        log2_bound_exclusive: usize,
-        rng: G,
-    ) -> Self::Element;
+    fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element;
 
     /// Computes the rounded division, i.e. rounding to the closest integer.
     /// In the case of a tie (i.e. `round(0.5)`), we round towards `+/- infinity`.
@@ -284,25 +274,13 @@ where
 {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &I) -> Option<Self::Homomorphism> {
-        Some(())
-    }
+    fn has_canonical_hom(&self, _: &I) -> Option<Self::Homomorphism> { Some(()) }
 
-    fn map_in(
-        &self,
-        from: &I,
-        el: <I as RingBase>::Element,
-        _: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &I, el: <I as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
         int_cast(el, &RingRef::new(self), &RingRef::new(from))
     }
 
-    default fn map_in_ref(
-        &self,
-        from: &I,
-        el: &<I as RingBase>::Element,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    default fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
         <J as CanHomFrom<I>>::map_in(self, from, from.clone_el(el), hom)
     }
 }
@@ -314,16 +292,9 @@ where
 {
     type Isomorphism = ();
 
-    fn has_canonical_iso(&self, _: &I) -> Option<Self::Isomorphism> {
-        Some(())
-    }
+    fn has_canonical_iso(&self, _: &I) -> Option<Self::Isomorphism> { Some(()) }
 
-    fn map_out(
-        &self,
-        from: &I,
-        el: Self::Element,
-        _: &Self::Isomorphism,
-    ) -> <I as RingBase>::Element {
+    fn map_out(&self, from: &I, el: Self::Element, _: &Self::Isomorphism) -> <I as RingBase>::Element {
         int_cast(el, &RingRef::new(from), &RingRef::new(self))
     }
 }
@@ -427,10 +398,7 @@ where
         let mut result = ring.one();
         let mut i = ring.one();
         while ring.is_leq(&i, &k) {
-            ring.mul_assign(
-                &mut result,
-                ring.sub_ref_snd(ring.add_ref_fst(&n, ring.one()), &i),
-            );
+            ring.mul_assign(&mut result, ring.sub_ref_snd(ring.add_ref_fst(&n, ring.one()), &i));
             result = ring.checked_div(&result, &i).unwrap();
             ring.add_assign(&mut i, ring.one());
         }
@@ -479,20 +447,12 @@ where
     /// from the set `{ 0, 1, ..., bound_exclusive - 1 }`.
     ///
     /// Uses rejection sampling on top of [`IntegerRing::get_uniformly_random_bits()`].
-    fn get_uniformly_random<G: FnMut() -> u64>(
-        &self,
-        bound_exclusive: &El<Self>,
-        mut rng: G,
-    ) -> El<Self> {
+    fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));
         let log2_ceil_bound = self.abs_highest_set_bit(bound_exclusive).unwrap() + 1;
-        let mut result = self
-            .get_ring()
-            .get_uniformly_random_bits(log2_ceil_bound, || rng());
+        let mut result = self.get_ring().get_uniformly_random_bits(log2_ceil_bound, || rng());
         while self.is_geq(&result, bound_exclusive) {
-            result = self
-                .get_ring()
-                .get_uniformly_random_bits(log2_ceil_bound, || rng());
+            result = self.get_ring().get_uniformly_random_bits(log2_ceil_bound, || rng());
         }
         return result;
     }
@@ -500,9 +460,7 @@ where
     /// Computes `floor(log2(abs(value)))`, and returns `None` if the argument is 0.
     ///
     /// This is equivalent to [`IntegerRingStore::abs_highest_set_bit`].
-    fn abs_log2_floor(&self, value: &El<Self>) -> Option<usize> {
-        self.abs_highest_set_bit(value)
-    }
+    fn abs_log2_floor(&self, value: &El<Self>) -> Option<usize> { self.abs_highest_set_bit(value) }
 
     /// Computes `ceil(log2(abs(value)))`, and returns `None` if the argument is 0.
     fn abs_log2_ceil(&self, value: &El<Self>) -> Option<usize> {
@@ -515,14 +473,10 @@ where
     }
 
     /// Returns true if the given integer is divisible by 2.
-    fn is_even(&self, value: &El<Self>) -> bool {
-        !self.abs_is_bit_set(value, 0)
-    }
+    fn is_even(&self, value: &El<Self>) -> bool { !self.abs_is_bit_set(value, 0) }
 
     /// Returns true if the given integer is not divisible by 2.
-    fn is_odd(&self, value: &El<Self>) -> bool {
-        !self.is_even(value)
-    }
+    fn is_odd(&self, value: &El<Self>) -> bool { !self.is_even(value) }
 
     /// Assumes the given integer is even, and computes its quotient by 2.
     fn half_exact(&self, mut value: El<Self>) -> El<Self> {
@@ -570,10 +524,7 @@ pub mod generic_impls {
             from.mul_pow_2(&mut rem, 16);
             from.sub_self_assign(&mut rem, x);
             let rem = int_cast(rem, StaticRing::<i32>::RING, &from);
-            to.add_assign(
-                &mut current,
-                to.mul_ref_snd(to.int_hom().map(rem), &current_pow),
-            );
+            to.add_assign(&mut current, to.mul_ref_snd(to.int_hom().map(rem), &current_pow));
             x = quo;
             to.mul_assign_ref(&mut current_pow, &basis);
         }
@@ -608,18 +559,12 @@ pub mod generic_impls {
             .map(std::str::from_utf8)
             .map(|chunk| chunk.map_err(|_| ()))
             .map(|chunk| chunk.and_then(|n| u64::from_str_radix(n, base).map_err(|_| ())));
-        let chunk_base = ring.pow(
-            int_cast(base as i64, &ring, StaticRing::<i64>::RING),
-            chunk_size,
-        );
+        let chunk_base = ring.pow(int_cast(base as i64, &ring, StaticRing::<i64>::RING), chunk_size);
         let result = it.fold(Ok(ring.zero()), |current, next| {
             current.and_then(|mut current| {
                 next.map(|next| {
                     ring.mul_assign_ref(&mut current, &chunk_base);
-                    ring.add(
-                        current,
-                        int_cast(next as i64, &ring, StaticRing::<i64>::RING),
-                    )
+                    ring.add(current, int_cast(next as i64, &ring, StaticRing::<i64>::RING))
                 })
             })
         });
@@ -655,11 +600,7 @@ pub mod generic_tests {
                 .map(|_| ring.get_uniformly_random(&bound, || rng.rand_u64()))
                 .collect();
             for i in 0..b {
-                assert!(
-                    elements
-                        .iter()
-                        .any(|x| ring.eq_el(x, &ring.int_hom().map(i)))
-                )
+                assert!(elements.iter().any(|x| ring.eq_el(x, &ring.int_hom().map(i))))
             }
             for x in &elements {
                 assert!(ring.is_lt(x, &bound));
@@ -667,10 +608,8 @@ pub mod generic_tests {
         }
     }
 
-    pub fn test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(
-        ring: R,
-        edge_case_elements: I,
-    ) where
+    pub fn test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where
         R::Type: IntegerRing,
     {
         let elements = edge_case_elements.collect::<Vec<_>>();
@@ -867,11 +806,7 @@ fn test_ceil_floor_div() {
 #[test]
 fn test_parse() {
     let ZZbig = BigIntRing::RING;
-    assert_el_eq!(
-        &ZZbig,
-        &ZZbig.int_hom().map(3),
-        ZZbig.parse("3", 10).unwrap()
-    );
+    assert_el_eq!(&ZZbig, &ZZbig.int_hom().map(3), ZZbig.parse("3", 10).unwrap());
     assert_el_eq!(
         &ZZbig,
         &ZZbig.power_of_two(100),
@@ -889,10 +824,7 @@ fn test_parse() {
     );
     assert_el_eq!(
         &ZZbig,
-        &ZZbig.mul(
-            ZZbig.pow(ZZbig.int_hom().map(11), 26),
-            ZZbig.int_hom().map(10)
-        ),
+        &ZZbig.mul(ZZbig.pow(ZZbig.int_hom().map(11), 26), ZZbig.int_hom().map(10)),
         ZZbig.parse("a00000000000000000000000000", 11).unwrap()
     );
     assert!(ZZbig.parse("238597a", 10).is_err());
@@ -914,23 +846,15 @@ fn test_map_from_integer() {
     assert_el_eq!(
         &ZZbig,
         ZZbig.parse("80934517340527398320561", 10).unwrap(),
-        map_from_integer_ring(
-            ZZbig,
-            ZZbig,
-            ZZbig.parse("80934517340527398320561", 10).unwrap()
-        )
+        map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("80934517340527398320561", 10).unwrap())
     );
     assert_el_eq!(
         &ZZbig,
-        ZZbig
-            .parse("-4861235897136598713465987138952643", 10)
-            .unwrap(),
+        ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap(),
         map_from_integer_ring(
             ZZbig,
             ZZbig,
-            ZZbig
-                .parse("-4861235897136598713465987138952643", 10)
-                .unwrap()
+            ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap()
         )
     );
 }

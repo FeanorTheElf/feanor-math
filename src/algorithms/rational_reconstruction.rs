@@ -29,10 +29,7 @@ where
 {
     let ZZ = Zn.integer_ring();
     if Zn.is_zero(&x) {
-        return (
-            [ZZ.one(), ZZ.zero()],
-            [ZZ.zero(), ZZ.clone_el(Zn.modulus())],
-        );
+        return ([ZZ.one(), ZZ.zero()], [ZZ.zero(), ZZ.clone_el(Zn.modulus())]);
     }
 
     let mut u = [ZZ.zero(), ZZ.clone_el(Zn.modulus())];
@@ -51,10 +48,7 @@ where
     // now use real LLL, it is likely that this does not run for many rounds anymore
     loop {
         let norm_u_sqr = ZZ.add(ZZ.pow(ZZ.clone_el(&u[0]), 2), ZZ.pow(ZZ.clone_el(&u[1]), 2));
-        let q = ZZ.rounded_div(
-            ZZ.add(ZZ.mul_ref(&u[0], &v[0]), ZZ.mul_ref(&u[1], &v[1])),
-            &norm_u_sqr,
-        );
+        let q = ZZ.rounded_div(ZZ.add(ZZ.mul_ref(&u[0], &v[0]), ZZ.mul_ref(&u[1], &v[1])), &norm_u_sqr);
         ZZ.sub_assign(&mut v[0], ZZ.mul_ref(&u[0], &q));
         ZZ.sub_assign(&mut v[1], ZZ.mul_ref(&u[1], &q));
         let norm_v_sqr = ZZ.add(ZZ.pow(ZZ.clone_el(&v[0]), 2), ZZ.pow(ZZ.clone_el(&v[1]), 2));
@@ -137,13 +131,8 @@ fn test_rational_reconstruction() {
     for a in -ab_bound..ab_bound {
         for b in 1..ab_bound {
             if a * b <= n / 2 && signed_gcd(b, a, StaticRing::<i32>::RING) == 1 {
-                let x = Zn
-                    .checked_div(&Zn.int_hom().map(a), &Zn.int_hom().map(b))
-                    .unwrap();
-                assert_eq!(
-                    (a as i64, b as i64),
-                    balanced_rational_reconstruction(Zn, x)
-                );
+                let x = Zn.checked_div(&Zn.int_hom().map(a), &Zn.int_hom().map(b)).unwrap();
+                assert_eq!((a as i64, b as i64), balanced_rational_reconstruction(Zn, x));
             }
         }
     }

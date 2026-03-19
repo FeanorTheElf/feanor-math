@@ -112,9 +112,7 @@ where
         {
             let m = A.col_count();
             let (src, mut dst) = A.reborrow().split_rows(src..(src + 1), dst..(dst + 1));
-            let factor = ring
-                .checked_div(dst.at(0, pivot), src.at(0, pivot))
-                .unwrap();
+            let factor = ring.checked_div(dst.at(0, pivot), src.at(0, pivot)).unwrap();
             for l in 0..m {
                 ring.sub_assign(dst.at_mut(0, l), ring.mul_ref(&factor, src.at(0, l)));
             }
@@ -160,8 +158,7 @@ where
     if n >= m {
         return largest_nonzero_minor_impl(TransposableSubmatrixMut::from(A), ring);
     } else {
-        let (col_res, row_res) =
-            largest_nonzero_minor_impl(TransposableSubmatrixMut::from(A).transpose(), ring);
+        let (col_res, row_res) = largest_nonzero_minor_impl(TransposableSubmatrixMut::from(A).transpose(), ring);
         return (row_res, col_res);
     }
 }
@@ -180,20 +177,17 @@ fn test_largest_nonzero_minor_field() {
     let field = Fp::<17>::RING;
 
     let mut matrix = [vec![1, 0], vec![1, 0]];
-    let (rows, cols) =
-        largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
     assert_eq!(1, rows.len());
     assert_eq!(vec![0], cols);
 
     let mut matrix = [vec![0, 0], vec![0, 1]];
-    let (rows, cols) =
-        largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
     assert_eq!(vec![1], rows);
     assert_eq!(vec![1], cols);
 
     let mut matrix = [vec![1, 2, 3], vec![1, 2, 3], vec![2, 3, 4]];
-    let (rows, cols) =
-        largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
     assert!(rows == vec![0, 2] || rows == vec![1, 2]);
     assert_eq!(2, cols.len());
 
@@ -204,8 +198,7 @@ fn test_largest_nonzero_minor_field() {
         vec![12, 16, 8, 6, 16],
         vec![15, 4, 14, 1, 11],
     ];
-    let (rows, cols) =
-        largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
     assert_eq!(3, rows.len());
     assert_eq!(3, cols.len());
 }
@@ -220,14 +213,7 @@ fn test_largest_nonzero_minor_localpir() {
     assert_eq!(vec![1], rows);
     assert_eq!(vec![1], cols);
 
-    let mut matrix = [
-        vec![i(4), i(0), i(0)],
-        vec![i(0), i(0), i(2)],
-        vec![i(0), i(1), i(0)],
-    ];
+    let mut matrix = [vec![i(4), i(0), i(0)], vec![i(0), i(0), i(2)], vec![i(0), i(1), i(0)]];
     let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), ring);
-    assert!(
-        (&vec![0, 2], &vec![0, 1]) == (&rows, &cols)
-            || (&vec![1, 2], &vec![1, 2]) == (&rows, &cols)
-    );
+    assert!((&vec![0, 2], &vec![0, 1]) == (&rows, &cols) || (&vec![1, 2], &vec![1, 2]) == (&rows, &cols));
 }

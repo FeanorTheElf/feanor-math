@@ -40,8 +40,7 @@ where
     let mut current_relative_error = relative_error_point;
     let mut total_error = 0.;
     for i in 1..=poly_deg {
-        total_error +=
-            CC.abs(*poly_ring.coefficient_at(f, i)) * CC.abs(current) * current_relative_error;
+        total_error += CC.abs(*poly_ring.coefficient_at(f, i)) * CC.abs(current) * current_relative_error;
         // technically, we would have `(1 + current_relative_error)(1 + f64::EPSILON) - 1`, but we
         // ignore `O(f64::EPSILON^2)` terms here
         current_relative_error += f64::EPSILON;
@@ -95,8 +94,7 @@ where
     // it suffices to assume `f_prime_bound <= |f'(x)| - |f(x)|/R = |f'(x)| (1 - approx_radius /
     // assume_radius)`
     if f_prime_bound
-        > CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity()))
-            * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.)
+        > CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity())) * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.)
             / ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR
     {
         return Err(PrecisionError);
@@ -128,10 +126,7 @@ where
             ),
         );
     }
-    return Ok((
-        current,
-        bound_distance_to_root(current, poly_ring, f, poly_deg)?,
-    ));
+    return Ok((current, bound_distance_to_root(current, poly_ring, f, poly_deg)?));
 }
 
 fn find_approximate_complex_root_squarefree<P>(
@@ -163,8 +158,7 @@ where
                     CC.from_f64((rng.rand_u64() as i64) as f64 / i64::MAX as f64),
                 ),
             );
-            let scale =
-                (rng.rand_u64() % (2 * NEWTON_MAX_SCALE as u64)) as i32 - NEWTON_MAX_SCALE as i32;
+            let scale = (rng.rand_u64() % (2 * NEWTON_MAX_SCALE as u64)) as i32 - NEWTON_MAX_SCALE as i32;
             let starting_point = CC.mul(starting_point_unscaled, CC.from_f64(2.0f64.powi(scale)));
 
             let mut current = starting_point;
@@ -209,10 +203,7 @@ where
 /// The first return value is an approximation to the root of the polynomial, and the
 /// second return value is an upper bound to the distance to the exact root.
 #[stability::unstable(feature = "enable")]
-pub fn find_approximate_complex_root<P>(
-    ZZX: P,
-    f: &El<P>,
-) -> Result<(El<Complex64>, f64), PrecisionError>
+pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex64>, f64), PrecisionError>
 where
     P: RingStore,
     P::Type: PolyRing + DivisibilityRing,
@@ -221,18 +212,14 @@ where
     assert!(ZZX.degree(f).unwrap_or(0) > 0);
     let CC = Complex64::RING;
     assert!(
-        ZZX.checked_div(
-            &poly_squarefree_part_local(&ZZX, ZZX.clone_el(f), DontObserve),
-            f
-        )
-        .is_some(),
+        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(f), DontObserve), f)
+            .is_some(),
         "polynomial must be square-free"
     );
     let CCX = DensePolyRing::new(CC, "X");
     return find_approximate_complex_root_squarefree(
         &CCX,
-        &CCX.lifted_hom(&ZZX, CC.can_hom(ZZX.base_ring()).unwrap())
-            .map_ref(f),
+        &CCX.lifted_hom(&ZZX, CC.can_hom(ZZX.base_ring()).unwrap()).map_ref(f),
         ZZX.degree(f).unwrap(),
     );
 }
@@ -248,10 +235,7 @@ where
 /// The first component of each returned tuple is an approximation to a root of the
 /// polynomial, and the second component is an upper bound to the distance to exact root.
 #[stability::unstable(feature = "enable")]
-pub fn find_all_approximate_complex_roots<P>(
-    ZZX: P,
-    poly: &El<P>,
-) -> Result<Vec<(El<Complex64>, f64)>, PrecisionError>
+pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec<(El<Complex64>, f64)>, PrecisionError>
 where
     P: RingStore,
     P::Type: PolyRing + DivisibilityRing,
@@ -261,11 +245,8 @@ where
     let CC = Complex64::RING;
     let ZZ_to_CC = CC.can_hom(ZZX.base_ring()).unwrap();
     assert!(
-        ZZX.checked_div(
-            &poly_squarefree_part_local(&ZZX, ZZX.clone_el(poly), DontObserve),
-            poly
-        )
-        .is_some(),
+        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(poly), DontObserve), poly)
+            .is_some(),
         "polynomial must be square-free"
     );
     let CCX = DensePolyRing::new(CC, "X");
@@ -276,12 +257,12 @@ where
     let mut remaining_poly = CCX.clone_el(&f);
     let mut result = Vec::new();
     for i in 0..ZZX.degree(&poly).unwrap() {
-        let (next_root_initial, _) =
-            find_approximate_complex_root_squarefree(&CCX, &remaining_poly, d - i)?;
+        let (next_root_initial, _) = find_approximate_complex_root_squarefree(&CCX, &remaining_poly, d - i)?;
         let (next_root, distance) = newton_with_initial(&CCX, &f, d, next_root_initial)?;
-        if result.iter().any(|(prev_root, prev_distance)| {
-            CC.abs(CC.sub(*prev_root, next_root)) <= distance + prev_distance
-        }) {
+        if result
+            .iter()
+            .any(|(prev_root, prev_distance)| CC.abs(CC.sub(*prev_root, next_root)) <= distance + prev_distance)
+        {
             return Err(PrecisionError);
         }
         result.push((next_root, distance));
@@ -297,10 +278,7 @@ where
     }
     // just some canonical order to make tests and debugging easier
     result.sort_unstable_by(|(l, _), (r, _)| {
-        f64::total_cmp(
-            &(CC.re(*l) + CC.im(*l) * 0.000001),
-            &(CC.re(*r) + CC.im(*r) * 0.000001),
-        )
+        f64::total_cmp(&(CC.re(*l) + CC.im(*l) * 0.000001), &(CC.re(*r) + CC.im(*r) * 0.000001))
     });
     return Ok(result);
 }
@@ -324,10 +302,7 @@ fn test_find_approximate_complex_root() {
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
     let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
     assert!(radius <= 0.000000001);
-    assert!(
-        CC.abs(CC.sub(Complex64::I, root)) <= radius
-            || CC.abs(CC.add(Complex64::I, root)) <= radius
-    );
+    assert!(CC.abs(CC.sub(Complex64::I, root)) <= radius || CC.abs(CC.add(Complex64::I, root)) <= radius);
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [100000000 * X.pow_ref(2) + 1]);
     let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
@@ -340,8 +315,7 @@ fn test_find_approximate_complex_root() {
     let f = cyclotomic_polynomial(&ZZX, 105);
     let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
     assert!(radius <= 0.000000001);
-    let root_of_unity =
-        |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
+    let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
     assert!(
         (0..105)
             .filter(|k| signed_gcd(*k, 105, StaticRing::<i64>::RING) == 1)
@@ -396,8 +370,7 @@ fn test_find_all_approximate_complex_roots() {
         assert!(CC.abs(CC.sub(actual, expected)) <= dist);
     }
 
-    let root_of_unity =
-        |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
+    let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
     let f = cyclotomic_polynomial(&ZZX, 105);
     let expected = (1..=52)
         .rev()

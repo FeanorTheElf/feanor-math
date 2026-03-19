@@ -33,10 +33,7 @@ pub trait ComputeInnerProduct: RingBase {
         Self: 'a;
 
     /// Computes the inner product `sum_i lhs[i] * rhs[i]`.
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element;
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element;
 }
 
 impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
@@ -68,10 +65,7 @@ impl<R: ?Sized + RingBase> ComputeInnerProduct for R {
         return result;
     }
 
-    default fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element {
+    default fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         let mut result = self.zero();
         for (l, r) in els {
             result = self.fma(&l, &r, result);
@@ -180,9 +174,7 @@ pub trait StrassenHint: RingBase {
 }
 
 impl<R: RingBase + ?Sized> StrassenHint for R {
-    default fn strassen_threshold(&self) -> usize {
-        0
-    }
+    default fn strassen_threshold(&self) -> usize { 0 }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -196,9 +188,7 @@ pub struct StrassenAlgorithm<A: Allocator = Global> {
 
 impl<A: Allocator> StrassenAlgorithm<A> {
     #[stability::unstable(feature = "enable")]
-    pub const fn new(allocator: A) -> Self {
-        Self { allocator }
-    }
+    pub const fn new(allocator: A) -> Self { Self { allocator } }
 }
 
 impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorithm<A> {
@@ -255,16 +245,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
 /// This implementation is very simple and not very optimized. Usually it is used as a fallback
 /// for more sophisticated implementations.
 #[stability::unstable(feature = "enable")]
-pub fn naive_matmul<
-    R,
-    V1,
-    V2,
-    V3,
-    const ADD_ASSIGN: bool,
-    const T1: bool,
-    const T2: bool,
-    const T3: bool,
->(
+pub fn naive_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, const T2: bool, const T3: bool>(
     lhs: TransposableSubmatrix<V1, El<R>, T1>,
     rhs: TransposableSubmatrix<V2, El<R>, T2>,
     mut dst: TransposableSubmatrixMut<V3, El<R>, T3>,
@@ -318,8 +299,7 @@ fn bench_naive_matmul(bencher: &mut test::Bencher) {
         |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
         Global,
     );
-    let mut result: OwnedMatrix<BenchInt> =
-        OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
+    let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
     bencher.iter(|| {
         strassen::<_, _, _, _, _, false, false, false>(
             false,
@@ -331,8 +311,7 @@ fn bench_naive_matmul(bencher: &mut test::Bencher) {
             &Global,
         );
         assert_eq!(
-            (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE)
-                as BenchInt,
+            (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt,
             *result.at(0, 0)
         );
     });
@@ -353,8 +332,7 @@ fn bench_strassen_matmul(bencher: &mut test::Bencher) {
         |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
         Global,
     );
-    let mut result: OwnedMatrix<BenchInt> =
-        OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
+    let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
     bencher.iter(|| {
         strassen::<_, _, _, _, _, false, false, false>(
             false,
@@ -366,8 +344,7 @@ fn bench_strassen_matmul(bencher: &mut test::Bencher) {
             &Global,
         );
         assert_eq!(
-            (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE)
-                as BenchInt,
+            (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt,
             *result.at(0, 0)
         );
     });

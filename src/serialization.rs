@@ -38,9 +38,7 @@ where
     R: RingStore,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: R) -> Self {
-        Self { ring }
-    }
+    pub fn new(ring: R) -> Self { Self { ring } }
 }
 
 impl<'de, R> DeserializeSeed<'de> for DeserializeWithRing<R>
@@ -74,9 +72,7 @@ where
     R::Type: SerializableElementRing,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(el: &'a El<R>, ring: R) -> Self {
-        Self { el, ring }
-    }
+    pub fn new(el: &'a El<R>, ring: R) -> Self { Self { el, ring } }
 }
 
 impl<'a, R: RingStore> Serialize for SerializeWithRing<'a, R>
@@ -107,9 +103,7 @@ where
     R::Type: SerializableElementRing,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(el: El<R>, ring: R) -> Self {
-        Self { el, ring }
-    }
+    pub fn new(el: El<R>, ring: R) -> Self { Self { el, ring } }
 }
 
 impl<R: RingStore> Serialize for SerializeOwnedWithRing<R>
@@ -131,17 +125,13 @@ pub mod generic_tests {
     use super::*;
 
     #[stability::unstable(feature = "enable")]
-    pub fn test_serialization<R: RingStore, I: Iterator<Item = El<R>>>(
-        ring: R,
-        edge_case_elements: I,
-    ) where
+    pub fn test_serialization<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where
         R::Type: SerializableElementRing,
     {
         let edge_case_elements = edge_case_elements.collect::<Vec<_>>();
 
-        let serializer = serde_assert::Serializer::builder()
-            .is_human_readable(true)
-            .build();
+        let serializer = serde_assert::Serializer::builder().is_human_readable(true).build();
         for x in &edge_case_elements {
             let tokens = ring.get_ring().serialize(&x, &serializer).unwrap();
             let mut deserializer = serde_assert::Deserializer::builder(tokens)
@@ -151,9 +141,7 @@ pub mod generic_tests {
             assert_el_eq!(ring, &result, &x);
         }
 
-        let serializer = serde_assert::Serializer::builder()
-            .is_human_readable(false)
-            .build();
+        let serializer = serde_assert::Serializer::builder().is_human_readable(false).build();
         for x in &edge_case_elements {
             let tokens = ring.get_ring().serialize(&x, &serializer).unwrap();
             let mut deserializer = serde_assert::Deserializer::builder(tokens)
@@ -166,9 +154,7 @@ pub mod generic_tests {
 
     #[stability::unstable(feature = "enable")]
     pub fn test_serialize_deserialize<T: Serialize + for<'de> Deserialize<'de> + PartialEq>(x: T) {
-        let serializer = serde_assert::Serializer::builder()
-            .is_human_readable(true)
-            .build();
+        let serializer = serde_assert::Serializer::builder().is_human_readable(true).build();
         let tokens = x.serialize(&serializer).unwrap();
         let mut deserializer = serde_assert::Deserializer::builder(tokens)
             .is_human_readable(true)
@@ -176,9 +162,7 @@ pub mod generic_tests {
         let result = T::deserialize(&mut deserializer).unwrap();
         assert!(result == x);
 
-        let serializer = serde_assert::Serializer::builder()
-            .is_human_readable(false)
-            .build();
+        let serializer = serde_assert::Serializer::builder().is_human_readable(false).build();
         let tokens = x.serialize(&serializer).unwrap();
         let mut deserializer = serde_assert::Deserializer::builder(tokens)
             .is_human_readable(false)

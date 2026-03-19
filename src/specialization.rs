@@ -39,9 +39,7 @@ pub trait FiniteRingSpecializable: RingBase {
             {
                 true
             }
-            fn fallback(self) -> Self::Output {
-                false
-            }
+            fn fallback(self) -> Self::Output { false }
         }
         return Self::specialize(CheckIsFinite);
     }
@@ -88,46 +86,38 @@ fn test_specialize_finite_field() {
             return true;
         }
 
-        fn fallback(self) -> Self::Output {
-            return false;
-        }
+        fn fallback(self) -> Self::Output { return false; }
     }
 
     let ring = zn_64::Zn::new(7).as_field().ok().unwrap();
-    assert!(<AsFieldBase<zn_64::Zn>>::specialize(Verify(
-        ring.get_ring(),
-        7
-    )));
+    assert!(<AsFieldBase<zn_64::Zn>>::specialize(Verify(ring.get_ring(), 7)));
 
     let ring = GaloisField::new(3, 2);
     assert!(GaloisFieldBase::specialize(Verify(ring.get_ring(), 9)));
 
     let ring = GaloisField::new(3, 2).into().unwrap_self();
-    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(
-        Verify(ring.get_ring(), 9)
-    ));
+    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(
+        ring.get_ring(),
+        9
+    )));
 
     let ring = RationalField::new(BigIntRing::RING);
-    assert!(!<RationalFieldBase<_>>::specialize(Verify(
+    assert!(!<RationalFieldBase<_>>::specialize(Verify(ring.get_ring(), 0)));
+
+    let QQ = RationalField::new(BigIntRing::RING);
+    let ring = FreeAlgebraImpl::new(&QQ, 2, [QQ.neg_one()]).as_field().ok().unwrap();
+    assert!(!<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(
         ring.get_ring(),
         0
     )));
-
-    let QQ = RationalField::new(BigIntRing::RING);
-    let ring = FreeAlgebraImpl::new(&QQ, 2, [QQ.neg_one()])
-        .as_field()
-        .ok()
-        .unwrap();
-    assert!(!<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(
-        Verify(ring.get_ring(), 0)
-    ));
 
     let base_ring = GaloisField::new(3, 2).into().unwrap_self();
     let ring = FreeAlgebraImpl::new(&base_ring, 3, [base_ring.neg_one(), base_ring.one()])
         .as_field()
         .ok()
         .unwrap();
-    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(
-        Verify(ring.get_ring(), 729)
-    ));
+    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(
+        ring.get_ring(),
+        729
+    )));
 }

@@ -48,15 +48,10 @@ where
     let ring = poly_ring.base_ring().get_ring();
 
     let ideal = ring.random_suitable_ideal(rng);
-    let heuristic_e = ring.heuristic_exponent(
-        &ideal,
-        poly_ring.degree(f).unwrap(),
-        poly_ring.terms(f).map(|(c, _)| c),
-    );
+    let heuristic_e = ring.heuristic_exponent(&ideal, poly_ring.degree(f).unwrap(), poly_ring.terms(f).map(|(c, _)| c));
     assert!(heuristic_e >= 1);
-    let e = (heuristic_e as f64
-        * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap()))
-    .floor() as usize;
+    let e = (heuristic_e as f64 * INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT.powi(current_attempt.try_into().unwrap()))
+        .floor() as usize;
     let reduction = ReductionContext::new(ring, &ideal, e);
 
     log_progress!(
@@ -79,11 +74,9 @@ where
         let FX = DensePolyRing::new(&F, "X");
         let RX_to_FX = FX.lifted_hom(poly_ring, &R_to_F);
 
-        let d = controller
-            .clone()
-            .run_computation(format_args!("local_gcd."), |_| {
-                FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)))
-            });
+        let d = controller.clone().run_computation(format_args!("local_gcd."), |_| {
+            FX.normalize(FX.ideal_gen(&RX_to_FX.map_ref(f), &RX_to_FX.map_ref(g)))
+        });
 
         let f_over_d = FX.checked_div(&RX_to_FX.map_ref(f), &d).unwrap();
         let g_over_d = FX.checked_div(&RX_to_FX.map_ref(g), &d).unwrap();
@@ -118,10 +111,7 @@ where
         }
         signature = Some(new_signature);
         let SX = DensePolyRing::new(*S_to_F.domain(), "X");
-        let RX_to_SX = SX.lifted_hom(
-            poly_ring,
-            reduction.main_ring_to_intermediate_ring_reduction(idx),
-        );
+        let RX_to_SX = SX.lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(idx));
 
         let factors = [factor1, factor2];
         let [d, _] = hensel_lift_factorization(
@@ -141,19 +131,16 @@ where
     }
 
     let signature = signature.unwrap();
-    let mut result = controller
-        .clone()
-        .run_computation(format_args!("reconstruct."), |_| {
-            poly_ring.from_terms((0..=signature.gcd_deg).map(|i| {
-                (
-                    reduction.reconstruct_ring_el(
-                        (0..reduction.len())
-                            .map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i)),
-                    ),
-                    i,
-                )
-            }))
-        });
+    let mut result = controller.clone().run_computation(format_args!("reconstruct."), |_| {
+        poly_ring.from_terms((0..=signature.gcd_deg).map(|i| {
+            (
+                reduction.reconstruct_ring_el(
+                    (0..reduction.len()).map_fn(|j| poly_rings_mod_me[j].coefficient_at(&gcds_mod_me[j], i)),
+                ),
+                i,
+            )
+        }))
+    });
 
     let divides_f_and_g = controller
         .clone()
@@ -204,8 +191,7 @@ where
     let f_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(f, lcg), &a);
     let g_monic = evaluate_aX(poly_ring, &poly_ring.inclusion().mul_map(g, lcf), &a);
 
-    let d_monic =
-        poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng, attempt, controller)?;
+    let d_monic = poly_gcd_monic_coprime_local(poly_ring, &f_monic, &g_monic, rng, attempt, controller)?;
 
     let mut result = unevaluate_aX(poly_ring, &d_monic, &a);
     _ = poly_ring.balance_poly(&mut result);
@@ -245,22 +231,16 @@ where
         |controller| {
             let mut rng = oorandom::Rand64::new(1);
             for attempt in 0..HOPE_FOR_SQUAREFREE_TRIES {
-                if let Some(result) = poly_gcd_monic_coprime_local(
-                    poly_ring,
-                    f,
-                    g,
-                    || rng.rand_u64(),
-                    attempt,
-                    controller.clone(),
-                ) {
+                if let Some(result) =
+                    poly_gcd_monic_coprime_local(poly_ring, f, g, || rng.rand_u64(), attempt, controller.clone())
+                {
                     return result;
                 }
             }
             if poly_ring.degree(g).unwrap_or(0) <= poly_ring.degree(f).unwrap_or(0) {
                 std::mem::swap(&mut f, &mut g);
             }
-            let f_power_decomposition =
-                poly_power_decomposition_monic_local(poly_ring, f, controller.clone());
+            let f_power_decomposition = poly_power_decomposition_monic_local(poly_ring, f, controller.clone());
             let mut g = poly_ring.clone_el(g);
             let mut d = poly_ring.one();
 
@@ -304,12 +284,7 @@ where
 /// The result can be assumed to be "balanced", according to the contract of
 /// [`DivisibilityRing::balance_factor()`] of the underlying ring.
 #[stability::unstable(feature = "enable")]
-pub fn poly_gcd_local<P, Controller>(
-    poly_ring: P,
-    mut f: El<P>,
-    mut g: El<P>,
-    controller: Controller,
-) -> El<P>
+pub fn poly_gcd_local<P, Controller>(poly_ring: P, mut f: El<P>, mut g: El<P>, controller: Controller) -> El<P>
 where
     P: RingStore + Copy,
     P::Type: PolyRing + DivisibilityRing,
@@ -424,15 +399,9 @@ fn random_test_poly_gcd_local() {
     let mut rng = oorandom::Rand64::new(1);
     let bound = ring.int_hom().map(10000);
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms(
-            (0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)),
-        );
-        let g = poly_ring.from_terms(
-            (0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)),
-        );
-        let h = poly_ring.from_terms(
-            (0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)),
-        );
+        let f = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=20).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let h = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         // println!("Testing gcd on ({}) * ({}) and ({}) * ({})", poly_ring.format(&f),
         // poly_ring.format(&h), poly_ring.format(&g), poly_ring.format(&h));
         let lhs = poly_ring.mul_ref(&f, &h);

@@ -144,10 +144,7 @@ pub trait FreeAlgebra: RingExtension {
         P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-        H: Homomorphism<
-                <Self::BaseRing as RingStore>::Type,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type,
-            >,
+        H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
     {
         extension_ops::charpoly(self, el, poly_ring, hom)
     }
@@ -169,10 +166,7 @@ pub trait FreeAlgebra: RingExtension {
         P: RingStore,
         P::Type: PolyRing,
         <<P::Type as RingExtension>::BaseRing as RingStore>::Type: LinSolveRing,
-        H: Homomorphism<
-                <Self::BaseRing as RingStore>::Type,
-                <<P::Type as RingExtension>::BaseRing as RingStore>::Type,
-            >,
+        H: Homomorphism<<Self::BaseRing as RingStore>::Type, <<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
     {
         extension_ops::minpoly(self, el, poly_ring, hom)
     }
@@ -223,10 +217,7 @@ where
     delegate! { FreeAlgebra, fn mul_assign_gen_power(&self, el: &mut El<Self>, power: usize) -> () }
 
     /// See [`FreeAlgebra::wrt_canonical_basis()`].
-    fn wrt_canonical_basis<'a>(
-        &'a self,
-        el: &'a El<Self>,
-    ) -> <Self::Type as FreeAlgebra>::VectorRepresentation<'a> {
+    fn wrt_canonical_basis<'a>(&'a self, el: &'a El<Self>) -> <Self::Type as FreeAlgebra>::VectorRepresentation<'a> {
         self.get_ring().wrt_canonical_basis(el)
     }
 
@@ -261,11 +252,7 @@ where
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         poly_ring.sub(
             poly_ring.from_terms([(poly_ring.base_ring().one(), self.rank())].into_iter()),
-            self.poly_repr(
-                &poly_ring,
-                &self.pow(self.canonical_gen(), self.rank()),
-                hom,
-            ),
+            self.poly_repr(&poly_ring, &self.pow(self.canonical_gen(), self.rank()), hom),
         )
     }
 
@@ -363,8 +350,7 @@ where
     R::Type: FreeAlgebra,
     S: RingStore,
     S::Type: FreeAlgebra,
-    <S::Type as RingExtension>::BaseRing:
-        RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>,
+    <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>,
 {
     from: R,
     to: S,
@@ -392,8 +378,7 @@ where
     R::Type: FreeAlgebra,
     S: RingStore,
     S::Type: FreeAlgebra,
-    <S::Type as RingExtension>::BaseRing:
-        RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>,
+    <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>,
 {
     /// Creates a new [`FreeAlgebraHom`] from `R` to `S`, mapping the canonical
     /// generator of `R` to the given element of `S`. This assumes that the resulting
@@ -435,9 +420,7 @@ where
     /// Consumes this object, producing the domain ring store, the codomain ring store
     /// and the image of the canonical generator of the domain number field.
     #[stability::unstable(feature = "enable")]
-    pub fn destruct(self) -> (R, S, El<S>) {
-        (self.from, self.to, self.image_of_generator)
-    }
+    pub fn destruct(self) -> (R, S, El<S>) { (self.from, self.to, self.image_of_generator) }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for FreeAlgebraHom<R, S>
@@ -446,30 +429,21 @@ where
     R::Type: FreeAlgebra,
     S: RingStore,
     S::Type: FreeAlgebra,
-    <S::Type as RingExtension>::BaseRing:
-        RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>,
+    <S::Type as RingExtension>::BaseRing: RingStore<Type = <<R::Type as RingExtension>::BaseRing as RingStore>::Type>,
 {
     type DomainStore = R;
     type CodomainStore = S;
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.from
-    }
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
 
-    fn map(&self, x: El<R>) -> El<S> {
-        self.map_ref(&x)
-    }
+    fn map(&self, x: El<R>) -> El<S> { self.map_ref(&x) }
 
     fn map_ref(&self, x: &El<R>) -> El<S> {
         let poly_ring = DensePolyRing::new(self.to.base_ring(), "X");
         return poly_ring.evaluate(
-            &self
-                .from
-                .poly_repr(&poly_ring, &x, self.to.base_ring().identity()),
+            &self.from.poly_repr(&poly_ring, &x, self.to.base_ring().identity()),
             &self.image_of_generator,
             self.to.inclusion(),
         );
@@ -490,19 +464,14 @@ pub mod generic_tests {
         let xn_original = ring.pow(ring.clone_el(&x), n);
         let xn_vec = ring.wrt_canonical_basis(&xn_original);
         let xn = ring.sum(Iterator::map(0..n, |i| {
-            ring.mul(
-                ring.inclusion().map(xn_vec.at(i)),
-                ring.pow(ring.clone_el(&x), i),
-            )
+            ring.mul(ring.inclusion().map(xn_vec.at(i)), ring.pow(ring.clone_el(&x), i))
         }));
         assert_el_eq!(ring, xn_original, xn);
 
         let x_n_1_vec_expected = (0..n).map_fn(|i| {
             if i > 0 {
-                ring.base_ring().add(
-                    ring.base_ring().mul(xn_vec.at(n - 1), xn_vec.at(i)),
-                    xn_vec.at(i - 1),
-                )
+                ring.base_ring()
+                    .add(ring.base_ring().mul(xn_vec.at(n - 1), xn_vec.at(i)), xn_vec.at(i - 1))
             } else {
                 ring.base_ring().mul(xn_vec.at(n - 1), xn_vec.at(0))
             }
@@ -510,11 +479,7 @@ pub mod generic_tests {
         let x_n_1 = ring.pow(ring.clone_el(&x), n + 1);
         let x_n_1_vec_actual = ring.wrt_canonical_basis(&x_n_1);
         for i in 0..n {
-            assert_el_eq!(
-                ring.base_ring(),
-                x_n_1_vec_expected.at(i),
-                x_n_1_vec_actual.at(i)
-            );
+            assert_el_eq!(ring.base_ring(), x_n_1_vec_expected.at(i), x_n_1_vec_actual.at(i));
         }
 
         // test basis wrt_canonical_basis linearity and compatibility
@@ -543,11 +508,7 @@ pub mod generic_tests {
                     if k == i {
                         assert_el_eq!(ring.base_ring(), ring.base_ring().one(), element_vec.at(k));
                     } else if k == j {
-                        assert_el_eq!(
-                            ring.base_ring(),
-                            ring.base_ring().int_hom().map(2),
-                            element_vec.at(k)
-                        );
+                        assert_el_eq!(ring.base_ring(), ring.base_ring().int_hom().map(2), element_vec.at(k));
                     } else {
                         assert_el_eq!(ring.base_ring(), ring.base_ring().zero(), element_vec.at(k));
                     }
@@ -561,11 +522,7 @@ pub mod generic_tests {
                 let element = ring.add(ring.pow(ring.canonical_gen(), i), ring.one());
                 let mut actual = ring.clone_el(&element);
                 ring.mul_assign_gen_power(&mut actual, j);
-                assert_el_eq!(
-                    ring,
-                    ring.mul(element, ring.pow(ring.canonical_gen(), j)),
-                    actual
-                );
+                assert_el_eq!(ring, ring.mul(element, ring.pow(ring.canonical_gen(), j)), actual);
             }
         }
     }

@@ -50,9 +50,7 @@ impl<'a, T> MyCow<'a, T> {
     }
 
     #[allow(unused)]
-    pub fn is_borrowed(&self) -> bool {
-        !self.is_owned()
-    }
+    pub fn is_borrowed(&self) -> bool { !self.is_owned() }
 }
 
 impl<'a, T> Deref for MyCow<'a, T> {

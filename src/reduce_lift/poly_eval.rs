@@ -23,12 +23,7 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     ///
     /// For the reason why there are so many quite specific trait bounds here:
     /// See the doc of [`EvalPolyLocallyRing::LocalRingBase`].
-    type ExtendedRingBase<'a>: ?Sized
-        + PrincipalIdealRing
-        + Domain
-        + LinSolveRing
-        + ComputeResultantRing
-        + Debug
+    type ExtendedRingBase<'a>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing + Debug
     where
         Self: 'a;
 
@@ -50,10 +45,7 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     /// is a non-zero-divisor.
     ///
     /// Any two calls must give elements in the same order.
-    fn interpolation_points<'a>(
-        &'a self,
-        count: usize,
-    ) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>);
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>);
 }
 
 /// [`RingStore`] for [`InterpolationBaseRing`].
@@ -87,10 +79,7 @@ where
     R: ?Sized + InterpolationBaseRing,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn for_interpolation(
-        ring: &'a R,
-        point_count: usize,
-    ) -> (Self, Vec<El<R::ExtendedRing<'a>>>) {
+    pub fn for_interpolation(ring: &'a R, point_count: usize) -> (Self, Vec<El<R::ExtendedRing<'a>>>) {
         let (ext_ring, points) = ring.interpolation_points(point_count);
         return (
             Self {
@@ -114,13 +103,9 @@ where
     type CodomainStore = R::ExtendedRing<'a>;
     type DomainStore = RingRef<'a, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.ext_ring
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.ext_ring }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.ring
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::ExtendedRingBase<'a> as RingBase>::Element {
         self.ring.get_ring().in_extension(&self.ext_ring, x)
@@ -373,12 +358,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
     /// Hence, we have to already bound `LocalRingBase` by all the traits that are reasonably
     /// required by some algorithms. This clearly makes it a lot less generic than it should be,
     /// but so far it worked out without too much trouble.
-    type LocalRingBase<'ring>: ?Sized
-        + PrincipalIdealRing
-        + Domain
-        + LinSolveRing
-        + ComputeResultantRing
-        + Debug
+    type LocalRingBase<'ring>: ?Sized + PrincipalIdealRing + Domain + LinSolveRing + ComputeResultantRing + Debug
     where
         Self: 'ring;
 
@@ -404,10 +384,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
 
     /// Sets up the context for a new polynomial evaluation, whose output
     /// should have pseudo norm less than the given bound.
-    fn local_computation<'ring>(
-        &'ring self,
-        ln_pseudo_norm_bound: f64,
-    ) -> Self::LocalComputationData<'ring>;
+    fn local_computation<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
 
     /// Returns the number `k` of local rings that are required
     /// to get the correct result of the given computation.
@@ -416,11 +393,7 @@ pub trait EvalPolyLocallyRing: RingBase + FiniteRingSpecializable {
         Self: 'ring;
 
     /// Returns the `i`-th local ring belonging to the given computation.
-    fn local_ring_at<'ring>(
-        &self,
-        computation: &Self::LocalComputationData<'ring>,
-        i: usize,
-    ) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
     where
         Self: 'ring;
 
@@ -467,22 +440,13 @@ where
     where
         Self: 'ring;
 
-    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 {
-        0.
-    }
+    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 { 0. }
 
-    fn local_computation<'ring>(
-        &'ring self,
-        _ln_pseudo_norm_bound: f64,
-    ) -> Self::LocalComputationData<'ring> {
+    fn local_computation<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
         RingRef::new(self)
     }
 
-    fn local_ring_at<'ring>(
-        &self,
-        computation: &Self::LocalComputationData<'ring>,
-        _i: usize,
-    ) -> Self::LocalRing<'ring>
+    fn local_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, _i: usize) -> Self::LocalRing<'ring>
     where
         Self: 'ring,
     {
@@ -550,8 +514,7 @@ where
     }
 }
 
-impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>>
-    for EvaluatePolyLocallyReductionMap<'ring, 'data, R>
+impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for EvaluatePolyLocallyReductionMap<'ring, 'data, R>
 where
     R: 'ring + ?Sized + EvalPolyLocallyRing,
     'ring: 'data,
@@ -559,18 +522,13 @@ where
     type CodomainStore = R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.local_ring
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.local_ring }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.ring
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
         let ring_ref: &'data R = self.ring.into();
-        let mut reductions: Vec<<R::LocalRingBase<'ring> as RingBase>::Element> =
-            ring_ref.reduce(self.data, &x);
+        let mut reductions: Vec<<R::LocalRingBase<'ring> as RingBase>::Element> = ring_ref.reduce(self.data, &x);
         return reductions.swap_remove(self.index);
     }
 }

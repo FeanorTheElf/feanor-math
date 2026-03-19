@@ -168,39 +168,21 @@ pub enum EnvBindingStrength {
 /// impl RingBase for MyRingBase {
 ///     type Element = Box<i32>;
 ///
-///     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-///         val.clone()
-///     }
+///     fn clone_el(&self, val: &Self::Element) -> Self::Element { val.clone() }
 ///
-///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-///         **lhs += *rhs;
-///     }
+///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs += *rhs; }
 ///
-///     fn negate_inplace(&self, lhs: &mut Self::Element) {
-///         **lhs = -**lhs;
-///     }
+///     fn negate_inplace(&self, lhs: &mut Self::Element) { **lhs = -**lhs; }
 ///
-///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-///         **lhs *= *rhs;
-///     }
+///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs *= *rhs; }
 ///
-///     fn from_int(&self, value: i32) -> Self::Element {
-///         Box::new(value)
-///     }
+///     fn from_int(&self, value: i32) -> Self::Element { Box::new(value) }
 ///
-///     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-///         **lhs == **rhs
-///     }
+///     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
 ///
-///     fn is_commutative(&self) -> bool {
-///         true
-///     }
-///     fn is_noetherian(&self) -> bool {
-///         true
-///     }
-///     fn is_approximate(&self) -> bool {
-///         false
-///     }
+///     fn is_commutative(&self) -> bool { true }
+///     fn is_noetherian(&self) -> bool { true }
+///     fn is_approximate(&self) -> bool { false }
 ///
 ///     fn dbg_within<'a>(
 ///         &self,
@@ -226,25 +208,17 @@ pub enum EnvBindingStrength {
 /// impl CanHomFrom<MyRingBase> for MyRingBase {
 ///     type Homomorphism = ();
 ///
-///     fn has_canonical_hom(&self, _from: &MyRingBase) -> Option<()> {
-///         Some(())
-///     }
+///     fn has_canonical_hom(&self, _from: &MyRingBase) -> Option<()> { Some(()) }
 ///
-///     fn map_in(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element {
-///         el
-///     }
+///     fn map_in(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element { el }
 /// }
 ///
 /// impl CanIsoFromTo<MyRingBase> for MyRingBase {
 ///     type Isomorphism = ();
 ///
-///     fn has_canonical_iso(&self, _from: &MyRingBase) -> Option<()> {
-///         Some(())
-///     }
+///     fn has_canonical_iso(&self, _from: &MyRingBase) -> Option<()> { Some(()) }
 ///
-///     fn map_out(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element {
-///         el
-///     }
+///     fn map_out(&self, _from: &MyRingBase, el: Self::Element, _: &()) -> Self::Element { el }
 /// }
 ///
 /// // A type alias for the simple, by-value RingStore.
@@ -268,46 +242,23 @@ pub trait RingBase: PartialEq {
     type Element: Sized;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element;
-    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.add_assign(lhs, self.clone_el(rhs))
-    }
+    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.add_assign(lhs, self.clone_el(rhs)) }
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.sub_assign(lhs, self.clone_el(rhs))
-    }
+    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.sub_assign(lhs, self.clone_el(rhs)) }
     fn negate_inplace(&self, lhs: &mut Self::Element);
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element);
-    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        self.mul_assign(lhs, self.clone_el(rhs))
-    }
-    fn zero(&self) -> Self::Element {
-        self.from_int(0)
-    }
-    fn one(&self) -> Self::Element {
-        self.from_int(1)
-    }
-    fn neg_one(&self) -> Self::Element {
-        self.from_int(-1)
-    }
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { self.mul_assign(lhs, self.clone_el(rhs)) }
+    fn zero(&self) -> Self::Element { self.from_int(0) }
+    fn one(&self) -> Self::Element { self.from_int(1) }
+    fn neg_one(&self) -> Self::Element { self.from_int(-1) }
     fn from_int(&self, value: i32) -> Self::Element;
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
-    fn is_zero(&self, value: &Self::Element) -> bool {
-        self.eq_el(value, &self.zero())
-    }
-    fn is_one(&self, value: &Self::Element) -> bool {
-        self.eq_el(value, &self.one())
-    }
-    fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.eq_el(value, &self.neg_one())
-    }
+    fn is_zero(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.zero()) }
+    fn is_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.one()) }
+    fn is_neg_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.neg_one()) }
 
     /// Fused-multiply-add. This computes `summand + lhs * rhs`.
-    fn fma(
-        &self,
-        lhs: &Self::Element,
-        rhs: &Self::Element,
-        summand: Self::Element,
-    ) -> Self::Element {
+    fn fma(&self, lhs: &Self::Element, rhs: &Self::Element, summand: Self::Element) -> Self::Element {
         self.add(summand, self.mul_ref(lhs, rhs))
     }
 
@@ -337,11 +288,7 @@ pub trait RingBase: PartialEq {
     ///
     /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of
     /// [`std::fmt::Debug`] and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
-    fn dbg<'a>(
-        &self,
-        value: &Self::Element,
-        out: &mut std::fmt::Formatter<'a>,
-    ) -> std::fmt::Result {
+    fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
@@ -359,9 +306,7 @@ pub trait RingBase: PartialEq {
         _env: EnvBindingStrength,
     ) -> std::fmt::Result;
 
-    fn square(&self, value: &mut Self::Element) {
-        self.mul_assign(value, self.clone_el(value));
-    }
+    fn square(&self, value: &mut Self::Element) { self.mul_assign(value, self.clone_el(value)); }
 
     fn negate(&self, mut value: Self::Element) -> Self::Element {
         self.negate_inplace(&mut value);
@@ -373,18 +318,14 @@ pub trait RingBase: PartialEq {
         self.add_assign(lhs, rhs);
     }
 
-    fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
-        self.mul_assign(lhs, self.from_int(rhs));
-    }
+    fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) { self.mul_assign(lhs, self.from_int(rhs)); }
 
     fn mul_int(&self, mut lhs: Self::Element, rhs: i32) -> Self::Element {
         self.mul_assign_int(&mut lhs, rhs);
         return lhs;
     }
 
-    fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element {
-        self.mul_int(self.clone_el(lhs), rhs)
-    }
+    fn mul_int_ref(&self, lhs: &Self::Element, rhs: i32) -> Self::Element { self.mul_int(self.clone_el(lhs), rhs) }
 
     /// Fused-multiply-add with an integer. This computes `summand + lhs * rhs`.
     fn fma_int(&self, lhs: &Self::Element, rhs: i32, summand: Self::Element) -> Self::Element {
@@ -661,9 +602,7 @@ macro_rules! assert_el_eq {
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
 /// # use std::rc::Rc;
-/// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> {
-///     ring.add(a, b)
-/// }
+/// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> { ring.add(a, b) }
 ///
 /// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
 /// assert_el_eq!(ring, 7, add_in_ring(ring, 3, 4));
@@ -751,14 +690,10 @@ pub trait RingStore: Sized {
     }
 
     /// Returns the identity map `self -> self`.
-    fn into_identity(self) -> Identity<Self> {
-        Identity::new(self)
-    }
+    fn into_identity(self) -> Identity<Self> { Identity::new(self) }
 
     /// Returns the identity map `self -> self`.
-    fn identity<'a>(&'a self) -> Identity<&'a Self> {
-        self.into_identity()
-    }
+    fn identity<'a>(&'a self) -> Identity<&'a Self> { self.into_identity() }
 
     /// Returns the canonical homomorphism `from -> self`, if it exists,
     /// moving both rings into the [`CanHom`] object.
@@ -801,14 +736,10 @@ pub trait RingStore: Sized {
     }
 
     /// Returns the homomorphism `Z -> self` that exists for any ring.
-    fn into_int_hom(self) -> IntHom<Self> {
-        IntHom::new(self)
-    }
+    fn into_int_hom(self) -> IntHom<Self> { IntHom::new(self) }
 
     /// Returns the homomorphism `Z -> self` that exists for any ring.
-    fn int_hom<'a>(&'a self) -> IntHom<&'a Self> {
-        self.into_int_hom()
-    }
+    fn int_hom<'a>(&'a self) -> IntHom<&'a Self> { self.into_int_hom() }
 
     /// Computes the sum of all elements returned by the iterator.
     ///
@@ -841,15 +772,13 @@ pub trait RingStore: Sized {
         I: IntoIterator<Item = Result<El<Self>, E>>,
     {
         let mut error = None;
-        let result = self
-            .get_ring()
-            .sum(els.into_iter().map_while(|el| match el {
-                Ok(el) => Some(el),
-                Err(err) => {
-                    error = Some(err);
-                    None
-                }
-            }));
+        let result = self.get_ring().sum(els.into_iter().map_while(|el| match el {
+            Ok(el) => Some(el),
+            Err(err) => {
+                error = Some(err);
+                None
+            }
+        }));
         if let Some(err) = error {
             return Err(err);
         } else {
@@ -989,14 +918,10 @@ where
     delegate! { RingExtension, fn base_ring(&self) -> &<Self::Type as RingExtension>::BaseRing }
 
     /// Returns the inclusion map of the base ring `R -> self`.
-    fn into_inclusion(self) -> Inclusion<Self> {
-        Inclusion::new(self)
-    }
+    fn into_inclusion(self) -> Inclusion<Self> { Inclusion::new(self) }
 
     /// Returns the inclusion map of the base ring `R -> self`.
-    fn inclusion<'a>(&'a self) -> Inclusion<&'a Self> {
-        self.into_inclusion()
-    }
+    fn inclusion<'a>(&'a self) -> Inclusion<&'a Self> { self.into_inclusion() }
 }
 
 impl<R: RingStore> RingExtensionStore for R where R::Type: RingExtension {}
@@ -1011,17 +936,13 @@ pub struct RingElementDisplayWrapper<'a, R: RingStore + ?Sized> {
 
 impl<'a, R: RingStore + ?Sized> std::fmt::Display for RingElementDisplayWrapper<'a, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring
-            .get_ring()
-            .dbg_within(self.element, f, self.within)
+        self.ring.get_ring().dbg_within(self.element, f, self.within)
     }
 }
 
 impl<'a, R: RingStore + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a, R> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.ring
-            .get_ring()
-            .dbg_within(self.element, f, self.within)
+        self.ring.get_ring().dbg_within(self.element, f, self.within)
     }
 }
 
@@ -1060,9 +981,7 @@ pub trait RingExtension: RingBase {
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element;
 
     /// Maps an element of the base ring (given as reference) into this ring.
-    fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
-        self.from(self.base_ring().get_ring().clone_el(x))
-    }
+    fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element { self.from(self.base_ring().get_ring().clone_el(x)) }
 
     /// Computes `lhs := lhs * rhs`, where `rhs` is mapped into this
     /// ring via [`RingExtension::from_ref()`]. Note that this may be
@@ -1071,12 +990,7 @@ pub trait RingExtension: RingBase {
         self.mul_assign(lhs, self.from_ref(rhs));
     }
 
-    fn fma_base(
-        &self,
-        lhs: &Self::Element,
-        rhs: &El<Self::BaseRing>,
-        summand: Self::Element,
-    ) -> Self::Element {
+    fn fma_base(&self, lhs: &Self::Element, rhs: &El<Self::BaseRing>, summand: Self::Element) -> Self::Element {
         let mut tmp = self.clone_el(lhs);
         self.mul_assign_base(&mut tmp, rhs);
         return self.add(summand, tmp);
@@ -1090,10 +1004,7 @@ pub trait RingExtension: RingBase {
     /// as a vector of base ring elements, in which case this function can make
     /// use of an optimized [`Homomorphism::mul_assign_map()`] implementation.
     #[stability::unstable(feature = "enable")]
-    fn mul_assign_base_through_hom<
-        S: ?Sized + RingBase,
-        H: Homomorphism<S, <Self::BaseRing as RingStore>::Type>,
-    >(
+    fn mul_assign_base_through_hom<S: ?Sized + RingBase, H: Homomorphism<S, <Self::BaseRing as RingStore>::Type>>(
         &self,
         lhs: &mut Self::Element,
         rhs: &S::Element,
@@ -1116,9 +1027,7 @@ where
     Self::Type: HashableElRing,
 {
     /// See [`HashableElRing::hash()`].
-    fn hash<H: std::hash::Hasher>(&self, el: &El<Self>, h: &mut H) {
-        self.get_ring().hash(el, h)
-    }
+    fn hash<H: std::hash::Hasher>(&self, el: &El<Self>, h: &mut H) { self.get_ring().hash(el, h) }
 
     /// Computes a hash of the given element using some default hasher.
     ///
@@ -1185,37 +1094,27 @@ impl<R: RingBase> RingValue<R> {
     ///
     /// This is a dedicated function instead of an implementation
     /// of [`std::convert::From`] so that we can declare it `const`.
-    pub const fn from(value: R) -> Self {
-        RingValue { ring: value }
-    }
+    pub const fn from(value: R) -> Self { RingValue { ring: value } }
 
     /// Creates a reference to a [`RingValue`] from a reference
     /// to the [`RingBase`].
-    pub fn from_ref<'a>(value: &'a R) -> &'a Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    pub fn from_ref<'a>(value: &'a R) -> &'a Self { unsafe { std::mem::transmute(value) } }
 
     /// Unwraps the [`RingBase`].
     ///
     /// The more common case would be to get a reference, which can
     /// be done with [`RingStore::get_ring()`].
-    pub fn into(self) -> R {
-        self.ring
-    }
+    pub fn into(self) -> R { self.ring }
 }
 
 impl<R: RingBase> RingStore for RingValue<R> {
     type Type = R;
 
-    fn get_ring(&self) -> &R {
-        &self.ring
-    }
+    fn get_ring(&self) -> &R { &self.ring }
 }
 
 impl<R: RingBase + Default> Default for RingValue<R> {
-    fn default() -> Self {
-        Self::from(R::default())
-    }
+    fn default() -> Self { Self::from(R::default()) }
 }
 
 /// The second most basic [`crate::ring::RingStore`]. Similarly to
@@ -1235,35 +1134,27 @@ pub struct RingRef<'a, R: RingBase + ?Sized> {
 }
 
 impl<'a, R: RingBase + ?Sized> Clone for RingRef<'a, R> {
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<'a, R: RingBase + ?Sized> Copy for RingRef<'a, R> {}
 
 impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
     /// Creates a new [`RingRef`] from a reference to a [`RingBase`].
-    pub const fn new(value: &'a R) -> Self {
-        RingRef { ring: value }
-    }
+    pub const fn new(value: &'a R) -> Self { RingRef { ring: value } }
 
     /// Returns the stored reference to the [`RingBase`].
     ///
     /// This is almost the same as [`RingStore::get_ring()`], except for
     /// that the lifetime of the returned reference is not bounded to the
     /// lifetime of the [`RingRef`].
-    pub fn into(self) -> &'a R {
-        self.ring
-    }
+    pub fn into(self) -> &'a R { self.ring }
 }
 
 impl<'a, R: RingBase + ?Sized> RingStore for RingRef<'a, R> {
     type Type = R;
 
-    fn get_ring(&self) -> &R {
-        self.ring
-    }
+    fn get_ring(&self) -> &R { self.ring }
 }
 
 impl<'a, S: Deref> RingStore for S
@@ -1272,9 +1163,7 @@ where
 {
     type Type = <<S as Deref>::Target as RingStore>::Type;
 
-    fn get_ring<'b>(&'b self) -> &'b Self::Type {
-        (**self).get_ring()
-    }
+    fn get_ring<'b>(&'b self) -> &'b Self::Type { (**self).get_ring() }
 }
 
 #[cfg(test)]
@@ -1307,45 +1196,27 @@ fn test_internal_wrappings_dont_matter() {
     }
 
     impl<R: RingStore> PartialEq for BBase<R> {
-        fn eq(&self, other: &Self) -> bool {
-            self.base.get_ring() == other.base.get_ring()
-        }
+        fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
     }
 
     impl RingBase for ABase {
         type Element = i32;
 
-        fn clone_el(&self, val: &Self::Element) -> Self::Element {
-            *val
-        }
+        fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
 
-        fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-            *lhs += rhs;
-        }
+        fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
 
-        fn negate_inplace(&self, lhs: &mut Self::Element) {
-            *lhs = -*lhs;
-        }
+        fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
 
-        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-            *lhs == *rhs
-        }
+        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
 
-        fn is_commutative(&self) -> bool {
-            true
-        }
+        fn is_commutative(&self) -> bool { true }
 
-        fn is_noetherian(&self) -> bool {
-            true
-        }
+        fn is_noetherian(&self) -> bool { true }
 
-        fn from_int(&self, value: i32) -> Self::Element {
-            value
-        }
+        fn from_int(&self, value: i32) -> Self::Element { value }
 
-        fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-            *lhs *= rhs;
-        }
+        fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
 
         fn dbg_within<'a>(
             &self,
@@ -1363,9 +1234,7 @@ fn test_internal_wrappings_dont_matter() {
             Some(ZZ.zero())
         }
 
-        fn is_approximate(&self) -> bool {
-            false
-        }
+        fn is_approximate(&self) -> bool { false }
     }
 
     impl_eq_based_self_iso! { ABase }
@@ -1373,36 +1242,20 @@ fn test_internal_wrappings_dont_matter() {
     impl<R: RingStore> RingBase for BBase<R> {
         type Element = i32;
 
-        fn clone_el(&self, val: &Self::Element) -> Self::Element {
-            *val
-        }
+        fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
 
-        fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-            *lhs += rhs;
-        }
-        fn negate_inplace(&self, lhs: &mut Self::Element) {
-            *lhs = -*lhs;
-        }
+        fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
+        fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
 
-        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-            *lhs == *rhs
-        }
+        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
 
-        fn is_commutative(&self) -> bool {
-            true
-        }
+        fn is_commutative(&self) -> bool { true }
 
-        fn is_noetherian(&self) -> bool {
-            true
-        }
+        fn is_noetherian(&self) -> bool { true }
 
-        fn from_int(&self, value: i32) -> Self::Element {
-            value
-        }
+        fn from_int(&self, value: i32) -> Self::Element { value }
 
-        fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-            *lhs *= rhs;
-        }
+        fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
 
         fn dbg_within<'a>(
             &self,
@@ -1420,21 +1273,15 @@ fn test_internal_wrappings_dont_matter() {
             Some(ZZ.zero())
         }
 
-        fn is_approximate(&self) -> bool {
-            false
-        }
+        fn is_approximate(&self) -> bool { false }
     }
 
     impl<R: RingStore> CanHomFrom<ABase> for BBase<R> {
         type Homomorphism = ();
 
-        fn has_canonical_hom(&self, _: &ABase) -> Option<()> {
-            Some(())
-        }
+        fn has_canonical_hom(&self, _: &ABase) -> Option<()> { Some(()) }
 
-        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element {
-            el
-        }
+        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element { el }
     }
 
     impl<R: RingStore, S: RingStore> CanHomFrom<BBase<S>> for BBase<R>
@@ -1443,18 +1290,9 @@ fn test_internal_wrappings_dont_matter() {
     {
         type Homomorphism = ();
 
-        fn has_canonical_hom(&self, _: &BBase<S>) -> Option<()> {
-            Some(())
-        }
+        fn has_canonical_hom(&self, _: &BBase<S>) -> Option<()> { Some(()) }
 
-        fn map_in(
-            &self,
-            _: &BBase<S>,
-            el: <BBase<S> as RingBase>::Element,
-            _: &(),
-        ) -> Self::Element {
-            el
-        }
+        fn map_in(&self, _: &BBase<S>, el: <BBase<S> as RingBase>::Element, _: &()) -> Self::Element { el }
     }
 
     impl<R: RingStore> CanIsoFromTo<BBase<R>> for BBase<R>
@@ -1463,18 +1301,9 @@ fn test_internal_wrappings_dont_matter() {
     {
         type Isomorphism = ();
 
-        fn has_canonical_iso(&self, _: &BBase<R>) -> Option<()> {
-            Some(())
-        }
+        fn has_canonical_iso(&self, _: &BBase<R>) -> Option<()> { Some(()) }
 
-        fn map_out(
-            &self,
-            _: &BBase<R>,
-            el: <BBase<R> as RingBase>::Element,
-            _: &(),
-        ) -> Self::Element {
-            el
-        }
+        fn map_out(&self, _: &BBase<R>, el: <BBase<R> as RingBase>::Element, _: &()) -> Self::Element { el }
     }
 
     type A = RingValue<ABase>;
@@ -1507,22 +1336,16 @@ pub mod generic_tests {
     use super::*;
     use crate::integer::{BigIntRing, int_cast};
 
-    pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(
-        from: R,
-        to: S,
-        edge_case_elements: I,
-    ) where
+    pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
+    where
         S::Type: CanHomFrom<R::Type>,
     {
         let hom = to.can_hom(&from).unwrap();
         crate::homomorphism::generic_tests::test_homomorphism_axioms(hom, edge_case_elements);
     }
 
-    pub fn test_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(
-        from: R,
-        to: S,
-        edge_case_elements: I,
-    ) where
+    pub fn test_iso_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
+    where
         S::Type: CanIsoFromTo<R::Type>,
     {
         let hom = to.get_ring().has_canonical_hom(from.get_ring()).unwrap();
@@ -1531,9 +1354,7 @@ pub mod generic_tests {
 
         for a in &elements {
             let map_in = to.get_ring().map_in_ref(from.get_ring(), a, &hom);
-            let map_in_out = to
-                .get_ring()
-                .map_out(from.get_ring(), to.clone_el(&map_in), &iso);
+            let map_in_out = to.get_ring().map_out(from.get_ring(), to.clone_el(&map_in), &iso);
             assert!(
                 from.eq_el(&map_in_out, &a),
                 "Bijectivity failed: {} != {} = hom^-1({}) = hom^-1(hom({}))",
@@ -1557,16 +1378,11 @@ pub mod generic_tests {
         test_iso_axioms(&ring, &ring, elements.iter().map(|x| ring.clone_el(x)));
 
         for a in &elements {
+            assert_el_eq!(ring, a, ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
             assert_el_eq!(
                 ring,
                 a,
-                ring.get_ring().map_in_ref(ring.get_ring(), a, &hom)
-            );
-            assert_el_eq!(
-                ring,
-                a,
-                ring.get_ring()
-                    .map_out(ring.get_ring(), ring.clone_el(a), &iso)
+                ring.get_ring().map_out(ring.get_ring(), ring.clone_el(a), &iso)
             );
         }
     }
@@ -1579,10 +1395,7 @@ pub mod generic_tests {
 
         // technically not required, but we should test hash inequality and this really should be
         // true
-        assert_ne!(
-            ring.default_hash(&ring.one()),
-            ring.default_hash(&ring.zero())
-        );
+        assert_ne!(ring.default_hash(&ring.one()), ring.default_hash(&ring.zero()));
 
         for a in &elements {
             for b in &elements {
@@ -1592,19 +1405,13 @@ pub mod generic_tests {
 
         for a in &elements {
             for b in &elements {
-                let expr = ring.sub(
-                    ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one())),
-                    ring.mul_ref(a, b),
-                );
+                let expr = ring.sub(ring.mul_ref_fst(a, ring.add_ref_fst(b, ring.one())), ring.mul_ref(a, b));
                 assert!(ring.default_hash(a) == ring.default_hash(&expr));
             }
         }
     }
 
-    pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(
-        ring: R,
-        edge_case_elements: I,
-    ) {
+    pub fn test_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I) {
         let elements = edge_case_elements.collect::<Vec<_>>();
         let zero = ring.zero();
         let one = ring.one();
@@ -1787,9 +1594,7 @@ pub mod generic_tests {
                 }
 
                 let actual = ring.get_ring().fma_int(a, 2, ring.clone_el(b));
-                let expected = ring
-                    .get_ring()
-                    .add(ring.get_ring().add_ref(a, a), ring.clone_el(b));
+                let expected = ring.get_ring().add(ring.get_ring().add_ref(a, a), ring.clone_el(b));
                 assert!(
                     ring.eq_el(&expected, &actual),
                     "Int-FMA failed: int-fma({}, 2, {}) = {} != {} = ({} * 2) + {}",
@@ -1806,9 +1611,7 @@ pub mod generic_tests {
         // check powering
         for a in &elements {
             for n in [0, 1, 2, 3, 7, 8] {
-                let expected = (0..n)
-                    .map(|_| a)
-                    .fold(ring.one(), |x, y| ring.mul_ref_snd(x, y));
+                let expected = (0..n).map(|_| a).fold(ring.one(), |x, y| ring.mul_ref_snd(x, y));
                 let actual = ring.pow(ring.clone_el(a), n);
                 assert!(
                     ring.eq_el(&expected, &actual),

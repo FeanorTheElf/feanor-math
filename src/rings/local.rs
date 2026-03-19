@@ -53,9 +53,7 @@ where
     R: DivisibilityRingStore,
     R::Type: DivisibilityRing,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
 }
 
 /// [`RingStore`] for [`AsLocalPIRBase`].
@@ -72,9 +70,7 @@ where
     El<R>: Clone,
     R::Type: DivisibilityRing,
 {
-    fn clone(&self) -> Self {
-        LocalPIREl(self.0.clone())
-    }
+    fn clone(&self) -> Self { LocalPIREl(self.0.clone()) }
 }
 
 impl<R: DivisibilityRingStore> Copy for LocalPIREl<R>
@@ -93,11 +89,7 @@ where
     pub fn from_zn(ring: R) -> Option<Self> {
         let (p, e) = is_prime_power(ring.integer_ring(), ring.modulus())?;
         let g = ring.can_hom(ring.integer_ring()).unwrap().map(p);
-        Some(Self::from(AsLocalPIRBase::promise_is_local_pir(
-            ring,
-            g,
-            Some(e),
-        )))
+        Some(Self::from(AsLocalPIRBase::promise_is_local_pir(ring, g, Some(e))))
     }
 }
 
@@ -148,11 +140,7 @@ where
     R::Type: DivisibilityRing,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn promise_is_local_pir(
-        base: R,
-        max_ideal_gen: El<R>,
-        nilpotent_power: Option<usize>,
-    ) -> Self {
+    pub fn promise_is_local_pir(base: R, max_ideal_gen: El<R>, nilpotent_power: Option<usize>) -> Self {
         assert!(base.is_commutative());
         let max_ideal_gen = LocalPIREl(max_ideal_gen);
         Self {
@@ -163,14 +151,10 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> {
-        el.0
-    }
+    pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> { el.0 }
 
     #[stability::unstable(feature = "enable")]
-    pub fn unwrap_self(self) -> R {
-        self.base
-    }
+    pub fn unwrap_self(self) -> R { self.base }
 }
 
 impl<R: DivisibilityRingStore> DelegateRing for AsLocalPIRBase<R>
@@ -180,37 +164,20 @@ where
     type Element = LocalPIREl<R>;
     type Base = R::Type;
 
-    fn get_delegate(&self) -> &Self::Base {
-        self.base.get_ring()
-    }
+    fn get_delegate(&self) -> &Self::Base { self.base.get_ring() }
 
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-        el.0
-    }
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el.0 }
 
-    fn delegate_mut<'a>(
-        &self,
-        el: &'a mut Self::Element,
-    ) -> &'a mut <Self::Base as RingBase>::Element {
-        &mut el.0
-    }
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { &mut el.0 }
 
-    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-        &el.0
-    }
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { &el.0 }
 
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-        LocalPIREl(el)
-    }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { LocalPIREl(el) }
 }
 
-impl<R: DivisibilityRingStore> DelegateRingImplFiniteRing for AsLocalPIRBase<R> where
-    R::Type: DivisibilityRing
-{
-}
+impl<R: DivisibilityRingStore> DelegateRingImplFiniteRing for AsLocalPIRBase<R> where R::Type: DivisibilityRing {}
 
-impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsLocalPIRBase<S>>
-    for AsLocalPIRBase<R>
+impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanHomFrom<AsLocalPIRBase<S>> for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing + CanHomFrom<S::Type>,
     S::Type: DivisibilityRing,
@@ -218,18 +185,10 @@ where
     type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsLocalPIRBase<S>) -> Option<Self::Homomorphism> {
-        <R::Type as CanHomFrom<S::Type>>::has_canonical_hom(
-            self.get_delegate(),
-            from.get_delegate(),
-        )
+        <R::Type as CanHomFrom<S::Type>>::has_canonical_hom(self.get_delegate(), from.get_delegate())
     }
 
-    fn map_in(
-        &self,
-        from: &AsLocalPIRBase<S>,
-        el: LocalPIREl<S>,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &AsLocalPIRBase<S>, el: LocalPIREl<S>, hom: &Self::Homomorphism) -> Self::Element {
         LocalPIREl(<R::Type as CanHomFrom<S::Type>>::map_in(
             self.get_delegate(),
             from.get_delegate(),
@@ -239,8 +198,7 @@ where
     }
 }
 
-impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanIsoFromTo<AsLocalPIRBase<S>>
-    for AsLocalPIRBase<R>
+impl<R: DivisibilityRingStore, S: DivisibilityRingStore> CanIsoFromTo<AsLocalPIRBase<S>> for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing + CanIsoFromTo<S::Type>,
     S::Type: DivisibilityRing,
@@ -248,18 +206,10 @@ where
     type Isomorphism = <R::Type as CanIsoFromTo<S::Type>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &AsLocalPIRBase<S>) -> Option<Self::Isomorphism> {
-        <R::Type as CanIsoFromTo<S::Type>>::has_canonical_iso(
-            self.get_delegate(),
-            from.get_delegate(),
-        )
+        <R::Type as CanIsoFromTo<S::Type>>::has_canonical_iso(self.get_delegate(), from.get_delegate())
     }
 
-    fn map_out(
-        &self,
-        from: &AsLocalPIRBase<S>,
-        el: Self::Element,
-        iso: &Self::Isomorphism,
-    ) -> LocalPIREl<S> {
+    fn map_out(&self, from: &AsLocalPIRBase<S>, el: Self::Element, iso: &Self::Isomorphism) -> LocalPIREl<S> {
         LocalPIREl(<R::Type as CanIsoFromTo<S::Type>>::map_out(
             self.get_delegate(),
             from.get_delegate(),
@@ -276,17 +226,10 @@ where
 {
     type Homomorphism = <R::Type as CanHomFrom<S>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> {
-        self.get_delegate().has_canonical_hom(from)
-    }
+    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> { self.get_delegate().has_canonical_hom(from) }
 
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        LocalPIREl(<R::Type as CanHomFrom<S>>::map_in(
-            self.get_delegate(),
-            from,
-            el,
-            hom,
-        ))
+        LocalPIREl(<R::Type as CanHomFrom<S>>::map_in(self.get_delegate(), from, el, hom))
     }
 }
 
@@ -295,9 +238,7 @@ where
     R::Type: DivisibilityRing,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.get_delegate()
-            .checked_left_div(&lhs.0, &rhs.0)
-            .map(LocalPIREl)
+        self.get_delegate().checked_left_div(&lhs.0, &rhs.0).map(LocalPIREl)
     }
 }
 
@@ -310,10 +251,9 @@ where
             if self.is_zero(lhs) && self.is_zero(rhs) {
                 return Some(self.one());
             } else if self.is_zero(lhs) {
-                return Some(RingRef::new(self).pow(
-                    self.clone_el(self.max_ideal_gen()),
-                    e - self.valuation(rhs).unwrap(),
-                ));
+                return Some(
+                    RingRef::new(self).pow(self.clone_el(self.max_ideal_gen()), e - self.valuation(rhs).unwrap()),
+                );
             } else {
                 // the constraint `rhs * result = lhs` already fixes the evaluation of `result`
                 // uniquely
@@ -337,11 +277,7 @@ where
         }
     }
 
-    fn create_elimination_matrix(
-        &self,
-        a: &Self::Element,
-        b: &Self::Element,
-    ) -> ([Self::Element; 4], Self::Element) {
+    fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
         if let Some(quo) = self.checked_left_div(b, a) {
             (
                 [self.one(), self.zero(), self.negate(quo), self.one()],
@@ -361,38 +297,28 @@ impl<R: DivisibilityRingStore> KaratsubaHint for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn karatsuba_threshold(&self) -> usize {
-        self.get_delegate().karatsuba_threshold()
-    }
+    fn karatsuba_threshold(&self) -> usize { self.get_delegate().karatsuba_threshold() }
 }
 
 impl<R: DivisibilityRingStore> StrassenHint for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn strassen_threshold(&self) -> usize {
-        self.get_delegate().strassen_threshold()
-    }
+    fn strassen_threshold(&self) -> usize { self.get_delegate().strassen_threshold() }
 }
 
 impl<R: DivisibilityRingStore> ComputeInnerProduct for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element {
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         self.rev_delegate(
             self.get_delegate()
                 .inner_product(els.map(|(a, b)| (self.delegate(a), self.delegate(b)))),
         )
     }
 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
         Self: 'a,
@@ -403,10 +329,7 @@ where
         )
     }
 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
         Self: 'a,
@@ -422,11 +345,7 @@ impl<R: DivisibilityRingStore> EuclideanRing for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         if let Some(quo) = self.checked_left_div(&lhs, rhs) {
             (quo, self.zero())
         } else {
@@ -434,22 +353,16 @@ where
         }
     }
 
-    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        self.valuation(val)
-    }
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { self.valuation(val) }
 }
 
 impl<R: DivisibilityRingStore> PrincipalLocalRing for AsLocalPIRBase<R>
 where
     R::Type: DivisibilityRing,
 {
-    fn max_ideal_gen(&self) -> &Self::Element {
-        &self.max_ideal_gen
-    }
+    fn max_ideal_gen(&self) -> &Self::Element { &self.max_ideal_gen }
 
-    fn nilpotent_power(&self) -> Option<usize> {
-        self.nilpotent_power
-    }
+    fn nilpotent_power(&self) -> Option<usize> { self.nilpotent_power }
 }
 
 impl<R: DivisibilityRingStore> Domain for AsLocalPIRBase<R> where R::Type: DivisibilityRing + Domain {}
@@ -489,9 +402,7 @@ where
         Self: 'a,
         S: RingStore<Type = Self::ExtendedRingBase<'a>>,
     {
-        self.get_delegate()
-            .in_base(ext_ring, el)
-            .map(|x| self.rev_delegate(x))
+        self.get_delegate().in_base(ext_ring, el).map(|x| self.rev_delegate(x))
     }
 
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
@@ -499,14 +410,10 @@ where
         Self: 'a,
         S: RingStore<Type = Self::ExtendedRingBase<'a>>,
     {
-        self.get_delegate()
-            .in_extension(ext_ring, self.delegate(el))
+        self.get_delegate().in_extension(ext_ring, self.delegate(el))
     }
 
-    fn interpolation_points<'a>(
-        &'a self,
-        count: usize,
-    ) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         self.get_delegate().interpolation_points(count)
     }
 }
@@ -531,10 +438,7 @@ where
         el: <AsFieldBase<R1> as RingBase>::Element,
         hom: &Self::Homomorphism,
     ) -> Self::Element {
-        self.rev_delegate(
-            self.get_delegate()
-                .map_in(from.get_delegate(), from.delegate(el), hom),
-        )
+        self.rev_delegate(self.get_delegate().map_in(from.get_delegate(), from.delegate(el), hom))
     }
 }
 
@@ -558,10 +462,7 @@ where
         el: Self::Element,
         iso: &Self::Isomorphism,
     ) -> <AsFieldBase<R1> as RingBase>::Element {
-        from.rev_delegate(
-            self.get_delegate()
-                .map_out(from.get_delegate(), self.delegate(el), iso),
-        )
+        from.rev_delegate(self.get_delegate().map_out(from.get_delegate(), self.delegate(el), iso))
     }
 }
 
@@ -715,14 +616,12 @@ fn test_checked_div_min() {
     assert_el_eq!(
         &ring,
         ring.int_hom().map(9),
-        ring.checked_div_min(&ring.zero(), &ring.int_hom().map(3))
-            .unwrap()
+        ring.checked_div_min(&ring.zero(), &ring.int_hom().map(3)).unwrap()
     );
     assert_el_eq!(
         &ring,
         ring.int_hom().map(3),
-        ring.checked_div_min(&ring.zero(), &ring.int_hom().map(9))
-            .unwrap()
+        ring.checked_div_min(&ring.zero(), &ring.int_hom().map(9)).unwrap()
     );
     assert_el_eq!(
         &ring,
@@ -765,10 +664,7 @@ fn test_solve_large_galois_ring() {
         )
         .assert_solved();
     let end = Instant::now();
-    println!(
-        "Solved over GR(17, 5, 2048) in {} ms",
-        (end - start).as_millis()
-    );
+    println!("Solved over GR(17, 5, 2048) in {} ms", (end - start).as_millis());
 
     let mut product: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
     STANDARD_MATMUL.matmul(

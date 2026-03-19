@@ -20,42 +20,26 @@ pub trait OrderedRing: RingBase {
     }
 
     /// Returns whether `lhs <= rhs`.
-    fn is_leq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.cmp(lhs, rhs) != Ordering::Greater
-    }
+    fn is_leq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.cmp(lhs, rhs) != Ordering::Greater }
 
     /// Returns whether `lhs >= rhs`.
-    fn is_geq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.cmp(lhs, rhs) != Ordering::Less
-    }
+    fn is_geq(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.cmp(lhs, rhs) != Ordering::Less }
 
     /// Returns whether `lhs < rhs`.
-    fn is_lt(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.cmp(lhs, rhs) == Ordering::Less
-    }
+    fn is_lt(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.cmp(lhs, rhs) == Ordering::Less }
 
     /// Returns whether `lhs > rhs`.
-    fn is_gt(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.cmp(lhs, rhs) == Ordering::Greater
-    }
+    fn is_gt(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.cmp(lhs, rhs) == Ordering::Greater }
 
     /// Returns whether `value < 0`.
-    fn is_neg(&self, value: &Self::Element) -> bool {
-        self.is_lt(value, &self.zero())
-    }
+    fn is_neg(&self, value: &Self::Element) -> bool { self.is_lt(value, &self.zero()) }
 
     /// Returns whether `value > 0`.
-    fn is_pos(&self, value: &Self::Element) -> bool {
-        self.is_gt(value, &self.zero())
-    }
+    fn is_pos(&self, value: &Self::Element) -> bool { self.is_gt(value, &self.zero()) }
 
     /// Returns the absolute value of `value`, i.e. `value` if `value >= 0` and `-value` otherwise.
     fn abs(&self, value: Self::Element) -> Self::Element {
-        if self.is_neg(&value) {
-            self.negate(value)
-        } else {
-            value
-        }
+        if self.is_neg(&value) { self.negate(value) } else { value }
     }
 
     /// Returns the larger one of `fst` and `snd`.
@@ -85,9 +69,7 @@ where
     delegate! { OrderedRing, fn abs(&self, value: El<Self>) -> El<Self> }
 
     /// See [`OrderedRing::max()`].
-    fn max<'a>(&self, fst: &'a El<Self>, snd: &'a El<Self>) -> &'a El<Self> {
-        self.get_ring().max(fst, snd)
-    }
+    fn max<'a>(&self, fst: &'a El<Self>, snd: &'a El<Self>) -> &'a El<Self> { self.get_ring().max(fst, snd) }
 }
 
 impl<R: ?Sized> OrderedRingStore for R

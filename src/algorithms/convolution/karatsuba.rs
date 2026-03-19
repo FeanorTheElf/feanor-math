@@ -8,12 +8,8 @@ use crate::ring::*;
 use crate::seq::*;
 
 #[stability::unstable(feature = "enable")]
-pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(
-    mut dst: V1,
-    lhs: V2,
-    rhs: V3,
-    ring: R,
-) where
+pub fn naive_assign_mul<R, V1, V2, V3, const ADD_ASSIGN: bool>(mut dst: V1, lhs: V2, rhs: V3, ring: R)
+where
     R: RingStore,
     V1: VectorViewMut<El<R>>,
     V2: VectorView<El<R>>,
@@ -186,12 +182,8 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(
         return;
     }
 
-    let lhs_log2_len = StaticRing::<i64>::RING
-        .abs_log2_ceil(&(lhs.len() as i64))
-        .unwrap();
-    let rhs_log2_len = StaticRing::<i64>::RING
-        .abs_log2_ceil(&(rhs.len() as i64))
-        .unwrap();
+    let lhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(lhs.len() as i64)).unwrap();
+    let rhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(rhs.len() as i64)).unwrap();
 
     fn pad<'a, R, V, A>(data: V, len: usize, ring: R, allocator: &'a A) -> Vec<El<R>, &'a A>
     where
@@ -209,12 +201,7 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(
 
     if lhs.len() != 1 << lhs_log2_len {
         if dst.len() < (1 << lhs_log2_len) + (1 << rhs_log2_len) {
-            let mut new_dst = pad(
-                &dst[..],
-                (1 << lhs_log2_len) + (1 << rhs_log2_len),
-                ring,
-                allocator,
-            );
+            let mut new_dst = pad(&dst[..], (1 << lhs_log2_len) + (1 << rhs_log2_len), ring, allocator);
             karatsuba(
                 threshold_size_log2,
                 &mut new_dst,
@@ -240,12 +227,7 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(
     }
     if rhs.len() != 1 << rhs_log2_len {
         if dst.len() < (1 << lhs_log2_len) + (1 << rhs_log2_len) {
-            let mut new_dst = pad(
-                &dst[..],
-                (1 << lhs_log2_len) + (1 << rhs_log2_len),
-                ring,
-                allocator,
-            );
+            let mut new_dst = pad(&dst[..], (1 << lhs_log2_len) + (1 << rhs_log2_len), ring, allocator);
             karatsuba(
                 threshold_size_log2,
                 &mut new_dst,
@@ -323,15 +305,7 @@ fn test_karatsuba_impl() {
     let b = [3, 4, 5, 0];
     let mut c = [0; 8];
     let mut tmp = [0; 4];
-    dispatch_karatsuba_impl::<_, _, _, true>(
-        2,
-        1,
-        &mut c[..],
-        &a[..],
-        &b[..],
-        &mut tmp[..],
-        StaticRing::<i64>::RING,
-    );
+    dispatch_karatsuba_impl::<_, _, _, true>(2, 1, &mut c[..], &a[..], &b[..], &mut tmp[..], StaticRing::<i64>::RING);
     assert_eq!([3, 10, 22, 22, 15, 0, 0, 0], c);
 }
 
@@ -351,13 +325,6 @@ fn test_karatsuba_mul() {
     let a = vec![1, 0, 1, 0, 1, 2, 3];
     let b = vec![3, 4];
     let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
-    karatsuba(
-        0,
-        &mut c[..],
-        &a[..],
-        &b[..],
-        StaticRing::<i64>::RING,
-        &Global,
-    );
+    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING, &Global);
     assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
 }

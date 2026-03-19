@@ -41,8 +41,7 @@ where
             for l in 0..ring.rank() {
                 let current_wrt_basis = ring.wrt_canonical_basis(&current);
                 for k in 0..ring.rank() {
-                    *expanded_lhs.at_mut(i * ring.rank() + k, j * ring.rank() + l) =
-                        current_wrt_basis.at(k);
+                    *expanded_lhs.at_mut(i * ring.rank() + k, j * ring.rank() + l) = current_wrt_basis.at(k);
                 }
                 drop(current_wrt_basis);
                 ring.mul_assign_ref(&mut current, &g);
@@ -84,10 +83,9 @@ where
 
     for i in 0..lhs.col_count() {
         for j in 0..rhs.col_count() {
-            let res_value = ring.from_canonical_basis((0..ring.rank()).map(|k| {
-                ring.base_ring()
-                    .clone_el(solution.at(i * ring.rank() + k, j))
-            }));
+            let res_value = ring.from_canonical_basis(
+                (0..ring.rank()).map(|k| ring.base_ring().clone_el(solution.at(i * ring.rank() + k, j))),
+            );
             *out.at_mut(i, j) = res_value;
         }
     }
@@ -129,8 +127,7 @@ fn test_solve() {
     let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
 
-    solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global)
-        .assert_solved();
+    solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).assert_solved();
 
     let A = OwnedMatrix::from_fn_in(3, 2, |i, j| ring.clone_el(&data_A[i][j]), Global);
     let B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
@@ -152,10 +149,7 @@ fn test_solve() {
     let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| ring.clone_el(&data_A[i][j]), Global);
     let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
-    assert!(
-        !solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global)
-            .is_solved()
-    );
+    assert!(!solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).is_solved());
 }
 
 #[test]

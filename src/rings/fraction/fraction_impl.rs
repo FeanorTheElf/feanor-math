@@ -66,10 +66,9 @@ where
         if let Some(quo) = self.base_ring.checked_div(&el.num, &el.den) {
             el.num = quo;
             el.den = self.base_ring.one();
-        } else if let Some(factor) = <_ as DivisibilityRing>::balance_factor(
-            self.base_ring.get_ring(),
-            [&el.num, &el.den].into_iter(),
-        ) {
+        } else if let Some(factor) =
+            <_ as DivisibilityRing>::balance_factor(self.base_ring.get_ring(), [&el.num, &el.den].into_iter())
+        {
             el.num = self.base_ring.checked_div(&el.num, &factor).unwrap();
             el.den = self.base_ring.checked_div(&el.den, &factor).unwrap();
         }
@@ -95,9 +94,7 @@ where
     R: RingStore,
     R::Type: Domain,
 {
-    fn eq(&self, other: &Self) -> bool {
-        self.base_ring.get_ring() == other.base_ring.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base_ring.get_ring() == other.base_ring.get_ring() }
 }
 
 impl<R> Clone for FractionFieldImplBase<R>
@@ -184,9 +181,7 @@ where
         self.reduce(lhs);
     }
 
-    fn negate_inplace(&self, lhs: &mut Self::Element) {
-        self.base_ring.negate_inplace(&mut lhs.num);
-    }
+    fn negate_inplace(&self, lhs: &mut Self::Element) { self.base_ring.negate_inplace(&mut lhs.num); }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.base_ring.eq_el(
@@ -195,24 +190,16 @@ where
         )
     }
 
-    fn is_zero(&self, value: &Self::Element) -> bool {
-        self.base_ring.is_zero(&value.num)
-    }
+    fn is_zero(&self, value: &Self::Element) -> bool { self.base_ring.is_zero(&value.num) }
 
-    fn is_one(&self, value: &Self::Element) -> bool {
-        self.base_ring.eq_el(&value.num, &value.den)
-    }
+    fn is_one(&self, value: &Self::Element) -> bool { self.base_ring.eq_el(&value.num, &value.den) }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.base_ring.eq_el(
-            &self.base_ring.negate(self.base_ring.clone_el(&value.num)),
-            &value.den,
-        )
+        self.base_ring
+            .eq_el(&self.base_ring.negate(self.base_ring.clone_el(&value.num)), &value.den)
     }
 
-    fn is_approximate(&self) -> bool {
-        self.base_ring.get_ring().is_approximate()
-    }
+    fn is_approximate(&self) -> bool { self.base_ring.get_ring().is_approximate() }
 
     fn is_commutative(&self) -> bool {
         // we currently enforce this, see assertion in construction; I'm not
@@ -220,13 +207,9 @@ where
         true
     }
 
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_noetherian(&self) -> bool { true }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        self.from(self.base_ring.int_hom().map(value))
-    }
+    fn from_int(&self, value: i32) -> Self::Element { self.from(self.base_ring.int_hom().map(value)) }
 
     fn dbg_within<'a>(
         &self,
@@ -269,9 +252,7 @@ where
 {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        &self.base_ring
-    }
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         FractionFieldEl {
@@ -305,9 +286,7 @@ where
         }
     }
 
-    fn is_unit(&self, x: &Self::Element) -> bool {
-        !self.is_zero(x)
-    }
+    fn is_unit(&self, x: &Self::Element) -> bool { !self.is_zero(x) }
 
     fn balance_factor<'a, I>(&self, elements: I) -> Option<Self::Element>
     where
@@ -387,15 +366,9 @@ where
     R: RingStore,
     R::Type: Domain,
 {
-    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        if self.is_zero(val) { Some(0) } else { Some(1) }
-    }
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
 
-    fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
     }
@@ -413,9 +386,7 @@ where
     R: RingStore,
     R::Type: Domain,
 {
-    fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>) {
-        (el.num, el.den)
-    }
+    fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>) { (el.num, el.den) }
 }
 
 /// We don't have a canonical representation when the base ring is not an integer ring
@@ -445,9 +416,7 @@ where
     R: RingStore,
     R::Type: Domain,
 {
-    default fn strassen_threshold(&self) -> usize {
-        usize::MAX
-    }
+    default fn strassen_threshold(&self) -> usize { usize::MAX }
 }
 
 impl<R: RingStore> KaratsubaHint for FractionFieldImplBase<R>
@@ -455,9 +424,7 @@ where
     R: RingStore,
     R::Type: Domain,
 {
-    default fn karatsuba_threshold(&self) -> usize {
-        usize::MAX
-    }
+    default fn karatsuba_threshold(&self) -> usize { usize::MAX }
 }
 
 impl<R: RingStore, S: RingStore> CanHomFrom<FractionFieldImplBase<S>> for FractionFieldImplBase<R>

@@ -77,9 +77,7 @@ pub trait DivisibilityRing: RingBase {
     }
 
     /// Returns whether the given element is a unit, i.e. has an inverse.
-    fn is_unit(&self, x: &Self::Element) -> bool {
-        self.checked_left_div(&self.one(), x).is_some()
-    }
+    fn is_unit(&self, x: &Self::Element) -> bool { self.checked_left_div(&self.one(), x).is_some() }
 
     /// Function that computes a "balancing" factor of a sequence of ring elements.
     /// The only use of the balancing factor is to increase performance, in particular,
@@ -205,16 +203,12 @@ pub trait DivisibilityRing: RingBase {
     ///
     /// See also [`DivisibilityRing::prepare_divisor()`].
     #[stability::unstable(feature = "enable")]
-    fn is_unit_prepared(&self, x: &PreparedDivisor<Self>) -> bool {
-        self.is_unit(&x.element)
-    }
+    fn is_unit_prepared(&self, x: &PreparedDivisor<Self>) -> bool { self.is_unit(&x.element) }
 
     /// If the given element is a unit, returns its inverse, otherwise `None`.
     ///
     /// This is equivalent (but possibly faster) than `ring.checked_div(ring.one(), el)`.
-    fn invert(&self, el: &Self::Element) -> Option<Self::Element> {
-        self.checked_div(&self.one(), el)
-    }
+    fn invert(&self, el: &Self::Element) -> Option<Self::Element> { self.checked_div(&self.one(), el) }
 }
 
 /// Struct for ring elements that are stored with associated data to
@@ -322,10 +316,8 @@ pub mod generic_tests {
     use super::*;
     use crate::ring::El;
 
-    pub fn test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<Item = El<R>>>(
-        ring: R,
-        edge_case_elements: I,
-    ) where
+    pub fn test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
+    where
         R::Type: DivisibilityRing,
     {
         let elements = edge_case_elements.collect::<Vec<_>>();
@@ -342,10 +334,7 @@ pub mod generic_tests {
                     ring.format(&a)
                 );
                 assert!(
-                    ring.eq_el(
-                        &ab,
-                        &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())
-                    ),
+                    ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())),
                     "Division failed: {} * {} != {} but {} = checked_div({}, {})",
                     ring.format(a),
                     ring.format(c.as_ref().unwrap()),
@@ -414,10 +403,7 @@ pub mod generic_tests {
                     ring.format(&a)
                 );
                 assert!(
-                    ring.eq_el(
-                        &ab,
-                        &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())
-                    ),
+                    ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())),
                     "Division failed: {} * {} != {} but {} = checked_div({}, {})",
                     ring.format(a),
                     ring.format(c.as_ref().unwrap()),

@@ -16,10 +16,7 @@ pub fn poly_factor_finite_field<P, Controller>(
     poly_ring: P,
     f: &El<P>,
     controller: Controller,
-) -> (
-    Vec<(El<P>, usize)>,
-    El<<P::Type as RingExtension>::BaseRing>,
-)
+) -> (Vec<(El<P>, usize)>, El<<P::Type as RingExtension>::BaseRing>)
 where
     P: RingStore,
     P::Type: PolyRing + EuclideanRing,
@@ -27,12 +24,7 @@ where
     Controller: ComputationController,
 {
     assert!(!poly_ring.is_zero(&f));
-    let even_char = BigIntRing::RING.is_even(
-        &poly_ring
-            .base_ring()
-            .characteristic(&BigIntRing::RING)
-            .unwrap(),
-    );
+    let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
 
     controller.run_computation(
         format_args!("factor_poly_GF(deg={})", poly_ring.degree(f).unwrap()),
@@ -43,8 +35,7 @@ where
 
             // we repeatedly remove the square-free part
             while !poly_ring.is_unit(&el) {
-                let sqrfree_part =
-                    poly_squarefree_part_finite_field(&poly_ring, &el, controller.clone());
+                let sqrfree_part = poly_squarefree_part_finite_field(&poly_ring, &el, controller.clone());
                 assert!(!poly_ring.is_unit(&sqrfree_part));
 
                 // factor the square-free part into distinct-degree factors

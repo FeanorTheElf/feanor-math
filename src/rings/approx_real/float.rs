@@ -73,63 +73,38 @@ impl Real64Base {
 impl RingBase for Real64Base {
     type Element = f64;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        *val
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
 
-    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        *lhs += rhs;
-    }
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
 
-    fn negate_inplace(&self, x: &mut Self::Element) {
-        *x = -*x;
-    }
+    fn negate_inplace(&self, x: &mut Self::Element) { *x = -*x; }
 
-    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        *lhs *= rhs;
-    }
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        value as f64
-    }
+    fn from_int(&self, value: i32) -> Self::Element { value as f64 }
 
     fn eq_el(&self, _: &Self::Element, _: &Self::Element) -> bool {
         panic!("Cannot provide equality on approximate rings")
     }
 
-    fn pow_gen<R: IntegerRingStore>(
-        &self,
-        x: Self::Element,
-        power: &El<R>,
-        integers: R,
-    ) -> Self::Element
+    fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
     where
         R::Type: IntegerRing,
     {
         if integers.get_ring().representable_bits().is_some()
             && integers.get_ring().representable_bits().unwrap() < i32::BITS as usize
         {
-            x.powi(int_cast(
-                integers.clone_el(power),
-                &StaticRing::<i32>::RING,
-                integers,
-            ))
+            x.powi(int_cast(integers.clone_el(power), &StaticRing::<i32>::RING, integers))
         } else {
             x.powf(integers.to_float_approx(power))
         }
     }
 
-    fn is_commutative(&self) -> bool {
-        true
-    }
+    fn is_commutative(&self) -> bool { true }
 
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_noetherian(&self) -> bool { true }
 
-    fn is_approximate(&self) -> bool {
-        true
-    }
+    fn is_approximate(&self) -> bool { true }
 
     fn dbg_within<'a>(
         &self,
@@ -174,11 +149,7 @@ impl PrincipalIdealRing for Real64Base {
 }
 
 impl EuclideanRing for Real64Base {
-    fn euclidean_div_rem(
-        &self,
-        _lhs: Self::Element,
-        _rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, _lhs: Self::Element, _rhs: &Self::Element) -> (Self::Element, Self::Element) {
         panic!("Since Complex64 is only approximate, this cannot be implemented properly")
     }
 
@@ -219,25 +190,13 @@ where
 {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _from: &I) -> Option<Self::Homomorphism> {
-        Some(())
-    }
+    fn has_canonical_hom(&self, _from: &I) -> Option<Self::Homomorphism> { Some(()) }
 
-    fn map_in(
-        &self,
-        from: &I,
-        el: <I as RingBase>::Element,
-        _hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &I, el: <I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
         from.to_float_approx(&el)
     }
 
-    fn map_in_ref(
-        &self,
-        from: &I,
-        el: &<I as RingBase>::Element,
-        _hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
         from.to_float_approx(el)
     }
 }
@@ -249,16 +208,9 @@ where
 {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> {
-        Some(())
-    }
+    fn has_canonical_hom(&self, _from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> { Some(()) }
 
-    fn map_in(
-        &self,
-        from: &RationalFieldBase<I>,
-        el: El<RationalField<I>>,
-        hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, from: &RationalFieldBase<I>, el: El<RationalField<I>>, hom: &Self::Homomorphism) -> Self::Element {
         self.map_in_ref(from, &el, hom)
     }
 
@@ -268,19 +220,14 @@ where
         el: &El<RationalField<I>>,
         _hom: &Self::Homomorphism,
     ) -> Self::Element {
-        from.base_ring().to_float_approx(from.num(el))
-            / from.base_ring().to_float_approx(from.den(el))
+        from.base_ring().to_float_approx(from.num(el)) / from.base_ring().to_float_approx(from.den(el))
     }
 }
 
 impl ApproxRealField for Real64Base {
-    fn epsilon(&self) -> &Self::Element {
-        &f64::EPSILON
-    }
+    fn epsilon(&self) -> &Self::Element { &f64::EPSILON }
 
-    fn infinity(&self) -> Self::Element {
-        f64::INFINITY
-    }
+    fn infinity(&self) -> Self::Element { f64::INFINITY }
 
     fn round_to_integer<I>(&self, ZZ: I, x: Self::Element) -> Option<El<I>>
     where
@@ -292,7 +239,5 @@ impl ApproxRealField for Real64Base {
 }
 
 impl SqrtRing for Real64Base {
-    fn sqrt(&self, x: Self::Element) -> Self::Element {
-        x.sqrt()
-    }
+    fn sqrt(&self, x: Self::Element) -> Self::Element { x.sqrt() }
 }

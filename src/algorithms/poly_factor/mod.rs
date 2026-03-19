@@ -203,25 +203,10 @@ fn test_factor_rational_poly() {
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
     let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
-    let g = poly_ring.from_terms(
-        [
-            (incl.map(1), 0),
-            (incl.map(2), 1),
-            (incl.map(1), 2),
-            (incl.map(1), 4),
-        ]
-        .into_iter(),
-    );
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(
         &poly_ring,
-        &poly_ring.prod(
-            [
-                poly_ring.clone_el(&f),
-                poly_ring.clone_el(&f),
-                poly_ring.clone_el(&g),
-            ]
-            .into_iter(),
-        ),
+        &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()),
     );
     assert_eq!(2, actual.len());
     assert_el_eq!(poly_ring, f, actual[0].0);
@@ -254,17 +239,8 @@ fn test_factor_nonmonic_poly() {
     let QQ = RationalField::new(BigIntRing::RING);
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
-    let f = poly_ring
-        .from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
-    let g = poly_ring.from_terms(
-        [
-            (incl.map(1), 0),
-            (incl.map(2), 1),
-            (incl.map(1), 2),
-            (incl.map(1), 4),
-        ]
-        .into_iter(),
-    );
+    let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(
         &poly_ring,
         &poly_ring.prod(
@@ -293,11 +269,7 @@ fn test_factor_fp() {
     let f = poly_ring.from_terms([(1, 0), (2, 1), (1, 3)].into_iter());
     let g = poly_ring.from_terms([(1, 0), (1, 1)].into_iter());
     let h = poly_ring.from_terms([(2, 0), (1, 2)].into_iter());
-    let fgghhh = poly_ring.prod(
-        [&f, &g, &g, &h, &h, &h]
-            .iter()
-            .map(|poly| poly_ring.clone_el(poly)),
-    );
+    let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| poly_ring.clone_el(poly)));
     let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &fgghhh);
     assert_el_eq!(Fp, Fp.one(), unit);
 

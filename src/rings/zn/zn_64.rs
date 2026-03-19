@@ -25,25 +25,17 @@ use crate::seq::*;
 use crate::serialization::*;
 use crate::specialization::*;
 use crate::{
-    impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos,
-    impl_localpir_wrap_unwrap_homs, impl_localpir_wrap_unwrap_isos,
+    impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos, impl_localpir_wrap_unwrap_homs,
+    impl_localpir_wrap_unwrap_isos,
 };
 
-fn high(x: u128) -> u64 {
-    (x >> 64) as u64
-}
+fn high(x: u128) -> u64 { (x >> 64) as u64 }
 
-fn low(x: u128) -> u64 {
-    (x & ((1 << 64) - 1)) as u64
-}
+fn low(x: u128) -> u64 { (x & ((1 << 64) - 1)) as u64 }
 
-fn mulhi(lhs: u64, rhs: u64) -> u64 {
-    high(lhs as u128 * rhs as u128)
-}
+fn mulhi(lhs: u64, rhs: u64) -> u64 { high(lhs as u128 * rhs as u128) }
 
-fn mullo(lhs: u64, rhs: u64) -> u64 {
-    lhs.wrapping_mul(rhs)
-}
+fn mullo(lhs: u64, rhs: u64) -> u64 { lhs.wrapping_mul(rhs) }
 
 /// Assuming that `x <= 2 * bound`, computes `x' <= bound` that is congruent
 /// to `x` modulo `bound`
@@ -96,8 +88,7 @@ const fn two_pow_128_div(x: u64) -> u128 {
     let q_low = (r_high << 64) / (x as u128);
     let result = (q_high << 64) | q_low;
     debug_assert!(
-        result.wrapping_mul(x as u128) == 0
-            || result.wrapping_mul(x as u128) >= 0u128.wrapping_sub(x as u128)
+        result.wrapping_mul(x as u128) == 0 || result.wrapping_mul(x as u128) >= 0u128.wrapping_sub(x as u128)
     );
     return result;
 }
@@ -125,15 +116,11 @@ impl ZnBase {
         }
     }
 
-    fn modulus_u64(&self) -> u64 {
-        self.modulus as u64
-    }
+    fn modulus_u64(&self) -> u64 { self.modulus as u64 }
 
     /// Positive integers bounded by `self.repr_bound()` (inclusive) are considered
     /// valid representatives of ring elements.
-    fn repr_bound(&self) -> u64 {
-        self.modulus_times_six
-    }
+    fn repr_bound(&self) -> u64 { self.modulus_times_six }
 
     /// Reduces from `[0, self.repr_bound() * self.repr_bound()]` to `[0, 3 * self.modulus()[`.
     fn bounded_reduce(&self, value: u128) -> u64 {
@@ -143,8 +130,7 @@ impl ZnBase {
         let (invmod_low, invmod_high) = (low(self.inv_modulus), high(self.inv_modulus));
         // we ignore the lowest part of the sum, causing an error of at most 1;
         // we also assume that `repr_bound * repr_bound * inv_modulus` fits into 192 bit
-        let approx_quotient =
-            mulhi(in_low, invmod_high) + mulhi(in_high, invmod_low) + mullo(in_high, invmod_high);
+        let approx_quotient = mulhi(in_low, invmod_high) + mulhi(in_high, invmod_low) + mullo(in_high, invmod_high);
         let result = low(value).wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
 
         debug_assert!(result < self.modulus_times_three);
@@ -161,16 +147,13 @@ impl ZnBase {
     #[inline(never)]
     fn bounded_reduce_larger<const FACTOR: usize>(&self, value: u128) -> u64 {
         assert!(FACTOR == 32);
-        debug_assert!(
-            value <= FACTOR as u128 * self.repr_bound() as u128 * self.repr_bound() as u128
-        );
+        debug_assert!(value <= FACTOR as u128 * self.repr_bound() as u128 * self.repr_bound() as u128);
 
         let (in_low, in_high) = (low(value), high(value));
         let invmod_high = high(self.inv_modulus);
         // `approx_quotient` can be just slightly larger than 64 bits, since we optimized for
         // `bounded_reduce()`
-        let approx_quotient =
-            in_high as u128 * invmod_high as u128 + mulhi(in_low, invmod_high) as u128;
+        let approx_quotient = in_high as u128 * invmod_high as u128 + mulhi(in_low, invmod_high) as u128;
 
         return self.bounded_reduce(value - (approx_quotient * self.modulus as u128));
     }
@@ -220,9 +203,7 @@ impl ZnBase {
         } else {
             let el_i128 = <T as Into<i128>>::into(el);
             if is_neg {
-                self.from_u64_promise_reduced(
-                    ((el_i128 % self.modulus as i128) as i64 + self.modulus) as u64,
-                )
+                self.from_u64_promise_reduced(((el_i128 % self.modulus as i128) as i64 + self.modulus) as u64)
             } else {
                 self.from_u64_promise_reduced((el_i128 % self.modulus as i128) as u64)
             }
@@ -235,9 +216,7 @@ impl ZnBase {
 pub type Zn = RingValue<ZnBase>;
 
 impl Zn {
-    pub const fn new(modulus: u64) -> Self {
-        RingValue::from(ZnBase::new(modulus))
-    }
+    pub const fn new(modulus: u64) -> Self { RingValue::from(ZnBase::new(modulus)) }
 }
 
 #[derive(Clone, Copy, Debug)]
@@ -247,23 +226,17 @@ pub struct ZnEl(
 );
 
 impl PartialEq for ZnBase {
-    fn eq(&self, other: &Self) -> bool {
-        self.modulus == other.modulus
-    }
+    fn eq(&self, other: &Self) -> bool { self.modulus == other.modulus }
 }
 
 impl Debug for ZnBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Z/{}Z", self.modulus)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Z/{}Z", self.modulus) }
 }
 
 impl RingBase for ZnBase {
     type Element = ZnEl;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        *val
-    }
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         debug_assert!(lhs.0 <= self.repr_bound());
@@ -296,13 +269,9 @@ impl RingBase for ZnBase {
         lhs.0 = self.bounded_reduce(lhs.0 as u128 * rhs.0 as u128);
     }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        self.from_primitive_int(value)
-    }
+    fn from_int(&self, value: i32) -> Self::Element { self.from_primitive_int(value) }
 
-    fn zero(&self) -> Self::Element {
-        ZnEl(0)
-    }
+    fn zero(&self) -> Self::Element { ZnEl(0) }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         debug_assert!(lhs.0 <= self.repr_bound());
@@ -319,12 +288,8 @@ impl RingBase for ZnBase {
         self.complete_reduce(val.0) == 0
     }
 
-    fn is_commutative(&self) -> bool {
-        true
-    }
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_commutative(&self) -> bool { true }
+    fn is_noetherian(&self) -> bool { true }
 
     fn dbg_within<'a>(
         &self,
@@ -353,10 +318,7 @@ impl RingBase for ZnBase {
             for ZnEl(c) in els_it.by_ref().take(self.repr_bound() as usize / 2 - 1) {
                 current += c as u128;
             }
-            self.add_assign(
-                &mut result,
-                self.from_u64_promise_reduced(self.bounded_reduce(current)),
-            );
+            self.add_assign(&mut result, self.from_u64_promise_reduced(self.bounded_reduce(current)));
         }
         debug_assert!(result.0 <= self.repr_bound());
         return result;
@@ -380,9 +342,7 @@ impl RingBase for ZnBase {
         )
     }
 
-    fn is_approximate(&self) -> bool {
-        false
-    }
+    fn is_approximate(&self) -> bool { false }
 }
 
 impl SerializableElementRing for ZnBase {
@@ -393,9 +353,7 @@ impl SerializableElementRing for ZnBase {
         <i64 as Deserialize>::deserialize(deserializer)
             .and_then(|x| {
                 if x < 0 || x >= *self.modulus() {
-                    Err(Error::custom(
-                        "ring element value out of bounds for ring Z/nZ",
-                    ))
+                    Err(Error::custom("ring element value out of bounds for ring Z/nZ"))
                 } else {
                     Ok(x)
                 }
@@ -452,10 +410,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn> {
         ext_ring.inclusion().map(el)
     }
 
-    fn interpolation_points<'a>(
-        &'a self,
-        count: usize,
-    ) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
         let points = ring.elements().take(count).collect();
         return (ring, points);
@@ -463,10 +418,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn> {
 }
 
 impl ComputeInnerProduct for ZnBase {
-    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element {
+    fn inner_product<I: Iterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         debug_assert!(u128::MAX / (self.repr_bound() as u128 * self.repr_bound() as u128) >= 36);
         const REDUCE_AFTER_STEPS: usize = 32;
         let mut array_chunks = els.array_chunks::<REDUCE_AFTER_STEPS>();
@@ -478,10 +430,7 @@ impl ComputeInnerProduct for ZnBase {
                 debug_assert!(r.0 <= self.repr_bound());
                 sum += l.0 as u128 * r.0 as u128;
             }
-            self.add_assign(
-                &mut result,
-                ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)),
-            );
+            self.add_assign(&mut result, ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)));
         }
         let mut sum: u128 = 0;
         for (l, r) in array_chunks.into_remainder() {
@@ -489,27 +438,18 @@ impl ComputeInnerProduct for ZnBase {
             debug_assert!(r.0 <= self.repr_bound());
             sum += l.0 as u128 * r.0 as u128;
         }
-        self.add_assign(
-            &mut result,
-            ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)),
-        );
+        self.add_assign(&mut result, ZnEl(self.bounded_reduce_larger::<REDUCE_AFTER_STEPS>(sum)));
         return result;
     }
 
-    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref_fst<'a, I: Iterator<Item = (&'a Self::Element, Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
     {
         self.inner_product(els.map(|(l, r)| (self.clone_el(l), r)))
     }
 
-    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(
-        &self,
-        els: I,
-    ) -> Self::Element
+    fn inner_product_ref<'a, I: Iterator<Item = (&'a Self::Element, &'a Self::Element)>>(&self, els: I) -> Self::Element
     where
         Self::Element: 'a,
     {
@@ -526,11 +466,7 @@ where
     type Homomorphism = ();
 
     fn has_canonical_hom(&self, from: &zn_big::ZnBase<I>) -> Option<Self::Homomorphism> {
-        if from
-            .integer_ring()
-            .get_ring()
-            .representable_bits()
-            .is_none()
+        if from.integer_ring().get_ring().representable_bits().is_none()
             || from.integer_ring().get_ring().representable_bits().unwrap()
                 >= self.integer_ring().abs_log2_ceil(self.modulus()).unwrap()
         {
@@ -568,11 +504,7 @@ where
     type Isomorphism = <zn_big::ZnBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
 
     fn has_canonical_iso(&self, from: &zn_big::ZnBase<I>) -> Option<Self::Isomorphism> {
-        if from
-            .integer_ring()
-            .get_ring()
-            .representable_bits()
-            .is_none()
+        if from.integer_ring().get_ring().representable_bits().is_none()
             || from.integer_ring().get_ring().representable_bits().unwrap()
                 >= self.integer_ring().abs_log2_ceil(self.modulus()).unwrap()
         {
@@ -595,11 +527,7 @@ where
         el: <Self as RingBase>::Element,
         iso: &Self::Isomorphism,
     ) -> <zn_big::ZnBase<I> as RingBase>::Element {
-        from.map_in(
-            self.integer_ring().get_ring(),
-            el.0.try_into().unwrap(),
-            iso,
-        )
+        from.map_in(self.integer_ring().get_ring(), el.0.try_into().unwrap(), iso)
     }
 }
 
@@ -620,11 +548,8 @@ impl DivisibilityRing for ZnBase {
     }
 
     fn prepare_divisor(&self, x: &Self::Element) -> Self::PreparedDivisorData {
-        let (s, _t, d) = algorithms::eea::signed_eea(
-            self.smallest_positive_lift(*x),
-            *self.modulus(),
-            self.integer_ring(),
-        );
+        let (s, _t, d) =
+            algorithms::eea::signed_eea(self.smallest_positive_lift(*x), *self.modulus(), self.integer_ring());
         debug_assert!(d > 0);
         debug_assert!(d <= *self.modulus());
         return ZnPreparedDivisorData {
@@ -634,10 +559,7 @@ impl DivisibilityRing for ZnBase {
             } else {
                 self.from_u64_promise_reduced(s as u64)
             },
-            smallest_positive_zero_divisor_part: PreparedDivisor::new(
-                StaticRing::<i64>::RING.get_ring(),
-                d,
-            ),
+            smallest_positive_zero_divisor_part: PreparedDivisor::new(StaticRing::<i64>::RING.get_ring(), d),
         };
     }
 
@@ -748,20 +670,13 @@ impl<'a> Iterator for ZnBaseElementsIter<'a> {
 }
 
 impl FiniteRingSpecializable for ZnBase {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        op.execute()
-    }
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.execute() }
 }
 
 impl FiniteRing for ZnBase {
     type ElementsIter<'a> = ZnBaseElementsIter<'a>;
 
-    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
-        ZnBaseElementsIter {
-            ring: self,
-            current: 0,
-        }
-    }
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> { ZnBaseElementsIter { ring: self, current: 0 } }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         super::generic_impls::random_element(self, rng)
@@ -772,8 +687,7 @@ impl FiniteRing for ZnBase {
         I::Type: IntegerRing,
     {
         if other_ZZ.get_ring().representable_bits().is_none()
-            || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1))
-                <= other_ZZ.get_ring().representable_bits()
+            || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1)) <= other_ZZ.get_ring().representable_bits()
         {
             Some(int_cast(*self.modulus(), other_ZZ, self.integer_ring()))
         } else {
@@ -792,39 +706,28 @@ impl PrincipalIdealRing for ZnBase {
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = StaticRing::<i64>::RING
-            .extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
-        let quo = RingRef::new(self)
-            .into_can_hom(StaticRing::<i64>::RING)
-            .ok()
-            .unwrap();
+        let (s, t, d) =
+            StaticRing::<i64>::RING.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
+        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
 }
 
 impl StrassenHint for ZnBase {
-    default fn strassen_threshold(&self) -> usize {
-        6
-    }
+    default fn strassen_threshold(&self) -> usize { 6 }
 }
 
 impl KaratsubaHint for ZnBase {
-    default fn karatsuba_threshold(&self) -> usize {
-        6
-    }
+    default fn karatsuba_threshold(&self) -> usize { 6 }
 }
 
 impl ZnRing for ZnBase {
     type IntegerRingBase = StaticRingBase<i64>;
     type IntegerRing = StaticRing<i64>;
 
-    fn integer_ring(&self) -> &Self::IntegerRing {
-        &StaticRing::<i64>::RING
-    }
+    fn integer_ring(&self) -> &Self::IntegerRing { &StaticRing::<i64>::RING }
 
-    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
-        self.complete_reduce(el.0) as i64
-    }
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> { self.complete_reduce(el.0) as i64 }
 
     fn smallest_lift(&self, ZnEl(mut value_u64): Self::Element) -> El<Self::IntegerRing> {
         debug_assert!(value_u64 <= self.repr_bound());
@@ -850,13 +753,9 @@ impl ZnRing for ZnBase {
         return value_i64;
     }
 
-    fn modulus(&self) -> &El<Self::IntegerRing> {
-        &self.modulus
-    }
+    fn modulus(&self) -> &El<Self::IntegerRing> { &self.modulus }
 
-    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
-        el.0 as i64
-    }
+    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> { el.0 as i64 }
 
     /// If the given integer is within `{ 0, ..., 6 * n }`, returns the corresponding
     /// element in `Z/nZ`. Any other input is considered a logic error.
@@ -896,8 +795,7 @@ impl ZnRing for ZnBase {
 
 impl HashableElRing for ZnBase {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        self.integer_ring()
-            .hash(&self.smallest_positive_lift(*el), h)
+        self.integer_ring().hash(&self.smallest_positive_lift(*el), h)
     }
 }
 
@@ -938,15 +836,11 @@ pub struct ZnFastmulBase {
 pub type ZnFastmul = RingValue<ZnFastmulBase>;
 
 impl ZnFastmul {
-    pub fn new(base: Zn) -> Option<Self> {
-        Some(RingValue::from(ZnFastmulBase { base }))
-    }
+    pub fn new(base: Zn) -> Option<Self> { Some(RingValue::from(ZnFastmulBase { base })) }
 }
 
 impl PartialEq for ZnFastmulBase {
-    fn eq(&self, other: &Self) -> bool {
-        self.base.get_ring() == other.base.get_ring()
-    }
+    fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
 }
 
 impl PrincipalIdealRing for ZnFastmulBase {
@@ -965,11 +859,7 @@ impl PrincipalIdealRing for ZnFastmulBase {
         let (s, t, d) = self
             .get_delegate()
             .extended_ideal_gen(self.delegate_ref(lhs), self.delegate_ref(rhs));
-        (
-            self.rev_delegate(s),
-            self.rev_delegate(t),
-            self.rev_delegate(d),
-        )
+        (self.rev_delegate(s), self.rev_delegate(t), self.rev_delegate(d))
     }
 }
 
@@ -985,31 +875,19 @@ impl DelegateRing for ZnFastmulBase {
     type Base = ZnBase;
     type Element = ZnFastmulEl;
 
-    fn get_delegate(&self) -> &Self::Base {
-        self.base.get_ring()
-    }
+    fn get_delegate(&self) -> &Self::Base { self.base.get_ring() }
 
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-        el.el
-    }
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el.el }
 
-    fn delegate_mut<'a>(
-        &self,
-        el: &'a mut Self::Element,
-    ) -> &'a mut <Self::Base as RingBase>::Element {
-        &mut el.el
-    }
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { &mut el.el }
 
-    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
-        &el.el
-    }
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { &el.el }
 
     fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
         assert!(el.el.0 <= self.base.get_ring().repr_bound());
         el.el.0 = self.base.get_ring().complete_reduce(el.el.0);
         let value = el.el.0;
-        el.value_invmod_shifted =
-            (((value as u128) << 64) / self.base.get_ring().modulus_u64() as u128) as u64;
+        el.value_invmod_shifted = (((value as u128) << 64) / self.base.get_ring().modulus_u64() as u128) as u64;
     }
 
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
@@ -1028,19 +906,10 @@ impl CanHomFrom<ZnBase> for ZnFastmulBase {
     type Homomorphism = ();
 
     fn has_canonical_hom(&self, from: &ZnBase) -> Option<Self::Homomorphism> {
-        if from == self.base.get_ring() {
-            Some(())
-        } else {
-            None
-        }
+        if from == self.base.get_ring() { Some(()) } else { None }
     }
 
-    fn map_in(
-        &self,
-        _from: &ZnBase,
-        el: <ZnBase as RingBase>::Element,
-        _hom: &Self::Homomorphism,
-    ) -> Self::Element {
+    fn map_in(&self, _from: &ZnBase, el: <ZnBase as RingBase>::Element, _hom: &Self::Homomorphism) -> Self::Element {
         self.rev_delegate(el)
     }
 }
@@ -1049,11 +918,7 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
     type Homomorphism = ();
 
     fn has_canonical_hom(&self, from: &ZnFastmulBase) -> Option<Self::Homomorphism> {
-        if self == from.base.get_ring() {
-            Some(())
-        } else {
-            None
-        }
+        if self == from.base.get_ring() { Some(()) } else { None }
     }
 
     fn map_in(
@@ -1078,11 +943,7 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
         let approx_quotient = mulhi(lhs.0, rhs.value_invmod_shifted);
         lhs.0 = product.wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
         debug_assert!(lhs.0 < self.modulus_times_three);
-        debug_assert!(
-            (lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128)
-                % (self.modulus_u64() as u128)
-                == 0
-        );
+        debug_assert!((lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128) % (self.modulus_u64() as u128) == 0);
     }
 
     fn mul_assign_map_in_ref(
@@ -1099,9 +960,7 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
 impl CanIsoFromTo<ZnFastmulBase> for ZnBase {
     type Isomorphism = <ZnFastmulBase as CanHomFrom<Self>>::Homomorphism;
 
-    fn has_canonical_iso(&self, from: &ZnFastmulBase) -> Option<Self::Isomorphism> {
-        from.has_canonical_hom(self)
-    }
+    fn has_canonical_iso(&self, from: &ZnFastmulBase) -> Option<Self::Isomorphism> { from.has_canonical_hom(self) }
 
     fn map_out(
         &self,
@@ -1229,12 +1088,7 @@ impl CooleyTukeyRadix3Butterfly<ZnFastmulBase> for ZnBase {
 
 impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
     #[inline(always)]
-    fn butterfly_new<H: Homomorphism<Self, Self>>(
-        hom: H,
-        a: &mut ZnEl,
-        b: &mut ZnEl,
-        twiddle: &ZnEl,
-    ) {
+    fn butterfly_new<H: Homomorphism<Self, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &ZnEl) {
         let self_ = hom.codomain().get_ring();
 
         a.0 = reduce_to_half(a.0, self_.modulus_times_three);
@@ -1244,12 +1098,7 @@ impl CooleyTuckeyButterfly<ZnBase> for ZnBase {
     }
 
     #[inline(always)]
-    fn inv_butterfly_new<H: Homomorphism<Self, Self>>(
-        hom: H,
-        a: &mut ZnEl,
-        b: &mut ZnEl,
-        twiddle: &ZnEl,
-    ) {
+    fn inv_butterfly_new<H: Homomorphism<Self, Self>>(hom: H, a: &mut ZnEl, b: &mut ZnEl, twiddle: &ZnEl) {
         let self_ = hom.codomain().get_ring();
 
         (a.0, b.0) = (a.0 + b.0, a.0 + self_.modulus_times_three - b.0);
@@ -1344,9 +1193,7 @@ where
 {
     type Homomorphism = <ZnBase as CanHomFrom<I>>::Homomorphism;
 
-    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
-        self.base.get_ring().has_canonical_hom(from)
-    }
+    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> { self.base.get_ring().has_canonical_hom(from) }
 
     fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
         self.rev_delegate(self.base.get_ring().map_in(from, el, hom))
@@ -1440,10 +1287,7 @@ fn test_sum() {
 fn test_ring_axioms() {
     for n in 2..=17 {
         let ring = Zn::new(n);
-        crate::ring::generic_tests::test_ring_axioms(
-            &ring,
-            (0..=ring.get_ring().repr_bound()).map(|n| ZnEl(n)),
-        );
+        crate::ring::generic_tests::test_ring_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| ZnEl(n)));
     }
     for n in LARGE_MODULI {
         let ring = Zn::new(n);
@@ -1455,10 +1299,7 @@ fn test_ring_axioms() {
 fn test_hash_axioms() {
     for n in 2..=17 {
         let ring = Zn::new(n);
-        crate::ring::generic_tests::test_hash_axioms(
-            &ring,
-            (0..=ring.get_ring().repr_bound()).map(|n| ZnEl(n)),
-        );
+        crate::ring::generic_tests::test_hash_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| ZnEl(n)));
     }
     for n in LARGE_MODULI {
         let ring = Zn::new(n);
@@ -1501,11 +1342,7 @@ fn test_hom_from_fastmul() {
     for n in 2..=17 {
         let Zn = Zn::new(n);
         let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
-        crate::ring::generic_tests::test_hom_axioms(
-            Zn_fastmul,
-            Zn,
-            Zn.elements().map(|x| Zn_fastmul.coerce(&Zn, x)),
-        );
+        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, Zn.elements().map(|x| Zn_fastmul.coerce(&Zn, x)));
     }
     for n in [
         (1 << 41) - 1,
@@ -1517,11 +1354,7 @@ fn test_hom_from_fastmul() {
     ] {
         let Zn = Zn::new(n);
         let Zn_fastmul = ZnFastmul::new(Zn).unwrap();
-        crate::ring::generic_tests::test_hom_axioms(
-            Zn_fastmul,
-            Zn,
-            elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)),
-        );
+        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)));
     }
 }
 
@@ -1558,9 +1391,7 @@ fn test_bounded_reduce_large() {
     let n_max = (1 << 62) / 9;
     for n in (n_max - 10)..=n_max {
         let Zn = Zn::new(n);
-        let val_max = Zn.get_ring().repr_bound() as u128
-            * Zn.get_ring().repr_bound() as u128
-            * FACTOR as u128;
+        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
         for k in (val_max - 100)..=val_max {
             assert_eq!(
                 (k % (n as u128)) as i64,
@@ -1581,10 +1412,7 @@ fn test_smallest_lift() {
                 (k % n) as i64 - n as i64
             };
             if n % 2 == 0 && (k % n) == n / 2 {
-                assert!(
-                    ring.smallest_lift(ZnEl(k)) == n as i64 / 2
-                        || ring.smallest_lift(ZnEl(k)) == -(n as i64) / 2
-                )
+                assert!(ring.smallest_lift(ZnEl(k)) == n as i64 / 2 || ring.smallest_lift(ZnEl(k)) == -(n as i64) / 2)
             } else {
                 assert_eq!(expected, ring.smallest_lift(ZnEl(k)));
             }
@@ -1622,9 +1450,7 @@ fn test_bounded_reduce_large_small() {
     const FACTOR: usize = 32;
     for n in 2..=17 {
         let Zn = Zn::new(n);
-        let val_max = Zn.get_ring().repr_bound() as u128
-            * Zn.get_ring().repr_bound() as u128
-            * FACTOR as u128;
+        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
         for k in (val_max - 100)..=val_max {
             assert_eq!(
                 (k % (n as u128)) as i64,
@@ -1658,11 +1484,7 @@ fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
         assert_el_eq!(
             Zn,
             Zn.int_hom().map(-1300),
-            Zn.sum(
-                (0..100)
-                    .flat_map(|_| (0..=56).map(|k| 1 << k))
-                    .map(|x| hom.map(x))
-            )
+            Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x)))
         )
     });
 }
@@ -1673,11 +1495,7 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
     let Zn = Zn::new(17);
     bencher.iter(|| {
         let hom = Zn.can_hom(&StaticRing::<i64>::RING).unwrap();
-        assert_el_eq!(
-            Zn,
-            Zn.int_hom().map(2850 * 5699),
-            Zn.sum((0..5700).map(|x| hom.map(x)))
-        )
+        assert_el_eq!(Zn, Zn.int_hom().map(2850 * 5699), Zn.sum((0..5700).map(|x| hom.map(x))))
     });
 }
 
@@ -1693,9 +1511,7 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
     let split_quo_rem = |x: El<Zn>| {
         let rem = Zp2_mod_p.map_ref(&x);
         let Zp2_rem = Zp2_mod_p.smallest_lift(rem);
-        let quo = Zp2_p
-            .checked_left_div_by(&Zp2.sub(x, Zp2_rem), Zp2.get_ring())
-            .unwrap();
+        let quo = Zp2_p.checked_left_div_by(&Zp2.sub(x, Zp2_rem), Zp2.get_ring()).unwrap();
         (rem, Zp2_mod_p.map(quo))
     };
 
@@ -1708,13 +1524,8 @@ fn bench_reduction_map_use_case(bencher: &mut Bencher) {
                     Zp2,
                     Zp2.mul(x, y),
                     &Zp2.add(
-                        Zp2.mul(
-                            Zp2_mod_p.smallest_lift(x_low),
-                            Zp2_mod_p.smallest_lift(y_low)
-                        ),
-                        Zp2_mod_p.mul_quotient_fraction(
-                            Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low))
-                        )
+                        Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)),
+                        Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))
                     )
                 );
             }

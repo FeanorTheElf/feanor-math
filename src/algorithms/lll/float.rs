@@ -49,10 +49,8 @@ where
         j: usize,
         transform: &[<I as RingBase>::Element; 4],
     ) {
-        TransformRows(self.quadratic_form.reborrow(), ring.get_ring())
-            .transform(ring, i, j, transform);
-        TransformCols(self.quadratic_form.reborrow(), ring.get_ring())
-            .transform(ring, i, j, transform);
+        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
+        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
     }
 
     fn swap<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize) {
@@ -67,10 +65,8 @@ where
         dst: usize,
         factor: &<I as RingBase>::Element,
     ) {
-        TransformRows(self.quadratic_form.reborrow(), ring.get_ring())
-            .subtract(ring, src, dst, factor);
-        TransformCols(self.quadratic_form.reborrow(), ring.get_ring())
-            .subtract(ring, src, dst, factor);
+        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).subtract(ring, src, dst, factor);
+        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).subtract(ring, src, dst, factor);
     }
 }
 
@@ -104,11 +100,8 @@ where
 /// Computes the column `C[..i, i]` of the Cholesky decomposition `C`
 /// of `A` and the corresponding error bounds, assuming that `Q[..i, ..i]`
 /// is already computed.
-fn compute_cholesky_column_without_pivot<I, R, H, V1, V2, V3>(
-    gso: &mut GSOMatrix<I, R, V1, V2, V3>,
-    i: usize,
-    h: &H,
-) where
+fn compute_cholesky_column_without_pivot<I, R, H, V1, V2, V3>(gso: &mut GSOMatrix<I, R, V1, V2, V3>, i: usize, h: &H)
+where
     I: ?Sized + RingBase,
     R: ?Sized + ApproxRealField + SqrtRing,
     H: Homomorphism<I, R>,
@@ -127,14 +120,8 @@ fn compute_cholesky_column_without_pivot<I, R, H, V1, V2, V3>(
             RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(k, i)))),
             RR.sum((0..k).map(|l| {
                 RR.add(
-                    RR.mul_ref_snd(
-                        RR.abs(RR.clone_el(gso.cholesky.at(l, i))),
-                        &gso.error_bound.at(l, k),
-                    ),
-                    RR.mul_ref_snd(
-                        RR.abs(RR.clone_el(gso.cholesky.at(l, k))),
-                        &gso.error_bound.at(l, i),
-                    ),
+                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, k)),
+                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, k))), &gso.error_bound.at(l, i)),
                 )
             })),
         ]);
@@ -156,11 +143,8 @@ fn compute_cholesky_column_without_pivot<I, R, H, V1, V2, V3>(
 /// Computes the entry `C[i, i]` of the Cholesky decomposition `C`
 /// of `A` and the corresponding error bounds, assuming that
 /// `Q[..i, ..=i]` is already computed.
-fn compute_cholesky_pivot<I, R, H, V1, V2, V3>(
-    gso: &mut GSOMatrix<I, R, V1, V2, V3>,
-    i: usize,
-    h: &H,
-) where
+fn compute_cholesky_pivot<I, R, H, V1, V2, V3>(gso: &mut GSOMatrix<I, R, V1, V2, V3>, i: usize, h: &H)
+where
     I: ?Sized + RingBase,
     R: ?Sized + ApproxRealField + SqrtRing,
     H: Homomorphism<I, R>,
@@ -177,22 +161,16 @@ fn compute_cholesky_pivot<I, R, H, V1, V2, V3>(
     let sum_error = RR.sum([
         RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(i, i)))),
         RR.int_hom().mul_map(
-            RR.sum((0..i).map(|l| {
-                RR.mul_ref_snd(
-                    RR.abs(RR.clone_el(gso.cholesky.at(l, i))),
-                    &gso.error_bound.at(l, i),
-                )
-            })),
+            RR.sum(
+                (0..i).map(|l| RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, i))),
+            ),
             2,
         ),
     ]);
     assert!(!RR.is_neg(&sum_error));
 
     let upper = RR.add_ref(&sum, &sum_error);
-    assert!(
-        !RR.is_neg(&upper),
-        "Quadratic form is not positive semidefinite"
-    );
+    assert!(!RR.is_neg(&upper), "Quadratic form is not positive semidefinite");
     let (value, error) = if !RR.is_pos(&RR.sub_ref(&sum, &sum_error)) {
         // we assume the matrix is positive semi-definite
         (
@@ -242,10 +220,7 @@ where
         let new_largest_max_mu = (0..i)
             .map(|k| {
                 RR.div(
-                    &RR.add_ref_snd(
-                        RR.abs(RR.clone_el(gso.cholesky.at(k, i))),
-                        gso.error_bound.at(k, i),
-                    ),
+                    &RR.add_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(k, i))), gso.error_bound.at(k, i)),
                     gso.cholesky.at(k, k),
                 )
             })
@@ -443,8 +418,7 @@ where
 
     let mut i = 1;
     let mut zero_vector_count = 0;
-    let mut remaining_swaps =
-        gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
+    let mut remaining_swaps = gso.quadratic_form.row_count() * gso.quadratic_form.row_count() * 1000;
     gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
     while i < gso.quadratic_form.row_count() {
         assert!(i > 0);
@@ -462,11 +436,7 @@ where
             LovaszCondition::Swap => {
                 remaining_swaps -= 1;
                 gso.swap(h.domain(), i - 1, i);
-                OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(
-                    h.domain(),
-                    i - 1,
-                    i,
-                );
+                OffsetTransformIndex::new(&mut transform, zero_vector_count).swap(h.domain(), i - 1, i);
                 i -= 1;
                 if i == 0 {
                     gso = remove_zero_vectors(gso, &h, &mut zero_vector_count);
@@ -675,10 +645,7 @@ fn test_lll_float_3d() {
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
-    assert_eq!(
-        144 * 144,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(0))
-    );
+    assert_eq!(144 * 144, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(
         72 * 72 + 279 * 279,
         norm_squared(ZZ, &reduced_matrix.as_const().col_at(1))
@@ -828,31 +795,11 @@ fn test_lll_generating_set() {
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(1))
-    );
-    assert_el_eq!(
-        ZZ,
-        5,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(2))
-    );
-    assert_el_eq!(
-        ZZ,
-        5,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(3))
-    );
-    assert_el_eq!(
-        ZZ,
-        12,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(4))
-    );
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(ZZ, 12, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
 
     let original = [
         DerefArray::from([-4, 8, -54, -1, 42, 15, -23, -259]),
@@ -881,46 +828,14 @@ fn test_lll_generating_set() {
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(1))
-    );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(2))
-    );
-    assert_el_eq!(
-        ZZ,
-        1,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(3))
-    );
-    assert_el_eq!(
-        ZZ,
-        1,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(4))
-    );
-    assert_el_eq!(
-        ZZ,
-        1,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(5))
-    );
-    assert_el_eq!(
-        ZZ,
-        5,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(6))
-    );
-    assert_el_eq!(
-        ZZ,
-        40,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(7))
-    );
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(5)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(6)));
+    assert_el_eq!(ZZ, 40, norm_squared(ZZ, &reduced_matrix.as_const().col_at(7)));
 
     let original = [
         DerefArray::from([
@@ -994,44 +909,12 @@ fn test_lll_generating_set() {
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(1))
-    );
-    assert_el_eq!(
-        ZZ,
-        0,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(2))
-    );
-    assert_el_eq!(
-        ZZ,
-        1,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(3))
-    );
-    assert_el_eq!(
-        ZZ,
-        1,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(4))
-    );
-    assert_el_eq!(
-        ZZ,
-        1,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(5))
-    );
-    assert_el_eq!(
-        ZZ,
-        5,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(6))
-    );
-    assert_el_eq!(
-        ZZ,
-        40,
-        norm_squared(ZZ, &reduced_matrix.as_const().col_at(7))
-    );
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
+    assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
+    assert_el_eq!(ZZ, 1, norm_squared(ZZ, &reduced_matrix.as_const().col_at(5)));
+    assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(6)));
+    assert_el_eq!(ZZ, 40, norm_squared(ZZ, &reduced_matrix.as_const().col_at(7)));
 }

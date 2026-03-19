@@ -62,10 +62,7 @@ pub fn fincke_pohst<I, R, H, V, F>(
 
     linear_components[i] = RR.zero();
     norms_square[i] = RR.zero();
-    let center_int = RR
-        .get_ring()
-        .round_to_integer(ZZ, RR.clone_el(&target[i]))
-        .unwrap();
+    let center_int = RR.get_ring().round_to_integer(ZZ, RR.clone_el(&target[i])).unwrap();
     current[i] = ZZ.clone_el(&center_int);
     centers[i] = center_int;
 
@@ -103,10 +100,7 @@ pub fn fincke_pohst<I, R, H, V, F>(
                             )
                         }),
                     );
-                    let center = RR.sub_ref_fst(
-                        &target[i],
-                        RR.div(&linear_components[i], quadratic_form.at(i, i)),
-                    );
+                    let center = RR.sub_ref_fst(&target[i], RR.div(&linear_components[i], quadratic_form.at(i, i)));
                     let center_int = RR.get_ring().round_to_integer(ZZ, center).unwrap();
                     current[i] = ZZ.clone_el(&center_int);
                     centers[i] = center_int;
@@ -250,10 +244,7 @@ fn test_fincke_pohst_3d() {
     );
     assert_eq!(13, result.len());
     for p in &result {
-        assert!(
-            ZZ.pow(p[0] + p[1] + p[2], 2) + ZZ.pow(p[0], 2) + ZZ.pow(p[1], 2) + ZZ.pow(p[2], 2)
-                <= 2
-        );
+        assert!(ZZ.pow(p[0] + p[1] + p[2], 2) + ZZ.pow(p[0], 2) + ZZ.pow(p[1], 2) + ZZ.pow(p[2], 2) <= 2);
     }
 
     let quadratic_form = [vec![2., 1., 1.], vec![1., 2., 1.], vec![1., 1., 2.]];

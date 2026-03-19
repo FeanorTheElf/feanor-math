@@ -18,8 +18,7 @@ use crate::ring::*;
 use crate::rings::rust_bigint::*;
 use crate::specialization::*;
 use crate::{
-    algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero,
-    impl_poly_gcd_locally_for_ZZ,
+    algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
 };
 
 mod mpir_bindings;
@@ -49,9 +48,7 @@ impl MPZEl {
 }
 
 impl Clone for MPZEl {
-    fn clone(&self) -> Self {
-        MPZ::RING.clone_el(self)
-    }
+    fn clone(&self) -> Self { MPZ::RING.clone_el(self) }
 }
 
 /// Except for random number generation (which we do in Rust), GMP/MPIR
@@ -62,15 +59,11 @@ unsafe impl Send for MPZEl {}
 unsafe impl Sync for MPZEl {}
 
 impl Drop for MPZEl {
-    fn drop(&mut self) {
-        unsafe { mpir_bindings::__gmpz_clear(&mut self.integer as mpir_bindings::mpz_ptr) }
-    }
+    fn drop(&mut self) { unsafe { mpir_bindings::__gmpz_clear(&mut self.integer as mpir_bindings::mpz_ptr) } }
 }
 
 impl std::fmt::Debug for MPZEl {
-    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        MPZ::RING.get_ring().dbg(self, f)
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result { MPZ::RING.get_ring().dbg(self, f) }
 }
 
 /// Arbitrary-precision integer ring, implemented by binding to the well-known
@@ -160,10 +153,7 @@ impl MPZBase {
                     0,
                     &src.integer as mpir_bindings::mpz_srcptr,
                 );
-                assert_eq!(
-                    result_ptr as *const libc::c_void,
-                    out.as_ptr() as *const libc::c_void
-                );
+                assert_eq!(result_ptr as *const libc::c_void, out.as_ptr() as *const libc::c_void);
                 for i in size..out.len() {
                     out[i] = 0;
                 }
@@ -197,10 +187,7 @@ impl MPZBase {
                     0,
                     &src.integer as mpir_bindings::mpz_srcptr,
                 );
-                assert_eq!(
-                    result_ptr as *const libc::c_void,
-                    out.as_ptr() as *const libc::c_void
-                );
+                assert_eq!(result_ptr as *const libc::c_void, out.as_ptr() as *const libc::c_void);
                 for i in size..out.len() {
                     out[i] = 0;
                 }
@@ -214,9 +201,7 @@ impl MPZBase {
 }
 
 impl Debug for MPZBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Z")
-    }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Z") }
 }
 
 impl RingBase for MPZBase {
@@ -254,13 +239,9 @@ impl RingBase for MPZBase {
         }
     }
 
-    fn zero(&self) -> Self::Element {
-        MPZEl::new()
-    }
+    fn zero(&self) -> Self::Element { MPZEl::new() }
 
-    fn one(&self) -> Self::Element {
-        self.from_int(1)
-    }
+    fn one(&self) -> Self::Element { self.from_int(1) }
 
     fn sub_ref_fst(&self, lhs: &Self::Element, mut rhs: Self::Element) -> Self::Element {
         unsafe {
@@ -284,9 +265,7 @@ impl RingBase for MPZBase {
         }
     }
 
-    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.add_assign_ref(lhs, &rhs);
-    }
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.add_assign_ref(lhs, &rhs); }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         unsafe {
@@ -298,9 +277,7 @@ impl RingBase for MPZBase {
         }
     }
 
-    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        self.mul_assign_ref(lhs, &rhs)
-    }
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.mul_assign_ref(lhs, &rhs) }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         unsafe {
@@ -328,17 +305,12 @@ impl RingBase for MPZBase {
         }
     }
 
-    fn sub(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
-        self.sub_ref_snd(lhs, &rhs)
-    }
+    fn sub(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element { self.sub_ref_snd(lhs, &rhs) }
 
     fn from_int(&self, value: i32) -> Self::Element {
         unsafe {
             let mut result = MPZEl::new();
-            mpir_bindings::__gmpz_set_ui(
-                &mut result.integer as mpir_bindings::mpz_ptr,
-                value.abs() as u64,
-            );
+            mpir_bindings::__gmpz_set_ui(&mut result.integer as mpir_bindings::mpz_ptr, value.abs() as u64);
             if value < 0 {
                 return self.negate(result);
             } else {
@@ -368,17 +340,11 @@ impl RingBase for MPZBase {
         unsafe { mpir_bindings::__gmpz_cmp_si(&val.integer as mpir_bindings::mpz_srcptr, -1) == 0 }
     }
 
-    fn is_noetherian(&self) -> bool {
-        true
-    }
+    fn is_noetherian(&self) -> bool { true }
 
-    fn is_commutative(&self) -> bool {
-        true
-    }
+    fn is_commutative(&self) -> bool { true }
 
-    fn is_approximate(&self) -> bool {
-        false
-    }
+    fn is_approximate(&self) -> bool { false }
 
     fn dbg_within<'a>(
         &self,
@@ -469,11 +435,8 @@ impl SerializableElementRing for MPZBase {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            SerializableNewtypeStruct::new(
-                "BigInt",
-                format!("{}", RingRef::new(self).format(el)).as_str(),
-            )
-            .serialize(serializer)
+            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).format(el)).as_str())
+                .serialize(serializer)
         } else {
             let len = self.to_le_bytes_len(el);
             let mut data = Vec::with_capacity(len);
@@ -531,11 +494,7 @@ impl PrincipalIdealRing for MPZBase {
 }
 
 impl EuclideanRing for MPZBase {
-    fn euclidean_div_rem(
-        &self,
-        mut lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         unsafe {
             assert!(!self.is_zero(rhs));
             let mut quo = MPZEl::new();
@@ -589,9 +548,7 @@ impl EuclideanRing for MPZBase {
 }
 
 impl Default for MPZBase {
-    fn default() -> Self {
-        MPZ::RING.into()
-    }
+    fn default() -> Self { MPZ::RING.into() }
 }
 
 impl Domain for MPZBase {}
@@ -632,20 +589,15 @@ impl IntegerRing for MPZBase {
     fn abs_is_bit_set(&self, el: &Self::Element, bit: usize) -> bool {
         unsafe {
             if mpir_bindings::mpz_is_neg(&el.integer as mpir_bindings::mpz_srcptr) {
-                let value = mpir_bindings::__gmpz_tstbit(
-                    &el.integer as mpir_bindings::mpz_srcptr,
-                    bit as u64,
-                ) == 1;
-                let least_significant_zero =
-                    mpir_bindings::__gmpz_scan1(&el.integer as mpir_bindings::mpz_srcptr, 0);
+                let value = mpir_bindings::__gmpz_tstbit(&el.integer as mpir_bindings::mpz_srcptr, bit as u64) == 1;
+                let least_significant_zero = mpir_bindings::__gmpz_scan1(&el.integer as mpir_bindings::mpz_srcptr, 0);
                 if bit <= least_significant_zero as usize {
                     value
                 } else {
                     !value
                 }
             } else {
-                mpir_bindings::__gmpz_tstbit(&el.integer as mpir_bindings::mpz_srcptr, bit as u64)
-                    == 1
+                mpir_bindings::__gmpz_tstbit(&el.integer as mpir_bindings::mpz_srcptr, bit as u64) == 1
             }
         }
     }
@@ -655,17 +607,13 @@ impl IntegerRing for MPZBase {
             if self.is_zero(value) {
                 return None;
             }
-            Some(
-                mpir_bindings::__gmpz_sizeinbase(&value.integer as mpir_bindings::mpz_srcptr, 2)
-                    - 1,
-            )
+            Some(mpir_bindings::__gmpz_sizeinbase(&value.integer as mpir_bindings::mpz_srcptr, 2) - 1)
         }
     }
 
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {
         unsafe {
-            let result =
-                mpir_bindings::__gmpz_scan1(&value.integer as mpir_bindings::mpz_srcptr, 0);
+            let result = mpir_bindings::__gmpz_scan1(&value.integer as mpir_bindings::mpz_srcptr, 0);
             if result == mpir_bindings::mpir_ui::MAX {
                 return None;
             } else {
@@ -684,11 +632,7 @@ impl IntegerRing for MPZBase {
         }
     }
 
-    fn get_uniformly_random_bits<G: FnMut() -> u64>(
-        &self,
-        log2_bound_exclusive: usize,
-        rng: G,
-    ) -> Self::Element {
+    fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, rng: G) -> Self::Element {
         unsafe {
             let mut result = MPZEl::new();
             let len = (log2_bound_exclusive - 1) / u64::BITS as usize + 1;
@@ -710,9 +654,7 @@ impl IntegerRing for MPZBase {
         }
     }
 
-    fn representable_bits(&self) -> Option<usize> {
-        None
-    }
+    fn representable_bits(&self) -> Option<usize> { None }
 }
 
 impl_interpolation_base_ring_char_zero! { InterpolationBaseRing for MPZBase }
@@ -722,9 +664,7 @@ impl_poly_gcd_locally_for_ZZ! { IntegerPolyGCDRing for MPZBase }
 impl_eval_poly_locally_for_ZZ! { EvalPolyLocallyRing for MPZBase }
 
 impl FiniteRingSpecializable for MPZBase {
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
-        op.fallback()
-    }
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
 }
 
 impl HashableElRing for MPZBase {
@@ -761,13 +701,9 @@ impl IntCast<RustBigintRingBase> for MPZBase {
 
 impl IntCast<MPZBase> for RustBigintRingBase {
     fn cast(&self, from: &MPZBase, el: MPZEl) -> RustBigint {
-        let mut result = (0..from.abs_base_u64_repr_len(&el))
-            .map(|_| 0u64)
-            .collect::<Vec<_>>();
+        let mut result = (0..from.abs_base_u64_repr_len(&el)).map(|_| 0u64).collect::<Vec<_>>();
         from.abs_base_u64_repr(&el, &mut result[..]);
-        let result = RustBigintRing::RING
-            .get_ring()
-            .from_base_u64_repr(result.into_iter());
+        let result = RustBigintRing::RING.get_ring().from_base_u64_repr(result.into_iter());
         if from.is_neg(&el) {
             return RustBigintRing::RING.negate(result);
         } else {
@@ -777,9 +713,7 @@ impl IntCast<MPZBase> for RustBigintRingBase {
 }
 
 impl IntCast<MPZBase> for MPZBase {
-    fn cast(&self, _from: &MPZBase, el: MPZEl) -> MPZEl {
-        el
-    }
+    fn cast(&self, _from: &MPZBase, el: MPZEl) -> MPZEl { el }
 }
 
 impl IntCast<StaticRingBase<i64>> for MPZBase {
@@ -812,10 +746,7 @@ impl IntCast<MPZBase> for StaticRingBase<i64> {
 impl IntCast<StaticRingBase<i128>> for MPZBase {
     fn cast(&self, _: &StaticRingBase<i128>, el: i128) -> MPZEl {
         let el_abs = el.unsigned_abs();
-        let data = [
-            (el_abs & u64::MAX as u128) as u64,
-            (el_abs >> u64::BITS) as u64,
-        ];
+        let data = [(el_abs & u64::MAX as u128) as u64, (el_abs >> u64::BITS) as u64];
         let mut result = MPZEl::new();
         self.from_base_u64_repr(&mut result, &data[..]);
         if el < 0 {
@@ -881,22 +812,13 @@ fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
         RustBigintRing::RING.int_hom().map(i32::MIN),
         RustBigintRing::RING.power_of_two(64),
         RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(64)),
-        RustBigintRing::RING.sub(
-            RustBigintRing::RING.power_of_two(64),
-            RustBigintRing::RING.one(),
-        ),
+        RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(64), RustBigintRing::RING.one()),
         RustBigintRing::RING.power_of_two(128),
         RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(128)),
-        RustBigintRing::RING.sub(
-            RustBigintRing::RING.power_of_two(128),
-            RustBigintRing::RING.one(),
-        ),
+        RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(128), RustBigintRing::RING.one()),
         RustBigintRing::RING.power_of_two(192),
         RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(192)),
-        RustBigintRing::RING.sub(
-            RustBigintRing::RING.power_of_two(192),
-            RustBigintRing::RING.one(),
-        ),
+        RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(192), RustBigintRing::RING.one()),
     ]
     .into_iter()
 }
@@ -920,14 +842,10 @@ fn test_negate_inplace() {
 }
 
 #[test]
-fn test_ring_axioms() {
-    crate::ring::generic_tests::test_ring_axioms(MPZ::RING, edge_case_elements())
-}
+fn test_ring_axioms() { crate::ring::generic_tests::test_ring_axioms(MPZ::RING, edge_case_elements()) }
 
 #[test]
-fn test_hash_axioms() {
-    crate::ring::generic_tests::test_hash_axioms(MPZ::RING, edge_case_elements());
-}
+fn test_hash_axioms() { crate::ring::generic_tests::test_hash_axioms(MPZ::RING, edge_case_elements()); }
 
 #[test]
 fn test_divisibility_ring_axioms() {
@@ -940,9 +858,7 @@ fn test_euclidean_ring_axioms() {
 }
 
 #[test]
-fn test_integer_ring_axioms() {
-    crate::integer::generic_tests::test_integer_axioms(MPZ::RING, edge_case_elements())
-}
+fn test_integer_ring_axioms() { crate::integer::generic_tests::test_integer_axioms(MPZ::RING, edge_case_elements()) }
 
 #[test]
 fn test_canonical_iso_axioms_i32() {
@@ -1042,16 +958,8 @@ fn test_canonical_iso_axioms_i128() {
 
 #[test]
 fn test_canonical_iso_axioms_bigint() {
-    crate::ring::generic_tests::test_hom_axioms(
-        RustBigintRing::RING,
-        MPZ::RING,
-        edge_case_elements_bigint(),
-    );
-    crate::ring::generic_tests::test_iso_axioms(
-        RustBigintRing::RING,
-        MPZ::RING,
-        edge_case_elements_bigint(),
-    );
+    crate::ring::generic_tests::test_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+    crate::ring::generic_tests::test_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
 }
 
 #[test]
@@ -1075,82 +983,28 @@ fn test_abs_is_bit_set() {
 
 #[test]
 fn test_highest_set_bit() {
-    assert_eq!(
-        None,
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0))
-    );
-    assert_eq!(
-        Some(0),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(1))
-    );
-    assert_eq!(
-        Some(0),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-1))
-    );
-    assert_eq!(
-        Some(1),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(2))
-    );
-    assert_eq!(
-        Some(1),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-2))
-    );
-    assert_eq!(
-        Some(1),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(3))
-    );
-    assert_eq!(
-        Some(1),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-3))
-    );
-    assert_eq!(
-        Some(2),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(4))
-    );
-    assert_eq!(
-        Some(2),
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-4))
-    );
+    assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0)));
+    assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(1)));
+    assert_eq!(Some(0), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-1)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(2)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-2)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(3)));
+    assert_eq!(Some(1), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-3)));
+    assert_eq!(Some(2), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(4)));
+    assert_eq!(Some(2), MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(-4)));
 }
 
 #[test]
 fn test_lowest_set_bit() {
-    assert_eq!(
-        None,
-        MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0))
-    );
-    assert_eq!(
-        Some(0),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(1))
-    );
-    assert_eq!(
-        Some(0),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-1))
-    );
-    assert_eq!(
-        Some(1),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(2))
-    );
-    assert_eq!(
-        Some(1),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-2))
-    );
-    assert_eq!(
-        Some(0),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(3))
-    );
-    assert_eq!(
-        Some(0),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-3))
-    );
-    assert_eq!(
-        Some(2),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(4))
-    );
-    assert_eq!(
-        Some(2),
-        MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-4))
-    );
+    assert_eq!(None, MPZ::RING.abs_highest_set_bit(&MPZ::RING.int_hom().map(0)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(1)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-1)));
+    assert_eq!(Some(1), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(2)));
+    assert_eq!(Some(1), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-2)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(3)));
+    assert_eq!(Some(0), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-3)));
+    assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(4)));
+    assert_eq!(Some(2), MPZ::RING.abs_lowest_set_bit(&MPZ::RING.int_hom().map(-4)));
 }
 
 #[test]
@@ -1163,7 +1017,16 @@ fn from_to_float_approx() {
 
 #[bench]
 fn bench_mul_300_bits(bencher: &mut test::Bencher) {
-    let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
+    let x = MPZ::RING.coerce(
+        &RustBigintRing::RING,
+        RustBigintRing::RING
+            .get_ring()
+            .parse(
+                "2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754",
+                10,
+            )
+            .unwrap(),
+    );
     let y = MPZ::RING.coerce(
         &RustBigintRing::RING,
         RustBigintRing::RING
@@ -1180,7 +1043,16 @@ fn bench_mul_300_bits(bencher: &mut test::Bencher) {
 
 #[bench]
 fn bench_div_300_bits(bencher: &mut test::Bencher) {
-    let x = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754", 10).unwrap());
+    let x = MPZ::RING.coerce(
+        &RustBigintRing::RING,
+        RustBigintRing::RING
+            .get_ring()
+            .parse(
+                "2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754",
+                10,
+            )
+            .unwrap(),
+    );
     let y = MPZ::RING.coerce(
         &RustBigintRing::RING,
         RustBigintRing::RING
@@ -1196,6 +1068,4 @@ fn bench_div_300_bits(bencher: &mut test::Bencher) {
 }
 
 #[test]
-fn test_serialization() {
-    crate::serialization::generic_tests::test_serialization(MPZ::RING, edge_case_elements());
-}
+fn test_serialization() { crate::serialization::generic_tests::test_serialization(MPZ::RING, edge_case_elements()); }

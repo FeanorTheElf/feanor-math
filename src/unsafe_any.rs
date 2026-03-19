@@ -46,9 +46,7 @@ impl UnsafeAny {
         assert!(self.data.is_some());
         // that is basicaly the only check we are able to do...
         assert_eq!(size_of::<T>(), unsafe { self.data.unwrap().as_ref().len() });
-        unsafe {
-            &*std::mem::transmute::<*const (), *const T>(self.data.unwrap().as_ptr() as *const ())
-        }
+        unsafe { &*std::mem::transmute::<*const (), *const T>(self.data.unwrap().as_ptr() as *const ()) }
     }
 }
 

@@ -22,18 +22,11 @@ use crate::rings::poly::*;
 /// division always works. If this is not the case, look also at [`poly_div_rem_domain()`], which
 /// implicitly performs the polynomial division over the field of fractions.
 #[stability::unstable(feature = "enable")]
-pub fn poly_div_rem<P, F, E>(
-    poly_ring: P,
-    mut lhs: El<P>,
-    rhs: &El<P>,
-    mut left_div_lc: F,
-) -> Result<(El<P>, El<P>), E>
+pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
 where
     P: RingStore,
     P::Type: PolyRing,
-    F: FnMut(
-        &El<<P::Type as RingExtension>::BaseRing>,
-    ) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
+    F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
 {
     assert!(poly_ring.degree(rhs).is_some());
 
@@ -78,9 +71,7 @@ pub fn fast_poly_div_rem<P, F, E, Controller>(
 where
     P: RingStore + Copy,
     P::Type: PolyRing,
-    F: FnMut(
-        &El<<P::Type as RingExtension>::BaseRing>,
-    ) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
+    F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
     Controller: ComputationController,
 {
     fn fast_poly_div_impl<P, F, E, Controller>(
@@ -93,9 +84,7 @@ where
     where
         P: RingStore + Copy,
         P::Type: PolyRing,
-        F: FnMut(
-            &El<<P::Type as RingExtension>::BaseRing>,
-        ) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
+        F: FnMut(&El<<P::Type as RingExtension>::BaseRing>) -> Result<El<<P::Type as RingExtension>::BaseRing>, E>,
         Controller: ComputationController,
     {
         let deg_g = poly_ring.degree(g).unwrap();
@@ -144,13 +133,9 @@ where
         )?;
         debug_assert!(
             poly_ring.degree(&q_upper).is_none()
-                || poly_ring.degree(&q_upper).unwrap()
-                    <= deg_f + split_degree_g - split_degree_f - deg_g
+                || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g
         );
-        debug_assert!(
-            poly_ring.degree(&r).is_none()
-                || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1
-        );
+        debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1);
 
         poly_ring.get_ring().add_assign_from_terms(
             &mut f_lower,
@@ -167,9 +152,7 @@ where
             &mut f_lower,
             poly_ring.terms(&g_lower).map(|(c, i)| {
                 (
-                    poly_ring
-                        .base_ring()
-                        .negate(poly_ring.base_ring().clone_el(c)),
+                    poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c)),
                     i + split_degree_f - split_degree_g,
                 )
             }),
@@ -177,10 +160,7 @@ where
         debug_assert!(
             poly_ring.degree(&f_lower).is_none()
                 || poly_ring.degree(&f_lower).unwrap()
-                    <= max(
-                        deg_f + split_degree_g - deg_g,
-                        deg_g + split_degree_f - split_degree_g
-                    )
+                    <= max(deg_f + split_degree_g - deg_g, deg_g + split_degree_f - split_degree_g)
         );
 
         let (mut q_lower, r) = fast_poly_div_impl(
@@ -193,12 +173,9 @@ where
 
         poly_ring.get_ring().add_assign_from_terms(
             &mut q_lower,
-            poly_ring.terms(&q_upper).map(|(c, i)| {
-                (
-                    poly_ring.base_ring().clone_el(c),
-                    i + split_degree_f - split_degree_g,
-                )
-            }),
+            poly_ring
+                .terms(&q_upper)
+                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f - split_degree_g)),
         );
         return Ok((q_lower, r));
     }
@@ -252,17 +229,11 @@ where
             .for_each(|(c, _)| base_ring.mul_assign_ref(c, &additional_scale));
         ring.inclusion().mul_assign_map(&mut lhs, additional_scale);
 
-        let factor = base_ring
-            .checked_div(ring.lc(&lhs).unwrap(), rhs_lc)
-            .unwrap();
+        let factor = base_ring.checked_div(ring.lc(&lhs).unwrap(), rhs_lc).unwrap();
         ring.get_ring().add_assign_from_terms(
             &mut lhs,
-            ring.terms(rhs).map(|(c, i)| {
-                (
-                    base_ring.negate(base_ring.mul_ref(c, &factor)),
-                    i + lhs_deg - d,
-                )
-            }),
+            ring.terms(rhs)
+                .map(|(c, i)| (base_ring.negate(base_ring.mul_ref(c, &factor)), i + lhs_deg - d)),
         );
         terms.push((factor, lhs_deg - d));
     }
@@ -342,10 +313,7 @@ pub fn poly_div_rem_finite_reduced<P>(
     ring: P,
     mut lhs: El<P>,
     rhs: &El<P>,
-) -> Result<
-    (El<P>, El<P>),
-    PolyDivRemReducedError<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>,
->
+) -> Result<(El<P>, El<P>), PolyDivRemReducedError<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>>
 where
     P: RingStore,
     P::Type: PolyRing,
@@ -354,9 +322,7 @@ where
     if ring.is_zero(rhs) && ring.is_zero(&lhs) {
         return Ok((ring.zero(), ring.zero()));
     } else if ring.is_zero(rhs) {
-        return Err(PolyDivRemReducedError::NotDivisibleByContent(
-            ring.base_ring().zero(),
-        ));
+        return Err(PolyDivRemReducedError::NotDivisibleByContent(ring.base_ring().zero()));
     }
     let rhs_deg = ring.degree(rhs).unwrap();
     let mut result = ring.zero();
@@ -385,18 +351,12 @@ where
             ring.inclusion().mul_assign_map(&mut h, s);
             ring.add_assign(
                 &mut h,
-                ring.from_terms([(
-                    ring.base_ring().mul_ref(&annihilator, &t),
-                    lhs_deg - i as usize,
-                )]),
+                ring.from_terms([(ring.base_ring().mul_ref(&annihilator, &t), lhs_deg - i as usize)]),
             );
             annihilator = ring.base_ring().annihilator(&new_d);
             d = new_d;
             i = i - 1;
-            if !ring
-                .base_ring()
-                .is_unit(&ring.base_ring().ideal_gen(&annihilator, &d))
-            {
+            if !ring.base_ring().is_unit(&ring.base_ring().ideal_gen(&annihilator, &d)) {
                 let nilpotent = ring
                     .base_ring()
                     .annihilator(&ring.base_ring().ideal_gen(&annihilator, &d));
@@ -480,26 +440,14 @@ fn test_poly_div_rem_finite_reduced() {
             91 * X - 33,
         ]
     });
-    let (q, r) = poly_div_rem_finite_reduced(&ring, ring.clone_el(&f), &g)
-        .ok()
-        .unwrap();
+    let (q, r) = poly_div_rem_finite_reduced(&ring, ring.clone_el(&f), &g).ok().unwrap();
     assert_eq!(1, ring.degree(&r).unwrap());
     assert_el_eq!(&ring, &f, ring.add(ring.mul(q, g), r));
 
     let [f, g] = ring.with_wrapped_indeterminate(|X| [5 * X.pow_ref(2), X * 5 * 11 + X * 7 * 11]);
-    if let Err(PolyDivRemReducedError::NotDivisibleByContent(content)) =
-        poly_div_rem_finite_reduced(&ring, f, &g)
-    {
-        assert!(
-            base_ring
-                .checked_div(&content, &base_ring.int_hom().map(11))
-                .is_some()
-        );
-        assert!(
-            base_ring
-                .checked_div(&base_ring.int_hom().map(11), &content)
-                .is_some()
-        );
+    if let Err(PolyDivRemReducedError::NotDivisibleByContent(content)) = poly_div_rem_finite_reduced(&ring, f, &g) {
+        assert!(base_ring.checked_div(&content, &base_ring.int_hom().map(11)).is_some());
+        assert!(base_ring.checked_div(&base_ring.int_hom().map(11), &content).is_some());
     } else {
         assert!(false);
     }
@@ -527,8 +475,7 @@ fn test_poly_div_rem_finite_reduced_nonmonic() {
         int_cast(8589934594, BigIntRing::RING, StaticRing::<i64>::RING),
     );
     let poly_ring = DensePolyRing::new(&base_ring, "X");
-    let [f, g] = poly_ring
-        .with_wrapped_indeterminate(|X| [1431655767 + -1431655765 * X, -2 + X + X.pow_ref(2)]);
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [1431655767 + -1431655765 * X, -2 + X + X.pow_ref(2)]);
     let (q, r) = poly_div_rem_finite_reduced(&poly_ring, poly_ring.clone_el(&g), &f)
         .ok()
         .unwrap();
@@ -549,14 +496,8 @@ fn test_fast_poly_div() {
     assert_el_eq!(
         &ZZX,
         ZZX.div_rem_monic(ZZX.clone_el(&f), &g).0,
-        fast_poly_div_rem(
-            &ZZX,
-            ZZX.clone_el(&f),
-            &g,
-            |c| Ok(ZZ.clone_el(c)),
-            LOG_PROGRESS
-        )
-        .unwrap_or_else(no_error)
-        .0
+        fast_poly_div_rem(&ZZX, ZZX.clone_el(&f), &g, |c| Ok(ZZ.clone_el(c)), LOG_PROGRESS)
+            .unwrap_or_else(no_error)
+            .0
     );
 }

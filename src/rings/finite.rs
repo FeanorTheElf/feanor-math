@@ -41,14 +41,10 @@ where
     Self::Type: FiniteRing,
 {
     /// See [`FiniteRing::elements()`].
-    fn elements<'a>(&'a self) -> <Self::Type as FiniteRing>::ElementsIter<'a> {
-        self.get_ring().elements()
-    }
+    fn elements<'a>(&'a self) -> <Self::Type as FiniteRing>::ElementsIter<'a> { self.get_ring().elements() }
 
     /// See [`FiniteRing::random_element()`].
-    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> {
-        self.get_ring().random_element(rng)
-    }
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> { self.get_ring().random_element(rng) }
 
     /// See [`FiniteRing::size()`].
     fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
@@ -85,9 +81,7 @@ impl<GuardType: ?Sized> UnsafeAnyFrobeniusDataGuarded<GuardType> {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub unsafe fn get<'a, T>(&'a self) -> &'a T {
-        unsafe { self.content.get() }
-    }
+    pub unsafe fn get<'a, T>(&'a self) -> &'a T { unsafe { self.content.get() } }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -123,13 +117,8 @@ where
         if exponent_of_p == 0 {
             return x;
         } else {
-            let (p, e) =
-                is_prime_power(BigIntRing::RING, &self.size(&BigIntRing::RING).unwrap()).unwrap();
-            return RingRef::new(self).pow_gen(
-                x,
-                &BigIntRing::RING.pow(p, exponent_of_p % e),
-                BigIntRing::RING,
-            );
+            let (p, e) = is_prime_power(BigIntRing::RING, &self.size(&BigIntRing::RING).unwrap()).unwrap();
+            return RingRef::new(self).pow_gen(x, &BigIntRing::RING.pow(p, exponent_of_p % e), BigIntRing::RING);
         }
     }
 }
@@ -152,8 +141,7 @@ where
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(field: R, exponent_of_p: usize) -> Self {
-        let (_p, field_dimension) =
-            is_prime_power(BigIntRing::RING, &field.size(BigIntRing::RING).unwrap()).unwrap();
+        let (_p, field_dimension) = is_prime_power(BigIntRing::RING, &field.size(BigIntRing::RING).unwrap()).unwrap();
         let exponent_of_p = exponent_of_p % field_dimension;
         let (data, exponent_of_p2) = field.get_ring().create_frobenius(exponent_of_p);
         assert_eq!(exponent_of_p, exponent_of_p2);
@@ -173,18 +161,12 @@ where
     type CodomainStore = R;
     type DomainStore = R;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore {
-        &self.field
-    }
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.field }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore {
-        &self.field
-    }
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.field }
 
     fn map(&self, x: <R::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
-        self.field
-            .get_ring()
-            .apply_frobenius(&self.data, self.exponent_of_p, x)
+        self.field.get_ring().apply_frobenius(&self.data, self.exponent_of_p, x)
     }
 }
 

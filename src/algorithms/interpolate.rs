@@ -52,9 +52,7 @@ where
 {
     assert_eq!(values.len(), out.len());
     let n = values.len();
-    let log2_n = StaticRing::<i64>::RING
-        .abs_log2_ceil(&n.try_into().unwrap())
-        .unwrap();
+    let log2_n = StaticRing::<i64>::RING.abs_log2_ceil(&n.try_into().unwrap()).unwrap();
     assert!(n <= (1 << log2_n));
     if n % 2 == 0 {
         for i in 0..n {
@@ -70,8 +68,7 @@ where
         for j in 0..(1 << (log2_n - s - 1)) {
             let block_index = j << (s + 1);
             if block_index + (1 << s) < n {
-                let (fst, snd) = (&mut out[block_index..min(n, block_index + (1 << (s + 1)))])
-                    .split_at_mut(1 << s);
+                let (fst, snd) = (&mut out[block_index..min(n, block_index + (1 << (s + 1)))]).split_at_mut(1 << s);
                 let snd_block_prod = ring.mul_ref_fst(&snd[0], values.at(block_index + (1 << s)));
                 let fst_block_prod = ring.mul_ref_fst(&fst[0], values.at(block_index));
                 for i in 0..(1 << s) {
@@ -148,10 +145,7 @@ where
 {
     assert_eq!(x.len(), y.len());
     let R = poly_ring.base_ring();
-    let null_poly = poly_ring.prod(
-        x.iter()
-            .map(|x| poly_ring.from_terms([(R.one(), 1), (R.negate(x), 0)])),
-    );
+    let null_poly = poly_ring.prod(x.iter().map(|x| poly_ring.from_terms([(R.one(), 1), (R.negate(x), 0)])));
     let mut nums = Vec::with_capacity_in(x.len(), &allocator);
     let div_linear = |poly: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>| {
         if let Some(d) = poly_ring.degree(poly) {
@@ -228,12 +222,8 @@ where
     let n = poly_ring.indeterminate_count();
     assert_eq!(values.len(), dim_prod(0..n));
 
-    let uni_poly_ring = DensePolyRing::new_with_convolution(
-        poly_ring.base_ring(),
-        "X",
-        &allocator,
-        STANDARD_CONVOLUTION,
-    );
+    let uni_poly_ring =
+        DensePolyRing::new_with_convolution(poly_ring.base_ring(), "X", &allocator, STANDARD_CONVOLUTION);
 
     for i in (0..n).rev() {
         let leading_dim = dim_prod((i + 1)..n);
@@ -253,9 +243,8 @@ where
                     &allocator,
                 )?;
                 for j in 0..len {
-                    values[block_start + leading_dim * j] = poly_ring
-                        .base_ring()
-                        .clone_el(uni_poly_ring.coefficient_at(&poly, j));
+                    values[block_start + leading_dim * j] =
+                        poly_ring.base_ring().clone_el(uni_poly_ring.coefficient_at(&poly, j));
                 }
             }
         }
@@ -263,11 +252,7 @@ where
     return Ok(poly_ring.from_terms(
         multi_cartesian_product(
             (0..n).map(|i| 0..interpolation_points.at(i).len()),
-            |idxs| {
-                poly_ring
-                    .get_ring()
-                    .create_monomial(idxs.iter().map(|e| *e))
-            },
+            |idxs| poly_ring.get_ring().create_monomial(idxs.iter().map(|e| *e)),
             |_, x| *x,
         )
         .zip(values.into_iter())
@@ -351,20 +336,10 @@ fn test_interpolate() {
     let ring = Zn::new(29).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(ring, "X");
     let x = (0..5).map_fn(|x| ring.int_hom().map(x as i32));
-    let y = (0..5).map_fn(|x| {
-        if x == 3 {
-            ring.int_hom().map(6)
-        } else {
-            ring.zero()
-        }
-    });
+    let y = (0..5).map_fn(|x| if x == 3 { ring.int_hom().map(6) } else { ring.zero() });
     let poly = interpolate(&poly_ring, x.clone(), y.clone(), Global).unwrap();
     for i in 0..5 {
-        assert_el_eq!(
-            ring,
-            y.at(i),
-            poly_ring.evaluate(&poly, &x.at(i), &ring.identity())
-        );
+        assert_el_eq!(ring, y.at(i), poly_ring.evaluate(&poly, &x.at(i), &ring.identity()));
     }
 }
 
@@ -374,9 +349,7 @@ fn test_interpolate_multivariate() {
     let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 
     let interpolation_points = (0..2).map_fn(|_| (0..5).map_fn(|x| ring.int_hom().map(x as i32)));
-    let values = (0..25)
-        .map(|x| ring.int_hom().map(x & 1))
-        .collect::<Vec<_>>();
+    let values = (0..25).map(|x| ring.int_hom().map(x & 1)).collect::<Vec<_>>();
     let poly = interpolate_multivariate(&poly_ring, &interpolation_points, values, Global).unwrap();
 
     for x in 0..5 {
@@ -396,11 +369,8 @@ fn test_interpolate_multivariate() {
 
     let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 3);
 
-    let interpolation_points =
-        (0..3).map_fn(|i| (0..(i + 2)).map_fn(|x| ring.int_hom().map(x as i32)));
-    let values = (0..24)
-        .map(|x| ring.int_hom().map(x / 2))
-        .collect::<Vec<_>>();
+    let interpolation_points = (0..3).map_fn(|i| (0..(i + 2)).map_fn(|x| ring.int_hom().map(x as i32)));
+    let values = (0..24).map(|x| ring.int_hom().map(x / 2)).collect::<Vec<_>>();
     let poly = interpolate_multivariate(&poly_ring, &interpolation_points, values, Global).unwrap();
 
     for x in 0..2 {
@@ -412,12 +382,8 @@ fn test_interpolate_multivariate() {
                     ring.int_hom().map(expected),
                     poly_ring.evaluate(
                         &poly,
-                        [
-                            ring.int_hom().map(x),
-                            ring.int_hom().map(y),
-                            ring.int_hom().map(z)
-                        ]
-                        .into_clone_ring_els(&ring),
+                        [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)]
+                            .into_clone_ring_els(&ring),
                         &ring.identity()
                     )
                 );
@@ -431,10 +397,7 @@ fn test_interpolate_multivariate() {
 fn large_polynomial_interpolation() {
     let field = Zn::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
-    let hom = poly_ring
-        .base_ring()
-        .can_hom(&StaticRing::<i64>::RING)
-        .unwrap();
+    let hom = poly_ring.base_ring().can_hom(&StaticRing::<i64>::RING).unwrap();
     let actual = interpolate(
         &poly_ring,
         (0..65536).map_fn(|x| hom.map(x as i64)),

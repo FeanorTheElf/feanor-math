@@ -80,10 +80,7 @@ where
 pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing
-        + OrderedRing
-        + CanIsoFromTo<BigIntRingBase>
-        + CanIsoFromTo<StaticRingBase<i128>>,
+    I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>,
 {
     const SMALL_PRIME_BOUND: i32 = 10000;
     let mut result = Vec::new();
@@ -109,8 +106,7 @@ where
     }
 
     // then we remove small factors
-    for p in algorithms::erathostenes::enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND)
-    {
+    for p in algorithms::erathostenes::enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND) {
         let ZZ_p = ZZ.int_hom().map(p);
         let mut count = 0;
         while let Some(quo) = ZZ.checked_div(&n, &ZZ_p) {
@@ -189,15 +185,9 @@ fn test_factor() {
         factor(&StaticRing::<i64>::RING, 3 * 3 * 5 * 29)
     );
     assert_eq!(vec![(2, 8)], factor(&StaticRing::<i64>::RING, 256));
-    assert_eq!(
-        vec![(1009, 2)],
-        factor(&StaticRing::<i64>::RING, 1009 * 1009)
-    );
+    assert_eq!(vec![(1009, 2)], factor(&StaticRing::<i64>::RING, 1009 * 1009));
     assert_eq!(vec![(0, 1)], factor(&StaticRing::<i64>::RING, 0));
-    assert_eq!(
-        Vec::<(i64, usize)>::new(),
-        factor(&StaticRing::<i64>::RING, 1)
-    );
+    assert_eq!(Vec::<(i64, usize)>::new(), factor(&StaticRing::<i64>::RING, 1));
     assert_eq!(vec![(-1, 1)], factor(&StaticRing::<i64>::RING, -1));
     assert_eq!(
         vec![(257, 1), (1009, 2)],
@@ -256,9 +246,6 @@ fn test_is_prime_power() {
 fn test_is_prime_power_large_n() {
     assert_eq!(
         Some((5, 25)),
-        is_prime_power(
-            &StaticRing::<i64>::RING,
-            &StaticRing::<i64>::RING.pow(5, 25)
-        )
+        is_prime_power(&StaticRing::<i64>::RING, &StaticRing::<i64>::RING.pow(5, 25))
     );
 }

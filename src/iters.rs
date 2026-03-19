@@ -296,10 +296,7 @@ where
             last_moved: 0,
         };
     }
-    let mut start = (0..multiset.len())
-        .map(|_| 0)
-        .collect::<Vec<_>>()
-        .into_boxed_slice();
+    let mut start = (0..multiset.len()).map(|_| 0).collect::<Vec<_>>().into_boxed_slice();
     let mut to_insert = size;
     let mut last_moved = 0;
     let mut i = 0;
@@ -310,9 +307,7 @@ where
         i += 1;
     }
     let mut trailing_empty_entries = 0;
-    while trailing_empty_entries < multiset.len()
-        && multiset[multiset.len() - trailing_empty_entries - 1] == 0
-    {
+    while trailing_empty_entries < multiset.len() && multiset[multiset.len() - trailing_empty_entries - 1] == 0 {
         trailing_empty_entries += 1;
     }
     return MultisetCombinations {
@@ -428,11 +423,7 @@ where
 ///     .collect::<Vec<_>>()
 /// );
 /// ```
-pub fn multi_cartesian_product<J, F, G, T>(
-    iters: J,
-    converter: F,
-    clone_el: G,
-) -> MultiProduct<J::Item, F, G, T>
+pub fn multi_cartesian_product<J, F, G, T>(iters: J, converter: F, clone_el: G) -> MultiProduct<J::Item, F, G, T>
 where
     J: Iterator,
     J::Item: Iterator + Clone,
@@ -672,9 +663,7 @@ fn test_multiset_combinations() {
 
 #[test]
 fn test_multiset_combinations_k_unlimited() {
-    fn fac(n: usize) -> usize {
-        if n == 0 { 1 } else { n * fac(n - 1) }
-    }
+    fn fac(n: usize) -> usize { if n == 0 { 1 } else { n * fac(n - 1) } }
     let a = [10, 10, 10, 10, 10, 10];
     assert_eq!(1, multiset_combinations(&a[..], 0, |_| ()).count());
     assert_eq!(6, multiset_combinations(&a[..], 1, |_| ()).count());

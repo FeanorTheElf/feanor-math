@@ -24,12 +24,7 @@ pub fn is_root_of_unity<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn is_root_of_unity_gen<R: RingStore, I: RingStore>(
-    ring: R,
-    el: &El<R>,
-    n: &El<I>,
-    ZZ: I,
-) -> bool
+pub fn is_root_of_unity_gen<R: RingStore, I: RingStore>(ring: R, el: &El<R>, n: &El<I>, ZZ: I) -> bool
 where
     I::Type: IntegerRing,
 {
@@ -88,17 +83,10 @@ where
     R: RingStore,
     R::Type: FiniteRing + Field,
 {
-    let order = BigIntRing::RING.sub(
-        ring.size(&BigIntRing::RING).unwrap(),
-        BigIntRing::RING.one(),
-    );
+    let order = BigIntRing::RING.sub(ring.size(&BigIntRing::RING).unwrap(), BigIntRing::RING.one());
     get_prim_root_of_unity_gen(
         ring,
-        &int_cast(
-            n.try_into().unwrap(),
-            BigIntRing::RING,
-            StaticRing::<i64>::RING,
-        ),
+        &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING),
         BigIntRing::RING,
         &order,
     )
@@ -125,13 +113,12 @@ where
                 ZZ.mul(ZZ.sub_ref_fst(&p, ZZ.one()), ZZ.pow(p, e - 1))
             }
         })
-        .fold(ZZ.one(), |current, next| {
-            if ZZ.is_lt(&current, &next) {
-                next
-            } else {
-                current
-            }
-        });
+        .fold(
+            ZZ.one(),
+            |current, next| {
+                if ZZ.is_lt(&current, &next) { next } else { current }
+            },
+        );
     get_prim_root_of_unity_gen(ring, n, ZZ, &order)
 }
 
@@ -163,16 +150,8 @@ where
     R: RingStore,
     R::Type: FiniteRing + Field,
 {
-    let order = BigIntRing::RING.sub(
-        ring.size(&BigIntRing::RING).unwrap(),
-        BigIntRing::RING.one(),
-    );
-    get_prim_root_of_unity_gen(
-        ring,
-        &BigIntRing::RING.power_of_two(log2_n),
-        BigIntRing::RING,
-        &order,
-    )
+    let order = BigIntRing::RING.sub(ring.size(&BigIntRing::RING).unwrap(), BigIntRing::RING.one());
+    get_prim_root_of_unity_gen(ring, &BigIntRing::RING.power_of_two(log2_n), BigIntRing::RING, &order)
 }
 
 /// Returns a primitive `n`-th root of unity in the given ring `Z/kZ`,
@@ -188,11 +167,7 @@ where
     R: RingStore,
     R::Type: ZnRing,
 {
-    get_prim_root_of_unity_zn_gen(
-        ring,
-        &BigIntRing::RING,
-        &BigIntRing::RING.power_of_two(log2_n),
-    )
+    get_prim_root_of_unity_zn_gen(ring, &BigIntRing::RING, &BigIntRing::RING.power_of_two(log2_n))
 }
 
 #[cfg(test)]
@@ -227,21 +202,11 @@ fn test_is_prim_root_of_unity() {
     assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(-1), 2));
     assert!(is_prim_root_of_unity(&ring, &ring.int_hom().map(2), 11));
     let poly_ring = DensePolyRing::new(&ring, "X");
-    let (factorization, _) =
-        <_ as FactorPolyField>::factor_poly(&poly_ring, &cyclotomic_polynomial(&poly_ring, 16));
+    let (factorization, _) = <_ as FactorPolyField>::factor_poly(&poly_ring, &cyclotomic_polynomial(&poly_ring, 16));
     for (mut factor, _) in factorization {
-        let normalization = poly_ring
-            .base_ring()
-            .invert(poly_ring.lc(&factor).unwrap())
-            .unwrap();
-        poly_ring
-            .inclusion()
-            .mul_assign_map(&mut factor, normalization);
-        assert!(is_prim_root_of_unity(
-            &ring,
-            poly_ring.coefficient_at(&factor, 0),
-            16
-        ));
+        let normalization = poly_ring.base_ring().invert(poly_ring.lc(&factor).unwrap()).unwrap();
+        poly_ring.inclusion().mul_assign_map(&mut factor, normalization);
+        assert!(is_prim_root_of_unity(&ring, poly_ring.coefficient_at(&factor, 0), 16));
         assert!(is_prim_root_of_unity_pow2(
             &ring,
             poly_ring.coefficient_at(&factor, 0),

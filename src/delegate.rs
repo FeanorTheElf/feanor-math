@@ -48,21 +48,13 @@ use crate::specialization::*;
 ///     type Base = StaticRingBase<i32>;
 ///     type Element = MyI32RingEl;
 ///
-///     fn get_delegate(&self) -> &Self::Base {
-///         StaticRing::<i32>::RING.get_ring()
-///     }
+///     fn get_delegate(&self) -> &Self::Base { StaticRing::<i32>::RING.get_ring() }
 ///
-///     fn delegate_ref<'a>(&self, MyI32RingEl(el): &'a MyI32RingEl) -> &'a i32 {
-///         el
-///     }
+///     fn delegate_ref<'a>(&self, MyI32RingEl(el): &'a MyI32RingEl) -> &'a i32 { el }
 ///
-///     fn delegate_mut<'a>(&self, MyI32RingEl(el): &'a mut MyI32RingEl) -> &'a mut i32 {
-///         el
-///     }
+///     fn delegate_mut<'a>(&self, MyI32RingEl(el): &'a mut MyI32RingEl) -> &'a mut i32 { el }
 ///
-///     fn delegate(&self, MyI32RingEl(el): MyI32RingEl) -> i32 {
-///         el
-///     }
+///     fn delegate(&self, MyI32RingEl(el): MyI32RingEl) -> i32 { el }
 ///
 ///     fn postprocess_delegate_mut(&self, _: &mut MyI32RingEl) {
 ///         // sometimes it might be necessary to fix some data of `Self::Element`
@@ -70,9 +62,7 @@ use crate::specialization::*;
 ///         // this is not the case here, so leave empty
 ///     }
 ///
-///     fn rev_delegate(&self, el: i32) -> MyI32RingEl {
-///         MyI32RingEl(el)
-///     }
+///     fn rev_delegate(&self, el: i32) -> MyI32RingEl { MyI32RingEl(el) }
 /// }
 ///
 /// // you will have to implement `CanIsoFromTo<Self>`
@@ -95,9 +85,7 @@ use crate::specialization::*;
 /// where
 ///     R: RingStore,
 /// {
-///     fn eq(&self, other: &Self) -> bool {
-///         self.0.get_ring() == other.0.get_ring()
-///     }
+///     fn eq(&self, other: &Self) -> bool { self.0.get_ring() == other.0.get_ring() }
 /// }
 ///
 /// impl<R> DelegateRing for BoringRingWrapper<R>
@@ -107,13 +95,9 @@ use crate::specialization::*;
 ///     type Base = R::Type;
 ///     type Element = El<R>;
 ///
-///     fn get_delegate(&self) -> &Self::Base {
-///         self.0.get_ring()
-///     }
+///     fn get_delegate(&self) -> &Self::Base { self.0.get_ring() }
 ///
-///     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element {
-///         el
-///     }
+///     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
 ///     fn delegate_mut<'a>(
 ///         &self,
 ///         el: &'a mut Self::Element,
@@ -123,9 +107,7 @@ use crate::specialization::*;
 ///     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
 ///         el
 ///     }
-///     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element {
-///         el
-///     }
+///     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
 /// }
 /// ```
 /// [`DivisibilityRing`] is automatically implemented (but can be specialized):
@@ -275,10 +257,7 @@ pub trait DelegateRing: PartialEq {
 
     /// Provides a mutable reference to the delegated-to ring element stored in the given element
     /// from this ring.
-    fn delegate_mut<'a>(
-        &self,
-        el: &'a mut Self::Element,
-    ) -> &'a mut <Self::Base as RingBase>::Element;
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element;
 
     /// Creates an element of the delegated-to ring, representing the given element from this ring.
     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element;
@@ -296,27 +275,16 @@ pub trait DelegateRing: PartialEq {
     }
 
     /// Necessary in some locations to satisfy the type system
-    fn element_cast(&self, el: Self::Element) -> <Self as RingBase>::Element {
-        el
-    }
+    fn element_cast(&self, el: Self::Element) -> <Self as RingBase>::Element { el }
 
     /// Necessary in some locations to satisfy the type system
-    fn rev_element_cast(&self, el: <Self as RingBase>::Element) -> Self::Element {
-        el
-    }
+    fn rev_element_cast(&self, el: <Self as RingBase>::Element) -> Self::Element { el }
 
     /// Necessary in some locations to satisfy the type system
-    fn rev_element_cast_ref<'a>(&self, el: &'a <Self as RingBase>::Element) -> &'a Self::Element {
-        el
-    }
+    fn rev_element_cast_ref<'a>(&self, el: &'a <Self as RingBase>::Element) -> &'a Self::Element { el }
 
     /// Necessary in some locations to satisfy the type system
-    fn rev_element_cast_mut<'a>(
-        &self,
-        el: &'a mut <Self as RingBase>::Element,
-    ) -> &'a mut Self::Element {
-        el
-    }
+    fn rev_element_cast_mut<'a>(&self, el: &'a mut <Self as RingBase>::Element) -> &'a mut Self::Element { el }
 }
 
 impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
@@ -378,52 +346,32 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.postprocess_delegate_mut(value);
     }
 
-    default fn zero(&self) -> Self::Element {
-        self.rev_delegate(self.get_delegate().zero())
-    }
+    default fn zero(&self) -> Self::Element { self.rev_delegate(self.get_delegate().zero()) }
 
-    default fn one(&self) -> Self::Element {
-        self.rev_delegate(self.get_delegate().one())
-    }
+    default fn one(&self) -> Self::Element { self.rev_delegate(self.get_delegate().one()) }
 
-    default fn neg_one(&self) -> Self::Element {
-        self.rev_delegate(self.get_delegate().neg_one())
-    }
+    default fn neg_one(&self) -> Self::Element { self.rev_delegate(self.get_delegate().neg_one()) }
 
-    default fn from_int(&self, value: i32) -> Self::Element {
-        self.rev_delegate(self.get_delegate().from_int(value))
-    }
+    default fn from_int(&self, value: i32) -> Self::Element { self.rev_delegate(self.get_delegate().from_int(value)) }
 
     default fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         self.get_delegate()
             .eq_el(self.delegate_ref(lhs), self.delegate_ref(rhs))
     }
 
-    default fn is_zero(&self, value: &Self::Element) -> bool {
-        self.get_delegate().is_zero(self.delegate_ref(value))
-    }
+    default fn is_zero(&self, value: &Self::Element) -> bool { self.get_delegate().is_zero(self.delegate_ref(value)) }
 
-    default fn is_one(&self, value: &Self::Element) -> bool {
-        self.get_delegate().is_one(self.delegate_ref(value))
-    }
+    default fn is_one(&self, value: &Self::Element) -> bool { self.get_delegate().is_one(self.delegate_ref(value)) }
 
     default fn is_neg_one(&self, value: &Self::Element) -> bool {
         self.get_delegate().is_neg_one(self.delegate_ref(value))
     }
 
-    default fn is_commutative(&self) -> bool {
-        self.get_delegate().is_commutative()
-    }
+    default fn is_commutative(&self) -> bool { self.get_delegate().is_commutative() }
 
-    default fn is_noetherian(&self) -> bool {
-        self.get_delegate().is_noetherian()
-    }
+    default fn is_noetherian(&self) -> bool { self.get_delegate().is_noetherian() }
 
-    default fn dbg<'a>(
-        &self,
-        value: &Self::Element,
-        out: &mut std::fmt::Formatter<'a>,
-    ) -> std::fmt::Result {
+    default fn dbg<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.get_delegate().dbg(self.delegate_ref(value), out)
     }
 
@@ -433,8 +381,7 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         out: &mut std::fmt::Formatter<'a>,
         env: EnvBindingStrength,
     ) -> std::fmt::Result {
-        self.get_delegate()
-            .dbg_within(self.delegate_ref(value), out, env)
+        self.get_delegate().dbg_within(self.delegate_ref(value), out, env)
     }
 
     default fn negate(&self, value: Self::Element) -> Self::Element {
@@ -469,10 +416,7 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
     }
 
     default fn add(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
-        self.rev_delegate(
-            self.get_delegate()
-                .add(self.delegate(lhs), self.delegate(rhs)),
-        )
+        self.rev_delegate(self.get_delegate().add(self.delegate(lhs), self.delegate(rhs)))
     }
 
     default fn sub_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -497,10 +441,7 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
     }
 
     default fn sub(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
-        self.rev_delegate(
-            self.get_delegate()
-                .sub(self.delegate(lhs), self.delegate(rhs)),
-        )
+        self.rev_delegate(self.get_delegate().sub(self.delegate(lhs), self.delegate(rhs)))
     }
 
     default fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -525,19 +466,13 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
     }
 
     default fn mul(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
-        self.rev_delegate(
-            self.get_delegate()
-                .mul(self.delegate(lhs), self.delegate(rhs)),
-        )
+        self.rev_delegate(self.get_delegate().mul(self.delegate(lhs), self.delegate(rhs)))
     }
 
-    default fn is_approximate(&self) -> bool {
-        self.get_delegate().is_approximate()
-    }
+    default fn is_approximate(&self) -> bool { self.get_delegate().is_approximate() }
 
     default fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
-        self.get_delegate()
-            .mul_assign_int(self.delegate_mut(lhs), rhs);
+        self.get_delegate().mul_assign_int(self.delegate_mut(lhs), rhs);
         self.postprocess_delegate_mut(lhs);
     }
 
@@ -549,19 +484,11 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.rev_delegate(self.get_delegate().mul_int_ref(self.delegate_ref(lhs), rhs))
     }
 
-    default fn pow_gen<S: IntegerRingStore>(
-        &self,
-        x: Self::Element,
-        power: &El<S>,
-        integers: S,
-    ) -> Self::Element
+    default fn pow_gen<S: IntegerRingStore>(&self, x: Self::Element, power: &El<S>, integers: S) -> Self::Element
     where
         S::Type: IntegerRing,
     {
-        self.rev_delegate(
-            self.get_delegate()
-                .pow_gen(self.delegate(x), power, integers),
-        )
+        self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))
     }
 
     default fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
@@ -578,11 +505,7 @@ where
 {
     type PreparedDivisorData = <R::Base as DivisibilityRing>::PreparedDivisorData;
 
-    default fn checked_left_div(
-        &self,
-        lhs: &Self::Element,
-        rhs: &Self::Element,
-    ) -> Option<Self::Element> {
+    default fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.get_delegate()
             .checked_left_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
             .map(|x| self.rev_delegate(x))
@@ -619,11 +542,8 @@ where
         rhs: &Self::Element,
         rhs_prep: &Self::PreparedDivisorData,
     ) -> bool {
-        self.get_delegate().divides_left_prepared(
-            self.delegate_ref(lhs),
-            self.delegate_ref(rhs),
-            rhs_prep,
-        )
+        self.get_delegate()
+            .divides_left_prepared(self.delegate_ref(lhs), self.delegate_ref(rhs), rhs_prep)
     }
 }
 
@@ -635,8 +555,7 @@ where
     where
         S: serde::Serializer,
     {
-        self.get_delegate()
-            .serialize(self.delegate_ref(el), serializer)
+        self.get_delegate().serialize(self.delegate_ref(el), serializer)
     }
 
     default fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
@@ -679,9 +598,7 @@ where
 {
     type Item = <R as RingBase>::Element;
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.base.next().map(|x| self.ring.rev_delegate(x))
-    }
+    fn next(&mut self) -> Option<Self::Item> { self.base.next().map(|x| self.ring.rev_delegate(x)) }
 }
 
 /// Marks a [`DelegateRing`] `R` to be considered in the blanket implementation
@@ -740,11 +657,7 @@ impl<R: DelegateRingImplEuclideanRing + ?Sized> PrincipalIdealRing for R
 where
     R::Base: PrincipalIdealRing,
 {
-    default fn checked_div_min(
-        &self,
-        lhs: &Self::Element,
-        rhs: &Self::Element,
-    ) -> Option<Self::Element> {
+    default fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.get_delegate()
             .checked_div_min(self.delegate_ref(lhs), self.delegate_ref(rhs))
             .map(|res| self.rev_delegate(res))
@@ -778,11 +691,7 @@ impl<R: DelegateRingImplEuclideanRing + ?Sized> EuclideanRing for R
 where
     R::Base: EuclideanRing,
 {
-    default fn euclidean_div_rem(
-        &self,
-        lhs: Self::Element,
-        rhs: &Self::Element,
-    ) -> (Self::Element, Self::Element) {
+    default fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let (q, r) = self
             .get_delegate()
             .euclidean_div_rem(self.delegate(lhs), self.delegate_ref(rhs));
@@ -837,9 +746,7 @@ where
             {
                 self.operation.execute()
             }
-            fn fallback(self) -> Self::Output {
-                self.operation.fallback()
-            }
+            fn fallback(self) -> Self::Output { self.operation.fallback() }
         }
 
         <R::Base as FiniteRingSpecializable>::specialize(OpWrapper {
@@ -858,13 +765,9 @@ where
     type IntegerRingBase = <R::Base as ZnRing>::IntegerRingBase;
     type IntegerRing = <R::Base as ZnRing>::IntegerRing;
 
-    default fn integer_ring(&self) -> &Self::IntegerRing {
-        self.get_delegate().integer_ring()
-    }
+    default fn integer_ring(&self) -> &Self::IntegerRing { self.get_delegate().integer_ring() }
 
-    default fn modulus(&self) -> &El<Self::IntegerRing> {
-        self.get_delegate().modulus()
-    }
+    default fn modulus(&self) -> &El<Self::IntegerRing> { self.get_delegate().modulus() }
 
     default fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         self.get_delegate()
@@ -888,13 +791,9 @@ where
 {
     type BaseRing = <R::Base as RingExtension>::BaseRing;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing {
-        self.get_delegate().base_ring()
-    }
+    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { self.get_delegate().base_ring() }
 
-    fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
-        self.rev_delegate(self.get_delegate().from(x))
-    }
+    fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.rev_delegate(self.get_delegate().from(x)) }
 }
 
 impl<R> FreeAlgebra for R
@@ -907,36 +806,24 @@ where
     where
         Self: 'a;
 
-    default fn canonical_gen(&self) -> Self::Element {
-        self.rev_delegate(self.get_delegate().canonical_gen())
-    }
+    default fn canonical_gen(&self) -> Self::Element { self.rev_delegate(self.get_delegate().canonical_gen()) }
 
     default fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
     where
         V: IntoIterator<Item = El<Self::BaseRing>>,
         V::IntoIter: DoubleEndedIterator,
     {
-        self.rev_delegate(
-            self.get_delegate()
-                .from_canonical_basis(vec.into_iter().map(|x| x)),
-        )
+        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.into_iter().map(|x| x)))
     }
 
-    default fn rank(&self) -> usize {
-        self.get_delegate().rank()
-    }
+    default fn rank(&self) -> usize { self.get_delegate().rank() }
 
-    default fn wrt_canonical_basis<'a>(
-        &'a self,
-        el: &'a Self::Element,
-    ) -> Self::VectorRepresentation<'a> {
-        self.get_delegate()
-            .wrt_canonical_basis(self.delegate_ref(el))
+    default fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
+        self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
     }
 
     default fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {
-        self.get_delegate()
-            .mul_assign_gen_power(self.delegate_mut(el), power);
+        self.get_delegate().mul_assign_gen_power(self.delegate_mut(el), power);
         self.postprocess_delegate_mut(el);
     }
 }
@@ -960,9 +847,7 @@ where
     S: RingStore,
 {
     /// Creates a new [`WrapHom`] between the given rings.
-    pub fn new(from: R, to: S) -> Self {
-        Self { from, to }
-    }
+    pub fn new(from: R, to: S) -> Self { Self { from, to } }
 }
 
 impl<'a, R> WrapHom<RingRef<'a, R::Base>, RingRef<'a, R>>
@@ -974,9 +859,7 @@ where
     ///
     /// This function must take `to` by reference, since it must be able to
     /// obtain a reference to its delegate target that lives long enough.
-    pub fn to_delegate_ring(to: &'a R) -> Self {
-        Self::new(RingRef::new(to.get_delegate()), RingRef::new(to))
-    }
+    pub fn to_delegate_ring(to: &'a R) -> Self { Self::new(RingRef::new(to.get_delegate()), RingRef::new(to)) }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for WrapHom<R, S>
@@ -988,19 +871,11 @@ where
     type DomainStore = R;
     type CodomainStore = S;
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.from
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
 
-    fn map(&self, x: El<R>) -> El<S> {
-        self.to
-            .get_ring()
-            .element_cast(self.to.get_ring().rev_delegate(x))
-    }
+    fn map(&self, x: El<R>) -> El<S> { self.to.get_ring().element_cast(self.to.get_ring().rev_delegate(x)) }
 }
 
 /// Homomorphism from a [`DelegateRing`] to its delegate target. An element
@@ -1022,9 +897,7 @@ where
     S: RingStore,
 {
     /// Creates a new [`UnwrapHom`] between the given rings.
-    pub fn new(from: R, to: S) -> Self {
-        Self { from, to }
-    }
+    pub fn new(from: R, to: S) -> Self { Self { from, to } }
 }
 
 impl<'a, R> UnwrapHom<RingRef<'a, R>, RingRef<'a, R::Base>>
@@ -1035,9 +908,7 @@ where
     ///
     /// This function must take `from` by reference, since it must be able to
     /// obtain a reference to its delegate target that lives long enough.
-    pub fn from_delegate_ring(from: &'a R) -> Self {
-        Self::new(RingRef::new(from), RingRef::new(from.get_delegate()))
-    }
+    pub fn from_delegate_ring(from: &'a R) -> Self { Self::new(RingRef::new(from), RingRef::new(from.get_delegate())) }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for UnwrapHom<R, S>
@@ -1049,17 +920,9 @@ where
     type DomainStore = R;
     type CodomainStore = S;
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.from
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.to
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
 
-    fn map(&self, x: El<R>) -> El<S> {
-        self.from
-            .get_ring()
-            .delegate(self.from.get_ring().rev_element_cast(x))
-    }
+    fn map(&self, x: El<R>) -> El<S> { self.from.get_ring().delegate(self.from.get_ring().rev_element_cast(x)) }
 }

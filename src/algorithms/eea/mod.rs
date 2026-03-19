@@ -188,10 +188,7 @@ where
         ring.zero()
     } else {
         ring.mul(
-            ring.euclidean_div(
-                ring.clone_el(&fst),
-                &signed_gcd(fst, ring.clone_el(&snd), &ring),
-            ),
+            ring.euclidean_div(ring.clone_el(&fst), &signed_gcd(fst, ring.clone_el(&snd), &ring)),
             snd,
         )
     }

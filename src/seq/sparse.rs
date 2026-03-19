@@ -84,15 +84,8 @@ impl<R: RingStore + Clone> Debug for SparseMapVector<R> {
 impl<R: RingStore + Clone> Clone for SparseMapVector<R> {
     fn clone(&self) -> Self {
         SparseMapVector {
-            data: self
-                .data
-                .iter()
-                .map(|(i, c)| (*i, self.ring.clone_el(c)))
-                .collect(),
-            modify_entry: (
-                self.modify_entry.0,
-                self.ring.clone_el(&self.modify_entry.1),
-            ),
+            data: self.data.iter().map(|(i, c)| (*i, self.ring.clone_el(c))).collect(),
+            modify_entry: (self.modify_entry.0, self.ring.clone_el(&self.modify_entry.1)),
             zero: self.ring.clone_el(&self.zero),
             ring: self.ring.clone(),
             len: self.len,
@@ -112,14 +105,9 @@ impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
         }
     }
 
-    fn len(&self) -> usize {
-        self.len
-    }
+    fn len(&self) -> usize { self.len }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<El<R>>>(
-        &'a self,
-        op: Op,
-    ) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<El<R>>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
         Ok(op.execute(self))
     }
 }

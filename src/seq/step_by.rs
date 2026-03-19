@@ -41,21 +41,15 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for StepBy<V, T> {
         }
     }
 
-    fn at(&self, i: usize) -> &T {
-        self.base.at(i * self.step_by)
-    }
+    fn at(&self, i: usize) -> &T { self.base.at(i * self.step_by) }
 }
 
 impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for StepBy<V, T> {
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        self.base.at_mut(i * self.step_by)
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { self.base.at_mut(i * self.step_by) }
 }
 
 impl<V: SwappableVectorViewMut<T>, T: ?Sized> SwappableVectorViewMut<T> for StepBy<V, T> {
-    fn swap(&mut self, i: usize, j: usize) {
-        self.base.swap(i * self.step_by, j * self.step_by)
-    }
+    fn swap(&mut self, i: usize, j: usize) { self.base.swap(i * self.step_by, j * self.step_by) }
 }
 
 #[derive(Debug)]
@@ -97,9 +91,7 @@ impl<V: VectorFn<T>, T> VectorFn<T> for StepByFn<V, T> {
         }
     }
 
-    fn at(&self, i: usize) -> T {
-        self.base.at(i * self.step_by)
-    }
+    fn at(&self, i: usize) -> T { self.base.at(i * self.step_by) }
 }
 
 #[test]

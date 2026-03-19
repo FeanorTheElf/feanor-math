@@ -142,9 +142,7 @@ where
 
     let poly_mod_m = FX.lifted_hom(poly_ring, R_to_F).map_ref(poly);
     let mut factors = Vec::new();
-    for (f, k) in
-        <_ as FactorPolyField>::factor_poly_with_controller(&FX, &poly_mod_m, controller.clone()).0
-    {
+    for (f, k) in <_ as FactorPolyField>::factor_poly_with_controller(&FX, &poly_mod_m, controller.clone()).0 {
         if k > 1 {
             return FactorAndLiftModpeResult::NotSquarefreeModpe;
         }
@@ -156,15 +154,10 @@ where
 
     let SX = DensePolyRing::new(*red_map.domain(), "X");
     let poly_mod_me = SX
-        .lifted_hom(
-            poly_ring,
-            reduction.main_ring_to_intermediate_ring_reduction(0),
-        )
+        .lifted_hom(poly_ring, reduction.main_ring_to_intermediate_ring_reduction(0))
         .map_ref(poly);
-    let factorization_mod_me =
-        hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..], controller);
-    let combined_factorization =
-        combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me);
+    let factorization_mod_me = hensel_lift_factorization(&red_map, &SX, &FX, &poly_mod_me, &factors[..], controller);
+    let combined_factorization = combine_local_factors_local(&reduction, poly_ring, poly, &SX, e, factorization_mod_me);
     if combined_factorization.len() == 1 {
         return FactorAndLiftModpeResult::Unknown;
     } else {
@@ -184,12 +177,8 @@ where
 
     // we use Theorem 3.5.1 from "A course in computational algebraic number theory", Cohen,
     // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
-    let log2_poly_norm = ZZX
-        .terms(f)
-        .map(|(c, _)| ZZ.abs_log2_ceil(c).unwrap())
-        .max()
-        .unwrap() as f64
-        + (d as f64).log2();
+    let log2_poly_norm =
+        ZZX.terms(f).map(|(c, _)| ZZ.abs_log2_ceil(c).unwrap()).max().unwrap() as f64 + (d as f64).log2();
     return (log2_poly_norm + d as f64) * 2f64.ln();
 }
 
@@ -212,8 +201,7 @@ where
     for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
         let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64());
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
-        let prime_f64 =
-            BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
+        let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;
         log_progress!(
             controller,
@@ -237,11 +225,7 @@ where
 /// Its factors are returned as primitive polynomials, thus their
 /// product is `f` only up to multiplication by a nonzero integer.
 #[stability::unstable(feature = "enable")]
-pub fn poly_factor_integer<P, Controller>(
-    ZZX: P,
-    f: El<P>,
-    controller: Controller,
-) -> Vec<(El<P>, usize)>
+pub fn poly_factor_integer<P, Controller>(ZZX: P, f: El<P>, controller: Controller) -> Vec<(El<P>, usize)>
 where
     P: PolyRingStore + Copy,
     P::Type: PolyRing + DivisibilityRing,
@@ -249,8 +233,7 @@ where
     Controller: ComputationController,
 {
     assert!(!ZZX.is_zero(&f));
-    let power_decomposition =
-        poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
+    let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f), controller.clone());
 
     controller.run_computation(
         format_args!("factor_int_poly(deg={})", ZZX.degree(&f).unwrap()),
@@ -261,25 +244,16 @@ where
                 log_progress!(controller, "(deg={})", ZZX.degree(&factor).unwrap());
                 let lc_factor = ZZX.lc(&factor).unwrap();
                 let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
-                let factorization = factor_squarefree_monic_integer_poly_local(
-                    &ZZX,
-                    &factor_monic,
-                    controller.clone(),
-                );
-                for irred_factor in factorization
-                    .into_iter()
-                    .map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor))
-                {
+                let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
+                for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
                     let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
                     let mut power = 0;
                     let irred_factor = make_primitive(ZZX, &irred_factor).0;
                     while let Some(quo) = ZZX.checked_div(
                         &ZZX.inclusion().mul_ref_map(
                             &current,
-                            &ZZX.base_ring().pow(
-                                ZZX.base_ring().clone_el(&irred_factor_lc),
-                                ZZX.degree(&f).unwrap(),
-                            ),
+                            &ZZX.base_ring()
+                                .pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap()),
                         ),
                         &irred_factor,
                     ) {
@@ -293,10 +267,7 @@ where
             }
             debug_assert_eq!(
                 ZZX.degree(&f).unwrap(),
-                result
-                    .iter()
-                    .map(|(fi, i)| *i * ZZX.degree(fi).unwrap())
-                    .sum::<usize>()
+                result.iter().map(|(fi, i)| *i * ZZX.degree(fi).unwrap()).sum::<usize>()
             );
             return result;
         },

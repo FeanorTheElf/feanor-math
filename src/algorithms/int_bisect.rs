@@ -139,24 +139,13 @@ use crate::primitive_int::StaticRing;
 fn test_bisect_floor() {
     assert_eq!(
         0,
-        bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 0 {
-            0
-        } else {
-            1
-        })
+        bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 0 { 0 } else { 1 })
     );
     assert_eq!(
         9,
-        bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 10 {
-            1
-        } else {
-            0
-        })
+        bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 10 { 1 } else { 0 })
     );
-    assert_eq!(
-        -15,
-        bisect_floor(&StaticRing::<i64>::RING, -20, -10, |x| *x + 15)
-    );
+    assert_eq!(-15, bisect_floor(&StaticRing::<i64>::RING, -20, -10, |x| *x + 15));
 }
 
 #[test]
@@ -169,34 +158,18 @@ fn test_root_floor() {
     assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 63, 3));
     assert_eq!(
         5,
-        root_floor(
-            &StaticRing::<i64>::RING,
-            StaticRing::<i64>::RING.pow(5, 25),
-            25
-        )
+        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 25)
     );
     assert_eq!(
         4,
-        root_floor(
-            &StaticRing::<i64>::RING,
-            StaticRing::<i64>::RING.pow(5, 25),
-            26
-        )
+        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 26)
     );
     assert_eq!(
         4,
-        root_floor(
-            &StaticRing::<i64>::RING,
-            StaticRing::<i64>::RING.pow(5, 25),
-            27
-        )
+        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 27)
     );
     assert_eq!(
         4,
-        root_floor(
-            &StaticRing::<i64>::RING,
-            StaticRing::<i64>::RING.pow(5, 25),
-            28
-        )
+        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 28)
     );
 }

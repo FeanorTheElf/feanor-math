@@ -93,11 +93,7 @@ pub trait PolyTFracGCDRing {
         P::Type: PolyRing + DivisibilityRing,
         <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
     {
-        poly_ring.prod(
-            Self::power_decomposition(poly_ring, poly)
-                .into_iter()
-                .map(|(f, _)| f),
-        )
+        poly_ring.prod(Self::power_decomposition(poly_ring, poly).into_iter().map(|(f, _)| f))
     }
 
     /// Compute square-free polynomials `f1, f2, ...` such that `a f = f1 f2^2 f3^3 ...`
@@ -162,12 +158,7 @@ pub trait PolyTFracGCDRing {
     /// As [`PolyTFracGCDRing::gcd()`], this computes the gcd of two polynomials.
     /// However, it additionally accepts a [`ComputationController`] to customize
     /// the performed computation.
-    fn gcd_with_controller<P, Controller>(
-        poly_ring: P,
-        lhs: &El<P>,
-        rhs: &El<P>,
-        _: Controller,
-    ) -> El<P>
+    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, _: Controller) -> El<P>
     where
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -184,11 +175,7 @@ pub trait PolyTFracGCDRing {
 /// ```
 /// that can be used to make polynomials over a domain monic (when setting `a = lc(f)`).
 #[stability::unstable(feature = "enable")]
-pub fn evaluate_aX<P>(
-    poly_ring: P,
-    f: &El<P>,
-    a: &El<<P::Type as RingExtension>::BaseRing>,
-) -> El<P>
+pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
 where
     P: RingStore,
     P::Type: PolyRing,
@@ -203,10 +190,7 @@ where
         if i == d {
             (ring.checked_div(c, a).unwrap(), d)
         } else {
-            (
-                ring.mul_ref_fst(c, ring.pow(ring.clone_el(a), d - i - 1)),
-                i,
-            )
+            (ring.mul_ref_fst(c, ring.pow(ring.clone_el(a), d - i - 1)), i)
         }
     }));
     return result;
@@ -214,11 +198,7 @@ where
 
 /// Computes the inverse to [`evaluate_aX()`].
 #[stability::unstable(feature = "enable")]
-pub fn unevaluate_aX<P>(
-    poly_ring: P,
-    g: &El<P>,
-    a: &El<<P::Type as RingExtension>::BaseRing>,
-) -> El<P>
+pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<<P::Type as RingExtension>::BaseRing>) -> El<P>
 where
     P: RingStore,
     P::Type: PolyRing,
@@ -233,11 +213,7 @@ where
         if i == d {
             (ring.mul_ref(c, a), d)
         } else {
-            (
-                ring.checked_div(c, &ring.pow(ring.clone_el(a), d - i - 1))
-                    .unwrap(),
-                i,
-            )
+            (ring.checked_div(c, &ring.pow(ring.clone_el(a), d - i - 1)).unwrap(), i)
         }
     }));
     return result;
@@ -246,10 +222,7 @@ where
 /// Given a polynomial `f` over a PID, returns `(f/cont(f), cont(f))`, where `cont(f)`
 /// is the content of `f`, i.e. the gcd of all coefficients of `f`.
 #[stability::unstable(feature = "enable")]
-pub fn make_primitive<P>(
-    poly_ring: P,
-    f: &El<P>,
-) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
+pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<<P::Type as RingExtension>::BaseRing>)
 where
     P: RingStore,
     P::Type: PolyRing,
@@ -313,12 +286,7 @@ where
         result_reversed.push(next_coeff);
     }
 
-    let result = poly_ring.from_terms(
-        result_reversed
-            .into_iter()
-            .enumerate()
-            .map(|(i, c)| (c, d - i)),
-    );
+    let result = poly_ring.from_terms(result_reversed.into_iter().enumerate().map(|(i, c)| (c, d - i)));
     if poly_ring.eq_el(&f, &poly_ring.pow(poly_ring.clone_el(&result), k)) {
         return Some(result);
     } else {
@@ -357,8 +325,7 @@ where
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso,
             Controller: ComputationController;
 
-        impl<'a, P, Controller>
-            FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+        impl<'a, P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
             for PowerDecompositionOperation<'a, P, Controller>
         where
             P: RingStore + Copy,
@@ -425,12 +392,7 @@ where
         Self::gcd_with_controller(poly_ring, lhs, rhs, DontObserve)
     }
 
-    fn gcd_with_controller<P, Controller>(
-        poly_ring: P,
-        lhs: &El<P>,
-        rhs: &El<P>,
-        controller: Controller,
-    ) -> El<P>
+    fn gcd_with_controller<P, Controller>(poly_ring: P, lhs: &El<P>, rhs: &El<P>, controller: Controller) -> El<P>
     where
         P: RingStore + Copy,
         P::Type: PolyRing + DivisibilityRing,
@@ -444,8 +406,7 @@ where
             <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + SelfIso,
             Controller: ComputationController;
 
-        impl<'a, P, Controller>
-            FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
+        impl<'a, P, Controller> FiniteRingOperation<<<P::Type as RingExtension>::BaseRing as RingStore>::Type>
             for PolyGCDOperation<'a, P, Controller>
         where
             P: RingStore + Copy,
@@ -484,19 +445,16 @@ where
                         i,
                     )
                 }));
-                let result = new_poly_ring
-                    .normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs, self.3).2);
-                return self
-                    .0
-                    .from_terms(new_poly_ring.terms(&result).map(|(c, i)| {
-                        (
-                            new_poly_ring
-                                .base_ring()
-                                .get_ring()
-                                .unwrap_element(new_poly_ring.base_ring().clone_el(c)),
-                            i,
-                        )
-                    }));
+                let result = new_poly_ring.normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs, self.3).2);
+                return self.0.from_terms(new_poly_ring.terms(&result).map(|(c, i)| {
+                    (
+                        new_poly_ring
+                            .base_ring()
+                            .get_ring()
+                            .unwrap_element(new_poly_ring.base_ring().clone_el(c)),
+                        i,
+                    )
+                }));
             }
 
             fn fallback(self) -> Self::Output {
@@ -528,14 +486,7 @@ fn test_poly_root() {
     let ring = BigIntRing::RING;
     let poly_ring = DensePolyRing::new(ring, "X");
     let [f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [X.pow_ref(7)
-            + X.pow_ref(6)
-            + X.pow_ref(5)
-            + X.pow_ref(4)
-            + X.pow_ref(3)
-            + X.pow_ref(2)
-            + X
-            + 1]
+        [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]
     });
     for k in 1..5 {
         assert_el_eq!(
@@ -568,11 +519,7 @@ fn test_poly_gcd_galois_field() {
             (X.pow_ref(2) + 2) * (X + 1),
         ]
     });
-    assert_el_eq!(
-        &poly_ring,
-        &f_g_gcd,
-        <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g)
-    );
+    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g));
 }
 
 #[test]
@@ -586,9 +533,5 @@ fn test_poly_gcd_prime_field() {
             (X.pow_ref(2) + 2) * (X + 1),
         ]
     });
-    assert_el_eq!(
-        &poly_ring,
-        &f_g_gcd,
-        <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g)
-    );
+    assert_el_eq!(&poly_ring, &f_g_gcd, <_ as PolyTFracGCDRing>::gcd(&poly_ring, &f, &g));
 }

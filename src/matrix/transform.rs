@@ -36,13 +36,7 @@ where
     ///      ^ i-th col    ^ j-th col
     /// ```
     /// where `transform = [A, B, C, D]`.
-    fn transform<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        i: usize,
-        j: usize,
-        transform: &[R::Element; 4],
-    );
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]);
 
     /// The transformation corresponding to subtracting `factor` times the `src`-th row
     /// resp. col from the `dst`-th row resp. col.
@@ -51,23 +45,12 @@ where
     ///  - `1` if `k == l`
     ///  - `-factor` if `k == dst, l == src`
     ///  - `0` otherwise
-    fn subtract<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        src: usize,
-        dst: usize,
-        factor: &R::Element,
-    ) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
         self.transform(
             ring,
             src,
             dst,
-            &[
-                ring.one(),
-                ring.zero(),
-                ring.negate(ring.clone_el(factor)),
-                ring.one(),
-            ],
+            &[ring.one(), ring.zero(), ring.negate(ring.clone_el(factor)), ring.one()],
         )
     }
 
@@ -80,12 +63,7 @@ where
     ///  - `1` if `k == j, l == i`
     ///  - `0` otherwise
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
-        self.transform(
-            ring,
-            i,
-            j,
-            &[ring.zero(), ring.one(), ring.one(), ring.zero()],
-        )
+        self.transform(ring, i, j, &[ring.zero(), ring.one(), ring.one(), ring.zero()])
     }
 }
 
@@ -94,23 +72,11 @@ where
     R: ?Sized + RingBase,
     T: TransformTarget<R>,
 {
-    fn transform<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        i: usize,
-        j: usize,
-        transform: &[R::Element; 4],
-    ) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
         <T as TransformTarget<R>>::transform(*self, ring, i, j, transform)
     }
 
-    fn subtract<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        src: usize,
-        dst: usize,
-        factor: &R::Element,
-    ) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
         <T as TransformTarget<R>>::subtract(*self, ring, src, dst, factor)
     }
 
@@ -260,11 +226,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn replay<S: Copy + RingStore<Type = R>, T: TransformTarget<R>>(
-        &self,
-        ring: S,
-        mut target: T,
-    ) {
+    pub fn replay<S: Copy + RingStore<Type = R>, T: TransformTarget<R>>(&self, ring: S, mut target: T) {
         for transform in &self.transforms {
             match transform {
                 Transform::General(i, j, matrix) => target.transform(ring, *i, *j, matrix),
@@ -275,11 +237,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn replay_transposed<S: Copy + RingStore<Type = R>, T: TransformTarget<R>>(
-        &self,
-        ring: S,
-        mut target: T,
-    ) {
+    pub fn replay_transposed<S: Copy + RingStore<Type = R>, T: TransformTarget<R>>(&self, ring: S, mut target: T) {
         for transform in self.transforms.iter().rev() {
             match transform {
                 Transform::General(i, j, matrix) => target.transform(
@@ -351,23 +309,9 @@ impl<R> TransformTarget<R> for ()
 where
     R: ?Sized + RingBase,
 {
-    fn transform<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        _: S,
-        _: usize,
-        _: usize,
-        _: &[R::Element; 4],
-    ) {
-    }
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize, _: &[R::Element; 4]) {}
 
-    fn subtract<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        _: S,
-        _: usize,
-        _: usize,
-        _: &R::Element,
-    ) {
-    }
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize, _: &R::Element) {}
 
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, _: S, _: usize, _: usize) {}
 }
@@ -404,13 +348,7 @@ where
     R: ?Sized + RingBase,
     T: TransformTarget<R>,
 {
-    fn transform<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        i: usize,
-        j: usize,
-        transform: &[R::Element; 4],
-    ) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
         <T as TransformTarget<R>>::transform(
             &mut self.delegate,
             ring,
@@ -420,13 +358,7 @@ where
         );
     }
 
-    fn subtract<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        src: usize,
-        dst: usize,
-        factor: &R::Element,
-    ) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
         <T as TransformTarget<R>>::subtract(
             &mut self.delegate,
             ring,
@@ -437,12 +369,7 @@ where
     }
 
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize) {
-        <T as TransformTarget<R>>::swap(
-            &mut self.delegate,
-            ring,
-            i + self.index_offset,
-            j + self.index_offset,
-        );
+        <T as TransformTarget<R>>::swap(&mut self.delegate, ring, i + self.index_offset, j + self.index_offset);
     }
 }
 
@@ -481,24 +408,12 @@ where
     T1: TransformTarget<R>,
     T2: TransformTarget<R>,
 {
-    fn transform<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        i: usize,
-        j: usize,
-        transform: &[R::Element; 4],
-    ) {
+    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]) {
         <T1 as TransformTarget<R>>::transform(&mut self.delegate1, ring, i, j, transform);
         <T2 as TransformTarget<R>>::transform(&mut self.delegate2, ring, i, j, transform);
     }
 
-    fn subtract<S: Copy + RingStore<Type = R>>(
-        &mut self,
-        ring: S,
-        src: usize,
-        dst: usize,
-        factor: &R::Element,
-    ) {
+    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, ring: S, src: usize, dst: usize, factor: &R::Element) {
         <T1 as TransformTarget<R>>::subtract(&mut self.delegate1, ring, src, dst, factor);
         <T2 as TransformTarget<R>>::subtract(&mut self.delegate2, ring, src, dst, factor);
     }
