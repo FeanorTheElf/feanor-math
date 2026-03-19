@@ -747,7 +747,7 @@ where
             {
                 self.operation.execute()
             }
-            
+
             fn fallback(self) -> Self::Output { self.operation.fallback() }
         }
 
