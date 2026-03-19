@@ -22,7 +22,7 @@ fn square<R>(Zn: &R, x: &El<R>) -> El<R>
 where
     R: RingStore,
 {
-    let mut result: <<R as RingStore>::Type as RingBase>::Element = Zn.clone_el(&x);
+    let mut result: <<R as RingStore>::Type as RingBase>::Element = Zn.clone_el(x);
     Zn.square(&mut result);
     return result;
 }
@@ -50,10 +50,10 @@ where
         }
         (&P.2, &Q.2)
     };
-    if !Zn.is_unit(&factor_quo.1) {
+    if !Zn.is_unit(factor_quo.1) {
         let factor_of_n = signed_gcd(
             Zn.integer_ring().clone_el(Zn.modulus()),
-            Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)),
+            Zn.smallest_positive_lift(Zn.clone_el(factor_quo.1)),
             Zn.integer_ring(),
         );
         let Zn_new = zn_big::Zn::new(
@@ -119,7 +119,7 @@ where
         }
         return true;
     }
-    let factor = Zn.checked_div(&factor_quo.0, &factor_quo.1).unwrap();
+    let factor = Zn.checked_div(factor_quo.0, factor_quo.1).unwrap();
     if !Zn.is_unit(&factor) {
         return false;
     }
@@ -167,7 +167,7 @@ where
 {
     let (Px, Py, Pz) = P;
 
-    let PxPy = Zn.mul_ref(&Px, &Py);
+    let PxPy = Zn.mul_ref(Px, Py);
     let Px_sqr = square(Zn, Px);
     let Py_sqr = square(Zn, Py);
     let Pz_sqr = square(Zn, Pz);
@@ -198,7 +198,7 @@ where
         copy_point(base),
         power,
         ZZ,
-        |P| Ok(edcurve_double(Zn, d, &P)),
+        |P| Ok(edcurve_double(Zn, d, P)),
         |P, Q| Ok(edcurve_add(Zn, d, copy_point(Q), P)),
         |P| copy_point(P),
         (Zn.zero(), Zn.one(), Zn.one()),
@@ -288,7 +288,7 @@ where
                 .map(|p| {
                     (
                         *p,
-                        log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(&p).unwrap(),
+                        log2_B.ceil() as usize / StaticRing::<i128>::RING.abs_log2_ceil(p).unwrap(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -373,7 +373,7 @@ where
     R::Type: ZnRing + DivisibilityRing,
     Controller: ComputationController,
 {
-    assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
+    assert!(!algorithms::miller_rabin::is_prime_base(Zn, 10));
     assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
@@ -402,7 +402,7 @@ where
     R::Type: ZnRing + DivisibilityRing,
     Controller: ComputationController,
 {
-    assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
+    assert!(!algorithms::miller_rabin::is_prime_base(Zn, 10));
     assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
     let ZZ = BigIntRing::RING;
     let log2_N = ZZ.abs_log2_floor(&Zn.size(&ZZ).unwrap()).unwrap();

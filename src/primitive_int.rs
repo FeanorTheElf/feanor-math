@@ -172,7 +172,7 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         // currently prepared division is not implemented for i128, as using Barett-reduction here
         // requires 256-bit arithmetic, and I saw no need to make that effort
         if TypeId::of::<T>() == TypeId::of::<i128>() {
-            return self.checked_left_div(lhs, &rhs);
+            return self.checked_left_div(lhs, rhs);
         }
         if *rhs == T::from(0) {
             if *lhs == T::from(0) { Some(T::from(0)) } else { None }
@@ -336,7 +336,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
-        assert!(log2_bound_exclusive <= T::bits() - 1);
+        assert!(log2_bound_exclusive < T::bits());
         RingRef::new(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING,
             ((((rng() as u128) << u64::BITS) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128,

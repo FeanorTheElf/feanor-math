@@ -219,10 +219,10 @@ where
             where
                 Self: 'b;
 
-            fn execute<'b, V: 'b + VectorViewSparse<El<R>>>(self, vector: V) -> () {
+            fn execute<'b, V: 'b + VectorViewSparse<El<R>>>(self, vector: V) {
                 for i in (self.rank..(2 * self.rank)).rev() {
                     for (j, c) in vector.nontrivial_entries() {
-                        let add = self.base_ring.mul_ref(c, &mut self.data[i]);
+                        let add = self.base_ring.mul_ref(c, &self.data[i]);
                         self.base_ring.add_assign(&mut self.data[i - self.rank + j], add);
                     }
                 }
@@ -449,7 +449,7 @@ where
 {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
+    fn base_ring(&self) -> &Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result_values = Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone());
@@ -506,7 +506,7 @@ where
             create_multiplication_matrix(RingRef::new(self), rhs, self.allocator().clone());
         let mut lhs_matrix: OwnedMatrix<_, _> =
             OwnedMatrix::zero_in(self.rank(), 1, self.base_ring(), self.allocator().clone());
-        let data = self.wrt_canonical_basis(&lhs);
+        let data = self.wrt_canonical_basis(lhs);
         for j in 0..self.rank() {
             *lhs_matrix.at_mut(j, 0) = data.at(j);
         }
@@ -685,7 +685,7 @@ where
         DeserializeSeedNewtypeStruct::new(
             "ExtensionRingEl",
             DeserializeSeedSeq::new(
-                std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank() + 1),
+                std::iter::repeat_n(DeserializeWithRing::new(self.base_ring()), self.rank() + 1),
                 Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
                 |mut current, next| {
                     current.push(next);
@@ -750,7 +750,7 @@ where
     }
 
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
-        (&el.values[..self.rank]).clone_ring_els(self.base_ring())
+        el.values[..self.rank].clone_ring_els(self.base_ring())
     }
 
     fn from_canonical_basis<W>(&self, vec: W) -> Self::Element
@@ -777,7 +777,7 @@ where
         gen_pow_d.extend(self.x_pow_rank.as_iter().map(|c| self.base_ring.clone_el(c)));
         gen_pow_d.resize_with(1 << self.log2_padded_len, || self.base_ring.zero());
 
-        if power % self.rank() != 0 {
+        if !power.is_multiple_of(self.rank()) {
             let mut gen_pow_rem = Vec::new_in(self.allocator().clone());
             gen_pow_rem.extend((0..((power % self.rank()) - 1)).map(|_| self.base_ring.zero()));
             gen_pow_rem.push(self.base_ring.one());

@@ -81,7 +81,7 @@ where
     #[stability::unstable(feature = "enable")]
     pub fn ring(&self) -> RingRef<'_, R_main> { RingRef::new(self.hom.codomain().get_ring()) }
 
-    fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R_main, R_twiddle, H> {
+    fn get_ntt_table(&self, log2_n: usize) -> &CooleyTuckeyFFT<R_main, R_twiddle, H> {
         self.fft_algos.get_or_init(log2_n, || {
             CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n)
                 .expect("NTTConvolution was instantiated with parameters that don't support this length")

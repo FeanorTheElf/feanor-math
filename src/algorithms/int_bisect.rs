@@ -121,7 +121,7 @@ where
                     return ZZ.clone_el(&n);
                 }
             } else {
-                let x_pow_root = if root % 2 == 0 {
+                let x_pow_root = if root.is_multiple_of(2) {
                     ZZ.pow(x_pow_root_half, 2)
                 } else {
                     ZZ.mul_ref_snd(ZZ.pow(x_pow_root_half, 2), x)

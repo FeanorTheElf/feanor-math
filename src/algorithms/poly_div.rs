@@ -117,7 +117,7 @@ where
         poly_ring.truncate_monomials(&mut f_lower, split_degree_f);
         let g_upper = poly_ring.from_terms(
             poly_ring
-                .terms(&g)
+                .terms(g)
                 .filter(|(_, i)| *i >= split_degree_g)
                 .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_g)),
         );
@@ -135,7 +135,7 @@ where
             poly_ring.degree(&q_upper).is_none()
                 || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g
         );
-        debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1);
+        debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() < deg_g - split_degree_g);
 
         poly_ring.get_ring().add_assign_from_terms(
             &mut f_lower,
@@ -220,8 +220,8 @@ where
             break;
         }
         let lhs_lc = base_ring.clone_el(ring.lc(&lhs).unwrap());
-        let gcd = base_ring.ideal_gen(&lhs_lc, &rhs_lc);
-        let additional_scale = base_ring.checked_div(&rhs_lc, &gcd).unwrap();
+        let gcd = base_ring.ideal_gen(&lhs_lc, rhs_lc);
+        let additional_scale = base_ring.checked_div(rhs_lc, &gcd).unwrap();
 
         base_ring.mul_assign_ref(&mut current_scale, &additional_scale);
         terms
@@ -237,7 +237,7 @@ where
         );
         terms.push((factor, lhs_deg - d));
     }
-    return (ring.from_terms(terms.into_iter()), lhs, current_scale);
+    return (ring.from_terms(terms), lhs, current_scale);
 }
 
 /// Possible errors that might be returned by [`poly_div_rem_finite_reduced()`].
@@ -346,7 +346,7 @@ where
                 &d,
                 &ring
                     .base_ring()
-                    .mul_ref(&annihilator, ring.coefficient_at(&rhs, i as usize)),
+                    .mul_ref(&annihilator, ring.coefficient_at(rhs, i as usize)),
             );
             ring.inclusion().mul_assign_map(&mut h, s);
             ring.add_assign(
@@ -355,7 +355,7 @@ where
             );
             annihilator = ring.base_ring().annihilator(&new_d);
             d = new_d;
-            i = i - 1;
+            i -= 1;
             if !ring.base_ring().is_unit(&ring.base_ring().ideal_gen(&annihilator, &d)) {
                 let nilpotent = ring
                     .base_ring()

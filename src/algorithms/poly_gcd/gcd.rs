@@ -145,7 +145,7 @@ where
     let divides_f_and_g = controller
         .clone()
         .run_computation(format_args!("check_division."), |_| {
-            poly_ring.divides(&f, &result) && poly_ring.divides(&g, &result)
+            poly_ring.divides(f, &result) && poly_ring.divides(g, &result)
         });
     if !divides_f_and_g {
         log_progress!(controller, "(no_divisor)");

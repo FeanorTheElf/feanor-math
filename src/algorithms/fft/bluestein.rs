@@ -289,7 +289,7 @@ where
 
         let (twiddle_fft, old_hom) = m_fft_table.change_ring(hom.domain().identity());
 
-        let half_mod_n = (n + 1) / 2;
+        let half_mod_n = n.div_ceil(2);
         let mut b: Vec<_> = (0..n)
             .map(|i| root_of_unity_n_pows(TryInto::<i64>::try_into(i * i * half_mod_n).unwrap()))
             .collect();
@@ -432,7 +432,7 @@ where
         f.debug_struct("BluesteinFFT")
             .field("ring", &self.ring().get_ring())
             .field("n", &self.n)
-            .field("root_of_unity_n", &self.ring().format(&self.root_of_unity(self.ring())))
+            .field("root_of_unity_n", &self.ring().format(self.root_of_unity(self.ring())))
             .finish()
     }
 }

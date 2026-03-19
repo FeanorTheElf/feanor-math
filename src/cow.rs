@@ -31,7 +31,7 @@ impl<'a, T> MyCow<'a, T> {
     {
         match self {
             Self::Owned(value) => value,
-            Self::Mutable(value) => *value,
+            Self::Mutable(value) => value,
             Self::Borrowed(value) => {
                 *self = MyCow::Owned(clone_data(value));
                 match self {
@@ -60,7 +60,7 @@ impl<'a, T> Deref for MyCow<'a, T> {
         match self {
             Self::Owned(value) => value,
             Self::Mutable(value) => value,
-            Self::Borrowed(value) => *value,
+            Self::Borrowed(value) => value,
         }
     }
 }

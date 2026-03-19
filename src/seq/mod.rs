@@ -94,7 +94,7 @@ pub trait VectorView<T: ?Sized> {
 
     /// If the underlying data of this [`VectorView`] can be represented as a slice,
     /// returns it. Otherwise, `None` is returned.
-    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -114,7 +114,7 @@ pub trait VectorView<T: ?Sized> {
 
     /// Converts this vector into a [`VectorFn`] that clones ring elements on access using
     /// the given ring.
-    fn clone_ring_els<'a, R: RingStore>(&'a self, ring: R) -> CloneElFn<&'a Self, T, CloneRingEl<R>>
+    fn clone_ring_els<R: RingStore>(&self, ring: R) -> CloneElFn<&Self, T, CloneRingEl<R>>
     where
         T: Sized,
         R::Type: RingBase<Element = T>,
@@ -135,7 +135,7 @@ pub trait VectorView<T: ?Sized> {
 
     /// Converts this vector into a [`VectorFn`] that clones elements on access using
     /// the given function.
-    fn clone_els_by<'a, F>(&'a self, clone_entry: F) -> CloneElFn<&'a Self, T, F>
+    fn clone_els_by<F>(&self, clone_entry: F) -> CloneElFn<&Self, T, F>
     where
         T: Sized,
         F: Fn(&T) -> T,
@@ -153,7 +153,7 @@ pub trait VectorView<T: ?Sized> {
     }
 
     /// Converts this vector into a [`VectorFn`] that clones elements on access.
-    fn clone_els<'a>(&'a self) -> CloneElFn<&'a Self, T, CloneValue>
+    fn clone_els(&self) -> CloneElFn<&Self, T, CloneValue>
     where
         T: Sized + Clone,
     {
@@ -170,7 +170,7 @@ pub trait VectorView<T: ?Sized> {
     }
 
     /// Converts this vector into a [`VectorFn`] that copies elements on access.
-    fn copy_els<'a>(&'a self) -> CloneElFn<&'a Self, T, CloneValue>
+    fn copy_els(&self) -> CloneElFn<&Self, T, CloneValue>
     where
         T: Sized + Copy,
     {
@@ -345,7 +345,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
         (**self).specialize_sparse(op)
     }
 
-    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -358,7 +358,7 @@ impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for Box<V> {
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { (**self).at_unchecked_mut(i) } }
 
-    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {
@@ -376,7 +376,7 @@ impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for Box<V> 
     fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> { (**self).nontrivial_entries() }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
+impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &V {
     fn len(&self) -> usize { (**self).len() }
 
     fn at(&self, i: usize) -> &T { (**self).at(i) }
@@ -387,7 +387,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
         (**self).specialize_sparse(op)
     }
 
-    fn as_slice<'b>(&'b self) -> Option<&'b [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -395,7 +395,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a V {
     }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a V {
+impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &V {
     type Iter<'b>
         = V::Iter<'b>
     where
@@ -405,7 +405,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a
     fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> { (**self).nontrivial_entries() }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
+impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &mut V {
     fn len(&self) -> usize { (**self).len() }
 
     fn at(&self, i: usize) -> &T { (**self).at(i) }
@@ -416,7 +416,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
         (**self).specialize_sparse(op)
     }
 
-    fn as_slice<'b>(&'b self) -> Option<&'b [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -424,12 +424,12 @@ impl<'a, T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &'a mut V {
     }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V {
+impl<T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &mut V {
     fn at_mut(&mut self, i: usize) -> &mut T { (**self).at_mut(i) }
 
     unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T { unsafe { (**self).at_unchecked_mut(i) } }
 
-    fn as_slice_mut<'b>(&'b mut self) -> Option<&'b mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {
@@ -437,7 +437,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewMut<T>> VectorViewMut<T> for &'a mut V
     }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a mut V {
+impl<T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &mut V {
     type Iter<'b>
         = V::Iter<'b>
     where
@@ -447,7 +447,7 @@ impl<'a, T: ?Sized, V: ?Sized + VectorViewSparse<T>> VectorViewSparse<T> for &'a
     fn nontrivial_entries<'b>(&'b self) -> Self::Iter<'b> { (**self).nontrivial_entries() }
 }
 
-impl<'a, T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMut<T> for &'a mut V {
+impl<T: ?Sized, V: ?Sized + SwappableVectorViewMut<T>> SwappableVectorViewMut<T> for &mut V {
     fn swap(&mut self, i: usize, j: usize) { (**self).swap(i, j) }
 }
 
@@ -474,7 +474,7 @@ pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
 
     /// If the underlying data of this [`VectorView`] can be represented as a slice,
     /// returns it. Otherwise, `None` is returned.
-    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {
@@ -559,7 +559,7 @@ pub trait VectorFn<T> {
     /// Produces an iterator over the elements of this [`VectorFn`].
     ///
     /// See also [`VectorFn::into_iter()`] if a transfer of ownership is required.
-    fn iter<'a>(&'a self) -> VectorFnIter<&'a Self, T> { self.into_iter() }
+    fn iter(&self) -> VectorFnIter<&Self, T> { self.into_iter() }
 
     /// NB: Named `map_fn` to avoid conflicts with `map` of [`Iterator`]
     fn map_fn<F: Fn(T) -> U, U>(self, func: F) -> VectorFnMap<Self, T, U, F>
@@ -637,7 +637,7 @@ pub trait SelfSubvectorFn<T>: Sized + VectorFn<T> {
     }
 }
 
-impl<'a, T, V: ?Sized + VectorFn<T>> VectorFn<T> for &'a V {
+impl<T, V: ?Sized + VectorFn<T>> VectorFn<T> for &V {
     fn len(&self) -> usize { (**self).len() }
 
     fn at(&self, i: usize) -> T { (**self).at(i) }
@@ -650,7 +650,7 @@ impl<T> VectorView<T> for [T] {
 
     unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { self.get_unchecked(i) } }
 
-    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -658,11 +658,11 @@ impl<T> VectorView<T> for [T] {
     }
 }
 
-impl<'a, T> SelfSubvectorView<T> for &'a [T] {
+impl<T> SelfSubvectorView<T> for &[T] {
     fn restrict_full(self, range: Range<usize>) -> Self { &self[range] }
 }
 
-impl<'a, T> SelfSubvectorView<T> for &'a mut [T] {
+impl<T> SelfSubvectorView<T> for &mut [T] {
     fn restrict_full(self, range: Range<usize>) -> Self { &mut self[range] }
 }
 
@@ -671,7 +671,7 @@ impl<T> VectorViewMut<T> for [T] {
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { self.get_unchecked_mut(i) } }
 
-    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {
@@ -690,11 +690,11 @@ impl<T, A: Allocator> VectorView<T> for Vec<T, A> {
 
     unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { self.get_unchecked(i) } }
 
-    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
-        Some(&*self)
+        Some(self)
     }
 }
 
@@ -703,7 +703,7 @@ impl<T, A: Allocator> VectorViewMut<T> for Vec<T, A> {
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { self.get_unchecked_mut(i) } }
 
-    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {
@@ -722,7 +722,7 @@ impl<T, const N: usize> VectorView<T> for [T; N] {
 
     unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { self.get_unchecked(i) } }
 
-    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -735,7 +735,7 @@ impl<T, const N: usize> VectorViewMut<T> for [T; N] {
 
     unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { unsafe { self.get_unchecked_mut(i) } }
 
-    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {

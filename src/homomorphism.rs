@@ -36,10 +36,10 @@ where
     type CodomainStore: RingStore<Type = Codomain>;
 
     /// Returns a reference to the domain ring.
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore;
+    fn domain(&self) -> &Self::DomainStore;
 
     /// Returns a reference to the codomain ring.
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore;
+    fn codomain(&self) -> &Self::CodomainStore;
 
     /// Applies this homomorphism to the given element from the domain ring,
     /// resulting in an element in the codomain ring.
@@ -662,9 +662,9 @@ where
     type CodomainStore = S;
     type DomainStore = R;
 
-    fn map(&self, el: El<R>) -> El<S> { self.to.get_ring().map_in(self.from.get_ring(), el, &self.data) }
+    fn map(&self, el: El<R>) -> El<S> { self.to.get_ring().map_in(self.from.get_ring(), el, self.data) }
 
-    fn map_ref(&self, el: &El<R>) -> El<S> { self.to.get_ring().map_in_ref(self.from.get_ring(), el, &self.data) }
+    fn map_ref(&self, el: &El<R>) -> El<S> { self.to.get_ring().map_in_ref(self.from.get_ring(), el, self.data) }
 
     fn domain(&self) -> &R { &self.from }
 
@@ -673,19 +673,19 @@ where
     fn mul_assign_map(&self, lhs: &mut El<S>, rhs: El<R>) {
         self.to
             .get_ring()
-            .mul_assign_map_in(self.from.get_ring(), lhs, rhs, &self.data);
+            .mul_assign_map_in(self.from.get_ring(), lhs, rhs, self.data);
     }
 
     fn mul_assign_ref_map(&self, lhs: &mut El<S>, rhs: &El<R>) {
         self.to
             .get_ring()
-            .mul_assign_map_in_ref(self.from.get_ring(), lhs, rhs, &self.data);
+            .mul_assign_map_in_ref(self.from.get_ring(), lhs, rhs, self.data);
     }
 
     fn fma_map(&self, lhs: &El<S>, rhs: &El<R>, summand: El<S>) -> El<S> {
         self.to
             .get_ring()
-            .fma_map_in(self.from.get_ring(), lhs, rhs, summand, &self.data)
+            .fma_map_in(self.from.get_ring(), lhs, rhs, summand, self.data)
     }
 }
 
@@ -774,9 +774,7 @@ where
     pub fn into_inv(self) -> CanHom<R, S> { CanHom::new(self.from, self.to).unwrap_or_else(|_| unreachable!()) }
 
     /// Returns the inverse homomorphism.
-    pub fn inv<'a>(&'a self) -> CanHom<&'a R, &'a S> {
-        CanHom::new(&self.from, &self.to).unwrap_or_else(|_| unreachable!())
-    }
+    pub fn inv(&self) -> CanHom<&R, &S> { CanHom::new(&self.from, &self.to).unwrap_or_else(|_| unreachable!()) }
 
     /// Returns a reference to the underlying [`CanIsoFromTo::Isomorphism`].
     pub fn raw_iso(&self) -> &<S::Type as CanIsoFromTo<R::Type>>::Isomorphism { &self.data }
@@ -854,9 +852,9 @@ where
     type CodomainStore = R;
     type DomainStore = <R::Type as RingExtension>::BaseRing;
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { self.ring.base_ring() }
+    fn domain(&self) -> &Self::DomainStore { self.ring.base_ring() }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.ring }
+    fn codomain(&self) -> &Self::CodomainStore { &self.ring }
 
     fn map(&self, x: El<<R::Type as RingExtension>::BaseRing>) -> El<R> { self.ring.get_ring().from(x) }
 
@@ -934,9 +932,9 @@ where
     type CodomainStore = R;
     type DomainStore = StaticRing<i32>;
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &StaticRing::<i32>::RING }
+    fn domain(&self) -> &Self::DomainStore { &StaticRing::<i32>::RING }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.ring }
+    fn codomain(&self) -> &Self::CodomainStore { &self.ring }
 
     fn map(&self, x: i32) -> El<R> { self.ring.get_ring().from_int(x) }
 
@@ -985,9 +983,9 @@ impl<R: RingStore> Homomorphism<R::Type, R::Type> for Identity<R> {
     type CodomainStore = R;
     type DomainStore = R;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.ring }
+    fn codomain(&self) -> &Self::CodomainStore { &self.ring }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.ring }
+    fn domain(&self) -> &Self::DomainStore { &self.ring }
 
     fn map(&self, x: El<R>) -> El<R> { x }
 
@@ -1012,7 +1010,7 @@ impl<R: RingStore> Homomorphism<R::Type, R::Type> for Identity<R> {
     fn fma_map(&self, lhs: &El<R>, rhs: &El<R>, summand: El<R>) -> El<R> { self.ring.get_ring().fma(lhs, rhs, summand) }
 }
 
-impl<'a, S, R, H> Homomorphism<S, R> for &'a H
+impl<S, R, H> Homomorphism<S, R> for &H
 where
     S: ?Sized + RingBase,
     R: ?Sized + RingBase,
@@ -1021,9 +1019,9 @@ where
     type CodomainStore = H::CodomainStore;
     type DomainStore = H::DomainStore;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { (*self).codomain() }
+    fn codomain(&self) -> &Self::CodomainStore { (*self).codomain() }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { (*self).domain() }
+    fn domain(&self) -> &Self::DomainStore { (*self).domain() }
 
     fn map(&self, x: <S as RingBase>::Element) -> <R as RingBase>::Element { (*self).map(x) }
 
@@ -1111,9 +1109,9 @@ where
     type CodomainStore = S;
     type DomainStore = R;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
     fn map(&self, x: El<R>) -> <S::Type as RingBase>::Element { (self.f)(self.domain(), self.codomain(), &x) }
 
@@ -1198,9 +1196,9 @@ where
     type DomainStore = <F as Homomorphism<R, S>>::DomainStore;
     type CodomainStore = <G as Homomorphism<S, T>>::CodomainStore;
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { self.f.domain() }
+    fn domain(&self) -> &Self::DomainStore { self.f.domain() }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { self.g.codomain() }
+    fn codomain(&self) -> &Self::CodomainStore { self.g.codomain() }
 
     fn map(&self, x: <R as RingBase>::Element) -> <T as RingBase>::Element { self.g.map(self.f.map(x)) }
 

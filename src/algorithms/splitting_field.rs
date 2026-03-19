@@ -47,8 +47,8 @@ where
     K: RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>,
     Controller: ComputationController,
 {
-    assert!(!poly_ring.is_zero(&irred_poly));
-    assert!(poly_ring.degree(&irred_poly).unwrap() > 1);
+    assert!(!poly_ring.is_zero(irred_poly));
+    assert!(poly_ring.degree(irred_poly).unwrap() > 1);
     assert!(<NumberFieldBase<_, _> as FactorPolyField>::is_irred(
         &poly_ring, irred_poly
     ));
@@ -128,7 +128,7 @@ where
         let gen_poly = kX.from_terms(
             (0..total_rank)
                 .map(|i| (k.negate(k.clone_el(sol.at(i, 0))), i))
-                .chain([(k.one(), total_rank)].into_iter()),
+                .chain([(k.one(), total_rank)]),
         );
         let K_generator = kX.from_terms((0..total_rank).map(|i| (k.clone_el(sol.at(i, 1)), i)));
         let L_generator = kX.from_terms((0..total_rank).map(|i| (k.clone_el(sol.at(i, 2)), i)));
@@ -146,8 +146,8 @@ pub fn extend_galois_field<K>(
 where
     K: RingStore<Type = GaloisFieldBase<DefaultGaloisFieldImpl>>,
 {
-    assert!(!poly_ring.is_zero(&irred_poly));
-    assert!(poly_ring.degree(&irred_poly).unwrap() > 1);
+    assert!(!poly_ring.is_zero(irred_poly));
+    assert!(poly_ring.degree(irred_poly).unwrap() > 1);
 
     // I wonder what is the better method: Either factoring the polynomial (taking `O(d^3 log(q))`
     // operations in `GF(q)`, or up to `d/log(d)` less with better convolution algorithms), or
@@ -161,9 +161,9 @@ where
     let L = AsField::from(AsFieldBase::promise_is_perfect_field(
         FreeAlgebraImpl::new_with_convolution(
             K,
-            poly_ring.degree(&irred_poly).unwrap(),
-            (0..poly_ring.degree(&irred_poly).unwrap())
-                .map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i))))
+            poly_ring.degree(irred_poly).unwrap(),
+            (0..poly_ring.degree(irred_poly).unwrap())
+                .map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(irred_poly, i))))
                 .collect::<Vec<_>>(),
             "X",
             Global,
@@ -178,12 +178,12 @@ where
         let potential_primitive_element = L.random_element(|| rng.rand_u64());
 
         if let Some((FpX, gen_poly, K_gen, L_gen)) = test_primitive_element(&L, potential_primitive_element) {
-            let mut modulus = SparseMapVector::new(total_rank, Fp.clone());
+            let mut modulus = SparseMapVector::new(total_rank, *Fp);
             for (x, i) in FpX.terms(&gen_poly).filter(|(_, i)| *i < total_rank) {
                 *modulus.at_mut(i) = Fp.clone_el(x);
             }
             _ = modulus.at_mut(0);
-            let potential_result = FreeAlgebraImpl::new(Fp.clone(), total_rank, modulus);
+            let potential_result = FreeAlgebraImpl::new(*Fp, total_rank, modulus);
 
             if let Ok(result) = potential_result.as_field() {
                 let result = GaloisField::create(result);
@@ -226,8 +226,8 @@ where
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: FactorPolyField);
     static_assert_impls!(NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>: PolyTFracGCDRing);
 
-    assert!(!poly_ring.is_zero(&irred_poly));
-    assert!(poly_ring.degree(&irred_poly).unwrap() > 1);
+    assert!(!poly_ring.is_zero(irred_poly));
+    assert!(poly_ring.degree(irred_poly).unwrap() > 1);
 
     controller.run_computation(
         format_args!(
@@ -241,9 +241,9 @@ where
             let L = AsField::from(AsFieldBase::promise_is_perfect_field(
                 FreeAlgebraImpl::new_with_convolution(
                     K,
-                    poly_ring.degree(&irred_poly).unwrap(),
-                    (0..poly_ring.degree(&irred_poly).unwrap())
-                        .map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(&irred_poly, i))))
+                    poly_ring.degree(irred_poly).unwrap(),
+                    (0..poly_ring.degree(irred_poly).unwrap())
+                        .map(|i| K.negate(K.clone_el(poly_ring.coefficient_at(irred_poly, i))))
                         .collect::<Vec<_>>(),
                     "X",
                     Global,
@@ -440,7 +440,7 @@ where
     let n = poly_ring.indeterminate_count();
     let constant_monomial = poly_ring.create_monomial((0..n).map(|_| 0));
     if lex_gb.iter().any(|f| {
-        poly_ring.appearing_indeterminates(f).len() == 0
+        poly_ring.appearing_indeterminates(f).is_empty()
             && !poly_ring
                 .base_ring()
                 .is_zero(poly_ring.coefficient_at(f, &constant_monomial))
@@ -468,7 +468,7 @@ where
                 .filter(|f| contains_indeterminate(f, indet) && has_no_indeterminate_before(f, indet))
                 .collect::<Vec<_>>();
             assert!(
-                relevant_polys.len() > 0,
+                !relevant_polys.is_empty(),
                 "basis is either not a lex-GB or does not generate a zero-dimensional ideal"
             );
             return relevant_polys;

@@ -200,7 +200,7 @@ where
     }
 }
 
-impl<'a, 'b, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for &'b RingElementWrapper<R>
+impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for &RingElementWrapper<R>
 where
     R::Type: Field,
 {
@@ -214,7 +214,7 @@ where
     }
 }
 
-impl<'a, R: RingStore + Clone> Div<RingElementWrapper<R>> for &'a RingElementWrapper<R>
+impl<R: RingStore + Clone> Div<RingElementWrapper<R>> for &RingElementWrapper<R>
 where
     R::Type: Field,
 {
@@ -340,7 +340,7 @@ where
     }
 }
 
-impl<'a, R: RingStore + Clone> Div<i32> for &'a RingElementWrapper<R>
+impl<R: RingStore + Clone> Div<i32> for &RingElementWrapper<R>
 where
     R::Type: Field,
 {

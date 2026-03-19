@@ -251,7 +251,7 @@ where
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         poly_ring.sub(
-            poly_ring.from_terms([(poly_ring.base_ring().one(), self.rank())].into_iter()),
+            poly_ring.from_terms([(poly_ring.base_ring().one(), self.rank())]),
             self.poly_repr(&poly_ring, &self.pow(self.canonical_gen(), self.rank()), hom),
         )
     }
@@ -434,16 +434,16 @@ where
     type DomainStore = R;
     type CodomainStore = S;
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
     fn map(&self, x: El<R>) -> El<S> { self.map_ref(&x) }
 
     fn map_ref(&self, x: &El<R>) -> El<S> {
         let poly_ring = DensePolyRing::new(self.to.base_ring(), "X");
         return poly_ring.evaluate(
-            &self.from.poly_repr(&poly_ring, &x, self.to.base_ring().identity()),
+            &self.from.poly_repr(&poly_ring, x, self.to.base_ring().identity()),
             &self.image_of_generator,
             self.to.inclusion(),
         );

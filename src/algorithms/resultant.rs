@@ -61,7 +61,7 @@ where
     let mut scale_num = base_ring.one();
 
     if ring.degree(&g).unwrap() < ring.degree(&f).unwrap() {
-        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap() % 2 != 0 {
+        if !ring.degree(&g).unwrap().is_multiple_of(2) && !ring.degree(&f).unwrap().is_multiple_of(2) {
             base_ring.negate_inplace(&mut scale_num);
         }
         std::mem::swap(&mut f, &mut g);
@@ -92,7 +92,7 @@ where
         g = f;
         f = r;
 
-        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap_or(0) % 2 != 0 {
+        if !ring.degree(&g).unwrap().is_multiple_of(2) && !ring.degree(&f).unwrap_or(0).is_multiple_of(2) {
             base_ring.negate_inplace(&mut scale_num);
         }
     }
@@ -100,7 +100,7 @@ where
     if ring.is_zero(&f) {
         return base_ring.zero();
     } else {
-        let mut result = base_ring.clone_el(&ring.coefficient_at(&f, 0));
+        let mut result = base_ring.clone_el(ring.coefficient_at(&f, 0));
         result = base_ring.pow(result, ring.degree(&g).unwrap());
         base_ring.mul_assign(&mut result, scale_num);
         return base_ring.checked_div(&result, &scale_den).unwrap();
@@ -124,7 +124,7 @@ where
     }
     let mut scale = base_ring.one();
     if ring.degree(&g).unwrap() < ring.degree(&f).unwrap() {
-        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap() % 2 != 0 {
+        if !ring.degree(&g).unwrap().is_multiple_of(2) && !ring.degree(&f).unwrap().is_multiple_of(2) {
             base_ring.negate_inplace(&mut scale);
         }
         swap(&mut f, &mut g);
@@ -144,7 +144,7 @@ where
         );
 
         swap(&mut f, &mut g);
-        if ring.degree(&g).unwrap() % 2 != 0 && ring.degree(&f).unwrap_or(0) % 2 != 0 {
+        if !ring.degree(&g).unwrap().is_multiple_of(2) && !ring.degree(&f).unwrap_or(0).is_multiple_of(2) {
             base_ring.negate_inplace(&mut scale);
         }
     }
@@ -152,7 +152,7 @@ where
     if ring.is_zero(&f) {
         return base_ring.zero();
     } else {
-        let mut result = base_ring.clone_el(&ring.coefficient_at(&f, 0));
+        let mut result = base_ring.clone_el(ring.coefficient_at(&f, 0));
         result = base_ring.pow(result, ring.degree(&g).unwrap());
         base_ring.mul_assign(&mut result, scale);
         return result;

@@ -93,7 +93,7 @@ where
                 + 1) as usize;
             let a = Fp.random_element(|| rng.rand_u64());
             let b = Fp.random_element(|| rng.rand_u64());
-            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)].into_iter());
+            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)]);
             if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
                 return result;
             }
@@ -167,20 +167,17 @@ where
             // would indeed generate the field
             let FqX = DensePolyRing::new(&Fq, "X");
             let minpoly = FqX.prod((0..small_d).map(|i| {
-                FqX.from_terms(
-                    [
-                        (
-                            Fq.negate(Fq.pow_gen(
-                                Fq.clone_el(&primitive_element),
-                                &ZZbig.pow(ZZbig.clone_el(&p), i as usize),
-                                ZZbig,
-                            )),
-                            0,
-                        ),
-                        (Fq.one(), 1),
-                    ]
-                    .into_iter(),
-                )
+                FqX.from_terms([
+                    (
+                        Fq.negate(Fq.pow_gen(
+                            Fq.clone_el(&primitive_element),
+                            &ZZbig.pow(ZZbig.clone_el(&p), i as usize),
+                            ZZbig,
+                        )),
+                        0,
+                    ),
+                    (Fq.one(), 1),
+                ])
             }));
             let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
                 let c_wrt_basis = Fq.wrt_canonical_basis(c);
@@ -189,8 +186,8 @@ where
             }));
             let f = poly_ring.evaluate(
                 &minpoly_Fp,
-                &poly_ring.from_terms([(Fp.one(), large_d as usize)].into_iter()),
-                &poly_ring.inclusion(),
+                &poly_ring.from_terms([(Fp.one(), large_d as usize)]),
+                poly_ring.inclusion(),
             );
             return f;
         }
@@ -201,7 +198,7 @@ where
         let f = poly_ring.from_terms(
             (0..degree)
                 .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
-                .chain([(Fp.one(), degree)].into_iter()),
+                .chain([(Fp.one(), degree)]),
         );
         if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
             return result;
@@ -475,7 +472,7 @@ where
         R: Copy,
     {
         assert!(degree >= 1);
-        let poly_ring = DensePolyRing::new(base_ring.clone(), "X");
+        let poly_ring = DensePolyRing::new(base_ring, "X");
         let mut rng = oorandom::Rand64::new(
             poly_ring
                 .base_ring()
@@ -483,7 +480,7 @@ where
                 .default_hash(poly_ring.base_ring().modulus()) as u128,
         );
         let modulus = find_small_irreducible_poly(&poly_ring, degree, &mut rng);
-        let mut modulus_vec = SparseMapVector::new(degree, base_ring.clone());
+        let mut modulus_vec = SparseMapVector::new(degree, base_ring);
         for (c, i) in poly_ring.terms(&modulus) {
             if i != degree {
                 *modulus_vec.at_mut(i) = base_ring.negate(base_ring.clone_el(c));

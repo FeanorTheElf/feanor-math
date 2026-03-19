@@ -229,11 +229,7 @@ where
 
         let mut count_since_last_reduction = 0;
         let mut current_max_sum_len = usize::MAX;
-        let mut current_log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
-            log2_data_size
-        } else {
-            0
-        };
+        let mut current_log2_data_size = ring_log2_el_size.unwrap_or_default();
         for (lhs, lhs_prep, rhs, rhs_prep) in data {
             if lhs.len() == 0 || rhs.len() == 0 {
                 continue;

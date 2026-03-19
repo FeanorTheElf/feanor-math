@@ -161,9 +161,9 @@ where
     type CodomainStore = R;
     type DomainStore = R;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.field }
+    fn codomain(&self) -> &Self::CodomainStore { &self.field }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.field }
+    fn domain(&self) -> &Self::DomainStore { &self.field }
 
     fn map(&self, x: <R::Type as RingBase>::Element) -> <R::Type as RingBase>::Element {
         self.field.get_ring().apply_frobenius(&self.data, self.exponent_of_p, x)

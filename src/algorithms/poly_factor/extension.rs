@@ -110,9 +110,8 @@ where
 
             for _ in 0..attempts {
                 let k = StaticRing::<i32>::RING.get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());
-                let lin_transform =
-                    LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
-                let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
+                let lin_transform = LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)]);
+                let f_transformed = LX.evaluate(f, &lin_transform, LX.inclusion());
 
                 let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
                 log_progress!(controller, "(norm)");
@@ -122,7 +121,7 @@ where
 
                 if KX.degree(&squarefree_part).unwrap() == degree {
                     let lin_transform_rev =
-                        LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
+                        LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)]);
                     let (factorization, _unit) =
                         <_ as FactorPolyField>::factor_poly_with_controller(&KX, &squarefree_part, controller.clone());
                     log_progress!(controller, "(factored)");
@@ -136,7 +135,7 @@ where
                                 &f_transformed,
                                 &LX.lifted_hom(&KX, L.inclusion()).map(factor),
                             ));
-                            return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
+                            return LX.evaluate(&f_factor, &lin_transform_rev, LX.inclusion());
                         })
                         .collect());
                 }
@@ -184,12 +183,7 @@ where
                 .ok()
                 .unwrap()
         {
-            if let Some((i, _)) = result
-                .iter()
-                .enumerate()
-                .filter(|(_, f)| KX.eq_el(&f.0, &factor))
-                .next()
-            {
+            if let Some((i, _)) = result.iter().enumerate().find(|(_, f)| KX.eq_el(&f.0, &factor)) {
                 result[i].1 += k;
             } else {
                 result.push((factor, k));

@@ -156,7 +156,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
         let mut data = Vec::with_capacity_in(val.data.len(), self.element_allocator.clone());
-        data.extend((0..val.data.len()).map(|i| self.base_ring.clone_el(&val.data.at(i))));
+        data.extend((0..val.data.len()).map(|i| self.base_ring.clone_el(val.data.at(i))));
         DensePolyRingEl { data }
     }
 
@@ -238,7 +238,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
-    fn square(&self, value: &mut Self::Element) { *value = self.mul_ref(&value, &value); }
+    fn square(&self, value: &mut Self::Element) { *value = self.mul_ref(value, value); }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         let lhs_len = if self.base_ring().get_ring().is_approximate() {
@@ -280,7 +280,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         I: IntoIterator<Item = Self::Element>,
     {
         let mut elements = els.into_iter().collect::<Vec<_>>();
-        if elements.len() == 0 {
+        if elements.is_empty() {
             return self.one();
         }
         elements.sort_unstable_by_key(|f| self.degree(f).unwrap_or(0));
@@ -293,7 +293,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingB
         {
             let step = 1 << i;
             for j in (0..(elements.len() - step)).step_by(2 * step) {
-                let (a, b) = (&mut elements[j..(j + step + 1)]).split_at_mut(step);
+                let (a, b) = elements[j..(j + step + 1)].split_at_mut(step);
                 self.mul_assign_ref(&mut a[0], &b[0]);
             }
         }
@@ -449,7 +449,7 @@ impl<R: RingStore, A: Allocator + Clone, C: ConvolutionAlgorithm<R::Type>> RingE
 {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
+    fn base_ring(&self) -> &Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result = self.zero();
@@ -509,7 +509,7 @@ where
     type Item = (&'a El<R>, usize);
 
     fn next(&mut self) -> Option<Self::Item> {
-        while let Some((i, c)) = self.iter.next() {
+        for (i, c) in self.iter.by_ref() {
             if self.ring.get_ring().is_approximate() || !self.ring.is_zero(c) {
                 return Some((c, i));
             }
@@ -583,9 +583,7 @@ where
 
     fn indeterminate(&self) -> Self::Element {
         let mut result = self.zero();
-        result
-            .data
-            .extend([self.base_ring().zero(), self.base_ring().one()].into_iter());
+        result.data.extend([self.base_ring().zero(), self.base_ring().one()]);
         return result;
     }
 
@@ -625,12 +623,7 @@ where
     }
 
     fn degree(&self, f: &Self::Element) -> Option<usize> {
-        for i in (0..f.data.len()).rev() {
-            if !self.base_ring().is_zero(&f.data[i]) {
-                return Some(i);
-            }
-        }
-        return None;
+        (0..f.data.len()).rev().find(|&i| !self.base_ring().is_zero(&f.data[i]))
     }
 
     fn div_rem_monic(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
@@ -790,7 +783,7 @@ where
                     RingRef::new(self),
                     self.clone_el(lhs),
                     rhs,
-                    |x| self.base_ring().checked_left_div(&x, lc).ok_or(()),
+                    |x| self.base_ring().checked_left_div(x, lc).ok_or(()),
                     DontObserve,
                 )
                 .ok()?;
@@ -813,18 +806,16 @@ where
                     RingRef::new(self),
                     self.clone_el(lhs),
                     rhs,
-                    |x| self.base_ring().checked_left_div(&x, lc).ok_or(()),
+                    |x| self.base_ring().checked_left_div(x, lc).ok_or(()),
                     DontObserve,
                 ) {
-                    if self.is_zero(&rem) { true } else { false }
+                    self.is_zero(&rem)
                 } else {
                     false
                 }
             }
-        } else if self.is_zero(lhs) {
-            true
         } else {
-            false
+            self.is_zero(lhs)
         }
     }
 
@@ -900,7 +891,7 @@ where
             RingRef::new(self),
             lhs,
             rhs,
-            |x| Ok(self.base_ring().mul_ref(&x, &lc_inv)),
+            |x| Ok(self.base_ring().mul_ref(x, &lc_inv)),
             DontObserve,
         )
         .unwrap_or_else(no_error);

@@ -42,7 +42,7 @@ impl UnsafeAny {
         }
     }
 
-    pub unsafe fn get<'a, T>(&'a self) -> &'a T {
+    pub unsafe fn get<T>(&self) -> &T {
         assert!(self.data.is_some());
         // that is basicaly the only check we are able to do...
         assert_eq!(size_of::<T>(), unsafe { self.data.unwrap().as_ref().len() });

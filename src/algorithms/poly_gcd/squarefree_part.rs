@@ -62,7 +62,7 @@ where
     // polynomials might after all still turn out to be perfect powers; the alternative to this
     // check here would be to check previously if all "factors" really divide f; I believe this
     // is faster
-    if !RX.eq_el(&poly, &RX.prod(result.iter().map(|(f, k)| RX.pow(RX.clone_el(f), *k)))) {
+    if !RX.eq_el(poly, &RX.prod(result.iter().map(|(f, k)| RX.pow(RX.clone_el(f), *k)))) {
         return None;
     }
     return Some(result);
@@ -208,13 +208,13 @@ where
                         }
                         Some((new_signature, local_power_decomposition)) => {
                             if new_signature
-                                == &[Signature {
+                                == [Signature {
                                     degree: poly_ring.degree(poly).unwrap(),
                                     perfect_power: 1,
                                 }]
                             {
                                 return vec![(poly_ring.clone_el(poly), 1)];
-                            } else if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
+                            } else if signature.is_some() && signature.as_ref().unwrap()[..] != new_signature[..] {
                                 log_progress!(controller, "(signature_mismatch)");
                                 continue 'try_random_ideal;
                             } else {
@@ -270,7 +270,7 @@ where
     let result = power_decomposition
         .into_iter()
         .map(|(fi, i)| {
-            let mut result = unevaluate_aX(poly_ring, &fi, &lcf);
+            let mut result = unevaluate_aX(poly_ring, &fi, lcf);
             _ = poly_ring.balance_poly(&mut result);
             return (result, i);
         })

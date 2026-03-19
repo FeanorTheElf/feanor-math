@@ -110,7 +110,7 @@ pub trait PolyRing: RingExtension {
         if let Some(balance_factor) = &balance_factor {
             *f = RingRef::new(self).from_terms(
                 self.terms(f)
-                    .map(|(c, i)| (self.base_ring().checked_div(c, &balance_factor).unwrap(), i)),
+                    .map(|(c, i)| (self.base_ring().checked_div(c, balance_factor).unwrap(), i)),
             );
         }
         return balance_factor;
@@ -244,7 +244,7 @@ where
             let lc = self.lc(&f).unwrap();
             return self.from_terms(
                 self.terms(&f)
-                    .map(|(c, i)| (self.base_ring().checked_div(c, &lc).unwrap(), i)),
+                    .map(|(c, i)| (self.base_ring().checked_div(c, lc).unwrap(), i)),
             );
         }
     }
@@ -277,7 +277,7 @@ where
 
     /// Lifts the given homomorphism of base rings `S -> R` to the corresponding
     /// homomorphism of polynomial rings `S[X] -> R[X]`.
-    fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
+    fn lifted_hom<P, H>(&self, from: P, hom: H) -> CoefficientHom<P, &Self, H>
     where
         P: RingStore,
         P::Type: PolyRing,
@@ -415,9 +415,9 @@ where
     type DomainStore = PFrom;
     type CodomainStore = PTo;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
     fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element { self.map_ref(&x) }
 
@@ -542,9 +542,9 @@ pub mod generic_impls {
         let second_term = terms.next();
         let use_parenthesis = (env > EnvBindingStrength::Sum && second_term.is_some())
             || (env > EnvBindingStrength::Product
-                && !(ring.base_ring().is_one(&first_term.as_ref().unwrap().0) && first_term.as_ref().unwrap().1 == 1))
+                && !(ring.base_ring().is_one(first_term.as_ref().unwrap().0) && first_term.as_ref().unwrap().1 == 1))
             || env == EnvBindingStrength::Strongest;
-        let mut terms = first_term.into_iter().chain(second_term.into_iter()).chain(terms);
+        let mut terms = first_term.into_iter().chain(second_term).chain(terms);
         if use_parenthesis {
             write!(out, "(")?;
         }
@@ -574,7 +574,7 @@ pub mod generic_impls {
         } else {
             write!(out, "0")?;
         }
-        while let Some((c, i)) = terms.next() {
+        for (c, i) in terms {
             write!(out, " + ")?;
             if ring.base_ring().get_ring().is_approximate() || !ring.base_ring().is_one(c) || i == 0 {
                 ring.base_ring().get_ring().dbg_within(
@@ -622,11 +622,7 @@ pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> imp
                 }
             }
         }
-        return to.from_terms(
-            result_terms
-                .into_iter()
-                .map(|(j, f)| (to.base_ring().from_terms(f.into_iter()), j)),
-        );
+        return to.from_terms(result_terms.into_iter().map(|(j, f)| (to.base_ring().from_terms(f), j)));
     })
 }
 

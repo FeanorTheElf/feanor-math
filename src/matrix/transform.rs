@@ -67,7 +67,7 @@ where
     }
 }
 
-impl<'a, T, R> TransformTarget<R> for &'a mut T
+impl<T, R> TransformTarget<R> for &mut T
 where
     R: ?Sized + RingBase,
     T: TransformTarget<R>,

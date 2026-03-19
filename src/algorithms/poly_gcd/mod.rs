@@ -185,7 +185,7 @@ where
         return poly_ring.zero();
     }
     let ring = poly_ring.base_ring();
-    let d = poly_ring.degree(&f).unwrap();
+    let d = poly_ring.degree(f).unwrap();
     let result = poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| {
         if i == d {
             (ring.checked_div(c, a).unwrap(), d)
@@ -208,7 +208,7 @@ where
         return poly_ring.zero();
     }
     let ring = poly_ring.base_ring();
-    let d = poly_ring.degree(&g).unwrap();
+    let d = poly_ring.degree(g).unwrap();
     let result = poly_ring.from_terms(poly_ring.terms(g).map(|(c, i)| {
         if i == d {
             (ring.mul_ref(c, a), d)
@@ -266,8 +266,8 @@ where
     P::Type: PolyRing,
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
 {
-    assert!(poly_ring.degree(&f).unwrap() % k == 0);
-    let d = poly_ring.degree(&f).unwrap() / k;
+    assert!(poly_ring.degree(f).unwrap().is_multiple_of(k));
+    let d = poly_ring.degree(f).unwrap() / k;
     let ring = poly_ring.base_ring();
     let k_in_ring = ring.int_hom().map(k.try_into().unwrap());
 
@@ -280,14 +280,14 @@ where
         );
         let partition_sum = poly_ring.coefficient_at(&g, i);
         let next_coeff = ring.checked_div(
-            &ring.sub_ref(poly_ring.coefficient_at(&f, k * d - i), partition_sum),
+            &ring.sub_ref(poly_ring.coefficient_at(f, k * d - i), partition_sum),
             &k_in_ring,
         )?;
         result_reversed.push(next_coeff);
     }
 
     let result = poly_ring.from_terms(result_reversed.into_iter().enumerate().map(|(i, c)| (c, d - i)));
-    if poly_ring.eq_el(&f, &poly_ring.pow(poly_ring.clone_el(&result), k)) {
+    if poly_ring.eq_el(f, &poly_ring.pow(poly_ring.clone_el(&result), k)) {
         return Some(result);
     } else {
         return None;
@@ -346,7 +346,7 @@ where
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
                     "X",
                 );
-                let new_poly = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| {
+                let new_poly = new_poly_ring.from_terms(self.0.terms(self.1).map(|(c, i)| {
                     (
                         new_poly_ring
                             .base_ring()
@@ -427,7 +427,7 @@ where
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
                     "X",
                 );
-                let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| {
+                let new_lhs = new_poly_ring.from_terms(self.0.terms(self.1).map(|(c, i)| {
                     (
                         new_poly_ring
                             .base_ring()
@@ -436,7 +436,7 @@ where
                         i,
                     )
                 }));
-                let new_rhs = new_poly_ring.from_terms(self.0.terms(&self.2).map(|(c, i)| {
+                let new_rhs = new_poly_ring.from_terms(self.0.terms(self.2).map(|(c, i)| {
                     (
                         new_poly_ring
                             .base_ring()

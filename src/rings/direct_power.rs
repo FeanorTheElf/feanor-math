@@ -70,37 +70,37 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
     fn clone_el(&self, val: &Self::Element) -> Self::Element { from_fn(|i| self.base.clone_el(&val[i])) }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.add_assign_ref(tgt, src)
         }
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.add_assign(tgt, src)
         }
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.sub_assign_ref(tgt, src)
         }
     }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) {
-        for val in lhs.into_iter() {
+        for val in lhs.iter_mut() {
             self.base.negate_inplace(val);
         }
     }
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.mul_assign(tgt, src)
         }
     }
 
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.mul_assign_ref(tgt, src)
         }
     }
@@ -117,13 +117,13 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        lhs.into_iter().zip(rhs.into_iter()).all(|(l, r)| self.base.eq_el(l, r))
+        lhs.iter().zip(rhs).all(|(l, r)| self.base.eq_el(l, r))
     }
 
-    fn is_zero(&self, value: &Self::Element) -> bool { value.into_iter().all(|v| self.base.is_zero(v)) }
+    fn is_zero(&self, value: &Self::Element) -> bool { value.iter().all(|v| self.base.is_zero(v)) }
 
-    fn is_one(&self, value: &Self::Element) -> bool { value.into_iter().all(|v| self.base.is_one(v)) }
-    fn is_neg_one(&self, value: &Self::Element) -> bool { value.into_iter().all(|v| self.base.is_neg_one(v)) }
+    fn is_one(&self, value: &Self::Element) -> bool { value.iter().all(|v| self.base.is_one(v)) }
+    fn is_neg_one(&self, value: &Self::Element) -> bool { value.iter().all(|v| self.base.is_neg_one(v)) }
 
     fn is_commutative(&self) -> bool { self.base.is_commutative() }
 
@@ -151,31 +151,31 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
     }
 
     fn square(&self, value: &mut Self::Element) {
-        for val in value.into_iter() {
+        for val in value.iter_mut() {
             self.base.square(val)
         }
     }
 
     fn sub_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.sub_assign(tgt, src)
         }
     }
 
     fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
-        for tgt in lhs.into_iter() {
+        for tgt in lhs.iter_mut() {
             self.base.get_ring().mul_assign_int(tgt, rhs)
         }
     }
 
     fn sub_self_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.sub_self_assign(tgt, src)
         }
     }
 
     fn sub_self_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
-        for (tgt, src) in lhs.into_iter().zip(rhs.into_iter()) {
+        for (tgt, src) in lhs.iter_mut().zip(rhs) {
             self.base.sub_self_assign_ref(tgt, src)
         }
     }
@@ -205,14 +205,14 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
 impl<R: RingStore, const N: usize> RingExtension for DirectPowerRingBase<R, N> {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base }
+    fn base_ring(&self) -> &Self::BaseRing { &self.base }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.from_ref(&x) }
 
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element { from_fn(|_| self.base.clone_el(x)) }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {
-        for tgt in lhs.into_iter() {
+        for tgt in lhs.iter_mut() {
             self.base.mul_assign_ref(tgt, rhs);
         }
     }
@@ -223,7 +223,7 @@ impl<R: RingStore, const N: usize> RingExtension for DirectPowerRingBase<R, N> {
         rhs: &S::Element,
         hom: H,
     ) {
-        for tgt in lhs.into_iter() {
+        for tgt in lhs.iter_mut() {
             hom.mul_assign_ref_map(tgt, rhs);
         }
     }
@@ -462,7 +462,7 @@ where
     R::Type: HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        for val in el.into_iter() {
+        for val in el.iter() {
             self.base.get_ring().hash(val, h);
         }
     }
@@ -479,7 +479,7 @@ where
         DeserializeSeedNewtypeStruct::new(
             "DirectPowerRingEl",
             DeserializeSeedSeq::new(
-                std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(N + 1),
+                std::iter::repeat_n(DeserializeWithRing::new(self.base_ring()), N + 1),
                 (from_fn(|_| None), 0),
                 |(mut current, mut current_idx), next| {
                     current[current_idx] = Some(next);

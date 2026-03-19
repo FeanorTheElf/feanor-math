@@ -29,7 +29,7 @@ where
     fn next(&mut self) -> Option<Self::Item> {
         if self.done {
             return None;
-        } else if self.iterators.len() == 0 {
+        } else if self.iterators.is_empty() {
             self.done = true;
             return Some((self.converter)(&[]));
         }
@@ -134,7 +134,7 @@ pub fn clone_slice<T>(slice: &[T]) -> Box<[T]>
 where
     T: Clone,
 {
-    let vec: Vec<T> = slice.iter().cloned().collect();
+    let vec: Vec<T> = slice.to_vec();
     return vec.into_boxed_slice();
 }
 
@@ -208,9 +208,7 @@ where
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        if self.current.is_none() {
-            return None;
-        }
+        self.current.as_ref()?;
         let current = &mut self.current.as_mut().unwrap();
         let result = (self.converter)(current);
         let mut removed = 0;
@@ -286,7 +284,7 @@ pub fn multiset_combinations<'a, F, T>(
 where
     F: FnMut(&[usize]) -> T,
 {
-    assert!(multiset.len() > 0);
+    assert!(!multiset.is_empty());
     if size > multiset.iter().copied().sum::<usize>() {
         return MultisetCombinations {
             converter,
@@ -375,7 +373,7 @@ where
         let mut i = self.base_iters.len();
         self.done = true;
         while i > 0 {
-            i = i - 1;
+            i -= 1;
             if let Some(val) = self.current_iters[i].next() {
                 self.current[i] = val;
                 self.done = false;
@@ -479,7 +477,7 @@ where
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        while let Some(el) = self.base_iter.next() {
+        for el in self.base_iter.by_ref() {
             if let Some(result) = (self.f)(el) {
                 return Some(result);
             }

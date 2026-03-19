@@ -1,3 +1,5 @@
+// TODO: Allow explicit returns in a more fine-grained way.
+#![allow(clippy::needless_return)]
 #![allow(non_snake_case)]
 #![allow(non_camel_case_types)]
 #![allow(non_upper_case_globals)]

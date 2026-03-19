@@ -141,7 +141,7 @@ where
     /// provided, which has to be able to store values of size at least `n^3`.
     #[stability::unstable(feature = "enable")]
     pub fn new_with_alloc(summands: Vec<C>, large_integers: J, element_allocator: A) -> Self {
-        assert!(summands.len() > 0);
+        assert!(!summands.is_empty());
         let total_modulus = large_integers.prod(
             summands
                 .iter()
@@ -261,7 +261,7 @@ where
 {
     fn len(&self) -> usize { self.get_ring().len() }
 
-    fn at(&self, index: usize) -> &C { &self.get_ring().at(index) }
+    fn at(&self, index: usize) -> &C { self.get_ring().at(index) }
 }
 
 impl<C: RingStore, J: RingStore, A: Allocator + Clone> VectorView<C> for ZnBase<C, J, A>
@@ -315,7 +315,7 @@ where
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        for (i, el) in (0..self.components.len()).zip(rhs.data.into_iter()) {
+        for (i, el) in (0..self.components.len()).zip(rhs.data) {
             self.components[i].add_assign_ref(&mut lhs.data[i], &el)
         }
     }
@@ -333,7 +333,7 @@ where
     }
 
     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
-        for (i, el) in (0..self.components.len()).zip(rhs.data.into_iter()) {
+        for (i, el) in (0..self.components.len()).zip(rhs.data) {
             self.components[i].mul_assign_ref(&mut lhs.data[i], &el)
         }
     }
@@ -595,7 +595,7 @@ where
             self.total_ring.get_ring(),
             self.components
                 .iter()
-                .zip(el.data.into_iter())
+                .zip(el.data)
                 .map(|(R, x): (&C, El<C>)| R.smallest_positive_lift(x))
                 .zip(self.unit_vectors.iter())
                 .map(|(x, u)| {
@@ -655,13 +655,11 @@ where
     type Homomorphism = Vec<<C::Type as CanHomFrom<K>>::Homomorphism>;
 
     fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
-        Some(
-            self.components
-                .iter()
-                .map(|R| <C::Type as CanHomFrom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
-                .collect::<Result<Vec<<C::Type as CanHomFrom<K>>::Homomorphism>, ()>>()
-                .ok()?,
-        )
+        self.components
+            .iter()
+            .map(|R| <C::Type as CanHomFrom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
+            .collect::<Result<Vec<<C::Type as CanHomFrom<K>>::Homomorphism>, ()>>()
+            .ok()
     }
 
     fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
@@ -733,7 +731,7 @@ where
 {
     extern "rust-call" fn call_mut(&mut self, args: (&'b [El<C>],)) -> Self::Output {
         self.ring
-            .from_congruence(args.0.into_iter().enumerate().map(|(i, x)| self.ring.at(i).clone_el(x)))
+            .from_congruence(args.0.iter().enumerate().map(|(i, x)| self.ring.at(i).clone_el(x)))
     }
 }
 
@@ -979,8 +977,8 @@ where
                 "RNSZnEl",
                 DeserializeSeedSeq::new(
                     self.as_iter()
-                        .map(|ring| DeserializeWithRing::new(ring))
-                        .chain([DeserializeWithRing::new(dummy_ring)].into_iter()),
+                        .map(DeserializeWithRing::new)
+                        .chain([DeserializeWithRing::new(dummy_ring)]),
                     Vec::with_capacity_in(self.len(), self.element_allocator.clone()),
                     |mut current, next| {
                         current.push(next);

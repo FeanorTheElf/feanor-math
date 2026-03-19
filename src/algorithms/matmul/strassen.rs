@@ -696,7 +696,7 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
             debug_assert_eq!(lhs_rows.len() % block_size, 0);
             debug_assert_eq!(ks.len() % block_size, 0);
             debug_assert_eq!(rhs_cols.len() % block_size, 0);
-            if lhs_rows.len() == 0 || ks.len() == 0 || rhs_cols.len() == 0 {
+            if lhs_rows.is_empty() || ks.is_empty() || rhs_cols.is_empty() {
                 return;
             }
             for lhs_row in lhs_rows.step_by(block_size) {

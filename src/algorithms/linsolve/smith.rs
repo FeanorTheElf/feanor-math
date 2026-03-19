@@ -130,7 +130,7 @@ where
         let pivot = lhs.at(i, i);
         for j in 0..rhs.col_count() {
             if let Some(quo) = ring.checked_left_div(rhs.at(i, j), pivot) {
-                solution_unique &= ring.is_zero(&ring.annihilator(&pivot));
+                solution_unique &= ring.is_zero(&ring.annihilator(pivot));
                 *out.at_mut(i, j) = quo;
             } else {
                 return SolveResult::NoSolution;
@@ -244,7 +244,7 @@ where
     }
 
     fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, _i: usize, _j: usize) {
-        ring.negate_inplace(&mut self.current_unit)
+        ring.negate_inplace(self.current_unit)
     }
 
     fn transform<S: Copy + RingStore<Type = R>>(
@@ -258,7 +258,7 @@ where
             ring.mul_ref(&transform[0], &transform[3]),
             ring.mul_ref(&transform[1], &transform[2]),
         );
-        ring.mul_assign(&mut self.current_unit, unit);
+        ring.mul_assign(self.current_unit, unit);
     }
 }
 

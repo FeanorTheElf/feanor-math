@@ -12,13 +12,9 @@ use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::divisibility::*;
-use crate::homomorphism::*;
-use crate::integer::*;
 use crate::ordered::OrderedRingStore;
-use crate::pid::*;
 use crate::primitive_int::*;
 use crate::reduce_lift::poly_eval::InterpolationBaseRing;
-use crate::ring::*;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::rings::extension::galois_field::*;
 use crate::seq::*;
@@ -134,7 +130,7 @@ impl ZnBase {
         let result = low(value).wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
 
         debug_assert!(result < self.modulus_times_three);
-        debug_assert!((value - result as u128) % (self.modulus_u64() as u128) == 0);
+        debug_assert!((value - result as u128).is_multiple_of(self.modulus_u64() as u128));
         return result;
     }
 
@@ -423,7 +419,7 @@ impl ComputeInnerProduct for ZnBase {
         const REDUCE_AFTER_STEPS: usize = 32;
         let mut array_chunks = els.array_chunks::<REDUCE_AFTER_STEPS>();
         let mut result = self.zero();
-        while let Some(chunk) = array_chunks.next() {
+        for chunk in array_chunks.by_ref() {
             let mut sum: u128 = 0;
             for (l, r) in chunk {
                 debug_assert!(l.0 <= self.repr_bound());
@@ -943,7 +939,9 @@ impl CanHomFrom<ZnFastmulBase> for ZnBase {
         let approx_quotient = mulhi(lhs.0, rhs.value_invmod_shifted);
         lhs.0 = product.wrapping_sub(mullo(approx_quotient, self.modulus_u64()));
         debug_assert!(lhs.0 < self.modulus_times_three);
-        debug_assert!((lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128) % (self.modulus_u64() as u128) == 0);
+        debug_assert!(
+            (lhs_original as u128 * rhs.el.0 as u128 - lhs.0 as u128).is_multiple_of(self.modulus_u64() as u128)
+        );
     }
 
     fn mul_assign_map_in_ref(
@@ -1040,7 +1038,7 @@ impl CooleyTukeyRadix3Butterfly<ZnFastmulBase> for ZnBase {
 
         b.0 = a.0 + s2;
         c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
+        a.0 += s1;
     }
 
     fn inv_butterfly<H: Homomorphism<ZnFastmulBase, Self>>(
@@ -1068,7 +1066,7 @@ impl CooleyTukeyRadix3Butterfly<ZnFastmulBase> for ZnBase {
 
         b.0 = a.0 + s2_.0;
         c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
+        a.0 += s1;
 
         a.0 = reduce_to_half(a.0, self_.modulus_times_three);
         hom.mul_assign_ref_map(b, t);
@@ -1141,7 +1139,7 @@ impl CooleyTukeyRadix3Butterfly<ZnBase> for ZnBase {
 
         b.0 = a.0 + s2;
         c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
+        a.0 += s1;
     }
 
     fn inv_butterfly<H: Homomorphism<ZnBase, Self>>(
@@ -1169,7 +1167,7 @@ impl CooleyTukeyRadix3Butterfly<ZnBase> for ZnBase {
 
         b.0 = a.0 + s2_.0;
         c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
+        a.0 += s1;
         a.0 = reduce_to_half(a.0, self_.modulus_times_three);
 
         hom.mul_assign_ref_map(b, t);

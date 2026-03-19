@@ -263,7 +263,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 .generators
                 .iter()
                 .map(|g| group.clone_el(g))
-                .chain([new_gen_base].into_iter())
+                .chain([new_gen_base])
                 .collect(),
             order_multiple: ZZbig.clone_el(&self.order_multiple),
             order_factorization: self.order_factorization.clone(),
@@ -333,7 +333,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         let H_dlog_wrt_H_gens = baby_giant_step(
             group,
             delta,
-            &H_generators,
+            H_generators,
             &(0..n).map(|_| int_cast(p, ZZbig, ZZ)).collect::<Vec<_>>(),
         )?;
         let H_dlog = {
@@ -349,7 +349,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
 
         let result = G_mod_H_dlog
             .into_iter()
-            .zip(H_dlog.into_iter())
+            .zip(H_dlog)
             .map(|(x, y)| x + y)
             .collect::<Vec<_>>();
         debug_assert!(group.eq_el(
@@ -408,7 +408,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         return Some(current_dlog);
     }
 
-    fn padic_rectangular_form<'a>(&'a self, p_idx: usize) -> Vec<(GroupEl<G>, usize)> {
+    fn padic_rectangular_form(&self, p_idx: usize) -> Vec<(GroupEl<G>, usize)> {
         let group = &self.parent;
         let (p, e) = self.order_factorization[p_idx];
         let power = ZZbig
@@ -734,7 +734,7 @@ where
                 .flat_map(|(p, e)| {
                     factor(ZZbig, ZZbig.sub_ref_fst(&p, ZZbig.one()))
                         .into_iter()
-                        .chain([(p, e - 1)].into_iter())
+                        .chain([(p, e - 1)])
                 })
                 .collect::<Vec<_>>();
             order_factorization.sort_unstable_by(|(pl, _), (pr, _)| ZZbig.cmp(pl, pr));
@@ -850,7 +850,7 @@ where
 {
     let n = generators.len();
     assert_eq!(n, dlog_bounds.len());
-    if generators.len() == 0 {
+    if generators.is_empty() {
         if group.is_identity(&value) {
             return Some(Vec::new());
         } else {
@@ -906,7 +906,7 @@ where
                 let mut result = current_idxs.clone();
                 for j in (0..n).rev() {
                     let bs_idxs_j = bs_idx % ns[j];
-                    bs_idx = bs_idx / ns[j];
+                    bs_idx /= ns[j];
                     result[j] = result[j] * ns[j] - bs_idxs_j;
                 }
                 if (0..dlog_bounds.len()).all(|j| ZZbig.is_leq(&int_cast(result[j], ZZbig, ZZ), &dlog_bounds[j])) {

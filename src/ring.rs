@@ -634,7 +634,7 @@ pub trait RingStore: Sized {
     type Type: RingBase + ?Sized;
 
     /// Returns a reference to the stored ring.
-    fn get_ring<'a>(&'a self) -> &'a Self::Type;
+    fn get_ring(&self) -> &Self::Type;
 
     delegate! { RingBase, fn clone_el(&self, val: &El<Self>) -> El<Self> }
     delegate! { RingBase, fn add_assign_ref(&self, lhs: &mut El<Self>, rhs: &El<Self>) -> () }
@@ -693,7 +693,7 @@ pub trait RingStore: Sized {
     fn into_identity(self) -> Identity<Self> { Identity::new(self) }
 
     /// Returns the identity map `self -> self`.
-    fn identity<'a>(&'a self) -> Identity<&'a Self> { self.into_identity() }
+    fn identity(&self) -> Identity<&Self> { self.into_identity() }
 
     /// Returns the canonical homomorphism `from -> self`, if it exists,
     /// moving both rings into the [`CanHom`] object.
@@ -739,7 +739,7 @@ pub trait RingStore: Sized {
     fn into_int_hom(self) -> IntHom<Self> { IntHom::new(self) }
 
     /// Returns the homomorphism `Z -> self` that exists for any ring.
-    fn int_hom<'a>(&'a self) -> IntHom<&'a Self> { self.into_int_hom() }
+    fn int_hom(&self) -> IntHom<&Self> { self.into_int_hom() }
 
     /// Computes the sum of all elements returned by the iterator.
     ///
@@ -921,7 +921,7 @@ where
     fn into_inclusion(self) -> Inclusion<Self> { Inclusion::new(self) }
 
     /// Returns the inclusion map of the base ring `R -> self`.
-    fn inclusion<'a>(&'a self) -> Inclusion<&'a Self> { self.into_inclusion() }
+    fn inclusion(&self) -> Inclusion<&Self> { self.into_inclusion() }
 }
 
 impl<R: RingStore> RingExtensionStore for R where R::Type: RingExtension {}
@@ -971,7 +971,7 @@ pub trait RingExtension: RingBase {
     type BaseRing: RingStore;
 
     /// Returns a reference to the base ring.
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing;
+    fn base_ring(&self) -> &Self::BaseRing;
 
     /// Maps an element of the base ring into this ring.
     ///
@@ -1098,7 +1098,7 @@ impl<R: RingBase> RingValue<R> {
 
     /// Creates a reference to a [`RingValue`] from a reference
     /// to the [`RingBase`].
-    pub fn from_ref<'a>(value: &'a R) -> &'a Self { unsafe { std::mem::transmute(value) } }
+    pub fn from_ref(value: &R) -> &Self { unsafe { std::mem::transmute(value) } }
 
     /// Unwraps the [`RingBase`].
     ///
@@ -1163,7 +1163,7 @@ where
 {
     type Type = <<S as Deref>::Target as RingStore>::Type;
 
-    fn get_ring<'b>(&'b self) -> &'b Self::Type { (**self).get_ring() }
+    fn get_ring(&self) -> &Self::Type { (**self).get_ring() }
 }
 
 #[cfg(test)]

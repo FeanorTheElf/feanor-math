@@ -35,10 +35,10 @@ where
 {
     debug_assert!(d == mon.iter().sum::<Exponent>());
     let n = mon.len();
-    let mut remaining_degree_minus_one: i64 = TryInto::<i64>::try_into(d).unwrap() - 1;
+    let mut remaining_degree_minus_one: i64 = Into::<i64>::into(d) - 1;
     let mut result = 0;
     for i in 0..(n - 1) {
-        remaining_degree_minus_one -= TryInto::<i64>::try_into(mon.at(n - 1 - i)).unwrap();
+        remaining_degree_minus_one -= Into::<i64>::into(mon.at(n - 1 - i));
         if remaining_degree_minus_one < 0 {
             return result;
         }
@@ -374,7 +374,7 @@ where
                 deg: res_deg,
                 order: enumeration_index_degrevlex(
                     res_deg,
-                    (&*lhs_mon).clone_els_by(|x| *x),
+                    (*lhs_mon).clone_els_by(|x| *x),
                     &self.cum_binomial_lookup_table,
                 ),
             },
@@ -412,7 +412,7 @@ where
         .collect::<Vec<_>>()
     }
 
-    fn try_get_multiplication_table<'a>(&'a self, lhs_deg: Exponent, rhs_deg: Exponent) -> Option<&'a Vec<Vec<u64>>> {
+    fn try_get_multiplication_table(&self, lhs_deg: Exponent, rhs_deg: Exponent) -> Option<&Vec<Vec<u64>>> {
         debug_assert!(lhs_deg <= rhs_deg);
         if lhs_deg as usize >= self.monomial_multiplication_table.len()
             || rhs_deg as usize >= self.monomial_multiplication_table[lhs_deg as usize].len()
@@ -449,7 +449,7 @@ where
             return;
         }
         el.retain(|(c, _)| !self.base_ring().is_zero(c));
-        debug_assert!(self.is_valid(&el));
+        debug_assert!(self.is_valid(el));
     }
 
     /// Computes the sum of two elements; rhs may contain zero elements, but must be sorted and not
@@ -557,13 +557,13 @@ where
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         debug_assert!(self.is_valid(&rhs.data));
-        *lhs = self.add_terms(&lhs, rhs.data.into_iter(), Vec::new_in(self.allocator.clone()));
+        *lhs = self.add_terms(lhs, rhs.data.into_iter(), Vec::new_in(self.allocator.clone()));
     }
 
     fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         debug_assert!(self.is_valid(&rhs.data));
         *lhs = self.add_terms(
-            &lhs,
+            lhs,
             rhs.data.iter().map(|(c, m)| {
                 (
                     self.base_ring().negate(self.base_ring.clone_el(c)),
@@ -648,7 +648,7 @@ where
         return true;
     }
 
-    fn is_zero(&self, value: &Self::Element) -> bool { value.data.len() == 0 }
+    fn is_zero(&self, value: &Self::Element) -> bool { value.data.is_empty() }
 
     fn is_one(&self, value: &Self::Element) -> bool {
         debug_assert!(self.is_valid(&value.data));
@@ -716,7 +716,7 @@ where
 {
     type BaseRing = R;
 
-    fn base_ring<'b>(&'b self) -> &'b Self::BaseRing { &self.base_ring }
+    fn base_ring(&self) -> &Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         if !self.base_ring().get_ring().is_approximate() && self.base_ring().is_zero(&x) {
@@ -774,7 +774,7 @@ where
                 deg,
                 order: enumeration_index_degrevlex(
                     deg,
-                    (&*tmp_monomial).clone_els_by(|x| *x),
+                    (*tmp_monomial).clone_els_by(|x| *x),
                     &self.cum_binomial_lookup_table,
                 ),
             },
@@ -792,9 +792,9 @@ where
             .tmp_poly
             .swap(None, std::sync::atomic::Ordering::AcqRel)
             .map(|b| *b)
-            .unwrap_or(Vec::new());
-        debug_assert!(rhs.len() == 0);
-        rhs.extend(terms.into_iter());
+            .unwrap_or_default();
+        debug_assert!(rhs.is_empty());
+        rhs.extend(terms);
         rhs.sort_unstable_by(|l, r| self.compare_degrevlex(&l.1.data, &r.1.data));
         rhs.dedup_by(|(snd_c, snd_m), (fst_c, fst_m)| {
             if self.compare_degrevlex(&fst_m.data, &snd_m.data) == Ordering::Equal {
@@ -804,7 +804,7 @@ where
                 return false;
             }
         });
-        *lhs = self.add_terms(&lhs, rhs.drain(..), Vec::new_in(self.allocator.clone()));
+        *lhs = self.add_terms(lhs, rhs.drain(..), Vec::new_in(self.allocator.clone()));
         _ = self
             .tmp_poly
             .swap(Some(Box::new(rhs)), std::sync::atomic::Ordering::AcqRel);
@@ -846,7 +846,7 @@ where
                         deg: res_deg,
                         order: enumeration_index_degrevlex(
                             res_deg,
-                            (&*lhs_mon).clone_els_by(|x| *x),
+                            (*lhs_mon).clone_els_by(|x| *x),
                             &self.cum_binomial_lookup_table,
                         ),
                     },
@@ -932,8 +932,7 @@ where
         if order.is_same(&DegRevLex) {
             f.data.last().map(|(c, m)| (c, m))
         } else {
-            self.terms(f)
-                .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+            self.terms(f).max_by(|l, r| order.compare(RingRef::new(self), l.1, r.1))
         }
     }
 
@@ -957,14 +956,14 @@ where
                 let expected = self
                     .terms(f)
                     .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
-                    .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1));
+                    .max_by(|l, r| order.compare(RingRef::new(self), l.1, r.1));
                 (res.is_none() && expected.is_none()) || std::ptr::eq(res.unwrap().0, expected.unwrap().0)
             });
             return res;
         } else {
             self.terms(f)
                 .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
-                .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+                .max_by(|l, r| order.compare(RingRef::new(self), l.1, r.1))
         }
     }
 
@@ -994,7 +993,7 @@ where
     }
 
     fn monomial_lcm(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Self::Monomial {
-        self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), |a, b| max(a, b))
+        self.exponent_wise_bivariate_monomial_operation(lhs.data, rhs.data.clone(), max)
     }
 
     fn monomial_div(&self, lhs: Self::Monomial, rhs: &Self::Monomial) -> Result<Self::Monomial, Self::Monomial> {
@@ -1040,7 +1039,7 @@ where
             result = new_ring.specialize(&result, i, &new_ring.inclusion().map(values.at(i)));
         }
         debug_assert!(result.data.len() <= 1);
-        if result.data.len() == 0 {
+        if result.data.is_empty() {
             return hom.codomain().zero();
         } else {
             debug_assert!(result.data[0].1.data.deg == 0);

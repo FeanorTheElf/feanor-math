@@ -228,7 +228,7 @@ impl Field for Complex64Base {
 impl RingExtension for Complex64Base {
     type BaseRing = Real64;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &Real64::RING }
+    fn base_ring(&self) -> &Self::BaseRing { &Real64::RING }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.from_f64(x) }
 

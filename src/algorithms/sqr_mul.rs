@@ -73,9 +73,9 @@ where
     F: FnMut(T) -> Result<T, E>,
     H: FnMut(&U, T) -> Result<T, E>,
 {
-    if int_ring.is_zero(&power) {
+    if int_ring.is_zero(power) {
         return Ok(identity);
-    } else if int_ring.is_one(&power) {
+    } else if int_ring.is_one(power) {
         return multiply_base(&base, identity);
     }
 
@@ -115,9 +115,9 @@ where
     H: FnMut(&T) -> T,
 {
     assert!(!int_ring.is_neg(power));
-    if int_ring.is_zero(&power) {
+    if int_ring.is_zero(power) {
         return Ok(identity);
-    } else if int_ring.is_one(&power) {
+    } else if int_ring.is_one(power) {
         return Ok(base);
     }
 
@@ -160,7 +160,7 @@ where
 
     let bitlen = int_ring.abs_highest_set_bit(power).unwrap() + 1;
     if bitlen < LOG2_BOUND {
-        let power = int_cast(int_ring.clone_el(&power), StaticRing::<i32>::RING, &int_ring) as usize;
+        let power = int_cast(int_ring.clone_el(power), StaticRing::<i32>::RING, &int_ring) as usize;
         eval_power_using_table(power, &mut mul, &mut double, &mut table, &mut mult_count)?;
         return Ok(table.into_iter().nth(power).unwrap().unwrap());
     }
@@ -188,7 +188,7 @@ where
         }
     }
 
-    if bitlen % LOG2_BOUND != 0 {
+    if !bitlen.is_multiple_of(LOG2_BOUND) {
         let final_power = (0..(bitlen % LOG2_BOUND))
             .filter(|j| int_ring.abs_is_bit_set(power, *j))
             .map(|j| 1 << j)

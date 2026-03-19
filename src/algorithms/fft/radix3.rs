@@ -41,7 +41,7 @@ where
     assert_eq!(2 * ZZ.pow(3, step) as usize, twiddles.len());
 
     let stride = ZZ.pow(3, log3_n - step - 1) as usize;
-    assert!(data.len() % (3 * stride) == 0);
+    assert!(data.len().is_multiple_of(3 * stride));
     assert_eq!(twiddles.as_chunks::<2>().0.len(), data.chunks_mut(3 * stride).len());
 
     if stride == 1 {
@@ -298,7 +298,7 @@ where
                     x,
                     y,
                     z,
-                    &third_root_of_unity,
+                    third_root_of_unity,
                     twiddle1,
                     twiddle2,
                 )
@@ -308,7 +308,7 @@ where
                     x,
                     y,
                     z,
-                    &third_root_of_unity,
+                    third_root_of_unity,
                     twiddle1,
                     twiddle2,
                 )
@@ -534,7 +534,7 @@ impl<R: ?Sized + RingBase, S: ?Sized + RingBase> CooleyTukeyRadix3Butterfly<S> f
         let ring = hom.codomain();
         let b_ = hom.mul_ref_map(b, z); // this is now `z b`
         let s1 = ring.add_ref(b, c); // this is now `b + c`
-        let s2 = ring.add_ref(&b_, &c); // this is now `z b + c`
+        let s2 = ring.add_ref(&b_, c); // this is now `z b + c`
         let s2_ = hom.mul_ref_snd_map(s2, z); // this is now `z^2 b + z c`
         let s3 = ring.add_ref(&s1, &s2_); // this is now `-(z b + z^2 c)`
         *b = ring.add_ref(a, &s2_); // this is now `a + z^2 b + z c`

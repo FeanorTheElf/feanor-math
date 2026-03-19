@@ -59,11 +59,11 @@ where
     return (
         (
             l_factor,
-            ring.monomial_div(ring.clone_monomial(&m_m), &l_m).ok().unwrap(),
+            ring.monomial_div(ring.clone_monomial(&m_m), l_m).ok().unwrap(),
         ),
         (
             r_factor,
-            ring.monomial_div(ring.clone_monomial(&m_m), &r_m).ok().unwrap(),
+            ring.monomial_div(ring.clone_monomial(&m_m), r_m).ok().unwrap(),
         ),
         (m_c, m_m),
     );
@@ -168,7 +168,7 @@ where
     O: MonomialOrder + Copy,
     I: Iterator<Item = (&'a El<P>, &'b ExpandedMonomial)>,
 {
-    if ring.is_zero(&f) {
+    if ring.is_zero(f) {
         return None;
     }
     let (f_lc, f_lm) = ring.LT(f, order).unwrap();
@@ -207,8 +207,8 @@ where
             if S_c_val == 0
                 && order.eq_mon(
                     ring,
-                    &ring.monomial_div(ring.clone_monomial(&S_m), &bi_m).ok().unwrap(),
-                    &bk_m,
+                    &ring.monomial_div(ring.clone_monomial(&S_m), bi_m).ok().unwrap(),
+                    bk_m,
                 )
             {
                 return Some(usize::MAX);
@@ -229,10 +229,11 @@ where
                     if j < i && order.eq_mon(ring, &f_m, &S_m) && f_c_val <= S_c_val {
                         return Some(j);
                     }
-                    if let Ok(quo) = ring.monomial_div(ring.clone_monomial(&S_m), &f_m) {
-                        if f_c_val <= S_c_val && (f_c_val < S_c_val || ring.monomial_deg(&quo) > 0) {
-                            return Some(j);
-                        }
+                    if let Ok(quo) = ring.monomial_div(ring.clone_monomial(&S_m), &f_m)
+                        && f_c_val <= S_c_val
+                        && (f_c_val < S_c_val || ring.monomial_deg(&quo) > 0)
+                    {
+                        return Some(j);
                     }
                     return None;
                 })
@@ -244,12 +245,12 @@ where
 
             let mut smallest_elim_coeff_valuation = usize::MAX;
             let mut current = ring.LT(f, order).unwrap();
-            while ring.base_ring().valuation(&current.0).unwrap() + k >= nilpotent_power {
+            while ring.base_ring().valuation(current.0).unwrap() + k >= nilpotent_power {
                 smallest_elim_coeff_valuation = min(
                     smallest_elim_coeff_valuation,
-                    ring.base_ring().valuation(&current.0).unwrap(),
+                    ring.base_ring().valuation(current.0).unwrap(),
                 );
-                let next = ring.largest_term_lt(f, order, &current.1);
+                let next = ring.largest_term_lt(f, order, current.1);
                 if next.is_none() {
                     return Some(usize::MAX);
                 }
@@ -277,7 +278,7 @@ where
 {
     move |open, basis| {
         open.sort_by_key(|spoly| {
-            let (lc, lm) = spoly.lcm_term(ring, &basis, order);
+            let (lc, lm) = spoly.lcm_term(ring, basis, order);
             (
                 -(ring.base_ring().valuation(&lc).unwrap_or(0) as i64),
                 -(ring.monomial_deg(&lm) as i64),
@@ -391,7 +392,7 @@ where
                 // I have no idea why, but this order seems to give the best results
                 reducers.sort_by(|(lf, _), (rf, _)| {
                     order
-                        .compare(ring, &ring.LT(lf, order).unwrap().1, &ring.LT(rf, order).unwrap().1)
+                        .compare(ring, ring.LT(lf, order).unwrap().1, ring.LT(rf, order).unwrap().1)
                         .then_with(|| ring.terms(lf).count().cmp(&ring.terms(rf).count()))
                 })
             };
@@ -428,8 +429,7 @@ where
                     .iter()
                     .enumerate()
                     .rev()
-                    .filter(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg)
-                    .next()
+                    .find(|(_, spoly)| ring.monomial_deg(&spoly.lcm_term(ring, &basis, order).1) > current_deg)
                     .map(|(i, _)| i + 1)
                     .unwrap_or(0);
                 let spolys_to_reduce = &open[spolys_to_reduce_index..];
@@ -470,7 +470,7 @@ where
                 _ = computation.finish()?;
 
                 // process the generated new polynomials
-                if new_polys.len() == 0 && open.len() == 0 {
+                if new_polys.is_empty() && open.is_empty() {
                     if changed {
                         log_progress!(controller, "!");
                         // this seems necessary, as the invariants for `reducers` don't imply that
@@ -488,7 +488,7 @@ where
                     } else {
                         return Ok(reducers.into_iter().map(|(f, _)| f).collect());
                     }
-                } else if new_polys.len() == 0 {
+                } else if new_polys.is_empty() {
                     current_deg = ring.monomial_deg(&open.last().unwrap().lcm_term(ring, &basis, order).1);
                     log_progress!(controller, "{{{}}}", current_deg);
                 } else {
@@ -512,7 +512,7 @@ where
                         filtered_spolys
                     );
 
-                    reducers.extend(new_polys.into_iter());
+                    reducers.extend(new_polys);
                     reducers = inter_reduce(ring, reducers, order);
                     sort_reducers(&mut reducers);
                     log_progress!(controller, "(r={})", reducers.len());
@@ -592,7 +592,7 @@ where
     I: Iterator<Item = (&'a El<P>, &'b ExpandedMonomial)>,
 {
     while let Some((_, reducer, quo_c, quo_m)) = find_reducer(ring, to_reduce, reducers(), order) {
-        let prev_lm = ring.clone_monomial(&ring.LT(to_reduce, order).unwrap().1);
+        let prev_lm = ring.clone_monomial(ring.LT(to_reduce, order).unwrap().1);
         let mut scaled_reducer = ring.clone_el(reducer);
         ring.mul_assign_monomial(&mut scaled_reducer, ring.clone_monomial(&quo_m));
         ring.inclusion().mul_assign_ref_map(&mut scaled_reducer, &quo_c);
@@ -600,13 +600,13 @@ where
             order.compare(
                 ring,
                 ring.LT(&scaled_reducer, order).unwrap().1,
-                ring.LT(&to_reduce, order).unwrap().1
+                ring.LT(to_reduce, order).unwrap().1
             ) == std::cmp::Ordering::Equal
         );
         ring.sub_assign(to_reduce, scaled_reducer);
         debug_assert!(
-            ring.is_zero(&to_reduce)
-                || order.compare(ring, &ring.LT(&to_reduce, order).unwrap().1, &prev_lm) == std::cmp::Ordering::Less
+            ring.is_zero(to_reduce)
+                || order.compare(ring, ring.LT(to_reduce, order).unwrap().1, &prev_lm) == std::cmp::Ordering::Less
         );
     }
 }

@@ -132,7 +132,7 @@ where
         for (_, multiplicity) in &mut power_factors {
             *multiplicity *= k;
         }
-        result.extend(power_factors.into_iter());
+        result.extend(power_factors);
         return result;
     }
 

@@ -132,7 +132,7 @@ where
             self.once = None;
             return Some((self.skip, start));
         } else {
-            while let Some((index, element)) = self.base.next() {
+            for (index, element) in self.base.by_ref() {
                 if *index != self.skip {
                     return Some((*index, element));
                 }

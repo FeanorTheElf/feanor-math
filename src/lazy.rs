@@ -38,7 +38,7 @@ impl<T> LazyVec<T> {
         panic!("get_or_init_incremental() is only valid when the vector has at least one initialized element")
     }
 
-    pub fn get_or_init<'a, F>(&'a self, i: usize, init: F) -> &'a T
+    pub fn get_or_init<F>(&self, i: usize, init: F) -> &T
     where
         F: FnOnce() -> T,
     {
