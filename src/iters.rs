@@ -208,10 +208,7 @@ where
     type Item = T;
 
     fn next(&mut self) -> Option<T> {
-        if self.current.is_none() {
-            return None;
-        }
-        let current = &mut self.current.as_mut().unwrap();
+        let current = self.current.as_mut()?;
         let result = (self.converter)(current);
         let mut removed = 0;
         let mut found_empty_place = self.last_moved + 1 < self.first_trailing_empty;
