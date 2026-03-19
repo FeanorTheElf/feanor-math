@@ -1,23 +1,25 @@
-use std::marker::PhantomData;
 use std::fmt::Debug;
+use std::marker::PhantomData;
 
-use super::{SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut, VectorFn, VectorView, VectorViewMut, VectorViewSparse};
+use super::{
+    SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut,
+    VectorFn, VectorView, VectorViewMut, VectorViewSparse,
+};
 
 pub struct SubvectorView<V: VectorView<T>, T: ?Sized> {
     begin: usize,
     end: usize,
     base: V,
-    element: PhantomData<T>
+    element: PhantomData<T>,
 }
 
 impl<V: Clone + VectorView<T>, T: ?Sized> Clone for SubvectorView<V, T> {
-    
     fn clone(&self) -> Self {
         Self {
             begin: self.begin,
             end: self.end,
             base: self.base.clone(),
-            element: PhantomData
+            element: PhantomData,
         }
     }
 }
@@ -25,19 +27,17 @@ impl<V: Clone + VectorView<T>, T: ?Sized> Clone for SubvectorView<V, T> {
 impl<V: Copy + VectorView<T>, T: ?Sized> Copy for SubvectorView<V, T> {}
 
 impl<V: VectorView<T>, T: ?Sized> SubvectorView<V, T> {
-
     pub fn new(base: V) -> Self {
         Self {
             begin: 0,
             end: base.len(),
-            base: base,
-            element: PhantomData
+            base,
+            element: PhantomData,
         }
     }
 }
 
 impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
-    
     fn at(&self, i: usize) -> &T {
         assert!(i < self.len());
         self.base.at(i + self.begin)
@@ -47,39 +47,53 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
         self.end - self.begin
     }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
-
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(
+        &'a self,
+        op: Op,
+    ) -> Result<Op::Output<'a>, ()> {
         struct WrapSubvector<T: ?Sized, Op: SparseVectorViewOperation<T>> {
             op: Op,
             element: PhantomData<T>,
             begin: usize,
-            end: usize
+            end: usize,
         }
 
-        impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T> for WrapSubvector<T, Op> {
-
-            type Output<'a> = Op::Output<'a>
-                where Self: 'a;
+        impl<T: ?Sized, Op: SparseVectorViewOperation<T>> SparseVectorViewOperation<T>
+            for WrapSubvector<T, Op>
+        {
+            type Output<'a>
+                = Op::Output<'a>
+            where
+                Self: 'a;
 
             fn execute<'a, V: 'a + VectorViewSparse<T> + Clone>(self, vector: V) -> Self::Output<'a>
-                where Self: 'a
+            where
+                Self: 'a,
             {
-                self.op.execute(SubvectorView::new(vector).restrict_full(self.begin..self.end))
+                self.op
+                    .execute(SubvectorView::new(vector).restrict_full(self.begin..self.end))
             }
         }
 
-        self.base.specialize_sparse(WrapSubvector { op: op, element: PhantomData, begin: self.begin, end: self.end })
+        self.base.specialize_sparse(WrapSubvector {
+            op,
+            element: PhantomData,
+            begin: self.begin,
+            end: self.end,
+        })
     }
 
     fn as_slice<'a>(&'a self) -> Option<&'a [T]>
-        where T: Sized
+    where
+        T: Sized,
     {
-        self.base.as_slice().map(|slice| &slice[self.begin..self.end])
+        self.base
+            .as_slice()
+            .map(|slice| &slice[self.begin..self.end])
     }
 }
 
 impl<V: VectorView<T> + Debug, T: ?Sized> Debug for SubvectorView<V, T> {
-
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SubvectorView")
             .field("begin", &self.begin)
@@ -90,55 +104,63 @@ impl<V: VectorView<T> + Debug, T: ?Sized> Debug for SubvectorView<V, T> {
 }
 
 pub struct FilterWithinRangeIter<'a, T: ?Sized, I>
-    where T: 'a,
-        I: Iterator<Item = (usize, &'a T)>
+where
+    T: 'a,
+    I: Iterator<Item = (usize, &'a T)>,
 {
     it: I,
     begin: usize,
-    end: usize
+    end: usize,
 }
 
 impl<'a, T: ?Sized, I> Iterator for FilterWithinRangeIter<'a, T, I>
-    where T: 'a,
-        I: Iterator<Item = (usize, &'a T)>
+where
+    T: 'a,
+    I: Iterator<Item = (usize, &'a T)>,
 {
     type Item = (usize, &'a T);
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.it.by_ref().filter(|(i, _)| *i >= self.begin && *i < self.end).next()
+        self.it
+            .by_ref()
+            .filter(|(i, _)| *i >= self.begin && *i < self.end)
+            .next()
     }
 }
 
 impl<V: VectorViewSparse<T>, T: ?Sized> VectorViewSparse<T> for SubvectorView<V, T> {
-
-    type Iter<'a> = FilterWithinRangeIter<'a, T, V::Iter<'a>>
-        where Self: 'a, T: 'a;
+    type Iter<'a>
+        = FilterWithinRangeIter<'a, T, V::Iter<'a>>
+    where
+        Self: 'a,
+        T: 'a;
 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
         FilterWithinRangeIter {
             it: self.base.nontrivial_entries(),
             begin: self.begin,
-            end: self.end
+            end: self.end,
         }
     }
 }
 
 impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for SubvectorView<V, T> {
-
     fn at_mut(&mut self, i: usize) -> &mut T {
         assert!(i < self.len());
         self.base.at_mut(i + self.begin)
     }
 
     fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
-        where T: Sized
+    where
+        T: Sized,
     {
-        self.base.as_slice_mut().map(|slice| &mut slice[self.begin..self.end])
+        self.base
+            .as_slice_mut()
+            .map(|slice| &mut slice[self.begin..self.end])
     }
 }
 
 impl<V: SwappableVectorViewMut<T>, T: ?Sized> SwappableVectorViewMut<T> for SubvectorView<V, T> {
-
     fn swap(&mut self, i: usize, j: usize) {
         assert!(i < self.len());
         assert!(j < self.len());
@@ -147,7 +169,6 @@ impl<V: SwappableVectorViewMut<T>, T: ?Sized> SwappableVectorViewMut<T> for Subv
 }
 
 impl<V: VectorView<T>, T: ?Sized> SelfSubvectorView<T> for SubvectorView<V, T> {
-
     fn restrict_full(mut self, range: std::ops::Range<usize>) -> Self {
         assert!(range.end <= self.len());
         debug_assert!(range.start <= range.end);
@@ -161,17 +182,16 @@ pub struct SubvectorFn<V: VectorFn<T>, T> {
     begin: usize,
     end: usize,
     base: V,
-    element: PhantomData<T>
+    element: PhantomData<T>,
 }
 
 impl<V: Clone + VectorFn<T>, T> Clone for SubvectorFn<V, T> {
-    
     fn clone(&self) -> Self {
         Self {
             begin: self.begin,
             end: self.end,
             base: self.base.clone(),
-            element: PhantomData
+            element: PhantomData,
         }
     }
 }
@@ -179,19 +199,17 @@ impl<V: Clone + VectorFn<T>, T> Clone for SubvectorFn<V, T> {
 impl<V: Copy + VectorFn<T>, T> Copy for SubvectorFn<V, T> {}
 
 impl<V: VectorFn<T>, T> SubvectorFn<V, T> {
-
     pub fn new(base: V) -> Self {
         Self {
             begin: 0,
             end: base.len(),
-            base: base,
-            element: PhantomData
+            base,
+            element: PhantomData,
         }
     }
 }
 
 impl<V: VectorFn<T>, T> VectorFn<T> for SubvectorFn<V, T> {
-    
     fn at(&self, i: usize) -> T {
         assert!(i < self.len());
         self.base.at(i + self.begin)
@@ -203,7 +221,6 @@ impl<V: VectorFn<T>, T> VectorFn<T> for SubvectorFn<V, T> {
 }
 
 impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
-    
     fn restrict_full(mut self, range: std::ops::Range<usize>) -> Self {
         assert!(range.end <= self.len());
         debug_assert!(range.start <= range.end);
@@ -214,9 +231,9 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
-#[cfg(test)]
 use super::sparse::SparseMapVector;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_subvector_ranges() {
@@ -287,13 +304,13 @@ fn test_subvector_sparse() {
     struct Verify;
 
     impl SparseVectorViewOperation<i64> for Verify {
-
         type Output<'a> = ();
 
         fn execute<'a, V: 'a + VectorViewSparse<i64>>(self, vector: V) -> Self::Output<'a> {
             assert!(
-                vec![(20, &20), (256, &256)] == vector.nontrivial_entries().collect::<Vec<_>>() ||
-                vec![(256, &256), (20, &20)] == vector.nontrivial_entries().collect::<Vec<_>>()
+                vec![(20, &20), (256, &256)] == vector.nontrivial_entries().collect::<Vec<_>>()
+                    || vec![(256, &256), (20, &20)]
+                        == vector.nontrivial_entries().collect::<Vec<_>>()
             );
         }
     }

@@ -1,40 +1,39 @@
+use std::fmt::Debug;
+use std::marker::PhantomData;
+
+use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
+use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
+use serde::de::DeserializeSeed;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::eea::{signed_gcd, signed_lcm};
-use crate::serialization::*;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
+use crate::algorithms::resultant::ComputeResultantRing;
+use crate::computation::DontObserve;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::field::*;
 use crate::homomorphism::*;
-use crate::computation::DontObserve;
-use crate::algorithms::resultant::ComputeResultantRing;
+use crate::impl_interpolation_base_ring_char_zero;
 use crate::integer::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
+use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::ring::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
-use crate::impl_interpolation_base_ring_char_zero;
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::serialization::*;
 use crate::specialization::*;
-use crate::ring::*;
 
-use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
-use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
-use serde::{Serialize, Deserialize, Deserializer, Serializer};
-use serde::de::DeserializeSeed;
-
-use std::fmt::Debug;
-use std::marker::PhantomData;
-
-///
 /// An implementation of the rational number `Q`, based on representing them
 /// as a tuple `(numerator, denominator)`.
-/// 
+///
 /// Be careful when instantiating it with finite-precision integers, like `StaticRing<i64>`,
 /// since by nature of the rational numbers, both numerator and denominator can increase
 /// dramatically, even when the numbers itself are of moderate size.
-/// 
+///
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
@@ -64,54 +63,56 @@ use std::marker::PhantomData;
 /// assert_el_eq!(ZZ, ZZ.int_hom().map(1), QQ.num(&one_half));
 /// assert_el_eq!(ZZ, ZZ.int_hom().map(2), QQ.den(&one_half));
 /// ```
-/// 
 pub struct RationalFieldBase<I: RingStore>
-    where I::Type: IntegerRing
+where
+    I::Type: IntegerRing,
 {
-    integers: I
+    integers: I,
 }
 
 impl<I> Clone for RationalFieldBase<I>
-    where I: RingStore + Clone,
-        I::Type: IntegerRing
+where
+    I: RingStore + Clone,
+    I::Type: IntegerRing,
 {
     fn clone(&self) -> Self {
         Self {
-            integers: self.integers.clone()
+            integers: self.integers.clone(),
         }
     }
 }
 
 impl<I> Copy for RationalFieldBase<I>
-    where I: RingStore + Copy,
-        I::Type: IntegerRing,
-        El<I>: Copy
-{}
+where
+    I: RingStore + Copy,
+    I::Type: IntegerRing,
+    El<I>: Copy,
+{
+}
 
 impl<I> Debug for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "Q")
     }
 }
-///
 /// [`RingStore`] corresponding to [`RationalFieldBase`]
-/// 
 pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 
-///
 /// An element of [`RationalField`], i.e. a fraction of two integers.
-/// 
 pub struct RationalFieldEl<I>(El<I>, El<I>)
-    where I: RingStore,
-        I::Type: IntegerRing;
+where
+    I: RingStore,
+    I::Type: IntegerRing;
 
 impl<I> Debug for RationalFieldEl<I>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        El<I>: Debug
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    El<I>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("RationalFieldEl")
@@ -122,9 +123,10 @@ impl<I> Debug for RationalFieldEl<I>
 }
 
 impl<I> Clone for RationalFieldEl<I>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        El<I>: Clone
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    El<I>: Clone,
 {
     fn clone(&self) -> Self {
         RationalFieldEl(self.0.clone(), self.1.clone())
@@ -132,14 +134,17 @@ impl<I> Clone for RationalFieldEl<I>
 }
 
 impl<I> Copy for RationalFieldEl<I>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        El<I>: Copy
-{}
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    El<I>: Copy,
+{
+}
 
 impl<I> PartialEq for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn eq(&self, other: &Self) -> bool {
         self.integers.get_ring() == other.integers.get_ring()
@@ -147,12 +152,12 @@ impl<I> PartialEq for RationalFieldBase<I>
 }
 
 impl<I> RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
-    ///
     /// The numerator of the fully reduced fraction.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
@@ -163,17 +168,23 @@ impl<I> RationalFieldBase<I>
     /// # use feanor_math::field::FieldStore;
     /// # let ZZ = StaticRing::<i64>::RING;
     /// # let QQ = RationalField::new(ZZ);
-    /// assert_el_eq!(ZZ, 2, QQ.num(&QQ.div(&QQ.inclusion().map(6), &QQ.inclusion().map(3))));
+    /// assert_el_eq!(
+    ///     ZZ,
+    ///     2,
+    ///     QQ.num(&QQ.div(&QQ.inclusion().map(6), &QQ.inclusion().map(3)))
+    /// );
     /// ```
-    /// 
     pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
-        debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
+        debug_assert!(self.base_ring().is_one(&signed_gcd(
+            self.base_ring().clone_el(&el.1),
+            self.base_ring().clone_el(&el.0),
+            self.base_ring()
+        )));
         &el.0
     }
 
-    ///
     /// The denominator of the fully reduced fraction.
-    /// 
+    ///
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
@@ -184,48 +195,56 @@ impl<I> RationalFieldBase<I>
     /// # use feanor_math::field::FieldStore;
     /// # let ZZ = StaticRing::<i64>::RING;
     /// # let QQ = RationalField::new(ZZ);
-    /// assert_el_eq!(ZZ, 3, QQ.den(&QQ.div(&QQ.inclusion().map(3), &QQ.inclusion().map(9))));
+    /// assert_el_eq!(
+    ///     ZZ,
+    ///     3,
+    ///     QQ.den(&QQ.div(&QQ.inclusion().map(3), &QQ.inclusion().map(9)))
+    /// );
     /// ```
-    /// 
     pub fn den<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
-        debug_assert!(self.base_ring().is_one(&signed_gcd(self.base_ring().clone_el(&el.1), self.base_ring().clone_el(&el.0), self.base_ring())));
+        debug_assert!(self.base_ring().is_one(&signed_gcd(
+            self.base_ring().clone_el(&el.1),
+            self.base_ring().clone_el(&el.0),
+            self.base_ring()
+        )));
         &el.1
     }
 }
 
 impl<I> RationalField<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
-    ///
     /// Returns the fraction field of the given integer ring.
-    /// 
     pub const fn new(integers: I) -> Self {
         RingValue::from(RationalFieldBase { integers })
     }
 
-    ///
     /// See [`RationalFieldBase::num()`].
-    /// 
     pub fn num<'a>(&'a self, el: &'a El<Self>) -> &'a El<I> {
         self.get_ring().num(el)
     }
 
-    ///
     /// See [`RationalFieldBase::den()`].
-    /// 
     pub fn den<'a>(&'a self, el: &'a El<Self>) -> &'a El<I> {
         self.get_ring().den(el)
     }
 }
 
 impl<I> RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
-        // take the denominator first, as in this case gcd will have the same sign, and the final denominator will be positive
-        let gcd = signed_gcd(self.integers.clone_el(&*value.1), self.integers.clone_el(&*value.0), &self.integers);
+        // take the denominator first, as in this case gcd will have the same sign, and the final
+        // denominator will be positive
+        let gcd = signed_gcd(
+            self.integers.clone_el(&*value.1),
+            self.integers.clone_el(&*value.0),
+            &self.integers,
+        );
         *value.0 = self.integers.checked_div(&*value.0, &gcd).unwrap();
         *value.1 = self.integers.checked_div(&*value.1, &gcd).unwrap();
     }
@@ -238,8 +257,9 @@ impl<I> RationalFieldBase<I>
 }
 
 impl<I> RingBase for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     type Element = RationalFieldEl<I>;
 
@@ -256,7 +276,10 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        RationalFieldEl(self.integers.clone_el(&val.0), self.integers.clone_el(&val.1))
+        RationalFieldEl(
+            self.integers.clone_el(&val.0),
+            self.integers.clone_el(&val.1),
+        )
     }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -264,7 +287,8 @@ impl<I> RingBase for RationalFieldBase<I>
             self.integers.add_assign_ref(&mut lhs.0, &rhs.0);
         } else {
             self.integers.mul_assign_ref(&mut lhs.0, &rhs.1);
-            self.integers.add_assign(&mut lhs.0, self.integers.mul_ref(&lhs.1, &rhs.0));
+            self.integers
+                .add_assign(&mut lhs.0, self.integers.mul_ref(&lhs.1, &rhs.0));
             self.integers.mul_assign_ref(&mut lhs.1, &rhs.1);
             self.reduce((&mut lhs.0, &mut lhs.1));
         }
@@ -285,7 +309,10 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.integers.eq_el(&self.integers.mul_ref(&lhs.0, &rhs.1), &self.integers.mul_ref(&lhs.1, &rhs.0))
+        self.integers.eq_el(
+            &self.integers.mul_ref(&lhs.0, &rhs.1),
+            &self.integers.mul_ref(&lhs.1, &rhs.0),
+        )
     }
 
     fn is_zero(&self, value: &Self::Element) -> bool {
@@ -297,7 +324,10 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.integers.eq_el(&value.0, &self.integers.negate(self.integers.clone_el(&value.1)))
+        self.integers.eq_el(
+            &value.0,
+            &self.integers.negate(self.integers.clone_el(&value.1)),
+        )
     }
 
     fn is_approximate(&self) -> bool {
@@ -313,40 +343,69 @@ impl<I> RingBase for RationalFieldBase<I>
     }
 
     fn characteristic<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
-        where J::Type: IntegerRing
+    where
+        J::Type: IntegerRing,
     {
         Some(ZZ.zero())
     }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, env: EnvBindingStrength) -> std::fmt::Result {
+    fn dbg_within<'a>(
+        &self,
+        value: &Self::Element,
+        out: &mut std::fmt::Formatter<'a>,
+        env: EnvBindingStrength,
+    ) -> std::fmt::Result {
         if self.base_ring().is_one(&value.1) {
             write!(out, "{}", self.integers.format(&value.0))
         } else {
             if env > EnvBindingStrength::Product {
-                write!(out, "({}/{})", self.integers.format(&value.0), self.integers.format(&value.1))
+                write!(
+                    out,
+                    "({}/{})",
+                    self.integers.format(&value.0),
+                    self.integers.format(&value.1)
+                )
             } else {
-                write!(out, "{}/{}", self.integers.format(&value.0), self.integers.format(&value.1))
+                write!(
+                    out,
+                    "{}/{}",
+                    self.integers.format(&value.0),
+                    self.integers.format(&value.1)
+                )
             }
         }
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        RationalFieldEl(self.integers.get_ring().from_int(value), self.integers.one())
+        RationalFieldEl(
+            self.integers.get_ring().from_int(value),
+            self.integers.one(),
+        )
     }
 }
 
 impl<I: RingStore> HashableElRing for RationalFieldBase<I>
-    where I::Type: IntegerRing + HashableElRing
+where
+    I::Type: IntegerRing + HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        let gcd = signed_gcd(self.integers.clone_el(&el.1), self.integers.clone_el(&el.0), &self.integers);
-        self.integers.get_ring().hash(&self.integers.checked_div(&el.0, &gcd).unwrap(), h);
-        self.integers.get_ring().hash(&self.integers.checked_div(&el.1, &gcd).unwrap(), h);
+        let gcd = signed_gcd(
+            self.integers.clone_el(&el.1),
+            self.integers.clone_el(&el.0),
+            &self.integers,
+        );
+        self.integers
+            .get_ring()
+            .hash(&self.integers.checked_div(&el.0, &gcd).unwrap(), h);
+        self.integers
+            .get_ring()
+            .hash(&self.integers.checked_div(&el.1, &gcd).unwrap(), h);
     }
 }
 
 impl<I: RingStore> StrassenHint for RationalFieldBase<I>
-    where I::Type: IntegerRing
+where
+    I::Type: IntegerRing,
 {
     default fn strassen_threshold(&self) -> usize {
         usize::MAX
@@ -354,7 +413,8 @@ impl<I: RingStore> StrassenHint for RationalFieldBase<I>
 }
 
 impl<I: RingStore> KaratsubaHint for RationalFieldBase<I>
-    where I::Type: IntegerRing
+where
+    I::Type: IntegerRing,
 {
     default fn karatsuba_threshold(&self) -> usize {
         usize::MAX
@@ -362,8 +422,9 @@ impl<I: RingStore> KaratsubaHint for RationalFieldBase<I>
 }
 
 impl<I> RingExtension for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     type BaseRing = I;
 
@@ -382,64 +443,90 @@ impl<I> RingExtension for RationalFieldBase<I>
 }
 
 impl<I> Serialize for RationalFieldBase<I>
-    where I: RingStore + Serialize,
-        I::Type: IntegerRing
+where
+    I: RingStore + Serialize,
+    I::Type: IntegerRing,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         SerializableNewtypeStruct::new("RationalField", self.base_ring()).serialize(serializer)
     }
 }
 
 impl<'de, I> Deserialize<'de> for RationalFieldBase<I>
-    where I: RingStore + Deserialize<'de>,
-        I::Type: IntegerRing
+where
+    I: RingStore + Deserialize<'de>,
+    I::Type: IntegerRing,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
-        DeserializeSeedNewtypeStruct::new("RationalField", PhantomData::<I>).deserialize(deserializer).map(|base_ring| RationalFieldBase { integers: base_ring })
+        DeserializeSeedNewtypeStruct::new("RationalField", PhantomData::<I>)
+            .deserialize(deserializer)
+            .map(|base_ring| RationalFieldBase {
+                integers: base_ring,
+            })
     }
 }
 
 impl<I> SerializableElementRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing + SerializableElementRing
+where
+    I: RingStore,
+    I::Type: IntegerRing + SerializableElementRing,
 {
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
-        DeserializeSeedNewtypeStruct::new("Rational", DeserializeSeedSeq::new(
-            std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(3),
-            (None, None),
-            |mut current, next| {
-                if current.0.is_none() {
-                    current.0 = Some(next);
-                } else if current.1.is_none() {
-                    current.1 = Some(next);
-                } else {
-                    unreachable!();
-                }
-                return current;
-            }
-        )).deserialize(deserializer).map(|res| self.from_fraction(res.0.unwrap(), res.1.unwrap()))
+        DeserializeSeedNewtypeStruct::new(
+            "Rational",
+            DeserializeSeedSeq::new(
+                std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(3),
+                (None, None),
+                |mut current, next| {
+                    if current.0.is_none() {
+                        current.0 = Some(next);
+                    } else if current.1.is_none() {
+                        current.1 = Some(next);
+                    } else {
+                        unreachable!();
+                    }
+                    return current;
+                },
+            ),
+        )
+        .deserialize(deserializer)
+        .map(|res| self.from_fraction(res.0.unwrap(), res.1.unwrap()))
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
-        SerializableNewtypeStruct::new("Rational", SerializableSeq::new_with_len(
-            [SerializeWithRing::new(&el.0, self.base_ring()), SerializeWithRing::new(&el.1, self.base_ring())].iter(), 2
-        )).serialize(serializer)
+        SerializableNewtypeStruct::new(
+            "Rational",
+            SerializableSeq::new_with_len(
+                [
+                    SerializeWithRing::new(&el.0, self.base_ring()),
+                    SerializeWithRing::new(&el.1, self.base_ring()),
+                ]
+                .iter(),
+                2,
+            ),
+        )
+        .serialize(serializer)
     }
 }
 
 impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        J: RingStore,
-        J::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    J: RingStore,
+    J::Type: IntegerRing,
 {
     type Homomorphism = ();
 
@@ -447,16 +534,25 @@ impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
         Some(())
     }
 
-    fn map_in(&self, from: &RationalFieldBase<J>, el: <RationalFieldBase<J> as RingBase>::Element, (): &Self::Homomorphism) -> Self::Element {
-        RationalFieldEl(int_cast(el.0, self.base_ring(), from.base_ring()), int_cast(el.1, self.base_ring(), from.base_ring()))
+    fn map_in(
+        &self,
+        from: &RationalFieldBase<J>,
+        el: <RationalFieldBase<J> as RingBase>::Element,
+        (): &Self::Homomorphism,
+    ) -> Self::Element {
+        RationalFieldEl(
+            int_cast(el.0, self.base_ring(), from.base_ring()),
+            int_cast(el.1, self.base_ring(), from.base_ring()),
+        )
     }
 }
 
 impl<I, J> CanIsoFromTo<RationalFieldBase<J>> for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        J: RingStore,
-        J::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    J: RingStore,
+    J::Type: IntegerRing,
 {
     type Isomorphism = ();
 
@@ -464,15 +560,24 @@ impl<I, J> CanIsoFromTo<RationalFieldBase<J>> for RationalFieldBase<I>
         Some(())
     }
 
-    fn map_out(&self, from: &RationalFieldBase<J>, el: Self::Element, (): &Self::Homomorphism) -> <RationalFieldBase<J> as RingBase>::Element {
-        RationalFieldEl(int_cast(el.0, from.base_ring(), self.base_ring()), int_cast(el.1, from.base_ring(), self.base_ring()))
+    fn map_out(
+        &self,
+        from: &RationalFieldBase<J>,
+        el: Self::Element,
+        (): &Self::Homomorphism,
+    ) -> <RationalFieldBase<J> as RingBase>::Element {
+        RationalFieldEl(
+            int_cast(el.0, from.base_ring(), self.base_ring()),
+            int_cast(el.1, from.base_ring(), self.base_ring()),
+        )
     }
 }
 
 impl<I, J> CanHomFrom<J> for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        J: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    J: IntegerRing,
 {
     type Homomorphism = ();
 
@@ -480,14 +585,23 @@ impl<I, J> CanHomFrom<J> for RationalFieldBase<I>
         Some(())
     }
 
-    fn map_in(&self, from: &J, el: <J as RingBase>::Element, (): &Self::Homomorphism) -> Self::Element {
-        RationalFieldEl(int_cast(el, self.base_ring(), &RingRef::new(from)), self.integers.one())
+    fn map_in(
+        &self,
+        from: &J,
+        el: <J as RingBase>::Element,
+        (): &Self::Homomorphism,
+    ) -> Self::Element {
+        RationalFieldEl(
+            int_cast(el, self.base_ring(), &RingRef::new(from)),
+            self.integers.one(),
+        )
     }
 }
 
 impl<I> DivisibilityRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -506,21 +620,34 @@ impl<I> DivisibilityRing for RationalFieldBase<I>
     }
 
     fn balance_factor<'a, J>(&self, elements: J) -> Option<Self::Element>
-        where J: Iterator<Item = &'a Self::Element>,
-            Self:'a
+    where
+        J: Iterator<Item = &'a Self::Element>,
+        Self: 'a,
     {
-        let (num, den) = elements.fold(
-            (self.integers.zero(), self.integers.one()), 
-            |x, y| (signed_gcd(x.0, self.base_ring().clone_el(self.num(y)), self.base_ring()), signed_lcm(x.1, self.base_ring().clone_el(self.den(y)), self.base_ring())));
+        let (num, den) = elements.fold((self.integers.zero(), self.integers.one()), |x, y| {
+            (
+                signed_gcd(
+                    x.0,
+                    self.base_ring().clone_el(self.num(y)),
+                    self.base_ring(),
+                ),
+                signed_lcm(
+                    x.1,
+                    self.base_ring().clone_el(self.den(y)),
+                    self.base_ring(),
+                ),
+            )
+        });
         return Some(RationalFieldEl(num, den));
     }
 }
 
-impl_interpolation_base_ring_char_zero!{ <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing + ComputeResultantRing }
+impl_interpolation_base_ring_char_zero! { <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing + ComputeResultantRing }
 
 impl<I> PrincipalIdealRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -529,7 +656,11 @@ impl<I> PrincipalIdealRing for RationalFieldBase<I>
         self.checked_left_div(lhs, rhs)
     }
 
-    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+    fn extended_ideal_gen(
+        &self,
+        lhs: &Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element, Self::Element) {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return (self.zero(), self.zero(), self.zero());
         } else if self.is_zero(lhs) {
@@ -541,37 +672,49 @@ impl<I> PrincipalIdealRing for RationalFieldBase<I>
 }
 
 impl<I> EuclideanRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
         if self.is_zero(val) { Some(0) } else { Some(1) }
     }
 
-    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(
+        &self,
+        lhs: Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
     }
 }
 
 impl<I> Domain for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{}
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+{
+}
 
 impl<I> PerfectField for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{}
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+{
+}
 
 impl<I> Field for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
-{}
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+{
+}
 
 impl<I> FiniteRingSpecializable for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         op.fallback()
@@ -579,8 +722,9 @@ impl<I> FiniteRingSpecializable for RationalFieldBase<I>
 }
 
 impl<I> FractionField for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>) {
         (el.0, el.1)
@@ -588,43 +732,65 @@ impl<I> FractionField for RationalFieldBase<I>
 }
 
 impl<I> OrderedRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         assert!(self.integers.is_pos(&lhs.1) && self.integers.is_pos(&rhs.1));
-        self.integers.cmp(&self.integers.mul_ref(&lhs.0, &rhs.1), &self.integers.mul_ref(&rhs.0, &lhs.1))
+        self.integers.cmp(
+            &self.integers.mul_ref(&lhs.0, &rhs.1),
+            &self.integers.mul_ref(&rhs.0, &lhs.1),
+        )
     }
 }
 
 impl<I> PolyTFracGCDRing for RationalFieldBase<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    where
+        P: RingStore + Copy,
+        P::Type: PolyRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
     {
         assert!(!poly_ring.is_zero(poly));
         let QQX = &poly_ring;
         let QQ = QQX.base_ring();
         let ZZ = QQ.base_ring();
-    
-        let den_lcm = QQX.terms(poly).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        
+
+        let den_lcm = QQX
+            .terms(poly)
+            .map(|(c, _)| QQ.get_ring().den(c))
+            .fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+
         let ZZX = DensePolyRing::new(ZZ, "X");
-        let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| {
+            (
+                ZZ.checked_div(
+                    &ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)),
+                    QQ.get_ring().den(c),
+                )
+                .unwrap(),
+                i,
+            )
+        }));
         let power_decomp = poly_power_decomposition_local(&ZZX, f, DontObserve);
         let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
-    
-        return power_decomp.into_iter().map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k)).collect();
+
+        return power_decomp
+            .into_iter()
+            .map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k))
+            .collect();
     }
-    
+
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
-        where P: RingStore + Copy,
-            P::Type: PolyRing,
-            <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
+    where
+        P: RingStore + Copy,
+        P::Type: PolyRing,
+        <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>,
     {
         if poly_ring.is_zero(lhs) {
             return poly_ring.clone_el(rhs);
@@ -634,40 +800,69 @@ impl<I> PolyTFracGCDRing for RationalFieldBase<I>
         let QQX = &poly_ring;
         let QQ = QQX.base_ring();
         let ZZ = QQ.base_ring();
-    
-        let den_lcm_lhs = QQX.terms(lhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        let den_lcm_rhs = QQX.terms(rhs).map(|(c, _)| QQ.get_ring().den(c)).fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
-        
+
+        let den_lcm_lhs = QQX
+            .terms(lhs)
+            .map(|(c, _)| QQ.get_ring().den(c))
+            .fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+        let den_lcm_rhs = QQX
+            .terms(rhs)
+            .map(|(c, _)| QQ.get_ring().den(c))
+            .fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+
         let ZZX = DensePolyRing::new(ZZ, "X");
-        let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
-        let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| (ZZ.checked_div(&ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)), QQ.get_ring().den(c)).unwrap(), i)));
+        let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| {
+            (
+                ZZ.checked_div(
+                    &ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)),
+                    QQ.get_ring().den(c),
+                )
+                .unwrap(),
+                i,
+            )
+        }));
+        let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| {
+            (
+                ZZ.checked_div(
+                    &ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)),
+                    QQ.get_ring().den(c),
+                )
+                .unwrap(),
+                i,
+            )
+        }));
         let result = poly_gcd_local(&ZZX, lhs, rhs, DontObserve);
         let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
-    
+
         return QQX.normalize(ZZX_to_QQX.map(result));
     }
 }
 
-#[cfg(test)]
-use crate::primitive_int::StaticRing;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
-
 use super::fraction::FractionField;
 use super::poly::PolyRing;
+#[cfg(test)]
+use crate::homomorphism::Homomorphism;
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
     let ring = RationalField::new(StaticRing::<i64>::RING);
     let incl = ring.into_int_hom();
-    (-6..8).flat_map(move |x| (-2..5).filter(|y| *y != 0).map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap()))
+    (-6..8).flat_map(move |x| {
+        (-2..5)
+            .filter(|y| *y != 0)
+            .map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap())
+    })
 }
 
 #[test]
 fn test_ring_axioms() {
     let ring = RationalField::new(StaticRing::<i64>::RING);
 
-    let half = ring.checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2)).unwrap();
+    let half = ring
+        .checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2))
+        .unwrap();
     assert!(!ring.is_one(&half));
     assert!(!ring.is_zero(&half));
     assert_el_eq!(ring, ring.one(), ring.add_ref(&half, &half));
@@ -701,17 +896,25 @@ fn test_serialization() {
 
 #[test]
 fn test_serialize_deserialize() {
-    crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(StaticRing::<i64>::RING).into());
-    crate::serialization::generic_tests::test_serialize_deserialize(RationalField::new(BigIntRing::RING).into());
+    crate::serialization::generic_tests::test_serialize_deserialize(
+        RationalField::new(StaticRing::<i64>::RING).into(),
+    );
+    crate::serialization::generic_tests::test_serialize_deserialize(
+        RationalField::new(BigIntRing::RING).into(),
+    );
 }
 
 #[test]
 fn test_serialize_postcard() {
-    let ring: RingValue<RationalFieldBase<RingValue<crate::primitive_int::StaticRingBase<i64>>>> = RationalField::new(StaticRing::<i64>::RING);
-    let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
-    let result = DeserializeWithRing::new(&ring).deserialize(
-        &mut postcard::Deserializer::from_flavor(postcard::de_flavors::Slice::new(&serialized))
-    ).unwrap();
+    let ring: RingValue<RationalFieldBase<RingValue<crate::primitive_int::StaticRingBase<i64>>>> =
+        RationalField::new(StaticRing::<i64>::RING);
+    let serialized =
+        postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
+    let result = DeserializeWithRing::new(&ring)
+        .deserialize(&mut postcard::Deserializer::from_flavor(
+            postcard::de_flavors::Slice::new(&serialized),
+        ))
+        .unwrap();
 
     assert_el_eq!(&ring, ring.int_hom().map(42), result);
 }
