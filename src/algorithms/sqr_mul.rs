@@ -1,12 +1,11 @@
-use crate::ring::*;
 use crate::integer::*;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::*;
+use crate::ring::*;
 
-///
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
 /// w.r.t. the given operation. The operation must be associative to provide correct results.
-/// 
+///
 /// # Example
 /// ```rust
 /// # use feanor_math::algorithms::sqr_mul::generic_abs_square_and_multiply;
@@ -26,32 +25,53 @@ use crate::primitive_int::*;
 ///         mul_count += 1;
 ///         return x + y;
 ///     },
-///     0
+///     0,
 /// );
 /// assert_eq!(120481, result);
 /// ```
-/// 
-pub fn generic_abs_square_and_multiply<T, U, F, H, I>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> T
-    where I: RingStore,
-        I::Type: IntegerRing,
-        F: FnMut(T) -> T, 
-        H: FnMut(&U, T) -> T
+pub fn generic_abs_square_and_multiply<T, U, F, H, I>(
+    base: U,
+    power: &El<I>,
+    int_ring: I,
+    mut square: F,
+    mut multiply_base: H,
+    identity: T,
+) -> T
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    F: FnMut(T) -> T,
+    H: FnMut(&U, T) -> T,
 {
-    try_generic_abs_square_and_multiply(base, power, int_ring, |a| Ok(square(a)), |a, b| Ok(multiply_base(a, b)), identity).unwrap_or_else(|x| x)
+    try_generic_abs_square_and_multiply(
+        base,
+        power,
+        int_ring,
+        |a| Ok(square(a)),
+        |a, b| Ok(multiply_base(a, b)),
+        identity,
+    )
+    .unwrap_or_else(|x| x)
 }
 
-///
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
 /// w.r.t. the given operation. The operation must be associative to provide correct results.
-/// 
+///
 /// This function aborts as soon as any operation returns `Err(_)`.
-/// 
 #[stability::unstable(feature = "enable")]
-pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El<I>, int_ring: I, mut square: F, mut multiply_base: H, identity: T) -> Result<T, E>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        F: FnMut(T) -> Result<T, E>, 
-        H: FnMut(&U, T) -> Result<T, E>
+pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(
+    base: U,
+    power: &El<I>,
+    int_ring: I,
+    mut square: F,
+    mut multiply_base: H,
+    identity: T,
+) -> Result<T, E>
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    F: FnMut(T) -> Result<T, E>,
+    H: FnMut(&U, T) -> Result<T, E>,
 {
     if int_ring.is_zero(&power) {
         return Ok(identity);
@@ -70,22 +90,29 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(base: U, power: &El
     return Ok(result);
 }
 
-///
 /// Computes the reduction of `power` times `base` w.r.t. the given operation.
 /// The operation must be associative to provide correct results.
-/// 
-/// The used algorithm relies on a decomposition of `power` and a table of small shortest addition 
-/// chains to heuristically reduce the number of operations compared to [`generic_abs_square_and_multiply()`].
-/// Note that this introduces some overhead, so in cases where the operation is very cheap, prefer
-/// [`generic_abs_square_and_multiply()`].
-/// 
+///
+/// The used algorithm relies on a decomposition of `power` and a table of small shortest addition
+/// chains to heuristically reduce the number of operations compared to
+/// [`generic_abs_square_and_multiply()`]. Note that this introduces some overhead, so in cases
+/// where the operation is very cheap, prefer [`generic_abs_square_and_multiply()`].
 #[stability::unstable(feature = "enable")]
-pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(base: T, power: &El<I>, int_ring: I, mut double: G, mut mul: F, mut clone: H, identity: T) -> Result<T, E>
-    where I: RingStore,
-        I::Type: IntegerRing,
-        F: FnMut(&T, &T) -> Result<T, E>, 
-        G: FnMut(&T) -> Result<T, E>, 
-        H: FnMut(&T) -> T
+pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(
+    base: T,
+    power: &El<I>,
+    int_ring: I,
+    mut double: G,
+    mut mul: F,
+    mut clone: H,
+    identity: T,
+) -> Result<T, E>
+where
+    I: RingStore,
+    I::Type: IntegerRing,
+    F: FnMut(&T, &T) -> Result<T, E>,
+    G: FnMut(&T) -> Result<T, E>,
+    H: FnMut(&T) -> T,
 {
     assert!(!int_ring.is_neg(power));
     if int_ring.is_zero(&power) {
@@ -105,9 +132,16 @@ pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(base: T, power: &El<I>
     table[1] = Some(base);
 
     #[inline(always)]
-    fn eval_power_using_table<T, F, G, E>(power: usize, mul: &mut F, double: &mut G, table: &mut Vec<Option<T>>, mult_count: &mut usize) -> Result<(), E>
-        where F: FnMut(&T, &T) -> Result<T, E>,
-            G: FnMut(&T) -> Result<T, E>, 
+    fn eval_power_using_table<T, F, G, E>(
+        power: usize,
+        mul: &mut F,
+        double: &mut G,
+        table: &mut Vec<Option<T>>,
+        mult_count: &mut usize,
+    ) -> Result<(), E>
+    where
+        F: FnMut(&T, &T) -> Result<T, E>,
+        G: FnMut(&T) -> Result<T, E>,
     {
         if table[power].is_none() {
             let (i, j) = SHORTEST_ADDITION_CHAINS[power];
@@ -126,32 +160,67 @@ pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(base: T, power: &El<I>
 
     let bitlen = int_ring.abs_highest_set_bit(power).unwrap() + 1;
     if bitlen < LOG2_BOUND {
-        let power = int_cast(int_ring.clone_el(&power), StaticRing::<i32>::RING, &int_ring) as usize;
+        let power = int_cast(
+            int_ring.clone_el(&power),
+            StaticRing::<i32>::RING,
+            &int_ring,
+        ) as usize;
         eval_power_using_table(power, &mut mul, &mut double, &mut table, &mut mult_count)?;
         return Ok(table.into_iter().nth(power).unwrap().unwrap());
     }
 
-    let start_power = (0..LOG2_BOUND).filter(|j| int_ring.abs_is_bit_set(power, *j + bitlen - LOG2_BOUND)).map(|j| 1 << j).sum::<usize>();
-    eval_power_using_table(start_power, &mut mul, &mut double, &mut table, &mut mult_count)?;
+    let start_power = (0..LOG2_BOUND)
+        .filter(|j| int_ring.abs_is_bit_set(power, *j + bitlen - LOG2_BOUND))
+        .map(|j| 1 << j)
+        .sum::<usize>();
+    eval_power_using_table(
+        start_power,
+        &mut mul,
+        &mut double,
+        &mut table,
+        &mut mult_count,
+    )?;
     let mut current = clone(table[start_power].as_ref().unwrap());
 
-    for i in (0..=(bitlen - LOG2_BOUND)).rev().step_by(LOG2_BOUND).skip(1) {
+    for i in (0..=(bitlen - LOG2_BOUND))
+        .rev()
+        .step_by(LOG2_BOUND)
+        .skip(1)
+    {
         for _ in 0..LOG2_BOUND {
             current = double(&current)?;
             mult_count += 1;
         }
-        let local_power = (0..LOG2_BOUND).filter(|j| int_ring.abs_is_bit_set(power, *j + i)).map(|j| 1 << j).sum::<usize>();
+        let local_power = (0..LOG2_BOUND)
+            .filter(|j| int_ring.abs_is_bit_set(power, *j + i))
+            .map(|j| 1 << j)
+            .sum::<usize>();
         if local_power != 0 {
-            eval_power_using_table(local_power, &mut mul, &mut double, &mut table, &mut mult_count)?;
+            eval_power_using_table(
+                local_power,
+                &mut mul,
+                &mut double,
+                &mut table,
+                &mut mult_count,
+            )?;
             current = mul(&current, table[local_power].as_ref().unwrap())?;
             mult_count += 1;
         }
     }
 
     if bitlen % LOG2_BOUND != 0 {
-        let final_power = (0..(bitlen % LOG2_BOUND)).filter(|j| int_ring.abs_is_bit_set(power, *j)).map(|j| 1 << j).sum::<usize>();
-        eval_power_using_table(final_power, &mut mul, &mut double, &mut table, &mut mult_count)?;
-        
+        let final_power = (0..(bitlen % LOG2_BOUND))
+            .filter(|j| int_ring.abs_is_bit_set(power, *j))
+            .map(|j| 1 << j)
+            .sum::<usize>();
+        eval_power_using_table(
+            final_power,
+            &mut mul,
+            &mut double,
+            &mut table,
+            &mut mult_count,
+        )?;
+
         for _ in 0..(bitlen % LOG2_BOUND) {
             current = double(&current)?;
             mult_count += 1;
@@ -236,34 +305,59 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
     (52, 9),
     (31, 31),
     (51, 12),
-    (32, 32)
+    (32, 32),
 ];
 
 #[cfg(test)]
 use test::Bencher;
-#[cfg(test)]
-use crate::rings::zn::zn_64;
+
 #[cfg(test)]
 use crate::homomorphism::*;
+#[cfg(test)]
+use crate::rings::zn::zn_64;
 
 #[test]
 fn test_generic_abs_square_and_multiply() {
     for i in 0..(1 << 16) {
-        assert_eq!(Ok(i), try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(1, &i, StaticRing::<i32>::RING, |a| Ok(a * 2), |a, b| Ok(a + b), 0));
+        assert_eq!(
+            Ok(i),
+            try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
+                1,
+                &i,
+                StaticRing::<i32>::RING,
+                |a| Ok(a * 2),
+                |a, b| Ok(a + b),
+                0
+            )
+        );
     }
 }
 
 #[test]
 fn test_generic_pow_shortest_chain_table() {
     for i in 0..(1 << 16) {
-        assert_eq!(Ok(i), generic_pow_shortest_chain_table::<_, _, _, _, _, !>(1, &i, StaticRing::<i32>::RING, |a| Ok(a * 2), |a, b| Ok(a + b), |a| *a, 0));
+        assert_eq!(
+            Ok(i),
+            generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
+                1,
+                &i,
+                StaticRing::<i32>::RING,
+                |a| Ok(a * 2),
+                |a, b| Ok(a + b),
+                |a| *a,
+                0
+            )
+        );
     }
 }
 
 #[test]
 fn test_shortest_addition_chain_table() {
     for i in 0..SHORTEST_ADDITION_CHAINS.len() {
-        assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
+        assert_eq!(
+            i,
+            SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1
+        );
     }
 }
 
@@ -272,17 +366,22 @@ fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
     let ring = zn_64::Zn::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {
-        assert_el_eq!(&ring, &ring.one(), try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
-            &x, 
-            &536903680, 
-            StaticRing::<i64>::RING, 
-            |mut res| {
-                ring.square(&mut res);
-                return Ok(res);
-            }, 
-            |a, b| Ok(ring.mul_ref_fst(a, b)), 
-            ring.one()
-        ).unwrap());
+        assert_el_eq!(
+            &ring,
+            &ring.one(),
+            try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
+                &x,
+                &536903680,
+                StaticRing::<i64>::RING,
+                |mut res| {
+                    ring.square(&mut res);
+                    return Ok(res);
+                },
+                |a, b| Ok(ring.mul_ref_fst(a, b)),
+                ring.one()
+            )
+            .unwrap()
+        );
     });
 }
 
@@ -291,18 +390,23 @@ fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
     let ring = zn_64::Zn::new(536903681);
     let x = ring.int_hom().map(2);
     bencher.iter(|| {
-        assert_el_eq!(&ring, &ring.one(), generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
-            x, 
-            &536903680, 
-            StaticRing::<i64>::RING, 
-            |a| {
-                let mut res = ring.clone_el(a);
-                ring.square(&mut res);
-                return Ok(res);
-            }, 
-            |a, b| Ok(ring.mul_ref(a, b)), 
-            |a| ring.clone_el(a),
-            ring.one()
-        ).unwrap());
+        assert_el_eq!(
+            &ring,
+            &ring.one(),
+            generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
+                x,
+                &536903680,
+                StaticRing::<i64>::RING,
+                |a| {
+                    let mut res = ring.clone_el(a);
+                    ring.square(&mut res);
+                    return Ok(res);
+                },
+                |a, b| Ok(ring.mul_ref(a, b)),
+                |a| ring.clone_el(a),
+                ring.one()
+            )
+            .unwrap()
+        );
     });
 }

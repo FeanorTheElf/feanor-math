@@ -2,22 +2,22 @@ use std::alloc::{Allocator, Global};
 
 use super::SwappableVectorViewMut;
 
-///
 /// Computes `values_new[i] = values[perm(i)]`.
-/// 
 #[stability::unstable(feature = "enable")]
 pub fn permute<V, T, F>(values: V, perm: F)
-    where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
+where
+    V: SwappableVectorViewMut<T>,
+    F: Fn(usize) -> usize,
 {
     permute_using_allocator(values, perm, Global)
 }
 
-///
 /// Computes `values_new[i] = values[perm(i)]`.
-/// 
 #[stability::unstable(feature = "enable")]
 pub fn permute_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
-    where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
+where
+    V: SwappableVectorViewMut<T>,
+    F: Fn(usize) -> usize,
 {
     let mut swapped_indices = Vec::with_capacity_in(values.len(), allocator);
     swapped_indices.extend((0..values.len()).map(|_| false));
@@ -36,24 +36,24 @@ pub fn permute_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, al
     }
 }
 
-///
 /// Computes `values_new[perm(i)] = values[i]`.
 /// This is the inverse operation to [`permute()`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub fn permute_inv<V, T, F>(values: V, perm: F)
-    where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
+where
+    V: SwappableVectorViewMut<T>,
+    F: Fn(usize) -> usize,
 {
     permute_inv_using_allocator(values, perm, Global)
 }
 
-///
 /// Computes `values_new[perm(i)] = values[i]`.
 /// This is the inverse operation to [`permute()`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub fn permute_inv_using_allocator<V, T, F, A: Allocator>(mut values: V, perm: F, allocator: A)
-    where V: SwappableVectorViewMut<T>, F: Fn(usize) -> usize
+where
+    V: SwappableVectorViewMut<T>,
+    F: Fn(usize) -> usize,
 {
     let mut swapped_indices = Vec::with_capacity_in(values.len(), allocator);
     swapped_indices.extend((0..values.len()).map(|_| false));

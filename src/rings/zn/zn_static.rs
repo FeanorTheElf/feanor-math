@@ -1,25 +1,23 @@
-use serde::{de, Deserialize, Deserializer, Serialize, Serializer};
+use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::algorithms::eea::*;
-use crate::reduce_lift::poly_eval::InterpolationBaseRing;
-use crate::local::PrincipalLocalRing;
-use crate::field::*;
-use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::divisibility::*;
-use crate::primitive_int::{StaticRing, StaticRingBase};
-use crate::ring::*;
-use crate::seq::*;
+use crate::field::*;
 use crate::homomorphism::*;
+use crate::local::PrincipalLocalRing;
+use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::reduce_lift::poly_eval::InterpolationBaseRing;
+use crate::ring::*;
 use crate::rings::extension::FreeAlgebraStore;
 use crate::rings::extension::galois_field::*;
 use crate::rings::zn::*;
+use crate::seq::*;
 use crate::serialization::SerializableElementRing;
 use crate::specialization::*;
 
-///
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time.
-/// 
 #[stability::unstable(feature = "enable")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct ZnBase<const N: u64, const IS_FIELD: bool>;
@@ -38,7 +36,6 @@ pub const fn is_prime(n: u64) -> bool {
 }
 
 impl<const N: u64, const IS_FIELD: bool> ZnBase<N, IS_FIELD> {
-    
     #[stability::unstable(feature = "enable")]
     pub const fn new() -> Self {
         assert!(!IS_FIELD || is_prime(N));
@@ -77,55 +74,76 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnBase<N, IS_FIELD> {
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         *lhs == *rhs
     }
-    
-    fn is_commutative(&self) -> bool { true }
 
-    fn is_noetherian(&self) -> bool { true }
+    fn is_commutative(&self) -> bool {
+        true
+    }
 
-    fn dbg_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
+    fn is_noetherian(&self) -> bool {
+        true
+    }
+
+    fn dbg_within<'a>(
+        &self,
+        value: &Self::Element,
+        out: &mut std::fmt::Formatter<'a>,
+        _: EnvBindingStrength,
+    ) -> std::fmt::Result {
         write!(out, "{}", *value)
     }
-    
+
     fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
-        where I::Type: IntegerRing
+    where
+        I::Type: IntegerRing,
     {
         self.size(ZZ)
     }
 
-    fn is_approximate(&self) -> bool { false }
+    fn is_approximate(&self) -> bool {
+        false
+    }
 }
 
 impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<()> { Some(()) }
+    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<()> {
+        Some(())
+    }
 
     fn map_in(&self, _: &StaticRingBase<i64>, el: i64, _: &()) -> Self::Element {
         let result = ((el % (N as i64)) + (N as i64)) as u64;
-        if result >= N {
-            result - N
-        } else {
-            result
-        }
+        if result >= N { result - N } else { result }
     }
 }
 
 impl<const N: u64, const IS_FIELD: bool> CanHomFrom<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
     type Homomorphism = ();
-    fn has_canonical_hom(&self, _: &Self) -> Option<()> { Some(()) }
-    fn map_in(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element { el }
+    fn has_canonical_hom(&self, _: &Self) -> Option<()> {
+        Some(())
+    }
+    fn map_in(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element {
+        el
+    }
 }
 
 impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<ZnBase<N, IS_FIELD>> for ZnBase<N, IS_FIELD> {
     type Isomorphism = ();
-    fn has_canonical_iso(&self, _: &Self) -> Option<()> { Some(()) }
-    fn map_out(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element { el }
+    fn has_canonical_iso(&self, _: &Self) -> Option<()> {
+        Some(())
+    }
+    fn map_out(&self, _: &Self, el: Self::Element, _: &()) -> Self::Element {
+        el
+    }
 }
 
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD> {
-
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        let (s, _, d) = signed_eea((*rhs).try_into().unwrap(), N as i64, StaticRing::<i64>::RING);
+        let (s, _, d) = signed_eea(
+            (*rhs).try_into().unwrap(),
+            N as i64,
+            StaticRing::<i64>::RING,
+        );
         let mut rhs_inv = ((s % (N as i64)) + (N as i64)) as u64;
         if rhs_inv >= N {
             rhs_inv -= N;
@@ -139,42 +157,47 @@ impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnBase<N, IS_FIELD
 }
 
 impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnBase<N, IS_FIELD> {
-    
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
     }
 
-    fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) = StaticRing::<i64>::RING.extended_ideal_gen(&(*lhs).try_into().unwrap(), &(*rhs).try_into().unwrap());
-        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+    fn extended_ideal_gen(
+        &self,
+        lhs: &Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element, Self::Element) {
+        let (s, t, d) = StaticRing::<i64>::RING
+            .extended_ideal_gen(&(*lhs).try_into().unwrap(), &(*rhs).try_into().unwrap());
+        let quo = RingRef::new(self)
+            .into_can_hom(StaticRing::<i64>::RING)
+            .ok()
+            .unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
 }
 
 impl<const N: u64> EuclideanRing for ZnBase<N, true> {
-
-    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+    fn euclidean_div_rem(
+        &self,
+        lhs: Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
         (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        if self.is_zero(val) {
-            Some(0)
-        } else {
-            Some(1)
-        }
+        if self.is_zero(val) { Some(0) } else { Some(1) }
     }
 }
 
 #[stability::unstable(feature = "enable")]
 #[derive(Clone, Copy)]
 pub struct ZnBaseElementsIter<const N: u64> {
-    current: u64
+    current: u64,
 }
 
 impl<const N: u64> Iterator for ZnBaseElementsIter<N> {
-
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -188,24 +211,32 @@ impl<const N: u64> Iterator for ZnBaseElementsIter<N> {
 }
 
 impl<const N: u64, const IS_FIELD: bool> HashableElRing for ZnBase<N, IS_FIELD> {
-    
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         h.write_u64(*el);
     }
 }
 
 impl<const N: u64, const IS_FIELD: bool> SerializableElementRing for ZnBase<N, IS_FIELD> {
-
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
-        where D: Deserializer<'de>
+    where
+        D: Deserializer<'de>,
     {
         <i64 as Deserialize>::deserialize(deserializer)
-            .and_then(|x| if x < 0 || x >= *self.modulus() { Err(de::Error::custom("ring element value out of bounds for ring Z/nZ")) } else { Ok(x) })
+            .and_then(|x| {
+                if x < 0 || x >= *self.modulus() {
+                    Err(de::Error::custom(
+                        "ring element value out of bounds for ring Z/nZ",
+                    ))
+                } else {
+                    Ok(x)
+                }
+            })
             .map(|x| self.from_int_promise_reduced(x))
     }
 
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
-        where S: Serializer
+    where
+        S: Serializer,
     {
         <i64 as Serialize>::serialize(&self.smallest_positive_lift(*el), serializer)
     }
@@ -223,9 +254,13 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
     }
 
     fn size<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
-        where I::Type: IntegerRing
+    where
+        I::Type: IntegerRing,
     {
-        if ZZ.get_ring().representable_bits().is_none() || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits() {
+        if ZZ.get_ring().representable_bits().is_none()
+            || self.integer_ring().abs_log2_ceil(self.modulus())
+                < ZZ.get_ring().representable_bits()
+        {
             Some(int_cast(*self.modulus(), ZZ, self.integer_ring()))
         } else {
             None
@@ -234,15 +269,20 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
 }
 
 impl<const N: u64> InterpolationBaseRing for ZnBase<N, true> {
+    type ExtendedRingBase<'a>
+        = GaloisFieldBaseOver<RingRef<'a, Self>>
+    where
+        Self: 'a;
 
-    type ExtendedRingBase<'a> = GaloisFieldBaseOver<RingRef<'a, Self>>
-        where Self: 'a;
-
-    type ExtendedRing<'a> = GaloisFieldOver<RingRef<'a, Self>>
-        where Self: 'a;
+    type ExtendedRing<'a>
+        = GaloisFieldOver<RingRef<'a, Self>>
+    where
+        Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
-        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    where
+        Self: 'a,
+        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
     {
         let wrt_basis = ext_ring.wrt_canonical_basis(&el);
         if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
@@ -253,12 +293,17 @@ impl<const N: u64> InterpolationBaseRing for ZnBase<N, true> {
     }
 
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
-        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+    where
+        Self: 'a,
+        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
     {
         ext_ring.inclusion().map(el)
     }
 
-    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(
+        &'a self,
+        count: usize,
+    ) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
         let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
         let points = ring.elements().take(count).collect();
         return (ring, points);
@@ -266,7 +311,6 @@ impl<const N: u64> InterpolationBaseRing for ZnBase<N, true> {
 }
 
 impl<const N: u64, const IS_FIELD: bool> FiniteRingSpecializable for ZnBase<N, IS_FIELD> {
-
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output {
         op.execute()
     }
@@ -306,8 +350,7 @@ impl<const N: u64> PerfectField for ZnBase<N, true> {}
 impl<const N: u64> Field for ZnBase<N, true> {}
 
 impl<const N: u64> PrincipalLocalRing for ZnBase<N, true> {
-    
-    fn max_ideal_gen(&self) ->  &Self::Element {
+    fn max_ideal_gen(&self) -> &Self::Element {
         &0
     }
 
@@ -317,22 +360,17 @@ impl<const N: u64> PrincipalLocalRing for ZnBase<N, true> {
 }
 
 impl<const N: u64, const IS_FIELD: bool> RingValue<ZnBase<N, IS_FIELD>> {
-
     #[stability::unstable(feature = "enable")]
     pub const RING: Self = Self::from(ZnBase::new());
 }
 
-///
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time. For details, see [`ZnBase`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub type Zn<const N: u64> = RingValue<ZnBase<N, false>>;
 
-///
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time. For details, see [`ZnBase`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub type Fp<const P: u64> = RingValue<ZnBase<P, true>>;
 
@@ -396,9 +434,18 @@ fn test_zn_ring_axioms_znbase() {
 
 #[test]
 fn test_divisibility_axioms() {
-    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, Zn::<17>::RING.elements());
-    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, Zn::<9>::RING.elements());
-    crate::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, Zn::<12>::RING.elements());
+    crate::divisibility::generic_tests::test_divisibility_axioms(
+        Zn::<17>::RING,
+        Zn::<17>::RING.elements(),
+    );
+    crate::divisibility::generic_tests::test_divisibility_axioms(
+        Zn::<9>::RING,
+        Zn::<9>::RING.elements(),
+    );
+    crate::divisibility::generic_tests::test_divisibility_axioms(
+        Zn::<12>::RING,
+        Zn::<12>::RING.elements(),
+    );
 }
 
 #[test]

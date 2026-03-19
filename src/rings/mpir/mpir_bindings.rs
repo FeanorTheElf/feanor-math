@@ -7,13 +7,13 @@
 pub struct __mpz_struct {
     _mp_alloc: libc::c_int,
     _mp_size: libc::c_int,
-    _mp_d: *mut libc::c_void
+    _mp_d: *mut libc::c_void,
 }
 
 pub const UNINIT_MPZ: __mpz_struct = __mpz_struct {
     _mp_alloc: 0,
     _mp_size: 0,
-    _mp_d: std::ptr::null_mut()
+    _mp_d: std::ptr::null_mut(),
 };
 
 pub type mpz_srcptr = *const __mpz_struct;
@@ -29,10 +29,8 @@ pub type mpir_ui = libc::c_ulonglong;
 #[cfg(not(windows))]
 pub type mpir_ui = libc::c_ulong;
 
-///
 /// Returns true if the value is negative, and false if it is positive.
 /// For 0, the result is arbitrary.
-///
 pub unsafe fn mpz_is_neg(val: mpz_srcptr) -> bool {
     // sadly, the function mpz_sgn() is only a macro in mpir (with more or
     // less this implementation), and so we have to break into the internals
@@ -44,12 +42,11 @@ pub unsafe fn mpz_is_neg(val: mpz_srcptr) -> bool {
 
 #[link(name = "mpir", kind = "static")]
 unsafe extern "C" {
-    //
     // It is a very hidden, but important fact that we are allowed
     // to pass the same pointer as multiple arguments, even in and
     // output parameters. See doc 3.0.0, MPIR Basics > Parameter Conventions,
     // directly after the source code example (only a half-sentence).
-    // 
+    //
 
     pub fn __gmpz_init(val: mpz_ptr);
     pub fn __gmpz_clear(val: mpz_ptr);
@@ -86,8 +83,24 @@ unsafe extern "C" {
     pub fn __gmpz_tstbit(val: mpz_srcptr, bit_index: mpir_ui) -> libc::c_int;
     pub fn __gmpz_fdiv_q(dst: mpz_ptr, lhs: mpz_srcptr, rhs: mpz_srcptr);
     pub fn __gmpz_nthroot(dst: mpz_ptr, val: mpz_srcptr, n: mpir_ui);
-    pub fn __gmpz_export(dst: *mut libc::c_void, countp: *mut libc::size_t, order: libc::c_int, size: libc::size_t, endian: libc::c_int, nails: libc::size_t, data: mpz_srcptr) -> *mut libc::c_void;
-    pub fn __gmpz_import(dst: mpz_ptr, count: libc::size_t, order: libc::c_int, size: libc::size_t, endian: libc::c_int, nails: libc::size_t, data: *const libc::c_void);
+    pub fn __gmpz_export(
+        dst: *mut libc::c_void,
+        countp: *mut libc::size_t,
+        order: libc::c_int,
+        size: libc::size_t,
+        endian: libc::c_int,
+        nails: libc::size_t,
+        data: mpz_srcptr,
+    ) -> *mut libc::c_void;
+    pub fn __gmpz_import(
+        dst: mpz_ptr,
+        count: libc::size_t,
+        order: libc::c_int,
+        size: libc::size_t,
+        endian: libc::c_int,
+        nails: libc::size_t,
+        data: *const libc::c_void,
+    );
     pub fn __gmpz_scan1(val: mpz_srcptr, starting_bit: mpir_ui) -> mpir_ui;
     pub fn __gmpz_scan0(val: mpz_srcptr, starting_bit: mpir_ui) -> mpir_ui;
 }
@@ -111,7 +124,11 @@ pub fn test___gmpz_add() {
         let mut integer = UNINIT_MPZ;
         __gmpz_init(&mut integer as mpz_ptr);
         __gmpz_set_si(&mut integer as mpz_ptr, 14);
-        __gmpz_add(&mut integer as mpz_ptr, &integer as mpz_srcptr, &integer as mpz_srcptr);
+        __gmpz_add(
+            &mut integer as mpz_ptr,
+            &integer as mpz_srcptr,
+            &integer as mpz_srcptr,
+        );
         let result = __gmpz_get_si(&integer as mpz_srcptr);
         assert_eq!(14 + 14, result);
         __gmpz_clear(&mut integer as mpz_ptr);
@@ -124,7 +141,11 @@ pub fn test___gmpz_mul() {
         let mut integer = UNINIT_MPZ;
         __gmpz_init(&mut integer as mpz_ptr);
         __gmpz_set_si(&mut integer as mpz_ptr, 14);
-        __gmpz_mul(&mut integer as mpz_ptr, &integer as mpz_srcptr, &integer as mpz_srcptr);
+        __gmpz_mul(
+            &mut integer as mpz_ptr,
+            &integer as mpz_srcptr,
+            &integer as mpz_srcptr,
+        );
         let result = __gmpz_get_si(&integer as mpz_srcptr);
         assert_eq!(14 * 14, result);
         __gmpz_clear(&mut integer as mpz_ptr);
@@ -142,7 +163,7 @@ pub fn test___gmpz_sub() {
         __gmpz_set_si(&mut b as mpz_ptr, 13);
         __gmpz_sub(&mut a as mpz_ptr, &a as mpz_srcptr, &b as mpz_srcptr);
         let result = __gmpz_get_si(&a as mpz_srcptr);
-        assert_eq!(14 -13, result);
+        assert_eq!(14 - 13, result);
         __gmpz_clear(&mut a as mpz_ptr);
         __gmpz_clear(&mut b as mpz_ptr);
     }
@@ -154,7 +175,11 @@ pub fn test___gmpz_addmul() {
         let mut integer = UNINIT_MPZ;
         __gmpz_init(&mut integer as mpz_ptr);
         __gmpz_set_si(&mut integer as mpz_ptr, 14);
-        __gmpz_addmul(&mut integer as mpz_ptr, &integer as mpz_srcptr, &integer as mpz_srcptr);
+        __gmpz_addmul(
+            &mut integer as mpz_ptr,
+            &integer as mpz_srcptr,
+            &integer as mpz_srcptr,
+        );
         let result = __gmpz_get_si(&integer as mpz_srcptr);
         assert_eq!(14 + 14 * 14, result);
         __gmpz_clear(&mut integer as mpz_ptr);
@@ -183,7 +208,12 @@ pub fn test___gmpz_tdiv_qr() {
         __gmpz_init(&mut b as mpz_ptr);
         __gmpz_set_si(&mut a as mpz_ptr, 14);
         __gmpz_set_si(&mut b as mpz_ptr, 5);
-        __gmpz_tdiv_qr(&mut a as mpz_ptr, &mut b as mpz_ptr, &a as mpz_srcptr, &b as mpz_srcptr);
+        __gmpz_tdiv_qr(
+            &mut a as mpz_ptr,
+            &mut b as mpz_ptr,
+            &a as mpz_srcptr,
+            &b as mpz_srcptr,
+        );
         let a_res = __gmpz_get_si(&a as mpz_srcptr);
         let b_res = __gmpz_get_si(&b as mpz_srcptr);
         assert_eq!(2, a_res);

@@ -1,6 +1,5 @@
-use std::collections::HashMap;
-use std::collections::hash_map;
 use std::collections::hash_map::Entry;
+use std::collections::{HashMap, hash_map};
 
 use crate::ring::*;
 use crate::seq::*;
@@ -10,18 +9,17 @@ pub struct SparseMapVector<R: RingStore> {
     modify_entry: (usize, El<R>),
     zero: El<R>,
     ring: R,
-    len: usize
+    len: usize,
 }
 
 impl<R: RingStore> SparseMapVector<R> {
-
     pub fn new(len: usize, ring: R) -> Self {
         SparseMapVector {
-            data: HashMap::new(), 
+            data: HashMap::new(),
             modify_entry: (usize::MAX, ring.zero()),
             zero: ring.zero(),
-            ring: ring,
-            len: len
+            ring,
+            len,
         }
     }
 
@@ -37,7 +35,8 @@ impl<R: RingStore> SparseMapVector<R> {
 
     #[stability::unstable(feature = "enable")]
     pub fn scan<F>(&mut self, mut f: F)
-        where F: FnMut(usize, &mut El<R>)
+    where
+        F: FnMut(usize, &mut El<R>),
     {
         self.enter_in_map((usize::MAX, self.ring.zero()));
         self.data.retain(|i, c| {
@@ -55,9 +54,15 @@ impl<R: RingStore> SparseMapVector<R> {
         if self.modify_entry.0 != usize::MAX {
             let (index, value) = std::mem::replace(&mut self.modify_entry, new_modify_entry);
             match self.data.entry(index) {
-                Entry::Occupied(mut e) if !self.ring.is_zero(&value) => { *e.get_mut() = value; },
-                Entry::Occupied(e) => { _ = e.remove(); },
-                Entry::Vacant(e) if !self.ring.is_zero(&value) => { _ = e.insert(value); },
+                Entry::Occupied(mut e) if !self.ring.is_zero(&value) => {
+                    *e.get_mut() = value;
+                }
+                Entry::Occupied(e) => {
+                    _ = e.remove();
+                }
+                Entry::Vacant(e) if !self.ring.is_zero(&value) => {
+                    _ = e.insert(value);
+                }
                 Entry::Vacant(_) => {}
             };
         } else {
@@ -67,7 +72,6 @@ impl<R: RingStore> SparseMapVector<R> {
 }
 
 impl<R: RingStore + Clone> Debug for SparseMapVector<R> {
-    
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let mut output = f.debug_map();
         for (key, value) in self.nontrivial_entries() {
@@ -78,20 +82,25 @@ impl<R: RingStore + Clone> Debug for SparseMapVector<R> {
 }
 
 impl<R: RingStore + Clone> Clone for SparseMapVector<R> {
-
     fn clone(&self) -> Self {
-        SparseMapVector { 
-            data: self.data.iter().map(|(i, c)| (*i, self.ring.clone_el(c))).collect(), 
-            modify_entry: (self.modify_entry.0, self.ring.clone_el(&self.modify_entry.1)), 
-            zero: self.ring.clone_el(&self.zero), 
-            ring: self.ring.clone(), 
-            len: self.len
+        SparseMapVector {
+            data: self
+                .data
+                .iter()
+                .map(|(i, c)| (*i, self.ring.clone_el(c)))
+                .collect(),
+            modify_entry: (
+                self.modify_entry.0,
+                self.ring.clone_el(&self.modify_entry.1),
+            ),
+            zero: self.ring.clone_el(&self.zero),
+            ring: self.ring.clone(),
+            len: self.len,
         }
     }
 }
 
 impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
-
     fn at(&self, i: usize) -> &El<R> {
         assert!(i < self.len());
         if i == self.modify_entry.0 {
@@ -107,21 +116,26 @@ impl<R: RingStore> VectorView<El<R>> for SparseMapVector<R> {
         self.len
     }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<El<R>>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<El<R>>>(
+        &'a self,
+        op: Op,
+    ) -> Result<Op::Output<'a>, ()> {
         Ok(op.execute(self))
     }
 }
 
 pub struct SparseMapVectorIter<'a, R>
-    where R: RingStore
+where
+    R: RingStore,
 {
     base: hash_map::Iter<'a, usize, El<R>>,
     skip: usize,
-    once: Option<&'a El<R>>
+    once: Option<&'a El<R>>,
 }
 
 impl<'a, R> Iterator for SparseMapVectorIter<'a, R>
-    where R: RingStore
+where
+    R: RingStore,
 {
     type Item = (usize, &'a El<R>);
 
@@ -141,21 +155,25 @@ impl<'a, R> Iterator for SparseMapVectorIter<'a, R>
 }
 
 impl<R: RingStore> VectorViewSparse<El<R>> for SparseMapVector<R> {
-
-    type Iter<'a> = SparseMapVectorIter<'a, R>
-        where Self: 'a;
+    type Iter<'a>
+        = SparseMapVectorIter<'a, R>
+    where
+        Self: 'a;
 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
         SparseMapVectorIter {
             base: self.data.iter(),
             skip: self.modify_entry.0,
-            once: if !self.ring.is_zero(&self.modify_entry.1) { Some(&self.modify_entry.1) } else { None }
+            once: if !self.ring.is_zero(&self.modify_entry.1) {
+                Some(&self.modify_entry.1)
+            } else {
+                None
+            },
         }
     }
 }
 
 impl<R: RingStore> VectorViewMut<El<R>> for SparseMapVector<R> {
-
     fn at_mut(&mut self, i: usize) -> &mut El<R> {
         assert!(i < self.len());
         if i == self.modify_entry.0 {
@@ -195,7 +213,7 @@ fn test_at_mut() {
     assert_eq!(0, *entry);
     *entry = -1;
     assert_vector_eq(&mut vector, [0, 3, 0, 0, -1]);
-    
+
     entry = vector.at_mut(1);
     assert_eq!(3, *entry);
     *entry = 4;
@@ -216,23 +234,47 @@ fn test_at_mut() {
 fn test_nontrivial_entries() {
     let ring = StaticRing::<i64>::RING;
     let mut vector = SparseMapVector::new(5, ring);
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [].into_iter().collect()
+    );
     *vector.at_mut(1) = 3;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &3)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &3)].into_iter().collect()
+    );
     *vector.at_mut(4) = -1;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &3), (4, &-1)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &3), (4, &-1)].into_iter().collect()
+    );
 
     *vector.at_mut(1) = 4;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &4), (4, &-1)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &4), (4, &-1)].into_iter().collect()
+    );
     *vector.at_mut(1) = 0;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(4, &-1)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(4, &-1)].into_iter().collect()
+    );
     *vector.at_mut(1) = 5;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &5), (4, &-1)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &5), (4, &-1)].into_iter().collect()
+    );
 
     *vector.at_mut(3) = 0;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &5), (4, &-1)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &5), (4, &-1)].into_iter().collect()
+    );
     *vector.at_mut(4) = -2;
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &5), (4, &-2)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &5), (4, &-2)].into_iter().collect()
+    );
 
     *vector.at_mut(1) = 0;
     assert_eq!(vector.nontrivial_entries().count(), 1);
@@ -251,5 +293,8 @@ fn test_scan() {
         *c -= 1;
     });
     assert_vector_eq(&vector, [0, 1, 0, 0, 0]);
-    assert_eq!(vector.nontrivial_entries().collect::<HashMap<_, _>>(), [(1, &1)].into_iter().collect());
+    assert_eq!(
+        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+        [(1, &1)].into_iter().collect()
+    );
 }
