@@ -84,7 +84,7 @@ macro_rules! karatsuba_impl {
             where R: RingStore + Copy, V2: SelfSubvectorView<El<R>> + Copy, V3: SelfSubvectorView<El<R>> + Copy
         {
             $(
-                fn $fun<R, V1, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, dst: &mut [El<R>], lhs: V2, rhs: V3, mem: &mut [El<R>], ring: R)
+                fn $fun<R, V2, V3, const ADD_ASSIGN: bool>(block_size_log2: usize, dst: &mut [El<R>], lhs: V2, rhs: V3, mem: &mut [El<R>], ring: R)
                     where R: RingStore + Copy, V2: SelfSubvectorView<El<R>> + Copy, V3: SelfSubvectorView<El<R>> + Copy
                 {
                     const STEPS_LEFT: usize = $num;
@@ -100,7 +100,7 @@ macro_rules! karatsuba_impl {
                         let n: usize = block_size / 2;
 
                         let (lower, rest) = mem.split_at_mut(2 * n);
-                        $prev::<R, &mut [El<R>], V2, V3, false>(block_size_log2 - 1, lower, lhs.restrict(..n), rhs.restrict(..n), rest, ring);
+                        $prev::<R, V2, V3, false>(block_size_log2 - 1, lower, lhs.restrict(..n), rhs.restrict(..n), rest, ring);
                         if ADD_ASSIGN {
                             slice_add_assign(dst.restrict(..(2 * n)), &lower, ring);
                         } else {
@@ -110,7 +110,7 @@ macro_rules! karatsuba_impl {
                         slice_sub_assign(dst.restrict(n..(3 * n)), &lower, ring);
 
                         let upper = lower;
-                        $prev::<R, &mut [El<R>], _, _, false>(block_size_log2 - 1, upper, lhs.restrict(n..(2 * n)), rhs.restrict(n..(2 * n)), rest, ring);
+                        $prev::<R, _, _, false>(block_size_log2 - 1, upper, lhs.restrict(n..(2 * n)), rhs.restrict(n..(2 * n)), rest, ring);
                         slice_add_assign(dst.restrict((2 * n)..(4 * n)), &upper, ring);
                         slice_sub_assign(dst.restrict(n..(3 * n)), &upper, ring);
 
@@ -119,7 +119,7 @@ macro_rules! karatsuba_impl {
                             lhs_combined[i] = ring.add_ref(lhs.at(i), lhs.at(i + n));
                             rhs_combined[i] = ring.add_ref(rhs.at(i), rhs.at(i + n));
                         }
-                        $prev::<R, &mut [El<R>], _, _, true>(block_size_log2 - 1, dst.restrict(n..(3 * n)), &lhs_combined[..], &rhs_combined[..], rest, ring);
+                        $prev::<R, _, _, true>(block_size_log2 - 1, dst.restrict(n..(3 * n)), &lhs_combined[..], &rhs_combined[..], rest, ring);
                     }
                 }
             )*
@@ -128,7 +128,7 @@ macro_rules! karatsuba_impl {
             } else {
                 match block_size_log2 - threshold_size_log2 {
                     $(
-                        $num => $fun::<R, &mut [El<R>], _, _, ADD_ASSIGN>(block_size_log2, dst, lhs, rhs, mem, ring),
+                        $num => $fun::<R, _, _, ADD_ASSIGN>(block_size_log2, dst, lhs, rhs, mem, ring),
                     )*
                     _ => panic!()
                 }
