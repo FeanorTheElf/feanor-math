@@ -564,11 +564,11 @@ where
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // the butterfly performs two multiplications with roots of unity, and then two additions
-        let multiply_absolute_error = 2. * input_bound * root_of_unity_error() + input_bound * f64::EPSILON;
-        let addition_absolute_error = 2. * input_bound * f64::EPSILON;
+        let multiply_absolute_error = 2.0 * input_bound * root_of_unity_error() + input_bound * f64::EPSILON;
+        let addition_absolute_error = 2.0 * input_bound * f64::EPSILON;
         let butterfly_absolute_error = multiply_absolute_error + addition_absolute_error;
         // the operator inf-norm of the FFT is its length
-        return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
+        return 2.0 * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
 }
 

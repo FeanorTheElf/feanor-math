@@ -464,27 +464,27 @@ where
 
 impl<A: Allocator + Clone> IntegerRing for RustBigintRingBase<A> {
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
-        let sign = if value.0 { -1. } else { 1. };
+        let sign = if value.0 { -1.0 } else { 1.0 };
         match highest_set_block(&value.1) {
-            None => 0.,
+            None => 0.0,
             Some(0) => value.1[0] as f64 * sign,
             Some(d) => {
-                (value.1[d] as f64 * 2f64.powi((d * u64::BITS as usize).try_into().unwrap())
-                    + value.1[d - 1] as f64 * 2f64.powi(((d - 1) * u64::BITS as usize).try_into().unwrap()))
+                (value.1[d] as f64 * 2.0f64.powi((d * u64::BITS as usize).try_into().unwrap())
+                    + value.1[d - 1] as f64 * 2.0f64.powi(((d - 1) * u64::BITS as usize).try_into().unwrap()))
                     * sign
             }
         }
     }
 
     fn from_float_approx(&self, mut value: f64) -> Option<Self::Element> {
-        if value.round() == 0. {
+        if value.round() == 0.0 {
             return Some(self.zero());
         }
-        let sign = value < 0.;
+        let sign = value < 0.0;
         value = value.abs();
         let scale: i32 = (value.log2().ceil() as i64).try_into().unwrap();
         let significant_digits = std::cmp::min(scale, u64::BITS.try_into().unwrap());
-        let most_significant_bits = (value / 2f64.powi(scale - significant_digits)) as u64;
+        let most_significant_bits = (value / 2.0f64.powi(scale - significant_digits)) as u64;
         let mut result = self.one();
         result.1[0] = most_significant_bits;
         result.0 = sign;
@@ -568,8 +568,8 @@ fn test_to_i128() {
     assert_eq!(2138479, iso.map(RustBigint(false, vec![2138479])));
     assert_eq!(-2138479, iso.map(RustBigint(true, vec![2138479])));
     assert_eq!(
-        0x138691a350bf12fca,
-        iso.map(RustBigint(false, vec![0x38691a350bf12fca, 0x1]))
+        0x138691A350BF12FCA,
+        iso.map(RustBigint(false, vec![0x38691A350BF12FCA, 0x1]))
     );
     assert_eq!(
         i128::MAX,
@@ -662,7 +662,7 @@ fn test_bigint_integer_ring_axioms() { crate::integer::generic_tests::test_integ
 
 #[test]
 fn from_to_float_approx() {
-    let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
+    let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.0;
     let y = ZZ.to_float_approx(&ZZ.from_float_approx(x).unwrap());
     assert!(x * 0.99999 < y);
     assert!(y < x * 1.00001);

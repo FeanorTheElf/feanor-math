@@ -965,7 +965,7 @@ where
         let addition_absolute_error = input_bound * f64::EPSILON;
         let butterfly_absolute_error = multiply_absolute_error + addition_absolute_error;
         // the operator inf-norm of the FFT is its length
-        return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
+        return 2.0 * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
 }
 
@@ -1129,7 +1129,7 @@ fn test_approximate_fft() {
             .map(|i| CC.root_of_unity(i.try_into().unwrap(), 1 << log2_n))
             .collect::<Vec<_>>();
         fft.fft(&mut array, CC);
-        let err = fft.expected_absolute_error(1., 0.);
+        let err = fft.expected_absolute_error(1.0, 0.0);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
         for i in 2..fft.len() {

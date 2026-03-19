@@ -504,7 +504,7 @@ where
         let error_after_fft = self
             .m_fft_table
             .expected_absolute_error(input_bound, error_after_twiddling);
-        let b_bitreverse_fft_error = self.m_fft_table.expected_absolute_error(1., root_of_unity_error());
+        let b_bitreverse_fft_error = self.m_fft_table.expected_absolute_error(1.0, root_of_unity_error());
         // now the values are increased by up to a factor of m, so use `input_bound * m` instead
         let new_input_bound = input_bound * self.m_fft_table.len() as f64;
         let b_bitreverse_fft_bound = self.m_fft_table.len() as f64;
@@ -577,7 +577,7 @@ fn test_approximate_fft() {
             .map(|i| CC.root_of_unity(i.try_into().unwrap(), p.try_into().unwrap()))
             .collect::<Vec<_>>();
         fft.fft(&mut array, CC);
-        let err = fft.expected_absolute_error(1., 0.);
+        let err = fft.expected_absolute_error(1.0, 0.0);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
         for i in 2..fft.len() {

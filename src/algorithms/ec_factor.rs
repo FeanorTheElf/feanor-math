@@ -227,15 +227,15 @@ const POW_COST_CONSTANT: f64 = 0.1;
 fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
     let pow_cost_constant = POW_COST_CONSTANT;
     let ln_cost_per_attempt = |ln_B: f64| ln_B + ln_B.ln() + pow_cost_constant * ln_n.ln();
-    let ln_cost_per_attempt_diff = |ln_B: f64| 1. + 1. / ln_B;
+    let ln_cost_per_attempt_diff = |ln_B: f64| 1.0 + 1.0 / ln_B;
     let ln_attempts = |ln_B: f64| {
         let u = ln_p / ln_B;
-        u * (1. + 2f64.ln()) * u.ln() - u
+        u * (1.0 + 2.0f64.ln()) * u.ln() - u
     };
     let ln_attempts_diff = |ln_B: f64| {
         let u = ln_p / ln_B;
         let u_diff = -ln_p / (ln_B * ln_B);
-        u_diff * (1. + 2f64.ln()) * u.ln() + u * (1. + 2f64.ln()) * u_diff / u - u_diff
+        u_diff * (1.0 + 2.0f64.ln()) * u.ln() + u * (1.0 + 2.0f64.ln()) * u_diff / u - u_diff
     };
     let f = |ln_B: f64| ln_cost_per_attempt(ln_B) - ln_attempts(ln_B);
     let f_diff = |ln_B: f64| ln_cost_per_attempt_diff(ln_B) - ln_attempts_diff(ln_B);
@@ -271,14 +271,14 @@ where
             let ZZ = BigIntRing::RING;
             assert!(ZZ.is_leq(&ZZ.power_of_two(log2_p * 2), &Zn.size(&ZZ).unwrap()));
             let log2_n = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
-            let ln_p = log2_p as f64 * 2f64.ln();
-            let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2f64.ln());
+            let ln_p = log2_p as f64 * 2.0f64.ln();
+            let (ln_B, ln_attempts) = optimize_parameters(ln_p, log2_n as f64 * 2.0f64.ln());
             // after this many random curves, we expect to have found a factor with high
             // probability, unless there is no factor of size about `log2_size`
             let attempts = ln_attempts.exp() as usize;
             log_progress!(controller, "(attempts={})", attempts);
 
-            let log2_B = ln_B / 2f64.ln();
+            let log2_B = ln_B / 2.0f64.ln();
             assert!(log2_B <= i128::MAX as f64);
 
             let primes =

@@ -72,8 +72,8 @@ pub trait IntegerRing:
     /// # use feanor_math::integer::*;
     /// let ZZ = BigIntRing::RING;
     /// let x = ZZ.power_of_two(1023);
-    /// assert!(ZZ.to_float_approx(&x) > 2f64.powi(1023) * 0.99999);
-    /// assert!(ZZ.to_float_approx(&x) < 2f64.powi(1023) * 1.000001);
+    /// assert!(ZZ.to_float_approx(&x) > 2.0f64.powi(1023) * 0.99999);
+    /// assert!(ZZ.to_float_approx(&x) < 2.0f64.powi(1023) * 1.000001);
     /// ```
     /// If the value is too large for the exponent of a `f64`, infinity is returned.
     /// ```rust

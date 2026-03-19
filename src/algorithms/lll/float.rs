@@ -511,9 +511,9 @@ use crate::rings::approx_real::float::*;
 #[test]
 fn test_compute_cholesky_column_without_pivot() {
     let RR = Real64::RING;
-    let mut quadratic_form = [DerefArray::from([4., 5.]), DerefArray::from([5., 12.])];
-    let mut cholesky = [DerefArray::from([2., 0.]), DerefArray::from([0., 0.])];
-    let mut errors = [DerefArray::from([0., 0.]), DerefArray::from([0., 0.])];
+    let mut quadratic_form = [DerefArray::from([4.0, 5.0]), DerefArray::from([5.0, 12.0])];
+    let mut cholesky = [DerefArray::from([2.0, 0.0]), DerefArray::from([0.0, 0.0])];
+    let mut errors = [DerefArray::from([0.0, 0.0]), DerefArray::from([0.0, 0.0])];
     let mut gso = GSOMatrix {
         quadratic_form: SubmatrixMut::from_2d(&mut quadratic_form),
         cholesky: SubmatrixMut::from_2d(&mut cholesky),
@@ -521,23 +521,23 @@ fn test_compute_cholesky_column_without_pivot() {
     };
     compute_cholesky_column_without_pivot(&mut gso, 1, &RR.identity());
 
-    assert!(errors[0][1] <= 5. * f64::EPSILON);
+    assert!(errors[0][1] <= 5.0 * f64::EPSILON);
     assert!((cholesky[0][1] - 2.5).abs() <= errors[0][1]);
 
     let mut quadratic_form = [
-        DerefArray::from([16., 6., 4.]),
-        DerefArray::from([6., 11., 2.5]),
-        DerefArray::from([4., 2.5, 2.]),
+        DerefArray::from([16.0, 6.0, 4.0]),
+        DerefArray::from([6.0, 11.0, 2.5]),
+        DerefArray::from([4.0, 2.5, 2.0]),
     ];
     let mut cholesky = [
-        DerefArray::from([4., 1.5, 0.]),
-        DerefArray::from([0., 2.9580398915498080212836641, 0.]),
-        DerefArray::from([0., 0., 0.]),
+        DerefArray::from([4.0, 1.5, 0.0]),
+        DerefArray::from([0.0, 2.9580398915498080212836641, 0.0]),
+        DerefArray::from([0.0, 0.0, 0.0]),
     ];
     let mut errors = [
-        DerefArray::from([0., 0., 0.]),
-        DerefArray::from([0., f64::EPSILON, 0.]),
-        DerefArray::from([0., 0., 0.]),
+        DerefArray::from([0.0, 0.0, 0.0]),
+        DerefArray::from([0.0, f64::EPSILON, 0.0]),
+        DerefArray::from([0.0, 0.0, 0.0]),
     ];
     let mut gso = GSOMatrix {
         quadratic_form: SubmatrixMut::from_2d(&mut quadratic_form),
@@ -546,9 +546,9 @@ fn test_compute_cholesky_column_without_pivot() {
     };
     compute_cholesky_column_without_pivot(&mut gso, 2, &RR.identity());
 
-    assert!(errors[0][2] <= 5. * f64::EPSILON);
-    assert!((cholesky[0][2] - 1.).abs() <= errors[0][2]);
-    assert!(errors[1][2] <= 10. * f64::EPSILON);
+    assert!(errors[0][2] <= 5.0 * f64::EPSILON);
+    assert!((cholesky[0][2] - 1.0).abs() <= errors[0][2]);
+    assert!(errors[1][2] <= 10.0 * f64::EPSILON);
     assert!((cholesky[1][2] - 0.33806170189140663100384733).abs() <= errors[1][2]);
 }
 

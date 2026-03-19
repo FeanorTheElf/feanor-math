@@ -16,7 +16,7 @@ use crate::rings::poly::*;
 
 const NEWTON_MAX_SCALE: u32 = 10;
 const NEWTON_ITERATIONS: usize = 16;
-const ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR: f64 = 2.;
+const ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR: f64 = 2.0;
 
 #[derive(Debug)]
 #[stability::unstable(feature = "enable")]
@@ -38,7 +38,7 @@ where
     let CC = Complex64::RING;
     let mut current = point;
     let mut current_relative_error = relative_error_point;
-    let mut total_error = 0.;
+    let mut total_error = 0.0;
     for i in 1..=poly_deg {
         total_error += CC.abs(*poly_ring.coefficient_at(f, i)) * CC.abs(current) * current_relative_error;
         // technically, we would have `(1 + current_relative_error)(1 + f64::EPSILON) - 1`, but we
@@ -65,7 +65,7 @@ where
     let f_prime = derive_poly(&CCX, &f);
 
     let approx_radius = (CC.abs(CCX.evaluate(&f, &approx_root, CC.identity()))
-        + absolute_error_of_poly_eval(&CCX, &f, poly_deg, approx_root, 0.))
+        + absolute_error_of_poly_eval(&CCX, &f, poly_deg, approx_root, 0.0))
         / CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity()));
     if !approx_radius.is_finite() {
         return Err(PrecisionError);
@@ -78,7 +78,7 @@ where
     let mut current = derive_poly(&CCX, &f_prime);
     for i in 0..poly_deg.saturating_sub(1) {
         CCX.inclusion()
-            .mul_assign_map(&mut current, CC.from_f64(1. / (i as f64 + 1.)));
+            .mul_assign_map(&mut current, CC.from_f64(1.0 / (i as f64 + 1.0)));
         abs_taylor_series_coeffs.push(CC.abs(CCX.evaluate(&current, &approx_root, CC.identity())));
         current = derive_poly(&CCX, &current);
     }
@@ -94,7 +94,7 @@ where
     // it suffices to assume `f_prime_bound <= |f'(x)| - |f(x)|/R = |f'(x)| (1 - approx_radius /
     // assume_radius)`
     if f_prime_bound
-        > CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity())) * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.)
+        > CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity())) * (ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR - 1.0)
             / ASSUME_RADIUS_TO_APPROX_RADIUS_FACTOR
     {
         return Err(PrecisionError);
@@ -185,7 +185,7 @@ where
             (true, true) => f64::total_cmp(r1, r2),
         })
         .unwrap();
-    if !approx_radius.is_finite() || approx_radius < 0. {
+    if !approx_radius.is_finite() || approx_radius < 0.0 {
         return Err(PrecisionError);
     }
 

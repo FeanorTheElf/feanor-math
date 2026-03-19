@@ -179,7 +179,7 @@ where
     // or equivalently Ex. 20 from Chapter 4.6.2 in Knuth's Art
     let log2_poly_norm =
         ZZX.terms(f).map(|(c, _)| ZZ.abs_log2_ceil(c).unwrap()).max().unwrap() as f64 + (d as f64).log2();
-    return (log2_poly_norm + d as f64) * 2f64.ln();
+    return (log2_poly_norm + d as f64) * 2.0f64.ln();
 }
 
 fn factor_squarefree_monic_integer_poly_local<'a, P, Controller>(

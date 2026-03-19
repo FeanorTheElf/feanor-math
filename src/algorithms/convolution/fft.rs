@@ -108,10 +108,10 @@ where
 
     fn max_sum_len(&self, log2_len: usize, log2_input_size: usize) -> usize {
         let fft_table = self.get_fft_table(log2_len);
-        let input_size = 2f64.powi(log2_input_size.try_into().unwrap());
+        let input_size = 2.0f64.powi(log2_input_size.try_into().unwrap());
         (0.5 / fft_table.expected_absolute_error(
             input_size * input_size,
-            input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.),
+            input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.0),
         ))
         .floor() as usize
     }

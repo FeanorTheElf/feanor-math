@@ -127,7 +127,7 @@ use crate::primitive_int::StaticRing;
 fn test_rational_reconstruction() {
     let n = 2021027;
     let Zn = zn_64::Zn::new(n as u64);
-    let ab_bound = (n as f64 / 2.).sqrt().floor() as i32;
+    let ab_bound = (n as f64 / 2.0).sqrt().floor() as i32;
     for a in -ab_bound..ab_bound {
         for b in 1..ab_bound {
             if a * b <= n / 2 && signed_gcd(b, a, StaticRing::<i32>::RING) == 1 {

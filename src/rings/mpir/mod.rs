@@ -1009,7 +1009,7 @@ fn test_lowest_set_bit() {
 
 #[test]
 fn from_to_float_approx() {
-    let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.;
+    let x: f64 = 83465209236517892563478156042389675783219532497861237985328563.0;
     let y = MPZ::RING.to_float_approx(&MPZ::RING.from_float_approx(x).unwrap());
     assert!(x * 0.99 < y);
     assert!(y < x * 1.01);

@@ -353,7 +353,7 @@ where
     );
     for i in 0..m {
         for j in 0..m {
-            let expected = if i == j { 1. } else { 0. };
+            let expected = if i == j { 1.0 } else { 0.0 };
             if !(Real64::RING.get_ring().is_approx_eq(expected, *product.at(i, j), 100)) {
                 println!("Q is not orthogonal");
                 println!("{}", format_matrix(m, m, |i, j| q.at(i, j), Real64::RING));
@@ -364,7 +364,7 @@ where
 
     for j in 0..n {
         for i in (j + 1)..m {
-            if !(Real64::RING.get_ring().is_approx_eq(0., *r.at(i, j), 100)) {
+            if !(Real64::RING.get_ring().is_approx_eq(0.0, *r.at(i, j), 100)) {
                 println!("R is not upper triangular");
                 println!("{}", format_matrix(m, n, |i, j| r.at(i, j), Real64::RING));
                 panic!();
@@ -407,7 +407,7 @@ where
     }
     for i in 0..n {
         for j in (i + 1)..n {
-            if !(Real64::RING.get_ring().is_approx_eq(0., *l.at(i, j), 100)) {
+            if !(Real64::RING.get_ring().is_approx_eq(0.0, *l.at(i, j), 100)) {
                 println!("L is not lower triangular");
                 println!("{}", format_matrix(n, n, |i, j| l.at(i, j), Real64::RING));
                 panic!();
@@ -419,25 +419,25 @@ where
 #[test]
 fn test_float_qr() {
     let RR = Real64::RING;
-    let a = OwnedMatrix::new_with_shape(vec![0., 1., 1., 0.], 2, 2);
+    let a = OwnedMatrix::new_with_shape(vec![0.0, 1.0, 1.0, 0.0], 2, 2);
     let mut r = a.clone_matrix(RR);
     let mut q = OwnedMatrix::zero(2, 2, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(vec![1., 2., 3., 4., 5., 6.], 3, 2);
+    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
     let mut r = a.clone_matrix(RR);
     let mut q = OwnedMatrix::zero(3, 3, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(vec![1., 2., 3., 4., 5., 6.], 2, 3);
+    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
     let mut r = a.clone_matrix(RR);
     let mut q = OwnedMatrix::zero(2, 2, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(vec![1., 1., 1., 2., 2., 3., 0., 0., 1.], 3, 3);
+    let a = OwnedMatrix::new_with_shape(vec![1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 0.0, 0.0, 1.0], 3, 3);
     let mut r = a.clone_matrix(RR);
     let mut q = OwnedMatrix::zero(3, 3, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
@@ -466,10 +466,10 @@ fn test_float_qdr() {
     for i in 0..3 {
         for j in 0..3 {
             if i == j {
-                assert!(RR.get_ring().is_approx_eq(1., *r.at(i, j), 100));
+                assert!(RR.get_ring().is_approx_eq(1.0, *r.at(i, j), 100));
             }
             RR.mul_assign(r.at_mut(i, j), diags[i].sqrt());
-            RR.mul_assign(q.at_mut(i, j), 1. / diags[j].sqrt());
+            RR.mul_assign(q.at_mut(i, j), 1.0 / diags[j].sqrt());
         }
     }
     assert_is_correct_qr(a.data(), q.data(), r.data());
@@ -478,12 +478,12 @@ fn test_float_qdr() {
 #[test]
 fn test_float_ldl() {
     let RR = Real64::RING;
-    let a = OwnedMatrix::new_with_shape(vec![5., 1., 1., 5.], 2, 2);
+    let a = OwnedMatrix::new_with_shape(vec![5.0, 1.0, 1.0, 5.0], 2, 2);
     let mut l = a.clone_matrix(RR);
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
-    let a = OwnedMatrix::new_with_shape(vec![1., 2., 3., 2., 6., 5., 3., 5., 20.], 3, 3);
+    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, 20.0], 3, 3);
     let mut l = a.clone_matrix(RR);
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
@@ -500,7 +500,7 @@ fn test_float_ldl() {
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
-    let a = OwnedMatrix::new_with_shape(vec![1., 2., 3., 2., 6., 5., 3., 5., -20.], 3, 3);
+    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, -20.0], 3, 3);
     let mut l = a.clone_matrix(RR);
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);

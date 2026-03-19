@@ -255,7 +255,7 @@ impl<R: ?Sized + EvalPolyLocallyRing + PrincipalIdealRing + Domain + SelfIso> Co
                     .max_by(f64::total_cmp)
                     .unwrap();
                 let ln_max_norm = coeff_bound_ln * n as f64
-                    + base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(n as i32)) * n as f64 / 2.;
+                    + base_ring.get_ring().ln_pseudo_norm(&base_ring.int_hom().map(n as i32)) * n as f64 / 2.0;
 
                 let work_locally = base_ring.get_ring().local_computation(ln_max_norm);
                 let mut resultants = Vec::new();

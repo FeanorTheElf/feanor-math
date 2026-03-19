@@ -548,7 +548,7 @@ fn test_approximate_fft() {
             .map(|i| CC.root_of_unity(i.try_into().unwrap(), TryInto::<i64>::try_into(p).unwrap() << log2_n))
             .collect::<Vec<_>>();
         fft.fft(&mut array, CC);
-        let err = fft.expected_absolute_error(1., 0.);
+        let err = fft.expected_absolute_error(1.0, 0.0);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
         for i in 2..fft.len() {

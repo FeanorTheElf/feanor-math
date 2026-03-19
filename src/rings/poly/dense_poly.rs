@@ -701,7 +701,7 @@ where
         if let Some(d) = self.degree(el) {
             return d as f64;
         } else {
-            return 0.;
+            return 0.0;
         }
     }
 
@@ -1117,7 +1117,7 @@ fn test_evaluate_approximate_ring() {
     let ring = DensePolyRing::new(Real64::RING, "X");
     let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
     let x = 0.47312;
-    assert!(Real64::RING.abs((x * x * x - x + 1.) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001);
+    assert!(Real64::RING.abs((x * x * x - x + 1.0) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001);
 }
 
 #[bench]

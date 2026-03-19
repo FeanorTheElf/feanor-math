@@ -440,7 +440,7 @@ where
     where
         Self: 'ring;
 
-    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 { 0. }
+    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 { 0.0 }
 
     fn local_computation<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
         RingRef::new(self)

@@ -129,7 +129,7 @@ impl Domain for Real64Base {}
 
 impl DivisibilityRing for Real64Base {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        assert!(*rhs != 0.);
+        assert!(*rhs != 0.0);
         return Some(*lhs / *rhs);
     }
 }

@@ -106,7 +106,7 @@ where
 
     return find_root_floor(
         &ZZ,
-        ZZ.from_float_approx(ZZ.to_float_approx(&n).powf(1. / root as f64))
+        ZZ.from_float_approx(ZZ.to_float_approx(&n).powf(1.0 / root as f64))
             .unwrap_or(ZZ.zero()),
         |x| {
             let x_pow_root_half = ZZ.pow(ZZ.clone_el(x), root / 2);

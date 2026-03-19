@@ -33,7 +33,7 @@ pub type Complex64 = RingValue<Complex64Base>;
 
 impl Complex64 {
     pub const RING: Self = RingValue::from(Complex64Base);
-    pub const I: Complex64El = Complex64El(0., 1.);
+    pub const I: Complex64El = Complex64El(0.0, 1.0);
 }
 
 impl Complex64Base {
@@ -72,10 +72,10 @@ impl Complex64Base {
         }
     }
 
-    pub fn from_f64(&self, x: f64) -> Complex64El { Complex64El(x, 0.) }
+    pub fn from_f64(&self, x: f64) -> Complex64El { Complex64El(x, 0.0) }
 
     pub fn root_of_unity(&self, i: i64, n: i64) -> Complex64El {
-        self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2. * PI)), Complex64::I))
+        self.exp(self.mul(self.from_f64((i as f64 / n as f64) * (2.0 * PI)), Complex64::I))
     }
 
     pub fn re(&self, Complex64El(re, _im): Complex64El) -> f64 { re }
@@ -136,7 +136,7 @@ impl RingBase for Complex64Base {
         *lhs_im = new_im;
     }
 
-    fn from_int(&self, value: i32) -> Self::Element { Complex64El(value as f64, 0.) }
+    fn from_int(&self, value: i32) -> Self::Element { Complex64El(value as f64, 0.0) }
 
     fn eq_el(&self, _: &Self::Element, _: &Self::Element) -> bool {
         panic!("Cannot provide equality on approximate rings")
@@ -146,7 +146,10 @@ impl RingBase for Complex64Base {
     where
         R::Type: IntegerRing,
     {
-        self.exp(self.mul(self.ln_main_branch(x), Complex64El(integers.to_float_approx(power), 0.)))
+        self.exp(self.mul(
+            self.ln_main_branch(x),
+            Complex64El(integers.to_float_approx(power), 0.0),
+        ))
     }
 
     fn is_commutative(&self) -> bool { true }
@@ -290,12 +293,12 @@ fn test_pow() {
     assert!(!CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 1));
     assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 100));
     assert!(CC.is_approx_eq(
-        CC.exp(CC.mul(CC.from_f64(PI / 4.), i)),
-        CC.mul(CC.add(CC.one(), i), CC.from_f64(2f64.powf(-0.5))),
+        CC.exp(CC.mul(CC.from_f64(PI / 4.0), i)),
+        CC.mul(CC.add(CC.one(), i), CC.from_f64(2.0f64.powf(-0.5))),
         1
     ));
 
-    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2. * PI / 7.)));
+    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2.0 * PI / 7.0)));
     assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
 }
 
@@ -303,7 +306,7 @@ fn test_pow() {
 fn test_mul() {
     let CC = Complex64::RING;
     let i = Complex64::I;
-    assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.), 1));
-    assert!(CC.is_approx_eq(CC.mul(i, CC.negate(i)), CC.from_f64(1.), 1));
+    assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.0), 1));
+    assert!(CC.is_approx_eq(CC.mul(i, CC.negate(i)), CC.from_f64(1.0), 1));
     assert!(CC.is_approx_eq(CC.mul(CC.add(i, CC.one()), i), CC.sub(i, CC.one()), 1));
 }
