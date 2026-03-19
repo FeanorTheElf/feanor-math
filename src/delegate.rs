@@ -346,6 +346,15 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.postprocess_delegate_mut(value);
     }
 
+    default fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        self.get_delegate()
+            .eq_el(self.delegate_ref(lhs), self.delegate_ref(rhs))
+    }
+
+    default fn is_neg_one(&self, value: &Self::Element) -> bool {
+        self.get_delegate().is_neg_one(self.delegate_ref(value))
+    }
+
     default fn zero(&self) -> Self::Element { self.rev_delegate(self.get_delegate().zero()) }
 
     default fn one(&self) -> Self::Element { self.rev_delegate(self.get_delegate().one()) }
@@ -354,18 +363,9 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
 
     default fn from_int(&self, value: i32) -> Self::Element { self.rev_delegate(self.get_delegate().from_int(value)) }
 
-    default fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
-        self.get_delegate()
-            .eq_el(self.delegate_ref(lhs), self.delegate_ref(rhs))
-    }
-
     default fn is_zero(&self, value: &Self::Element) -> bool { self.get_delegate().is_zero(self.delegate_ref(value)) }
 
     default fn is_one(&self, value: &Self::Element) -> bool { self.get_delegate().is_one(self.delegate_ref(value)) }
-
-    default fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.get_delegate().is_neg_one(self.delegate_ref(value))
-    }
 
     default fn is_commutative(&self) -> bool { self.get_delegate().is_commutative() }
 
@@ -740,12 +740,14 @@ where
             O: FiniteRingOperation<R>,
         {
             type Output = O::Output;
+
             fn execute(self) -> Self::Output
             where
                 R::Base: FiniteRing,
             {
                 self.operation.execute()
             }
+            
             fn fallback(self) -> Self::Output { self.operation.fallback() }
         }
 
