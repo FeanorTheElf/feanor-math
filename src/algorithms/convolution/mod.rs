@@ -221,7 +221,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase> {
             }
         }
         impl ProduceValue<()> for ProduceUnitType {
-            fn produce() -> () {}
+            fn produce() {}
         }
         return <ProduceUnitType as ProduceValue<Self::PreparedConvolutionOperand>>::produce();
     }

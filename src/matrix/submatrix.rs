@@ -397,7 +397,7 @@ where
     /// This requires `i != j`, otherwise the function will panic. This
     /// is necessary, since otherwise the two references would violate the
     /// borrowing rules of Rust.
-    pub fn two_entries<'b>(&'b mut self, i: usize, j: usize) -> (&'b mut T, &'b mut T) {
+    pub fn two_entries(&mut self, i: usize, j: usize) -> (&mut T, &mut T) {
         assert!(i != j);
         // safe since i != j
         unsafe {
@@ -481,7 +481,7 @@ impl<'a, V, T> VectorViewMut<T> for ColumnMut<'a, V, T>
 where
     V: AsPointerToSlice<T>,
 {
-    fn at_mut<'b>(&'b mut self, i: usize) -> &'b mut T {
+    fn at_mut(&mut self, i: usize) -> &mut T {
         // safe since self is borrow mutably
         unsafe { self.raw_data.entry_at(i, 0).as_mut() }
     }
@@ -550,7 +550,7 @@ where
     pub fn into_at(self, i: usize, j: usize) -> &'a T { &self.into_row_at(i)[j] }
 
     /// Returns a reference to the `(i, j)`-th entry of this matrix.
-    pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T { &self.row_at(i)[j] }
+    pub fn at(&self, i: usize, j: usize) -> &T { &self.row_at(i)[j] }
 
     /// Returns the submatrix that references only the entries whose column indices are within the
     /// given range.
@@ -595,7 +595,7 @@ where
     }
 
     /// Returns a view on the `i`-th row of this matrix.
-    pub fn row_at<'b>(&'b self, i: usize) -> &'b [T] {
+    pub fn row_at(&self, i: usize) -> &[T] {
         // safe since there are no immutable references to self.raw_data
         unsafe { self.raw_data.row_at(i).as_ref() }
     }
@@ -766,13 +766,13 @@ where
     pub fn into_at_mut(self, i: usize, j: usize) -> &'a mut T { &mut self.into_row_mut_at(i)[j] }
 
     /// Returns a mutable reference to the `(i, j)`-th entry of this matrix.
-    pub fn at_mut<'b>(&'b mut self, i: usize, j: usize) -> &'b mut T { &mut self.row_mut_at(i)[j] }
+    pub fn at_mut(&mut self, i: usize, j: usize) -> &mut T { &mut self.row_mut_at(i)[j] }
 
     /// Returns a reference to the `(i, j)`-th entry of this matrix.
-    pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T { self.as_const().into_at(i, j) }
+    pub fn at(&self, i: usize, j: usize) -> &T { self.as_const().into_at(i, j) }
 
     /// Returns a view onto the `i`-th row of this matrix.
-    pub fn row_at<'b>(&'b self, i: usize) -> &'b [T] { self.as_const().into_row_at(i) }
+    pub fn row_at(&self, i: usize) -> &[T] { self.as_const().into_row_at(i) }
 
     /// Consumes the submatrix and produces a reference to its `i`-th row.
     ///
@@ -785,7 +785,7 @@ where
     }
 
     /// Returns a mutable view onto the `i`-th row of this matrix.
-    pub fn row_mut_at<'b>(&'b mut self, i: usize) -> &'b mut [T] { self.reborrow().into_row_mut_at(i) }
+    pub fn row_mut_at(&mut self, i: usize) -> &mut [T] { self.reborrow().into_row_mut_at(i) }
 
     /// Returns a view onto the `i`-th column of this matrix.
     pub fn col_at<'b>(&'b self, j: usize) -> Column<'b, V, T> { self.as_const().into_col_at(j) }
@@ -870,7 +870,7 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> SubmatrixMut<'a, V, T>
     /// Interprets the given slice of slices as a matrix, by using the elements
     /// of the outer slice as the rows of the matrix.
     pub fn from_2d(data: &'a mut [V]) -> Self {
-        assert!(data.len() > 0);
+        assert!(!data.is_empty());
         let row_count = data.len();
         let col_count = data[0].len();
         for row in data.iter() {
@@ -926,7 +926,7 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
     /// Interprets the given slice of slices as a matrix, by using the elements
     /// of the outer slice as the rows of the matrix.
     pub fn from_2d(data: &'a [V]) -> Self {
-        assert!(data.len() > 0);
+        assert!(!data.is_empty());
         let row_count = data.len();
         let col_count = data[0].len();
         for row in data.iter() {

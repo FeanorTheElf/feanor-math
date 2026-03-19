@@ -217,7 +217,7 @@ where
         &poly_ring.base_ring().characteristic(&ZZ).unwrap()
     ));
     assert!(ZZ.is_odd(&q));
-    assert!(mod_f_ring.rank() % d == 0);
+    assert!(mod_f_ring.rank().is_multiple_of(d));
     assert!(mod_f_ring.rank() > d);
 
     controller.run_computation(
@@ -324,7 +324,7 @@ where
 
     let mut rng = oorandom::Rand64::new((ZZ.default_hash(&q) as u128) | ((seed as u128) << u64::BITS));
     let zeta3 = get_prim_root_of_unity(&Fq, 3).unwrap();
-    let exp = if (d * e) % 2 == 0 {
+    let exp = if (d * e).is_multiple_of(2) {
         ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(d * e), ZZ.one()), &ZZ.int_hom().map(3))
             .unwrap()
     } else {
@@ -383,7 +383,7 @@ where
     Controller: ComputationController,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
-    assert!(mod_f_ring.rank() % d == 0);
+    assert!(mod_f_ring.rank().is_multiple_of(d));
     assert!(mod_f_ring.rank() > d);
 
     controller.run_computation(
@@ -450,14 +450,13 @@ where
                                 .map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)),
                         );
                     } else {
-                        assert!(d % 2 == 0);
+                        assert!(d.is_multiple_of(2));
                         // if d is even, the factor might only live in `new_base_ring`, but we can
                         // just use its norm; the automorphism is X -> X^2
                         let factor_conjugate = new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
                             let c_vec = new_base_ring.wrt_canonical_basis(c);
-                            let new_c = new_base_ring.from_canonical_basis(
-                                [Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter(),
-                            );
+                            let new_c = new_base_ring
+                                .from_canonical_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))]);
                             (new_c, i)
                         }));
                         let factor_norm = new_poly_ring.mul(factor, factor_conjugate);

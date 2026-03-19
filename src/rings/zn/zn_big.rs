@@ -128,17 +128,17 @@ where
     fn bounded_reduce(&self, n: &mut El<I>) {
         debug_assert!(
             self.integer_ring
-                .is_leq(&n, &self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus))
+                .is_leq(n, &self.integer_ring.mul_ref(&self.twice_modulus, &self.twice_modulus))
         );
-        debug_assert!(!self.integer_ring.is_neg(&n));
+        debug_assert!(!self.integer_ring.is_neg(n));
 
-        let mut subtract = self.integer_ring.mul_ref(&n, &self.inverse_modulus);
+        let mut subtract = self.integer_ring.mul_ref(n, &self.inverse_modulus);
         self.integer_ring
             .euclidean_div_pow_2(&mut subtract, self.inverse_modulus_bitshift);
         self.integer_ring.mul_assign_ref(&mut subtract, &self.modulus);
         self.integer_ring.sub_assign(n, subtract);
 
-        debug_assert!(self.integer_ring.is_lt(&n, &self.twice_modulus));
+        debug_assert!(self.integer_ring.is_lt(n, &self.twice_modulus));
     }
 }
 

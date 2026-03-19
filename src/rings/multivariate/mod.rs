@@ -94,8 +94,7 @@ pub trait MultivariatePolyRing: RingExtension {
         f: &'a Self::Element,
         order: O,
     ) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
-        self.terms(f)
-            .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+        self.terms(f).max_by(|l, r| order.compare(RingRef::new(self), l.1, r.1))
     }
 
     /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all
@@ -108,7 +107,7 @@ pub trait MultivariatePolyRing: RingExtension {
     ) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         self.terms(f)
             .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
-            .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+            .max_by(|l, r| order.compare(RingRef::new(self), l.1, r.1))
     }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
@@ -386,7 +385,7 @@ where
     ///
     /// If the ownership of this ring should be transferred to the homomorphism, consider
     /// using [`MultivariatePolyRingStore::into_lifted_hom()`].
-    fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
+    fn lifted_hom<P, H>(&self, from: P, hom: H) -> CoefficientHom<P, &Self, H>
     where
         P: RingStore,
         P::Type: MultivariatePolyRing,
@@ -690,9 +689,9 @@ where
     type DomainStore = PFrom;
     type CodomainStore = PTo;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
     fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element { self.map_ref(&x) }
 

@@ -7,7 +7,6 @@ use crate::algorithms::fft::*;
 use crate::algorithms::unity_root::is_prim_root_of_unity;
 use crate::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
-use crate::ring::*;
 use crate::rings::float_complex::*;
 use crate::seq::subvector::SubvectorView;
 

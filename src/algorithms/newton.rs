@@ -62,10 +62,10 @@ where
 {
     let CC = Complex64::RING;
     let f = poly;
-    let f_prime = derive_poly(&CCX, &f);
+    let f_prime = derive_poly(&CCX, f);
 
-    let approx_radius = (CC.abs(CCX.evaluate(&f, &approx_root, CC.identity()))
-        + absolute_error_of_poly_eval(&CCX, &f, poly_deg, approx_root, 0.0))
+    let approx_radius = (CC.abs(CCX.evaluate(f, &approx_root, CC.identity()))
+        + absolute_error_of_poly_eval(&CCX, f, poly_deg, approx_root, 0.0))
         / CC.abs(CCX.evaluate(&f_prime, &approx_root, CC.identity()));
     if !approx_radius.is_finite() {
         return Err(PrecisionError);
@@ -256,7 +256,7 @@ where
     let f = ZZX_to_CCX.map_ref(poly);
     let mut remaining_poly = CCX.clone_el(&f);
     let mut result = Vec::new();
-    for i in 0..ZZX.degree(&poly).unwrap() {
+    for i in 0..ZZX.degree(poly).unwrap() {
         let (next_root_initial, _) = find_approximate_complex_root_squarefree(&CCX, &remaining_poly, d - i)?;
         let (next_root, distance) = newton_with_initial(&CCX, &f, d, next_root_initial)?;
         if result

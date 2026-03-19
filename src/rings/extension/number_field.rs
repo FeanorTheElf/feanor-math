@@ -33,7 +33,6 @@ use crate::rings::extension::sparse::SparseMapVector;
 use crate::rings::extension::*;
 use crate::rings::field::AsField;
 use crate::rings::float_complex::{Complex64, Complex64Base};
-use crate::rings::poly::*;
 use crate::rings::rational::*;
 use crate::rings::zn::ZnRingStore;
 use crate::serialization::*;
@@ -224,15 +223,15 @@ where
     type DomainStore = K;
     type CodomainStore = Complex64;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &Complex64::RING }
+    fn codomain(&self) -> &Self::CodomainStore { &Complex64::RING }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
     fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
         let poly_ring = DensePolyRing::new(*self.codomain(), "X");
         let hom = self.codomain().can_hom(self.from.base_ring()).unwrap();
         return poly_ring.evaluate(
-            &self.from.poly_repr(&poly_ring, &x, &hom),
+            &self.from.poly_repr(&poly_ring, x, &hom),
             &self.image_of_generator,
             self.codomain().identity(),
         );
@@ -1051,7 +1050,7 @@ where
         let FpX = &self.FpX;
         let Zpe_to_Fp =
             PolyGCDLocallyIntermediateReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, &self.Fp_as_ring, 1, 0);
-        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
+        let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &self.prime, Zpe, e, 0);
 
         let factors = hensel::hensel_lift_factorization(
             &Zpe_to_Fp,
@@ -1166,8 +1165,8 @@ where
         let gen_poly = self.base.generating_poly(
             &ZZX,
             LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
-                assert!(ZZ.is_one(QQ.get_ring().den(&x)));
-                ZZ.clone_el(QQ.get_ring().num(&x))
+                assert!(ZZ.is_one(QQ.get_ring().den(x)));
+                ZZ.clone_el(QQ.get_ring().num(x))
             }),
         );
 
@@ -1294,8 +1293,8 @@ where
         let ZZ = QQ.base_ring();
         let ZZX = &ideal.ZZX;
         let partial_QQ_to_ZZ = LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
-            assert!(ZZ.is_one(QQ.get_ring().den(&x)));
-            ZZ.clone_el(QQ.get_ring().num(&x))
+            assert!(ZZ.is_one(QQ.get_ring().den(x)));
+            ZZ.clone_el(QQ.get_ring().num(x))
         });
         let ZZ_to_Zpe = PolyGCDLocallyReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
 
@@ -1438,8 +1437,8 @@ where
             &self.base.generating_poly(
                 &ZpeX,
                 ZZ_to_Zpe.compose(LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
-                    assert!(ZZ.is_one(QQ.get_ring().den(&x)));
-                    ZZ.clone_el(QQ.get_ring().num(&x))
+                    assert!(ZZ.is_one(QQ.get_ring().den(x)));
+                    ZZ.clone_el(QQ.get_ring().num(x))
                 }))
             )
         );
@@ -1480,7 +1479,7 @@ where
         }
 
         // now lift the polynomial modulo `p^e` to the rationals
-        let Zpe_as_zn = ZZ.get_ring().local_ring_as_zn(&Zpe);
+        let Zpe_as_zn = ZZ.get_ring().local_ring_as_zn(Zpe);
         let Zpe_to_as_zn = Zpe_as_zn.can_hom(Zpe).unwrap();
         let result = self.from_canonical_basis((0..self.rank()).map(|i| {
             let (num, den) =

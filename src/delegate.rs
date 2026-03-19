@@ -793,7 +793,7 @@ where
 {
     type BaseRing = <R::Base as RingExtension>::BaseRing;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { self.get_delegate().base_ring() }
+    fn base_ring(&self) -> &Self::BaseRing { self.get_delegate().base_ring() }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.rev_delegate(self.get_delegate().from(x)) }
 }
@@ -815,7 +815,7 @@ where
         V: IntoIterator<Item = El<Self::BaseRing>>,
         V::IntoIter: DoubleEndedIterator,
     {
-        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.into_iter().map(|x| x)))
+        self.rev_delegate(self.get_delegate().from_canonical_basis(vec))
     }
 
     default fn rank(&self) -> usize { self.get_delegate().rank() }
@@ -873,9 +873,9 @@ where
     type DomainStore = R;
     type CodomainStore = S;
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
     fn map(&self, x: El<R>) -> El<S> { self.to.get_ring().element_cast(self.to.get_ring().rev_delegate(x)) }
 }
@@ -922,9 +922,9 @@ where
     type DomainStore = R;
     type CodomainStore = S;
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
     fn map(&self, x: El<R>) -> El<S> { self.from.get_ring().delegate(self.from.get_ring().rev_element_cast(x)) }
 }

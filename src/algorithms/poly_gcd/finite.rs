@@ -30,12 +30,12 @@ where
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field,
     Controller: ComputationController,
 {
-    assert!(!poly_ring.is_zero(&poly));
+    assert!(!poly_ring.is_zero(poly));
     let squarefree_part = poly_squarefree_part_finite_field(poly_ring, poly, controller.clone());
-    if poly_ring.degree(&squarefree_part).unwrap() == poly_ring.degree(&poly).unwrap() {
+    if poly_ring.degree(&squarefree_part).unwrap() == poly_ring.degree(poly).unwrap() {
         return vec![(squarefree_part, 1)];
     } else {
-        let square_part = poly_ring.checked_div(&poly, &squarefree_part).unwrap();
+        let square_part = poly_ring.checked_div(poly, &squarefree_part).unwrap();
         let square_part_decomposition = poly_power_decomposition_finite_field(poly_ring, &square_part, controller);
         let mut result = square_part_decomposition;
         let mut degree = 0;
@@ -43,10 +43,10 @@ where
             *k += 1;
             degree += poly_ring.degree(g).unwrap() * *k;
         }
-        if degree != poly_ring.degree(&poly).unwrap() {
+        if degree != poly_ring.degree(poly).unwrap() {
             let remaining_part = poly_ring
                 .checked_div(
-                    &poly,
+                    poly,
                     &poly_ring.prod(result.iter().map(|(g, e)| poly_ring.pow(poly_ring.clone_el(g), *e))),
                 )
                 .unwrap();
@@ -69,7 +69,7 @@ where
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field,
     Controller: ComputationController,
 {
-    assert!(!poly_ring.is_zero(&poly));
+    assert!(!poly_ring.is_zero(poly));
     if poly_ring.degree(poly).unwrap() == 0 {
         return poly_ring.one();
     }

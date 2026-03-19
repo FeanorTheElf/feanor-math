@@ -9,7 +9,6 @@ use crate::field::Field;
 use crate::homomorphism::{Homomorphism, *};
 use crate::integer::IntegerRing;
 use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::ring::*;
 use crate::rings::rational::RationalFieldBase;
 
 #[stability::unstable(feature = "enable")]
@@ -252,7 +251,7 @@ where
 {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
+    fn base_ring(&self) -> &Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         FractionFieldEl {

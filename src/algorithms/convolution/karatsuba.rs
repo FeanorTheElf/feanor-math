@@ -185,7 +185,7 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(
     let lhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(lhs.len() as i64)).unwrap();
     let rhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(rhs.len() as i64)).unwrap();
 
-    fn pad<'a, R, V, A>(data: V, len: usize, ring: R, allocator: &'a A) -> Vec<El<R>, &'a A>
+    fn pad<R, V, A>(data: V, len: usize, ring: R, allocator: &A) -> Vec<El<R>, &A>
     where
         R: RingStore + Copy,
         V: SelfSubvectorView<El<R>> + Copy,

@@ -603,9 +603,9 @@ where
         )
     }
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 }
 
 #[cfg(any(test, feature = "generic_tests"))]

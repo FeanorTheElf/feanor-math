@@ -347,9 +347,9 @@ where
     type CodomainStore = &'local R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to.0 }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to.0 }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
+    fn domain(&self) -> &Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
         self.ring
@@ -424,9 +424,9 @@ where
     type CodomainStore = &'local R::LocalRing<'ring>;
     type DomainStore = &'local R::LocalRing<'ring>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to.0 }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to.0 }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from.0 }
+    fn domain(&self) -> &Self::DomainStore { &self.from.0 }
 
     fn map(&self, x: <R::LocalRingBase<'ring> as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
         self.ring.get_ring().reduce_partial(
@@ -500,9 +500,9 @@ where
     type DomainStore = RingRef<'local, R::LocalRingBase<'ring>>;
     type CodomainStore = RingRef<'local, R::LocalFieldBase<'ring>>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
     fn map(
         &self,
@@ -560,9 +560,9 @@ where
     type DomainStore = RingRef<'local, R::LocalFieldBase<'ring>>;
     type CodomainStore = RingRef<'local, R::LocalRingBase<'ring>>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.to }
+    fn codomain(&self) -> &Self::CodomainStore { &self.to }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.from }
+    fn domain(&self) -> &Self::DomainStore { &self.from }
 
     fn map(
         &self,

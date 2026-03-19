@@ -1,5 +1,3 @@
-use std::convert::identity;
-
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::hensel::*;
@@ -60,12 +58,12 @@ where
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
     let mut current = poly_ring.clone_el(poly);
     let mut result = Vec::new();
-    while ungrouped_factors.len() > 0 {
+    while !ungrouped_factors.is_empty() {
         // Here we use the naive approach to group the factors such that the product of each group
         // is integral - just try all combinations. It might be worth using LLL for this instead;
         // note that powerset yields smaller subsets first
         let (factor, new, factor_group) = powerset(ungrouped_factors.iter().copied(), |indices| {
-            if indices.len() == 0 {
+            if indices.is_empty() {
                 return None;
             }
             let factor = local_poly_ring.prod(
@@ -81,7 +79,7 @@ where
                 return None;
             }
         })
-        .filter_map(identity)
+        .flatten()
         .next()
         .unwrap();
         current = new;
@@ -127,7 +125,7 @@ where
     let ring = poly_ring.base_ring().get_ring();
     assert_eq!(
         1,
-        ring.maximal_ideal_factor_count(&prime),
+        ring.maximal_ideal_factor_count(prime),
         "currently only maximal ideals are supported, got {}",
         IdealDisplayWrapper::new(ring, prime)
     );
@@ -245,7 +243,7 @@ where
                 let lc_factor = ZZX.lc(&factor).unwrap();
                 let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
                 let factorization = factor_squarefree_monic_integer_poly_local(&ZZX, &factor_monic, controller.clone());
-                for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, &lc_factor)) {
+                for irred_factor in factorization.into_iter().map(|fi| unevaluate_aX(ZZX, &fi, lc_factor)) {
                     let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
                     let mut power = 0;
                     let irred_factor = make_primitive(ZZX, &irred_factor).0;
@@ -253,7 +251,7 @@ where
                         &ZZX.inclusion().mul_ref_map(
                             &current,
                             &ZZX.base_ring()
-                                .pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap()),
+                                .pow(ZZX.base_ring().clone_el(irred_factor_lc), ZZX.degree(&f).unwrap()),
                         ),
                         &irred_factor,
                     ) {

@@ -30,7 +30,7 @@ where
     return <_ as ComputeInnerProduct>::inner_product(
         ring,
         (0..).map_while(|_| {
-            if data.len() == 0 {
+            if data.is_empty() {
                 return None;
             }
             let taken_elements = min(data.len(), ring.rank());
@@ -96,7 +96,7 @@ where
             poly_ring.from_terms(
                 (0..d)
                     .map(|i| (base_ring.clone_el(sol.at(i, 0)), i))
-                    .chain([(base_ring.one(), d)].into_iter()),
+                    .chain([(base_ring.one(), d)]),
             )
         };
         match <_ as LinSolveRingStore>::solve_right(base_ring, lhs.data_mut(), rhs.data_mut(), sol.data_mut()) {

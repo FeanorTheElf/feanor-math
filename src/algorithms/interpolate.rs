@@ -68,7 +68,7 @@ where
         for j in 0..(1 << (log2_n - s - 1)) {
             let block_index = j << (s + 1);
             if block_index + (1 << s) < n {
-                let (fst, snd) = (&mut out[block_index..min(n, block_index + (1 << (s + 1)))]).split_at_mut(1 << s);
+                let (fst, snd) = out[block_index..min(n, block_index + (1 << (s + 1)))].split_at_mut(1 << s);
                 let snd_block_prod = ring.mul_ref_fst(&snd[0], values.at(block_index + (1 << s)));
                 let fst_block_prod = ring.mul_ref_fst(&fst[0], values.at(block_index));
                 for i in 0..(1 << s) {
@@ -162,7 +162,7 @@ where
     nums.extend(x.iter().map(|x| div_linear(&null_poly, &x)));
 
     let mut denoms = Vec::with_capacity_in(x.len(), &allocator);
-    denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), &R.identity())));
+    denoms.extend((0..x.len()).map(|i| poly_ring.evaluate(&nums[i], &x.at(i), R.identity())));
     let mut factors = Vec::with_capacity_in(x.len(), &allocator);
     factors.resize_with(x.len(), || R.zero());
     product_except_one(R, (&denoms[..]).into_clone_ring_els(R), &mut factors);
@@ -176,7 +176,7 @@ where
             <_ as RingStore>::sum(
                 &poly_ring,
                 nums.into_iter()
-                    .zip(factors.into_iter())
+                    .zip(factors)
                     .map(|(num, c)| poly_ring.inclusion().mul_map(num, c)),
             ),
             inv,
@@ -185,11 +185,11 @@ where
         let scaled_result = <_ as RingStore>::sum(
             &poly_ring,
             nums.into_iter()
-                .zip(factors.into_iter())
+                .zip(factors)
                 .map(|(num, c)| poly_ring.inclusion().mul_map(num, c)),
         );
         poly_ring.try_from_terms(poly_ring.terms(&scaled_result).map(|(c, i)| {
-            R.checked_div(&c, &denominator)
+            R.checked_div(c, &denominator)
                 .map(|c| (c, i))
                 .ok_or(InterpolationError::NotInvertible)
         }))
@@ -252,10 +252,10 @@ where
     return Ok(poly_ring.from_terms(
         multi_cartesian_product(
             (0..n).map(|i| 0..interpolation_points.at(i).len()),
-            |idxs| poly_ring.get_ring().create_monomial(idxs.iter().map(|e| *e)),
+            |idxs| poly_ring.get_ring().create_monomial(idxs.iter().copied()),
             |_, x| *x,
         )
-        .zip(values.into_iter())
+        .zip(values)
         .map(|(m, c)| (c, m)),
     ));
 }

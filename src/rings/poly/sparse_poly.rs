@@ -103,7 +103,7 @@ impl<R: RingStore> SparsePolyRing<R> {
 impl<R: RingStore> SparsePolyRingBase<R> {
     fn degree_truncate(&self, el: &mut SparseMapVector<Arc<R>>) {
         for i in (0..el.len()).rev() {
-            if !self.base_ring.is_zero(&el.at(i)) {
+            if !self.base_ring.is_zero(el.at(i)) {
                 el.set_len(i + 1);
                 return;
             }
@@ -211,7 +211,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
         self.dbg_within(value, out, EnvBindingStrength::Weakest)
     }
 
-    fn square(&self, value: &mut Self::Element) { *value = self.mul_ref(&value, &value); }
+    fn square(&self, value: &mut Self::Element) { *value = self.mul_ref(value, value); }
 
     fn mul_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         if lhs.data.len() == 0 || rhs.data.len() == 0 {
@@ -257,7 +257,7 @@ where
 impl<R: RingStore> RingExtension for SparsePolyRingBase<R> {
     type BaseRing = R;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.base_ring }
+    fn base_ring(&self) -> &Self::BaseRing { &self.base_ring }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element {
         let mut result = self.zero();
@@ -458,7 +458,7 @@ where
             self.base_ring()
                 .is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap()))
         );
-        let quo = self.poly_div(&mut lhs, rhs, |x| Some(x)).unwrap();
+        let quo = self.poly_div(&mut lhs, rhs, Some).unwrap();
         return (quo, lhs);
     }
 }
@@ -478,7 +478,7 @@ where
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
             let lc = rhs.data.at(d);
-            let mut lhs_copy = self.clone_el(&lhs);
+            let mut lhs_copy = self.clone_el(lhs);
             let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
             if self.is_zero(&lhs_copy) { Some(quo) } else { None }
         } else if self.is_zero(lhs) {

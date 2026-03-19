@@ -168,7 +168,7 @@ pub trait DivisibilityRing: RingBase {
             }
         }
         impl ProduceValue<()> for ProduceUnitType {
-            fn produce() -> () {}
+            fn produce() {}
         }
         <ProduceUnitType as ProduceValue<Self::PreparedDivisorData>>::produce()
     }

@@ -7,7 +7,6 @@ use crate::algorithms::fft::*;
 use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
-use crate::ring::*;
 use crate::rings::float_complex::*;
 use crate::rings::zn::*;
 use crate::seq::{SwappableVectorViewMut, VectorViewMut};
@@ -132,7 +131,7 @@ fn butterfly_loop<T, S, F>(
             .zip(current_data.as_chunks_mut::<2>().0.iter_mut())
         {
             let [a, b] = butterfly_data.each_mut();
-            butterfly(a, b, &twiddle);
+            butterfly(a, b, twiddle);
         }
     } else if stride_range_len >= 1 {
         for (twiddle, butterfly_data) in twiddles[butterfly_range]
@@ -143,13 +142,13 @@ fn butterfly_loop<T, S, F>(
             let (first_chunks, first_rem) = first[..stride_range_len].as_chunks_mut::<4>();
             let (second_chunks, second_rem) = second.as_chunks_mut::<4>();
             for (a, b) in first_chunks.iter_mut().zip(second_chunks.iter_mut()) {
-                butterfly(&mut a[0], &mut b[0], &twiddle);
-                butterfly(&mut a[1], &mut b[1], &twiddle);
-                butterfly(&mut a[2], &mut b[2], &twiddle);
-                butterfly(&mut a[3], &mut b[3], &twiddle);
+                butterfly(&mut a[0], &mut b[0], twiddle);
+                butterfly(&mut a[1], &mut b[1], twiddle);
+                butterfly(&mut a[2], &mut b[2], twiddle);
+                butterfly(&mut a[3], &mut b[3], twiddle);
             }
             for (a, b) in first_rem.iter_mut().zip(second_rem.iter_mut()) {
-                butterfly(a, b, &twiddle);
+                butterfly(a, b, twiddle);
             }
         }
     }
@@ -314,7 +313,7 @@ where
         f.debug_struct("CooleyTuckeyFFT")
             .field("ring", &self.ring().get_ring())
             .field("n", &(1 << self.log2_n))
-            .field("root_of_unity", &self.ring().format(&self.root_of_unity(self.ring())))
+            .field("root_of_unity", &self.ring().format(self.root_of_unity(self.ring())))
             .finish()
     }
 }
@@ -535,7 +534,7 @@ where
         );
 
         let root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(-i), log2_n);
-        let inv_root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(i), log2_n);
+        let inv_root_of_unity_list = Self::create_root_of_unity_list(&mut root_of_unity_pow, log2_n);
         let root_of_unity = root_of_unity_pow(1);
 
         let store_twiddle_ring = root_of_unity_list.len();
@@ -601,7 +600,7 @@ where
     }
 
     /// Returns the ring over which this object can compute FFTs.
-    pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore { self.hom.codomain() }
+    pub fn ring(&self) -> &<H as Homomorphism<R_twiddle, R_main>>::CodomainStore { self.hom.codomain() }
 
     /// Computes the main butterfly step, either forward or backward (without division by two).
     ///

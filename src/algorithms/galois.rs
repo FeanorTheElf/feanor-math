@@ -173,9 +173,9 @@ where
     type DomainStore = K;
     type CodomainStore = K;
 
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.field }
+    fn codomain(&self) -> &Self::CodomainStore { &self.field }
 
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.field }
+    fn domain(&self) -> &Self::DomainStore { &self.field }
 
     fn map_ref(
         &self,
@@ -301,13 +301,7 @@ where
                 .into_iter()
                 .map(|x| GaloisAutomorphism::new(field.clone(), x))
                 .collect();
-            let id_idx = result
-                .iter()
-                .enumerate()
-                .filter(|(_, g)| g.is_identity())
-                .next()
-                .unwrap()
-                .0;
+            let id_idx = result.iter().enumerate().find(|(_, g)| g.is_identity()).unwrap().0;
             result.swap(0, id_idx);
             return Ok(result);
         }

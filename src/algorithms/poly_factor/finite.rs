@@ -23,7 +23,7 @@ where
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: FiniteRing + Field + SelfIso,
     Controller: ComputationController,
 {
-    assert!(!poly_ring.is_zero(&f));
+    assert!(!poly_ring.is_zero(f));
     let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
 
     controller.run_computation(
@@ -31,7 +31,7 @@ where
         |controller| {
             let mut result = Vec::new();
             let mut unit = poly_ring.base_ring().one();
-            let mut el = poly_ring.clone_el(&f);
+            let mut el = poly_ring.clone_el(f);
 
             // we repeatedly remove the square-free part
             while !poly_ring.is_unit(&el) {

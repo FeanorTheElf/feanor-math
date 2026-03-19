@@ -70,7 +70,7 @@ pub trait AbelianGroupBase: PartialEq {
             e,
             BigIntRing::RING,
             |a| self.op_ref(&a, &a),
-            |a, b| self.op_ref_snd(b, &a),
+            |a, b| self.op_ref_snd(b, a),
             self.identity(),
         );
         if !BigIntRing::RING.is_neg(e) {

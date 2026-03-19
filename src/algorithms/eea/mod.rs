@@ -219,10 +219,7 @@ where
 {
     let (s, t, d) = signed_eea(ZZ.clone_el(p), ZZ.clone_el(q), &ZZ);
     assert!(ZZ.is_one(&d) || ZZ.is_neg_one(&d));
-    let mut result = ZZ.add(
-        ZZ.prod([a, t, ZZ.clone_el(q)].into_iter()),
-        ZZ.prod([b, s, ZZ.clone_el(p)].into_iter()),
-    );
+    let mut result = ZZ.add(ZZ.prod([a, t, ZZ.clone_el(q)]), ZZ.prod([b, s, ZZ.clone_el(p)]));
 
     let n = ZZ.mul_ref(p, q);
     result = ZZ.euclidean_rem(result, &n);

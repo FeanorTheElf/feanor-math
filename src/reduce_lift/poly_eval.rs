@@ -103,9 +103,9 @@ where
     type CodomainStore = R::ExtendedRing<'a>;
     type DomainStore = RingRef<'a, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.ext_ring }
+    fn codomain(&self) -> &Self::CodomainStore { &self.ext_ring }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
+    fn domain(&self) -> &Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::ExtendedRingBase<'a> as RingBase>::Element {
         self.ring.get_ring().in_extension(&self.ext_ring, x)
@@ -522,9 +522,9 @@ where
     type CodomainStore = R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.local_ring }
+    fn codomain(&self) -> &Self::CodomainStore { &self.local_ring }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
+    fn domain(&self) -> &Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
         let ring_ref: &'data R = self.ring.into();

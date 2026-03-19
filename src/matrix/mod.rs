@@ -35,12 +35,7 @@ where
                 .flat_map(|i| (0..self.col_count).map(move |j| (i, j)))
                 .map(|(i, j)| format!("{}", self.ring.format((self.matrix)(i, j))))
                 .collect::<Vec<_>>();
-            let max_len = strings
-                .iter()
-                .map(|s| s.chars().count())
-                .chain([2].into_iter())
-                .max()
-                .unwrap();
+            let max_len = strings.iter().map(|s| s.chars().count()).chain([2]).max().unwrap();
             let mut strings = strings.into_iter();
             for i in 0..self.row_count {
                 write!(f, "|")?;
@@ -133,7 +128,7 @@ pub mod matrix_compare {
         fn at(&self, i: usize, j: usize) -> &T { OwnedMatrix::at(self, i, j) }
     }
 
-    impl<'a, T, M: MatrixCompare<T>> MatrixCompare<T> for &'a M {
+    impl<T, M: MatrixCompare<T>> MatrixCompare<T> for &M {
         fn col_count(&self) -> usize { (**self).col_count() }
         fn row_count(&self) -> usize { (**self).row_count() }
         fn at(&self, i: usize, j: usize) -> &T { (**self).at(i, j) }

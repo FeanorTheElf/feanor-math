@@ -50,23 +50,16 @@ pub fn bigint_add<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt], bl
             i += 1;
         }
     }
-    let new_highest_set_block = highest_set_block(&lhs);
+    let new_highest_set_block = highest_set_block(lhs);
     debug_assert!(new_highest_set_block.is_none() || max(prev_len, new_highest_set_block.unwrap() + 1) == lhs.len());
 }
 
 #[stability::unstable(feature = "enable")]
-pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> {
-    for i in (0..x.len()).rev() {
-        if x[i] != 0 {
-            return Some(i);
-        }
-    }
-    return None;
-}
+pub fn highest_set_block(x: &[BlockInt]) -> Option<usize> { (0..x.len()).rev().find(|&i| x[i] != 0) }
 
 #[stability::unstable(feature = "enable")]
 pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
-    match (highest_set_block(lhs.as_ref()), highest_set_block(rhs.as_ref())) {
+    match (highest_set_block(lhs), highest_set_block(rhs)) {
         (None, None) => return Ordering::Equal,
         (Some(_), None) => return Ordering::Greater,
         (None, Some(_)) => return Ordering::Less,
@@ -89,7 +82,7 @@ pub fn bigint_cmp(lhs: &[BlockInt], rhs: &[BlockInt]) -> Ordering {
 
 #[stability::unstable(feature = "enable")]
 pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
-    match highest_set_block(lhs.as_ref()) {
+    match highest_set_block(lhs) {
         None => 0.cmp(&rhs),
         Some(0) => (lhs[0] as DoubleBlockInt).cmp(&rhs),
         Some(1) => (((lhs[1] as DoubleBlockInt) << BLOCK_BITS) | (lhs[0] as DoubleBlockInt)).cmp(&rhs),
@@ -102,9 +95,9 @@ pub fn bigint_cmp_small(lhs: &[BlockInt], rhs: DoubleBlockInt) -> Ordering {
 /// This will panic if the subtraction would result in a negative number
 #[stability::unstable(feature = "enable")]
 pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
-    assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less);
+    assert!(bigint_cmp(lhs, rhs) != Ordering::Less);
 
-    if let Some(rhs_high) = highest_set_block(rhs.as_ref()) {
+    if let Some(rhs_high) = highest_set_block(rhs) {
         let mut buffer: bool = false;
         let mut i = 0;
         while i <= rhs_high || buffer {
@@ -130,9 +123,9 @@ pub fn bigint_sub(lhs: &mut [BlockInt], rhs: &[BlockInt], block_offset: usize) {
 /// This will panic or give a wrong result if the subtraction would result in a negative number
 #[stability::unstable(feature = "enable")]
 pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt]) {
-    debug_assert!(bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Greater);
+    debug_assert!(bigint_cmp(lhs.as_ref(), rhs) != Ordering::Greater);
 
-    let rhs_high = highest_set_block(rhs.as_ref()).expect("rhs must be larger than lhs");
+    let rhs_high = highest_set_block(rhs).expect("rhs must be larger than lhs");
     expand(lhs, rhs_high + 1);
     let mut buffer: bool = false;
     let mut i = 0;
@@ -153,7 +146,7 @@ pub fn bigint_sub_self<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: &[BlockInt
 
 #[stability::unstable(feature = "enable")]
 pub fn bigint_lshift<A: Allocator>(lhs: &mut Vec<BlockInt, A>, power: usize) {
-    if let Some(high) = highest_set_block(&lhs) {
+    if let Some(high) = highest_set_block(lhs) {
         let mut buffer: BlockInt = 0;
         let mut i = 0;
         let in_block = (power % BlockInt::BITS as usize) as u32;
@@ -209,15 +202,15 @@ pub fn bigint_fma<A: Allocator, A2: Allocator>(
     let prev_len = highest_set_block(&out).map(|x| x + 1).unwrap_or(0);
     let new_len = max(
         prev_len + 1,
-        highest_set_block(lhs.as_ref())
-            .and_then(|lb| highest_set_block(rhs.as_ref()).map(|rb| lb + rb + 2))
+        highest_set_block(lhs)
+            .and_then(|lb| highest_set_block(rhs).map(|rb| lb + rb + 2))
             .unwrap_or(0),
     );
     out.resize(new_len, 0);
-    if let Some(d) = highest_set_block(rhs.as_ref()) {
+    if let Some(d) = highest_set_block(rhs) {
         let mut val = Vec::new_in(scratch_alloc);
         for i in 0..=d {
-            assign(&mut val, lhs.as_ref());
+            assign(&mut val, lhs);
             bigint_mul_small(&mut val, rhs[i]);
             bigint_add(&mut out, val.as_ref(), i);
         }
@@ -245,7 +238,7 @@ pub fn bigint_mul_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, factor: BlockI
 
 #[stability::unstable(feature = "enable")]
 pub fn bigint_add_small<A: Allocator>(lhs: &mut Vec<BlockInt, A>, rhs: BlockInt) {
-    if lhs.len() > 0 {
+    if !lhs.is_empty() {
         let (sum, mut buffer) = lhs[0].overflowing_add(rhs);
         *lhs.at_mut(0) = sum;
         let mut i = 1;
@@ -284,20 +277,20 @@ fn division_step_last<A: Allocator>(
         }
     } else {
         let mut quotient = (self_high_blocks / (rhs_high_blocks + 1)) as u64;
-        assign(tmp, rhs.as_ref());
+        assign(tmp, rhs);
         bigint_mul_small(tmp, quotient);
         bigint_sub(lhs, tmp.as_ref(), 0);
 
-        if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
-            bigint_sub(lhs, rhs.as_ref(), 0);
+        if bigint_cmp(lhs, rhs) != Ordering::Less {
+            bigint_sub(lhs, rhs, 0);
             quotient += 1;
         }
-        if bigint_cmp(lhs.as_ref(), rhs.as_ref()) != Ordering::Less {
-            bigint_sub(lhs, rhs.as_ref(), 0);
+        if bigint_cmp(lhs, rhs) != Ordering::Less {
+            bigint_sub(lhs, rhs, 0);
             quotient += 1;
         }
 
-        debug_assert!(bigint_cmp(lhs.as_ref(), rhs) == Ordering::Less);
+        debug_assert!(bigint_cmp(lhs, rhs) == Ordering::Less);
         return quotient;
     }
 }
@@ -340,7 +333,7 @@ fn division_step<A: Allocator>(
         if rhs_high_blocks != DoubleBlockInt::MAX && lhs_high_blocks >= (rhs_high_blocks + 1) {
             let mut quotient = (lhs_high_blocks / (rhs_high_blocks + 1)) as u64;
             debug_assert!(quotient != 0);
-            assign(tmp, rhs.as_ref());
+            assign(tmp, rhs);
             bigint_mul_small(tmp, quotient);
             bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high);
 
@@ -348,7 +341,7 @@ fn division_step<A: Allocator>(
                 ((lhs[lhs_high] as DoubleBlockInt) << BLOCK_BITS) | (lhs[lhs_high - 1] as DoubleBlockInt);
 
             if lhs_high_blocks > rhs_high_blocks {
-                bigint_sub(lhs, rhs.as_ref(), lhs_high - rhs_high);
+                bigint_sub(lhs, rhs, lhs_high - rhs_high);
                 quotient += 1;
             }
             result_upper = quotient;
@@ -366,12 +359,12 @@ fn division_step<A: Allocator>(
 
         if lhs[lhs_high] != 0 {
             let mut quotient = (lhs_high_blocks / (rhs_high_block + 1)) as BlockInt;
-            assign(tmp, rhs.as_ref());
+            assign(tmp, rhs);
             bigint_mul_small(tmp, quotient);
             bigint_sub(lhs, tmp.as_ref(), lhs_high - rhs_high - 1);
 
             if lhs[lhs_high] != 0 {
-                bigint_sub(lhs, rhs.as_ref(), lhs_high - rhs_high - 1);
+                bigint_sub(lhs, rhs, lhs_high - rhs_high - 1);
                 quotient += 1;
             }
             result_lower = quotient;
@@ -394,7 +387,7 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(
     mut out: Vec<BlockInt, A>,
     scratch_alloc: A2,
 ) -> Vec<BlockInt, A> {
-    assert!(highest_set_block(rhs.as_ref()).is_some());
+    assert!(highest_set_block(rhs).is_some());
 
     out.clear();
     match (highest_set_block(lhs), highest_set_block(rhs)) {
@@ -415,7 +408,7 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(
             expand(&mut out, d - k + 1);
             while d > k {
                 if lhs[d] != 0 {
-                    let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs.as_ref(), d, k, &mut tmp);
+                    let (quo_upper, quo_lower, quo_power) = division_step(lhs, rhs, d, k, &mut tmp);
                     *out.at_mut(quo_power) = quo_lower;
                     bigint_add(&mut out, &[quo_upper][..], quo_power + 1);
                     debug_assert!(lhs[d] == 0);
@@ -437,7 +430,7 @@ pub fn bigint_div<A: Allocator, A2: Allocator>(
 #[stability::unstable(feature = "enable")]
 pub fn bigint_div_small(lhs: &mut [BlockInt], rhs: BlockInt) -> BlockInt {
     assert!(rhs != 0);
-    let highest_block_opt = highest_set_block(lhs.as_ref());
+    let highest_block_opt = highest_set_block(lhs);
     if highest_block_opt == Some(0) {
         let (quo, rem) = (lhs[0] / rhs, lhs[0] % rhs);
         *lhs.at_mut(0) = quo;

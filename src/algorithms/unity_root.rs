@@ -15,7 +15,7 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
     if log2_n == 0 {
         return ring.is_one(el);
     }
-    ring.is_neg_one(&ring.pow(ring.clone_el(&el), 1 << (log2_n - 1)))
+    ring.is_neg_one(&ring.pow(ring.clone_el(el), 1 << (log2_n - 1)))
 }
 
 #[stability::unstable(feature = "enable")]
@@ -29,7 +29,7 @@ where
     I::Type: IntegerRing,
 {
     assert!(ZZ.is_pos(n));
-    ring.is_one(&ring.pow_gen(ring.clone_el(&el), n, ZZ))
+    ring.is_one(&ring.pow_gen(ring.clone_el(el), n, ZZ))
 }
 
 #[stability::unstable(feature = "enable")]

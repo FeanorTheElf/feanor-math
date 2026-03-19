@@ -27,7 +27,7 @@ pub const fn is_prime(n: u64) -> bool {
     assert!(n >= 2);
     let mut d = 2;
     while d < n {
-        if n % d == 0 {
+        if n.is_multiple_of(d) {
             return false;
         }
         d += 1;
@@ -208,7 +208,7 @@ impl<const N: u64, const IS_FIELD: bool> SerializableElementRing for ZnBase<N, I
 impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnBase<N, IS_FIELD> {
     type ElementsIter<'a> = ZnBaseElementsIter<N>;
 
-    fn elements<'a>(&'a self) -> ZnBaseElementsIter<N> { ZnBaseElementsIter { current: 0 } }
+    fn elements(&self) -> ZnBaseElementsIter<N> { ZnBaseElementsIter { current: 0 } }
 
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
         generic_impls::random_element(self, rng)

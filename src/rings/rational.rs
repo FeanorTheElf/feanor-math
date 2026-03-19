@@ -392,7 +392,7 @@ where
 {
     type BaseRing = I;
 
-    fn base_ring<'a>(&'a self) -> &'a Self::BaseRing { &self.integers }
+    fn base_ring(&self) -> &Self::BaseRing { &self.integers }
 
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element { RationalFieldEl(x, self.integers.one()) }
 
@@ -442,7 +442,7 @@ where
         DeserializeSeedNewtypeStruct::new(
             "Rational",
             DeserializeSeedSeq::new(
-                std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(3),
+                std::iter::repeat_n(DeserializeWithRing::new(self.base_ring()), 3),
                 (None, None),
                 |mut current, next| {
                     if current.0.is_none() {

@@ -76,7 +76,7 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
         })
     }
 
-    fn as_slice<'a>(&'a self) -> Option<&'a [T]>
+    fn as_slice(&self) -> Option<&[T]>
     where
         T: Sized,
     {
@@ -111,12 +111,7 @@ where
 {
     type Item = (usize, &'a T);
 
-    fn next(&mut self) -> Option<Self::Item> {
-        self.it
-            .by_ref()
-            .filter(|(i, _)| *i >= self.begin && *i < self.end)
-            .next()
-    }
+    fn next(&mut self) -> Option<Self::Item> { self.it.by_ref().find(|(i, _)| *i >= self.begin && *i < self.end) }
 }
 
 impl<V: VectorViewSparse<T>, T: ?Sized> VectorViewSparse<T> for SubvectorView<V, T> {
@@ -141,7 +136,7 @@ impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for SubvectorView<V, T> {
         self.base.at_mut(i + self.begin)
     }
 
-    fn as_slice_mut<'a>(&'a mut self) -> Option<&'a mut [T]>
+    fn as_slice_mut(&mut self) -> Option<&mut [T]>
     where
         T: Sized,
     {
@@ -162,7 +157,7 @@ impl<V: VectorView<T>, T: ?Sized> SelfSubvectorView<T> for SubvectorView<V, T> {
         assert!(range.end <= self.len());
         debug_assert!(range.start <= range.end);
         self.end = self.begin + range.end;
-        self.begin = self.begin + range.start;
+        self.begin += range.start;
         return self;
     }
 }
@@ -212,7 +207,7 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
         assert!(range.end <= self.len());
         debug_assert!(range.start <= range.end);
         self.end = self.begin + range.end;
-        self.begin = self.begin + range.start;
+        self.begin += range.start;
         return self;
     }
 }

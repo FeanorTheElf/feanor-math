@@ -381,7 +381,7 @@ where
     I::Type: IntegerRing,
 {
     if ring.is_neg(&n) {
-        let mut result = binomial(ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k, ring);
+        let mut result = binomial(ring.sub(ring.sub_ref_fst(k, n), ring.one()), k, ring);
         if !ring.is_even(k) {
             ring.negate_inplace(&mut result);
         }
@@ -391,13 +391,13 @@ where
     } else {
         // this formula works always, and is guaranteed not to overflow if k <= n/2 and `binomial(n,
         // k) * k` fits into an integer; thus distinguish this case that k > n/2
-        let n_neg_k = ring.sub_ref(&n, &k);
+        let n_neg_k = ring.sub_ref(&n, k);
         if ring.is_lt(&n_neg_k, k) {
             return binomial(n, &n_neg_k, ring);
         }
         let mut result = ring.one();
         let mut i = ring.one();
-        while ring.is_leq(&i, &k) {
+        while ring.is_leq(&i, k) {
             ring.mul_assign(&mut result, ring.sub_ref_snd(ring.add_ref_fst(&n, ring.one()), &i));
             result = ring.checked_div(&result, &i).unwrap();
             ring.add_assign(&mut i, ring.one());
@@ -415,7 +415,7 @@ where
     let mut current = ring.zero();
     let one = ring.one();
     return ring.prod((0..).map_while(|_| {
-        if ring.is_lt(&current, &n) {
+        if ring.is_lt(&current, n) {
             ring.add_assign_ref(&mut current, &one);
             return Some(ring.clone_el(&current));
         } else {
@@ -450,9 +450,9 @@ where
     fn get_uniformly_random<G: FnMut() -> u64>(&self, bound_exclusive: &El<Self>, mut rng: G) -> El<Self> {
         assert!(self.is_gt(bound_exclusive, &self.zero()));
         let log2_ceil_bound = self.abs_highest_set_bit(bound_exclusive).unwrap() + 1;
-        let mut result = self.get_ring().get_uniformly_random_bits(log2_ceil_bound, || rng());
+        let mut result = self.get_ring().get_uniformly_random_bits(log2_ceil_bound, &mut rng);
         while self.is_geq(&result, bound_exclusive) {
-            result = self.get_ring().get_uniformly_random_bits(log2_ceil_bound, || rng());
+            result = self.get_ring().get_uniformly_random_bits(log2_ceil_bound, &mut rng);
         }
         return result;
     }
@@ -499,7 +499,6 @@ where
 pub mod generic_impls {
     use super::*;
     use crate::primitive_int::*;
-    use crate::ring::*;
 
     #[stability::unstable(feature = "enable")]
     pub fn map_from_integer_ring<I, R>(from: I, to: R, mut x: El<I>) -> El<R>
@@ -541,9 +540,9 @@ pub mod generic_impls {
         I: RingStore,
         I::Type: IntegerRing,
     {
-        let (negative, rest) = if string.chars().next() == Some('-') {
+        let (negative, rest) = if string.starts_with('-') {
             (true, string.split_at(1).1)
-        } else if string.chars().next() == Some('+') {
+        } else if string.starts_with('+') {
             (false, string.split_at(1).1)
         } else {
             (false, string)

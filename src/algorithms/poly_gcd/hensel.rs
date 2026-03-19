@@ -262,8 +262,8 @@ where
         delta_h = current_h.div_rem_poly(&P, delta_h).1;
         current_g.lift(&P, delta_g, 2 * current_e);
         current_h.lift(&P, delta_h, 2 * current_e);
-        debug_assert!(P.degree(&current_g.poly).unwrap() == base_poly_ring.degree(&g).unwrap());
-        debug_assert!(P.degree(&current_h.poly).unwrap() == base_poly_ring.degree(&h).unwrap());
+        debug_assert!(P.degree(&current_g.poly).unwrap() == base_poly_ring.degree(g).unwrap());
+        debug_assert!(P.degree(&current_h.poly).unwrap() == base_poly_ring.degree(h).unwrap());
 
         // now lift the bezout identity
         // the formula is `s' = s(2 - (sg + th))`, `t' = t(2 - (sg + th))`
@@ -276,22 +276,22 @@ where
         P.mul_assign(&mut current_t, P.sub_ref_snd(P.int_hom().map(2), &bezout_value));
         assert!(
             P.degree(&current_s).is_none()
-                || P.degree(&current_s).unwrap() < base_poly_ring.degree(&h).unwrap() + degree_delta_bound
+                || P.degree(&current_s).unwrap() < base_poly_ring.degree(h).unwrap() + degree_delta_bound
         );
         assert!(
             P.degree(&current_t).is_none()
-                || P.degree(&current_t).unwrap() < base_poly_ring.degree(&g).unwrap() + degree_delta_bound
+                || P.degree(&current_t).unwrap() < base_poly_ring.degree(g).unwrap() + degree_delta_bound
         );
         current_s = current_h.div_rem_poly(&P, current_s).1;
         current_t = current_g.div_rem_poly(&P, current_t).1;
         debug_assert!(
-            P.degree(&current_s).is_none() || P.degree(&current_s).unwrap() < base_poly_ring.degree(&h).unwrap()
+            P.degree(&current_s).is_none() || P.degree(&current_s).unwrap() < base_poly_ring.degree(h).unwrap()
         );
         debug_assert!(
-            P.degree(&current_t).is_none() || P.degree(&current_t).unwrap() < base_poly_ring.degree(&g).unwrap()
+            P.degree(&current_t).is_none() || P.degree(&current_t).unwrap() < base_poly_ring.degree(g).unwrap()
         );
 
-        current_e = 2 * current_e;
+        current_e *= 2;
         log_progress!(controller, ".");
     }
     debug_assert!(P.eq_el(f, &P.mul_ref(&current_g.poly, &current_h.poly)));
@@ -342,10 +342,10 @@ where
 
     let f_base = base_poly_ring
         .lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(reduction_map))
-        .map_ref(&f);
+        .map_ref(f);
     let g_base = base_poly_ring
         .lifted_hom(&target_poly_ring, (&prime_ring_iso).compose(reduction_map))
-        .map_ref(&g);
+        .map_ref(g);
     assert!(
         base_poly_ring
             .is_one(&base_poly_ring.add(base_poly_ring.mul_ref(&f_base, s), base_poly_ring.mul_ref(&g_base, t)))
@@ -366,8 +366,8 @@ where
         }))
     };
 
-    let mut current_s = lift_to_target_poly_ring(&s);
-    let mut current_t = lift_to_target_poly_ring(&t);
+    let mut current_s = lift_to_target_poly_ring(s);
+    let mut current_t = lift_to_target_poly_ring(t);
     let mut current_e = 1;
 
     let P = target_poly_ring;
@@ -382,7 +382,7 @@ where
         current_s = P.div_rem_monic(current_s, g).1;
         current_t = P.div_rem_monic(current_t, f).1;
 
-        current_e = 2 * current_e;
+        current_e *= 2;
     }
     debug_assert!(P.is_one(&P.add(P.mul_ref(f, &current_s), P.mul_ref(g, &current_t))));
     return (current_s, current_t);
@@ -497,7 +497,7 @@ where
         reduction_map,
         target_poly_ring,
         base_poly_ring,
-        &f,
+        f,
         (g, &h),
         controller.clone(),
     );

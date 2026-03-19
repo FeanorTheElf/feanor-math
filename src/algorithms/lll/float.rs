@@ -91,7 +91,7 @@ where
     };
     assert!(!RR.is_neg(&pivot_inv_error));
     let result_err = RR.sum([
-        RR.mul_ref_fst(num_err, RR.div(&RR.one(), &den)),
+        RR.mul_ref_fst(num_err, RR.div(&RR.one(), den)),
         RR.mul(RR.abs(RR.clone_el(num)), pivot_inv_error),
     ]);
     return (result, result_err);
@@ -120,8 +120,8 @@ where
             RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(k, i)))),
             RR.sum((0..k).map(|l| {
                 RR.add(
-                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, k)),
-                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, k))), &gso.error_bound.at(l, i)),
+                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), gso.error_bound.at(l, k)),
+                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, k))), gso.error_bound.at(l, i)),
                 )
             })),
         ]);
@@ -162,7 +162,7 @@ where
         RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(i, i)))),
         RR.int_hom().mul_map(
             RR.sum(
-                (0..i).map(|l| RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, i))),
+                (0..i).map(|l| RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), gso.error_bound.at(l, i))),
             ),
             2,
         ),
@@ -225,7 +225,7 @@ where
                 )
             })
             .fold(RR.zero(), |l, r| if RR.is_leq(&l, &r) { r } else { l });
-        if RR.is_leq(&new_largest_max_mu, &eta) {
+        if RR.is_leq(&new_largest_max_mu, eta) {
             return Ok(());
         } else if RR.is_geq(&new_largest_max_mu, &largest_max_mu) {
             return Err(NotEnoughPrecision);

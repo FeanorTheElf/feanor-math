@@ -208,11 +208,11 @@ impl<A: Allocator + Clone> RingBase for RustBigintRingBase<A> {
     fn is_zero(&self, value: &Self::Element) -> bool { highest_set_block(&value.1).is_none() }
 
     fn is_one(&self, value: &Self::Element) -> bool {
-        value.0 == false && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
+        !value.0 && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
     }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        value.0 == true && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
+        value.0 && highest_set_block(&value.1) == Some(0) && value.1[0] == 1
     }
 
     fn is_commutative(&self) -> bool { true }
@@ -439,7 +439,7 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
             let len = highest_set_block(&el.1).map(|n| n + 1).unwrap_or(0);
             let mut data = Vec::with_capacity_in(len * size_of::<u64>(), &self.allocator);
             for digit in &el.1 {
-                data.extend(digit.to_le_bytes().into_iter());
+                data.extend(digit.to_le_bytes());
             }
             let mut seq = serializer.serialize_tuple(2)?;
             seq.serialize_element(&self.is_neg(el))?;
