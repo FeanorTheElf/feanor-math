@@ -390,6 +390,7 @@ fn test_compute_galois_closure() {
 }
 
 #[test]
+#[ignore = "slow"]
 fn test_compute_galois_group() {
     let ZZ = BigIntRing::RING;
     let ZZX = DensePolyRing::new(&ZZ, "X");

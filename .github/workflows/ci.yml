@@ -37,3 +37,25 @@ jobs:
     
     - name: Run rustfmt
       run: cargo fmt --check
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
+      with:
+        toolchain: nightly-2026-03-01
+        override: true
+    
+    - name: Install latest nextest release
+      uses: taiki-e/install-action@nextest
+    - name: Fetch cache
+      uses: Swatinem/rust-cache@v2
+    
+    - name: Run tests
+      run: cargo nextest run --profile ci
+    
