@@ -396,6 +396,22 @@ impl<R: ?Sized + RingBase, A: Allocator> ConvolutionAlgorithm<R> for KaratsubaAl
     fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool { true }
 }
 
+/// Very simple schoolbook convolution algorithm.
+pub struct SchoolbookConvolution;
+
+impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for SchoolbookConvolution {
+    fn supports_ring<S: RingStore<Type = R> + Copy>(&self, _ring: S) -> bool { true }
+
+    fn compute_convolution<S, V1, V2>(&self, lhs: V1, rhs: V2, dst: &mut [<R as RingBase>::Element], ring: S)
+    where
+        S: RingStore<Type = R> + Copy,
+        V1: VectorView<<R as RingBase>::Element>,
+        V2: VectorView<<R as RingBase>::Element>,
+    {
+        naive_assign_mul::<_, _, _, _, true>(dst, lhs, rhs, ring)
+    }
+}
+
 /// Trait to allow rings to customize the parameters with which [`KaratsubaAlgorithm`] will
 /// compute convolutions over the ring.
 #[stability::unstable(feature = "enable")]
@@ -447,6 +463,9 @@ fn bench_karatsuba_mul(bencher: &mut test::Bencher) {
     });
 }
 
+#[test]
+fn test_schoolbook_convolution() { generic_tests::test_convolution(SchoolbookConvolution, StaticRing::<i64>::RING, 1); }
+
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
@@ -454,7 +473,6 @@ pub mod generic_tests {
 
     use super::*;
     use crate::homomorphism::*;
-    use crate::ring::*;
 
     pub fn test_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
     where

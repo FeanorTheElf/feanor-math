@@ -240,7 +240,7 @@ where
             self.executor.finished.store(true, Ordering::Relaxed);
             self.executor.abort.store(Some(Box::new(abort)), Ordering::AcqRel);
         };
-        self.controller.join(
+        _ = self.controller.join(
             |controller| {
                 if self.executor.finished.load(Ordering::Relaxed) {
                     return;
