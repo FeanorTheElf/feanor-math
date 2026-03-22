@@ -72,8 +72,8 @@ pub trait MultivariatePolyRing: RingExtension {
     /// every `i` in `0..self.indeterminate_count()`.
     fn expand_monomial_to(&self, m: &Self::Monomial, out: &mut [usize]) {
         assert_eq!(out.len(), self.indeterminate_count());
-        for i in 0..self.indeterminate_count() {
-            out[i] = self.exponent_at(m, i)
+        for (i, out) in out.iter_mut().enumerate() {
+            *out = self.exponent_at(m, i);
         }
     }
 
@@ -158,8 +158,8 @@ pub trait MultivariatePolyRing: RingExtension {
     fn appearing_indeterminates(&self, f: &Self::Element) -> Vec<(usize, usize)> {
         let mut result = (0..self.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
         for (_, m) in self.terms(f) {
-            for i in 0..self.indeterminate_count() {
-                result[i] = max(result[i], self.exponent_at(m, i));
+            for (i, result) in result.iter_mut().enumerate() {
+                *result = max(*result, self.exponent_at(m, i));
             }
         }
         return result.into_iter().enumerate().filter(|(_, e)| *e > 0).collect();

@@ -217,7 +217,7 @@ where
                 }
             } else {
                 let mid = (from + to) / 2;
-                controller.join(
+                let _ = controller.join(
                     move |controller| join_many_internal(controller, executor, tasks, from, mid, batch_tasks),
                     move |controller| join_many_internal(controller, executor, tasks, mid, to, batch_tasks),
                 );
@@ -240,7 +240,7 @@ where
             self.executor.finished.store(true, Ordering::Relaxed);
             self.executor.abort.store(Some(Box::new(abort)), Ordering::AcqRel);
         };
-        self.controller.join(
+        let _ = self.controller.join(
             |controller| {
                 if self.executor.finished.load(Ordering::Relaxed) {
                     return;

@@ -61,6 +61,7 @@ pub mod sparse;
 /// ```
 pub trait VectorView<T: ?Sized> {
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool { self.len() == 0 }
     fn at(&self, i: usize) -> &T;
 
     /// Returns a refernce to the `i`-th entry of the vector view, causing
@@ -70,7 +71,7 @@ pub trait VectorView<T: ?Sized> {
     ///
     /// Same as for [`slice::get_unchecked()`]. More concretely, calling this method with an
     /// out-of-bounds index is undefined behavior even if the resulting reference is not used.
-    unsafe fn at_unchecked<'a>(&self, i: usize) -> &T { self.at(i) }
+    unsafe fn at_unchecked(&self, i: usize) -> &T { self.at(i) }
 
     /// Calls `op` with `self` if this vector view supports sparse access.
     /// Otherwise, `()` is returned.
@@ -78,9 +79,7 @@ pub trait VectorView<T: ?Sized> {
     /// This is basically a workaround that enables users to specialize on
     /// `V: VectorViewSparse`, even though specialization currently does not support
     /// this.
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, _op: Op) -> Result<Op::Output<'a>, ()> {
-        Err(())
-    }
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, _op: Op) -> Option<Op::Output<'a>> { None }
 
     /// Returns an iterator over all elements in this vector.
     ///
@@ -341,7 +340,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for Box<V> {
 
     unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { (**self).at_unchecked(i) } }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Option<Op::Output<'a>> {
         (**self).specialize_sparse(op)
     }
 
@@ -383,7 +382,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &V {
 
     unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { (**self).at_unchecked(i) } }
 
-    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
+    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Option<Op::Output<'b>> {
         (**self).specialize_sparse(op)
     }
 
@@ -412,7 +411,7 @@ impl<T: ?Sized, V: ?Sized + VectorView<T>> VectorView<T> for &mut V {
 
     unsafe fn at_unchecked(&self, i: usize) -> &T { unsafe { (**self).at_unchecked(i) } }
 
-    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Result<Op::Output<'b>, ()> {
+    fn specialize_sparse<'b, Op: SparseVectorViewOperation<T>>(&'b self, op: Op) -> Option<Op::Output<'b>> {
         (**self).specialize_sparse(op)
     }
 
@@ -488,7 +487,7 @@ pub trait VectorViewMut<T: ?Sized>: VectorView<T> {
     ///
     /// Same as for [`slice::get_unchecked_mut()`]. More concretely, calling this method with an
     /// out-of-bounds index is undefined behavior even if the resulting reference is not used.
-    unsafe fn at_unchecked_mut<'a>(&mut self, i: usize) -> &mut T { self.at_mut(i) }
+    unsafe fn at_unchecked_mut(&mut self, i: usize) -> &mut T { self.at_mut(i) }
 }
 
 /// A trait for [`VectorViewMut`]s that support swapping of two elements.
@@ -533,6 +532,7 @@ pub trait SwappableVectorViewMut<T: ?Sized>: VectorViewMut<T> {
 /// ```
 pub trait VectorFn<T> {
     fn len(&self) -> usize;
+    fn is_empty(&self) -> bool { self.len() == 0 }
     fn at(&self, i: usize) -> T;
 
     /// Produces an iterator over the elements of this [`VectorFn`].

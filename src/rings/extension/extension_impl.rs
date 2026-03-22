@@ -234,7 +234,7 @@ where
             base_ring: self.base_ring(),
             data,
         });
-        if was_sparse.is_err() {
+        if was_sparse.is_none() {
             for i in (self.rank()..(2 * self.rank())).rev() {
                 for j in 0..self.x_pow_rank.len() {
                     let add = self.base_ring.mul_ref(self.x_pow_rank.at(j), &data[i]);

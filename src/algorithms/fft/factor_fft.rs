@@ -408,8 +408,6 @@ use crate::algorithms::fft::bluestein::BluesteinFFT;
 #[cfg(test)]
 use crate::algorithms::unity_root::*;
 #[cfg(test)]
-use crate::rings::zn::ZnRingStore;
-#[cfg(test)]
 use crate::rings::zn::zn_64;
 #[cfg(test)]
 use crate::rings::zn::zn_static::{Fp, Zn};
