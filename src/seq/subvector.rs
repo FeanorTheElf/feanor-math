@@ -45,7 +45,7 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for SubvectorView<V, T> {
 
     fn len(&self) -> usize { self.end - self.begin }
 
-    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Result<Op::Output<'a>, ()> {
+    fn specialize_sparse<'a, Op: SparseVectorViewOperation<T>>(&'a self, op: Op) -> Option<Op::Output<'a>> {
         struct WrapSubvector<T: ?Sized, Op: SparseVectorViewOperation<T>> {
             op: Op,
             element: PhantomData<T>,

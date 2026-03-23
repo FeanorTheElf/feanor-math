@@ -217,7 +217,7 @@ where
                 }
             } else {
                 let mid = (from + to) / 2;
-                controller.join(
+                _ = controller.join(
                     move |controller| join_many_internal(controller, executor, tasks, from, mid, batch_tasks),
                     move |controller| join_many_internal(controller, executor, tasks, mid, to, batch_tasks),
                 );

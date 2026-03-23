@@ -1,5 +1,4 @@
 use core::f64;
-use std::f64::EPSILON;
 
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
@@ -61,7 +60,7 @@ impl Real64Base {
         rhs: <Self as RingBase>::Element,
         precision: u64,
     ) -> bool {
-        let scaled_precision = precision as f64 * EPSILON;
+        let scaled_precision = precision as f64 * f64::EPSILON;
         if self.is_absolute_approx_eq(lhs, self.zero(), scaled_precision) {
             self.is_absolute_approx_eq(rhs, self.zero(), scaled_precision)
         } else {

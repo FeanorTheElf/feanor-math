@@ -110,7 +110,7 @@ impl<
 pub struct VectorFnMap<V: VectorFn<T>, T, U, F: Fn(T) -> U> {
     base: V,
     mapping_fn: F,
-    elements: PhantomData<(fn(T), fn() -> U)>,
+    elements: PhantomData<(T, U)>,
 }
 
 impl<V: Clone + VectorFn<T>, T, U, F: Clone + Fn(T) -> U> Clone for VectorFnMap<V, T, U, F> {

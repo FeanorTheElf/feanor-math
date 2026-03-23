@@ -138,16 +138,13 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
         _env: EnvBindingStrength,
     ) -> std::fmt::Result {
         write!(out, "(")?;
-        for i in 0..N {
-            self.base
-                .get_ring()
-                .dbg_within(&value[i], out, EnvBindingStrength::Weakest)?;
-            if i + 1 != N {
+        for (i, v) in value.iter().enumerate() {
+            if i > 0 {
                 write!(out, ", ")?;
             }
+            self.base.get_ring().dbg_within(v, out, EnvBindingStrength::Weakest)?;
         }
-        write!(out, ")")?;
-        return Ok(());
+        write!(out, ")")
     }
 
     fn square(&self, value: &mut Self::Element) {
@@ -354,9 +351,9 @@ where
     }
 }
 
-impl<'a, 'b, R: RingStore, const N: usize> Copy for DirectPowerRingElCreator<'a, R, N> {}
+impl<'a, R: RingStore, const N: usize> Copy for DirectPowerRingElCreator<'a, R, N> {}
 
-impl<'a, 'b, R: RingStore, const N: usize> Clone for DirectPowerRingElCreator<'a, R, N> {
+impl<'a, R: RingStore, const N: usize> Clone for DirectPowerRingElCreator<'a, R, N> {
     fn clone(&self) -> Self { *self }
 }
 
