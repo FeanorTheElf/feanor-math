@@ -258,7 +258,7 @@ where
     fn clone(&self) -> Self {
         Self {
             base_ring: self.base_ring.clone(),
-            x_pow_rank: self.x_pow_rank.clone(self.base_ring.get_ring()),
+            x_pow_rank: self.x_pow_rank.clone_with_ring(self.base_ring.get_ring()),
             element_allocator: self.element_allocator.clone(),
             log2_padded_len: self.log2_padded_len,
             rank: self.rank,
@@ -431,7 +431,7 @@ where
         debug_assert_eq!(1 << self.log2_padded_len, value.values.len());
         let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
         poly_ring.get_ring().fmt_el_within(
-            &RingRef::new(self).poly_repr(&poly_ring, value, &self.base_ring().identity()),
+            &RingRef::from(self).poly_repr(&poly_ring, value, &self.base_ring().identity()),
             out,
             env,
         )
@@ -553,7 +553,7 @@ where
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut mul_matrix: OwnedMatrix<_, _> =
-            create_multiplication_matrix(RingRef::new(self), rhs, self.allocator().clone());
+            create_multiplication_matrix(RingRef::from(self), rhs, self.allocator().clone());
         let mut lhs_matrix: OwnedMatrix<_, _> =
             OwnedMatrix::zero_in(self.rank(), 1, self.base_ring(), self.allocator().clone());
         let data = self.wrt_canonical_basis(&lhs);
@@ -585,7 +585,7 @@ where
         self.base_ring()
             .get_ring()
             .balance_factor(elements.flat_map(|x| x.values.iter()))
-            .map(|c| RingRef::new(self).inclusion().map(c))
+            .map(|c| RingRef::from(self).inclusion().map(c))
     }
 
     default fn invert(&self, el: &Self::Element) -> Option<Self::Element> { self.checked_left_div(&self.one(), el) }
@@ -607,7 +607,7 @@ where
             "{:?}[{}]/({})",
             self.base_ring.get_ring(),
             self.gen_name,
-            poly_ring.formatted_el(&RingRef::new(self).generating_poly(&poly_ring, self.base_ring.identity()))
+            poly_ring.formatted_el(&RingRef::from(self).generating_poly(&poly_ring, self.base_ring.identity()))
         )
     }
 }
@@ -628,7 +628,7 @@ where
             (
                 self.base_ring(),
                 SerializeOwnedWithRing::new(
-                    RingRef::new(self).generating_poly(&poly_ring, self.base_ring().identity()),
+                    RingRef::from(self).generating_poly(&poly_ring, self.base_ring().identity()),
                     poly_ring,
                 ),
             ),
@@ -842,7 +842,7 @@ where
                 FreeAlgebraImplEl {
                     values: replace(&mut el.values, Box::new_in([], self.allocator().clone())),
                 },
-                RingRef::new(self).pow(
+                RingRef::from(self).pow(
                     FreeAlgebraImplEl {
                         values: gen_pow_d.into_boxed_slice(),
                     },
@@ -855,7 +855,7 @@ where
         } else {
             self.mul_assign(
                 el,
-                RingRef::new(self).pow(
+                RingRef::from(self).pow(
                     FreeAlgebraImplEl {
                         values: gen_pow_d.into_boxed_slice(),
                     },

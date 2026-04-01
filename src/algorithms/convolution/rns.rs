@@ -564,7 +564,7 @@ where
             val,
             ring,
             len_hint,
-            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::new(ring)),
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::from(ring)),
             None,
         )
     }
@@ -585,8 +585,8 @@ where
             rhs_prep,
             dst,
             ring,
-            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::new(ring)),
-            |x| int_cast(x, RingRef::new(ring), &self.integer_ring),
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::from(ring)),
+            |x| int_cast(x, RingRef::from(ring), &self.integer_ring),
             None,
         )
     }
@@ -606,8 +606,8 @@ where
             values,
             dst,
             ring,
-            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::new(ring)),
-            |x| int_cast(x, RingRef::new(ring), &self.integer_ring),
+            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::from(ring)),
+            |x| int_cast(x, RingRef::from(ring), &self.integer_ring),
             None,
         )
     }
@@ -656,7 +656,7 @@ where
         dst: &mut [R::Element],
         ring: &R,
     ) {
-        let hom = RingRef::new(ring).into_can_hom(&self.base.integer_ring).ok().unwrap();
+        let hom = RingRef::from(ring).into_can_hom(&self.base.integer_ring).ok().unwrap();
         self.base.compute_convolution_impl(
             lhs,
             lhs_prep,
@@ -687,7 +687,7 @@ where
         dst: &mut [R::Element],
         ring: &R,
     ) {
-        let hom = RingRef::new(ring).into_can_hom(&self.base.integer_ring).ok().unwrap();
+        let hom = RingRef::from(ring).into_can_hom(&self.base.integer_ring).ok().unwrap();
         self.base.compute_convolution_sum_impl(
             values,
             dst,

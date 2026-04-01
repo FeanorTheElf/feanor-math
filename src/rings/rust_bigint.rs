@@ -646,7 +646,7 @@ impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintR
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).formatted_el(el)).as_str())
+            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::from(self).formatted_el(el)).as_str())
                 .serialize(serializer)
         } else {
             let len = effective_length(&el.1);

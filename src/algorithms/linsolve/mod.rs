@@ -138,7 +138,7 @@ impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
         V3: AsPointerToSlice<Self::Element>,
         A: Allocator,
     {
-        smith::solve_right_using_pre_smith(RingRef::new(self), lhs, rhs, out, allocator)
+        smith::solve_right_using_pre_smith(RingRef::from(self), lhs, rhs, out, allocator)
     }
 }
 
@@ -163,6 +163,6 @@ where
         V3: AsPointerToSlice<Self::Element>,
         A: Allocator,
     {
-        extension::solve_right_over_extension(RingRef::new(self), lhs, rhs, out, allocator)
+        extension::solve_right_over_extension(RingRef::from(self), lhs, rhs, out, allocator)
     }
 }

@@ -95,7 +95,7 @@ pub trait MultivariatePolyRing: RingExtension {
         order: O,
     ) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         self.terms(f)
-            .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+            .max_by(|l, r| order.compare(RingRef::from(self), &l.1, &r.1))
     }
 
     /// Returns the term of `f` whose monomial is largest (w.r.t. the given order) among all
@@ -107,15 +107,15 @@ pub trait MultivariatePolyRing: RingExtension {
         lt_than: &Self::Monomial,
     ) -> Option<(&'a El<Self::BaseRing>, &'a Self::Monomial)> {
         self.terms(f)
-            .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
-            .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+            .filter(|(_, m)| order.compare(RingRef::from(self), m, lt_than) == Ordering::Less)
+            .max_by(|l, r| order.compare(RingRef::from(self), &l.1, &r.1))
     }
 
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, rhs: I)
     where
         I: IntoIterator<Item = (El<Self::BaseRing>, Self::Monomial)>,
     {
-        let self_ring = RingRef::new(self);
+        let self_ring = RingRef::from(self);
         self.add_assign(lhs, self_ring.sum(rhs.into_iter().map(|(c, m)| self.create_term(c, m))));
     }
 
@@ -130,7 +130,7 @@ pub trait MultivariatePolyRing: RingExtension {
         assert!(from.base_ring().get_ring() == hom.domain().get_ring());
         assert_eq!(self.indeterminate_count(), from.indeterminate_count());
         let mut exponents_storage = (0..self.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
-        return RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| {
+        return RingRef::from(self).from_terms(from.terms(el).map(|(c, m)| {
             from.expand_monomial_to(m, &mut exponents_storage);
             (hom.map_ref(c), self.create_monomial(exponents_storage.iter().copied()))
         }));

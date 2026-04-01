@@ -79,6 +79,71 @@ pub struct DensePolyRingBase<
     convolution_algorithm: C,
 }
 
+/// An element of [`DensePolyRing`].
+pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone + Send + Sync = Global> {
+    data: Vec<El<R>, A>,
+}
+
+/// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of
+/// coefficients. For details, see [`DensePolyRingBase`].
+pub type DensePolyRing<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> =
+    RingValue<DensePolyRingBase<R, C, A>>;
+
+impl<'conv, R: RingStore> DensePolyRing<R, DynConvolution<'conv, R::Type>, Global>
+where
+    R: 'conv,
+{
+    /// Creates a new univariate polynomial ring over the given base ring.
+    ///
+    /// For more details, see [`DensePolyRingBase::new()`]
+    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
+        RingValue::from(DensePolyRingBase::new(base_ring, unknown_name))
+    }
+}
+
+impl<'conv, R: RingStore> DensePolyRingBase<R, DynConvolution<'conv, R::Type>, Global>
+where
+    R: 'conv,
+{
+    /// Creates a new univariate polynomial ring over the given base ring.
+    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
+        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), None);
+        Self::new_with_convolution(base_ring, unknown_name, Global, convolution)
+    }
+}
+
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, C, A> {
+    /// Creates a new univariate polynomial ring over the given base ring.
+    ///
+    /// The given allocator will be used to allocate memory for ring elements and the
+    /// given convolution to compute polynomial multiplication.
+    pub fn new_with_convolution(
+        base_ring: R,
+        unknown_name: &'static str,
+        element_allocator: A,
+        convolution_algorithm: C,
+    ) -> Self {
+        Self::create(base_ring, unknown_name, element_allocator, convolution_algorithm)
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn create(base_ring: R, unknown_name: &'static str, element_allocator: A, convolution_algorithm: C) -> Self {
+        let zero = base_ring.zero();
+        DensePolyRingBase {
+            base_ring,
+            unknown_name,
+            zero,
+            element_allocator,
+            convolution_algorithm,
+        }
+    }
+}
+
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, C, A> {
+    #[stability::unstable(feature = "enable")]
+    pub fn into_base_ring(self) -> R { self.base_ring }
+}
+
 impl<R: RingStore + Clone, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type> + Clone> Clone
     for DensePolyRingBase<R, C, A>
 {
@@ -101,50 +166,6 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
     }
-}
-
-/// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of
-/// coefficients. For details, see [`DensePolyRingBase`].
-pub type DensePolyRing<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> =
-    RingValue<DensePolyRingBase<R, C, A>>;
-
-impl<'conv, R: RingStore> DensePolyRing<R, DynConvolution<'conv, R::Type>, Global>
-where
-    R::Type: 'conv,
-{
-    pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), None);
-        Self::new_with_convolution(base_ring, unknown_name, Global, convolution)
-    }
-}
-
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> DensePolyRing<R, C, A> {
-    #[stability::unstable(feature = "enable")]
-    pub fn new_with_convolution(
-        base_ring: R,
-        unknown_name: &'static str,
-        element_allocator: A,
-        convolution_algorithm: C,
-    ) -> Self {
-        let zero = base_ring.zero();
-        RingValue::from(DensePolyRingBase {
-            base_ring,
-            unknown_name,
-            zero,
-            element_allocator,
-            convolution_algorithm,
-        })
-    }
-}
-
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, C, A> {
-    #[stability::unstable(feature = "enable")]
-    pub fn into_base_ring(self) -> R { self.base_ring }
-}
-
-/// An element of [`DensePolyRing`].
-pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone + Send + Sync = Global> {
-    data: Vec<El<R>, A>,
 }
 
 impl<R, A> Debug for DensePolyRingEl<R, A>
@@ -379,7 +400,7 @@ where
         el: &DensePolyRingEl<R1, A1>,
         hom: &Self::Homomorphism,
     ) -> Self::Element {
-        RingRef::new(self).from_terms((0..el.data.len()).map(|i| {
+        RingRef::from(self).from_terms((0..el.data.len()).map(|i| {
             (
                 self.base_ring()
                     .get_ring()
@@ -423,7 +444,7 @@ where
         el: DensePolyRingEl<R2, A2>,
         hom: &Self::Isomorphism,
     ) -> DensePolyRingEl<R1, A1> {
-        RingRef::new(from).from_terms((0..el.data.len()).map(|i| {
+        RingRef::from(from).from_terms((0..el.data.len()).map(|i| {
             (
                 self.base_ring().get_ring().map_out(
                     from.base_ring().get_ring(),
@@ -657,7 +678,7 @@ where
             self.base_ring()
                 .is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap()))
         );
-        let (quo, rem) = fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x)))
+        let (quo, rem) = fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x)))
             .unwrap_or_else(no_error);
         return (quo, rem);
     }
@@ -765,7 +786,7 @@ where
     where
         Self: 'ring,
     {
-        let base_ring = RingRef::new(data.0.codomain().get_ring());
+        let base_ring = RingRef::from(data.0.codomain().get_ring());
         let new_ring = DensePolyRing::new(base_ring, self.unknown_name);
         let result_in_extension = interpolate(
             &new_ring,
@@ -774,7 +795,7 @@ where
             &self.element_allocator,
         )
         .unwrap();
-        return RingRef::new(self).from_terms(
+        return RingRef::from(self).from_terms(
             new_ring
                 .terms(&result_in_extension)
                 .map(|(c, i)| (data.0.as_base_ring_el(base_ring.clone_el(c)), i)),
@@ -799,7 +820,7 @@ where
         if let Some(d) = self.degree(rhs) {
             if d == 0 {
                 let rhs = self.coefficient_at(rhs, 0);
-                return RingRef::new(self)
+                return RingRef::from(self)
                     .try_from_terms(
                         self.terms(lhs)
                             .map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())),
@@ -808,12 +829,12 @@ where
             } else {
                 let lc = &rhs.data[d];
                 let (quo, rem) = if let Some(lc_inv) = self.base_ring().invert(&lc) {
-                    fast_poly_div_rem::<_, _, !>(RingRef::new(self), self.clone_el(lhs), rhs, |x| {
+                    fast_poly_div_rem::<_, _, !>(RingRef::from(self), self.clone_el(lhs), rhs, |x| {
                         Ok(self.base_ring().mul_ref(x, &lc_inv))
                     })
                     .ok()?
                 } else {
-                    fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| {
+                    fast_poly_div_rem(RingRef::from(self), self.clone_el(lhs), rhs, |x| {
                         self.base_ring().checked_left_div(x, lc).ok_or(())
                     })
                     .ok()?
@@ -833,7 +854,7 @@ where
                 true
             } else {
                 let lc = &rhs.data[d];
-                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::new(self), self.clone_el(lhs), rhs, |x| {
+                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::from(self), self.clone_el(lhs), rhs, |x| {
                     self.base_ring().checked_left_div(&x, lc).ok_or(())
                 }) {
                     if self.is_zero(&rem) { true } else { false }
@@ -856,7 +877,7 @@ where
         self.base_ring()
             .get_ring()
             .balance_factor(elements.flat_map(|f| self.terms(f).map(|(c, _)| c)))
-            .map(|c| RingRef::new(self).inclusion().map(c))
+            .map(|c| RingRef::from(self).inclusion().map(c))
     }
 
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
@@ -889,11 +910,11 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), &RingRef::new(self))
+        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), &RingRef::from(self))
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        <_ as PolyTFracGCDRing>::gcd(RingRef::new(self), lhs, rhs)
+        <_ as PolyTFracGCDRing>::gcd(RingRef::from(self), lhs, rhs)
     }
 }
 
@@ -908,12 +929,12 @@ where
         assert!(!self.is_zero(&rhs));
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
         if self.degree(&lhs).unwrap_or(0).saturating_sub(self.degree(rhs).unwrap()) < FAST_POLY_DIV_THRESHOLD {
-            return poly_div_rem(RingRef::new(self), lhs, rhs, |x| {
+            return poly_div_rem(RingRef::from(self), lhs, rhs, |x| {
                 Ok(self.base_ring().mul_ref(&x, &lc_inv))
             })
             .unwrap_or_else(no_error);
         } else {
-            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| {
+            return fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| {
                 Ok(self.base_ring().mul_ref(&x, &lc_inv))
             })
             .unwrap_or_else(no_error);
@@ -924,12 +945,12 @@ where
         assert!(!self.is_zero(&rhs));
         let lc_inv = self.base_ring.invert(&rhs.data[self.degree(rhs).unwrap()]).unwrap();
         if self.degree(&lhs).unwrap_or(0).saturating_sub(self.degree(rhs).unwrap()) < FAST_POLY_DIV_THRESHOLD {
-            return poly_rem(RingRef::new(self), lhs, rhs, |x| {
+            return poly_rem(RingRef::from(self), lhs, rhs, |x| {
                 Ok(self.base_ring().mul_ref(&x, &lc_inv))
             })
             .unwrap_or_else(no_error);
         } else {
-            return fast_poly_div_rem(RingRef::new(self), lhs, rhs, |x| {
+            return fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| {
                 Ok(self.base_ring().mul_ref(&x, &lc_inv))
             })
             .unwrap_or_else(no_error)

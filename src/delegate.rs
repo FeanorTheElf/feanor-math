@@ -853,7 +853,7 @@ where
     ///
     /// This function must take `to` by reference, since it must be able to
     /// obtain a reference to its delegate target that lives long enough.
-    pub fn to_delegate_ring(to: &'a R) -> Self { Self::new(RingRef::new(to.get_delegate()), RingRef::new(to)) }
+    pub fn to_delegate_ring(to: &'a R) -> Self { Self::new(RingRef::from(to.get_delegate()), RingRef::from(to)) }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for WrapHom<R, S>
@@ -902,7 +902,9 @@ where
     ///
     /// This function must take `from` by reference, since it must be able to
     /// obtain a reference to its delegate target that lives long enough.
-    pub fn from_delegate_ring(from: &'a R) -> Self { Self::new(RingRef::new(from), RingRef::new(from.get_delegate())) }
+    pub fn from_delegate_ring(from: &'a R) -> Self {
+        Self::new(RingRef::from(from), RingRef::from(from.get_delegate()))
+    }
 }
 
 impl<R, S> Homomorphism<R::Type, S::Type> for UnwrapHom<R, S>

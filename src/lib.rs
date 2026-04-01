@@ -132,17 +132,6 @@ const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 #[cfg(test)]
 const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
 
-macro_rules! static_assert_impls {
-    ($type:ty: $trait:tt) => {{
-        fn assert_impls<T>()
-        where
-            T: ?Sized + $trait,
-        {
-        }
-        assert_impls::<$type>();
-    }};
-}
-
 /// Contains [`unstable_sealed::UnstableSealed`] to mark a trait "sealed" on stable.
 #[stability::unstable(feature = "enable")]
 pub mod unstable_sealed {

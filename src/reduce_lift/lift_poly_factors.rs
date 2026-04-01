@@ -358,7 +358,7 @@ where
     ) -> Self {
         assert!(to.get_ring() == ring.quotient_ring_at(ideal, to_e, max_ideal_idx).get_ring());
         Self {
-            ring: RingRef::new(ring),
+            ring: RingRef::from(ring),
             ideal,
             to: (to, to_e),
             max_ideal_idx,
@@ -419,7 +419,7 @@ where
         assert!(ring.quotient_ring_at(ideal, from_e, max_ideal_idx).get_ring() == from.get_ring());
         assert!(ring.quotient_ring_at(ideal, to_e, max_ideal_idx).get_ring() == to.get_ring());
         Self {
-            ring: RingRef::new(ring),
+            ring: RingRef::from(ring),
             ideal,
             from: (from, from_e),
             to: (to, to_e),
@@ -428,7 +428,7 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn parent_ring<'a>(&'a self) -> RingRef<'a, R> { RingRef::new(self.ring.get_ring()) }
+    pub fn parent_ring<'a>(&'a self) -> RingRef<'a, R> { RingRef::from(self.ring.get_ring()) }
 
     #[stability::unstable(feature = "enable")]
     pub fn from_e(&self) -> usize { self.from.1 }
@@ -499,10 +499,10 @@ where
         assert!(ring.quotient_ring_at(ideal, 1, max_ideal_idx).get_ring() == from);
         assert!(ring.quotient_field_at(ideal, max_ideal_idx).get_ring() == to);
         Self {
-            ring: RingRef::new(ring),
+            ring: RingRef::from(ring),
             ideal,
-            from: RingRef::new(from),
-            to: RingRef::new(to),
+            from: RingRef::from(from),
+            to: RingRef::from(to),
             max_ideal_idx,
         }
     }
@@ -636,7 +636,7 @@ where
         assert!(e >= 1);
         let maximal_ideal_factor_count = ring.maximal_ideal_factor_count(ideal);
         Self {
-            ring: RingRef::new(ring),
+            ring: RingRef::from(ring),
             ideal,
             from_e: e,
             from: (0..maximal_ideal_factor_count)
@@ -702,8 +702,8 @@ where
         PolyLiftFactorsDomainBaseRingToFieldIso {
             ring: self.ring,
             ideal: self.ideal,
-            from: RingRef::new(self.to[max_ideal_idx].get_ring()),
-            to: RingRef::new(self.to_fields[max_ideal_idx].get_ring()),
+            from: RingRef::from(self.to[max_ideal_idx].get_ring()),
+            to: RingRef::from(self.to_fields[max_ideal_idx].get_ring()),
             max_ideal_idx,
         }
     }
@@ -828,7 +828,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 use $crate::seq::*;
                 assert_eq!(1, from.len());
                 assert_eq!(1, x.len());
-                int_cast(from.at(0).smallest_lift(from.at(0).clone_el(x.at(0))), RingRef::new(self), BigIntRing::RING)
+                int_cast(from.at(0).smallest_lift(from.at(0).clone_el(x.at(0))), RingRef::from(self), BigIntRing::RING)
             }
 
             fn maximal_ideal_factor_count<'ring>(&self, _p: &Self::SuitableIdeal<'ring>) -> usize
@@ -845,7 +845,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 
                 assert_eq!(0, max_ideal_idx);
                 assert!(from.1 <= to.1);
-                let hom = RingRef::new(to.0).into_can_hom(to.0.integer_ring()).ok().unwrap();
+                let hom = RingRef::from(to.0).into_can_hom(to.0.integer_ring()).ok().unwrap();
                 return hom.map(from.0.any_lift(x));
             }
 
@@ -903,8 +903,8 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 use $crate::homomorphism::*;
 
                 assert_eq!(0, max_ideal_idx);
-                let self_ref = RingRef::new(self);
-                let hom = RingRef::new(to.0).into_can_hom(&self_ref).ok().unwrap();
+                let self_ref = RingRef::from(self);
+                let hom = RingRef::from(to.0).into_can_hom(&self_ref).ok().unwrap();
                 return hom.map(x);
             }
 
@@ -916,7 +916,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
 
                 assert_eq!(0, max_ideal_idx);
                 assert!(from.1 >= to.1);
-                let hom = RingRef::new(to.0).into_can_hom(to.0.integer_ring()).ok().unwrap();
+                let hom = RingRef::from(to.0).into_can_hom(to.0.integer_ring()).ok().unwrap();
                 return hom.map(from.0.smallest_lift(x));
             }
 
@@ -925,7 +925,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                     Self: 'a,
                     Self: 'ring
             {
-                let log2_max_coeff = coefficients.map(|c| RingRef::new(self).abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
+                let log2_max_coeff = coefficients.map(|c| RingRef::from(self).abs_log2_ceil(c).unwrap_or(0)).max().unwrap_or(0);
                 // this is in no way a rigorous bound, but equals the worst-case bound at least asymptotically (up to constants)
                 return ((log2_max_coeff as f64 + poly_deg as f64) / (*p as f64).log2() * $crate::reduce_lift::lift_poly_factors::INTRING_HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR).ceil() as usize + 1;
             }
@@ -1170,7 +1170,7 @@ where
     #[stability::unstable(feature = "enable")]
     pub fn reduction_context<'b>(&'b self, from_e: usize) -> PolyLiftFactorsDomainReductionContext<'b, 'b, Self> {
         PolyLiftFactorsDomainReductionContext {
-            ring: RingRef::new(self),
+            ring: RingRef::from(self),
             ideal: &self.prime,
             from_e,
             from: vec![self.quotient_ring_at(&self.prime, from_e, 0)],
@@ -1468,8 +1468,8 @@ where
         assert!(self.integers.eq_el(ideal, &self.prime));
         RingValue::from(
             R::from_modulus(|ZZ| {
-                Ok(RingRef::new(ZZ).pow(
-                    int_cast(self.integers.clone_el(&self.prime), RingRef::new(ZZ), &self.integers),
+                Ok(RingRef::from(ZZ).pow(
+                    int_cast(self.integers.clone_el(&self.prime), RingRef::from(ZZ), &self.integers),
                     e,
                 ))
             })
@@ -1493,7 +1493,7 @@ where
             &self.integers.pow(self.integers.clone_el(&self.prime), to.1),
             to.0.modulus()
         ));
-        RingRef::new(to.0).coerce(&self.integers, x)
+        RingRef::from(to.0).coerce(&self.integers, x)
     }
 
     fn reduce_partial<'ring>(
@@ -1517,7 +1517,7 @@ where
             &self.integers.pow(self.integers.clone_el(&self.prime), from.1),
             from.0.modulus()
         ));
-        RingRef::new(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
+        RingRef::from(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
     }
 
     fn lift_partial<'ring>(
@@ -1541,7 +1541,7 @@ where
             &self.integers.pow(self.integers.clone_el(&self.prime), from.1),
             from.0.modulus()
         ));
-        RingRef::new(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
+        RingRef::from(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
     }
 
     fn base_ring_to_field<'ring>(

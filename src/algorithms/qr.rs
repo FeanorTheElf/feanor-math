@@ -60,7 +60,7 @@ pub trait QRDecompositionField: Field {
     where
         V: AsPointerToSlice<Self::Element>,
     {
-        ldl_decomposition_impl(RingRef::new(self), matrix)
+        ldl_decomposition_impl(RingRef::from(self), matrix)
     }
 
     /// Given a matrix `A`, computes an orthogonal matrix `Q` and an upper triangular
@@ -306,7 +306,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
     where
         V: AsPointerToSlice<Self::Element>,
     {
-        ldl_decomposition_impl(RingRef::new(self), matrix)
+        ldl_decomposition_impl(RingRef::from(self), matrix)
     }
 
     default fn qr_decomposition<V1, V2>(
@@ -317,7 +317,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
         V1: AsPointerToSlice<Self::Element>,
         V2: AsPointerToSlice<Self::Element>,
     {
-        householder_qr(RingRef::new(self), matrix, q);
+        householder_qr(RingRef::from(self), matrix, q);
     }
 }
 

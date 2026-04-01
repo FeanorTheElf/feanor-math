@@ -156,7 +156,6 @@ const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 0;
 ///
 /// This is done analogously to [`crate::rings::extension::galois_field::GaloisFieldBase`], see
 /// the description there.
-#[stability::unstable(feature = "enable")]
 pub struct NumberFieldBase<Impl = DefaultNumberFieldImpl, I = BigIntRing>
 where
     Impl: RingStore,
@@ -183,64 +182,6 @@ where
     from: K,
     image_of_generator: El<Complex64>,
     absolute_error_image_of_generator: f64,
-}
-
-impl<K, Impl, I> ComplexEmbedding<K, Impl, I>
-where
-    K: RingStore<Type = NumberFieldBase<Impl, I>>,
-    Impl: RingStore,
-    Impl::Type: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Type: IntegerRing,
-{
-    /// Returns `epsilon > 0` such that when evaluating this homomorphism
-    /// at point `x`, the given result is at most `epsilon` from the actual
-    /// result (i.e. the result when computed with infinite precision).
-    #[stability::unstable(feature = "enable")]
-    pub fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
-        let CC = Complex64::RING;
-        let CCX = DensePolyRing::new(CC, "X");
-        let f = self.from.poly_repr(&CCX, x, CC.can_hom(self.from.base_ring()).unwrap());
-        return absolute_error_of_poly_eval(
-            &CCX,
-            &f,
-            self.from.rank(),
-            self.image_of_generator,
-            self.absolute_error_image_of_generator / CC.abs(self.image_of_generator),
-        );
-    }
-}
-
-impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, Complex64Base> for ComplexEmbedding<K, Impl, I>
-where
-    K: RingStore<Type = NumberFieldBase<Impl, I>>,
-    Impl: RingStore,
-    Impl::Type: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Type: IntegerRing,
-{
-    type DomainStore = K;
-    type CodomainStore = Complex64;
-
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &Complex64::RING }
-
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
-
-    fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
-        let poly_ring = DensePolyRing::new(*self.codomain(), "X");
-        let hom = self.codomain().can_hom(self.from.base_ring()).unwrap();
-        return poly_ring.evaluate(
-            &self.from.poly_repr(&poly_ring, &x, &hom),
-            &self.image_of_generator,
-            self.codomain().identity(),
-        );
-    }
-
-    fn map(&self, x: <NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
-        self.map_ref(&x)
-    }
 }
 
 #[stability::unstable(feature = "enable")]
@@ -380,7 +321,7 @@ impl NumberFieldBase {
             }
         }));
         return Self::try_new(ZZX, &new_generating_poly).map(|res| {
-            let root = RingRef::new(&res)
+            let root = RingRef::from(&res)
                 .inclusion()
                 .mul_map(res.canonical_gen(), QQ.invert(&QQ.inclusion().map(scaled_lc)).unwrap());
             return (res, root);
@@ -397,6 +338,64 @@ impl NumberFieldBase {
         BaseRing<P>: RingStore<Type = RationalFieldBase<BigIntRing>>,
     {
         Self::try_adjoin_root(poly_ring, generating_poly).unwrap()
+    }
+}
+
+impl<K, Impl, I> ComplexEmbedding<K, Impl, I>
+where
+    K: RingStore<Type = NumberFieldBase<Impl, I>>,
+    Impl: RingStore,
+    Impl::Type: Field + FreeAlgebra,
+    BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
+    I: RingStore,
+    I::Type: IntegerRing,
+{
+    /// Returns `epsilon > 0` such that when evaluating this homomorphism
+    /// at point `x`, the given result is at most `epsilon` from the actual
+    /// result (i.e. the result when computed with infinite precision).
+    #[stability::unstable(feature = "enable")]
+    pub fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
+        let CC = Complex64::RING;
+        let CCX = DensePolyRing::new(CC, "X");
+        let f = self.from.poly_repr(&CCX, x, CC.can_hom(self.from.base_ring()).unwrap());
+        return absolute_error_of_poly_eval(
+            &CCX,
+            &f,
+            self.from.rank(),
+            self.image_of_generator,
+            self.absolute_error_image_of_generator / CC.abs(self.image_of_generator),
+        );
+    }
+}
+
+impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, Complex64Base> for ComplexEmbedding<K, Impl, I>
+where
+    K: RingStore<Type = NumberFieldBase<Impl, I>>,
+    Impl: RingStore,
+    Impl::Type: Field + FreeAlgebra,
+    BaseRing<Impl>: RingStore<Type = RationalFieldBase<I>>,
+    I: RingStore,
+    I::Type: IntegerRing,
+{
+    type DomainStore = K;
+    type CodomainStore = Complex64;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &Complex64::RING }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+
+    fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
+        let poly_ring = DensePolyRing::new(*self.codomain(), "X");
+        let hom = self.codomain().can_hom(self.from.base_ring()).unwrap();
+        return poly_ring.evaluate(
+            &self.from.poly_repr(&poly_ring, &x, &hom),
+            &self.image_of_generator,
+            self.codomain().identity(),
+        );
+    }
+
+    fn map(&self, x: <NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
+        self.map_ref(&x)
     }
 }
 
@@ -421,6 +420,7 @@ where
                 .base_ring()
                 .is_one(poly_ring.base_ring().get_ring().den(c))
         }));
+        drop(poly_ring);
         NumberFieldBase { base: implementation }
     }
 
@@ -429,6 +429,8 @@ where
         let poly_ring = DensePolyRing::new(ZZ, "X");
         let poly = self_.get_ring().generating_poly_as_int(&poly_ring);
         let (root, error) = find_approximate_complex_root(&poly_ring, &poly).unwrap();
+        drop(poly);
+        drop(poly_ring);
         return ComplexEmbedding {
             from: self_,
             image_of_generator: root,
@@ -437,7 +439,7 @@ where
     }
 
     pub fn choose_complex_embedding<'a>(&'a self) -> ComplexEmbedding<RingRef<'a, Self>, Impl, I> {
-        Self::into_choose_complex_embedding(RingRef::new(self))
+        Self::into_choose_complex_embedding(RingRef::from(self))
     }
 }
 
@@ -1278,7 +1280,7 @@ where
         ZZX.evaluate(
             &RingValue::from_ref(&self.base).poly_repr(ZZX, &x, partial_QQ_to_ZZ),
             &to.0.canonical_gen(),
-            RingRef::new(to.0).into_inclusion().compose(ZZ_to_Zpe),
+            RingRef::from(to.0).into_inclusion().compose(ZZ_to_Zpe),
         )
     }
 

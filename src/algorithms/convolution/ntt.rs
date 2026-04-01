@@ -81,7 +81,7 @@ where
 
     /// Returns the ring over which this object can compute convolutions.
     #[stability::unstable(feature = "enable")]
-    pub fn ring(&self) -> RingRef<'_, R_main> { RingRef::new(self.hom.codomain().get_ring()) }
+    pub fn ring(&self) -> RingRef<'_, R_main> { RingRef::from(self.hom.codomain().get_ring()) }
 
     fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R_main, R_twiddle, H> {
         self.fft_algos.get_or_init(log2_n, || {

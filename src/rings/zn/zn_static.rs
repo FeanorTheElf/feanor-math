@@ -78,7 +78,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnSBase<N, IS_FIELD> {
     }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        RingRef::new(self).coerce(&StaticRing::<i64>::RING, value.into())
+        RingRef::from(self).coerce(&StaticRing::<i64>::RING, value.into())
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
@@ -148,7 +148,7 @@ impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnSBase<N, IS_FIEL
 
 impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnSBase<N, IS_FIELD> {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+        generic_impls::checked_div_min(RingRef::from(self), lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -158,7 +158,7 @@ impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnSBase<N, IS_FI
     ) -> (Self::Element, Self::Element, Self::Element) {
         let (s, t, d) =
             StaticRing::<i64>::RING.extended_ideal_gen(&(*lhs).try_into().unwrap(), &(*rhs).try_into().unwrap());
-        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+        let quo = RingRef::from(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
 }
@@ -252,7 +252,7 @@ impl<const N: u64> InterpolationBaseRing for ZnSBase<N, true> {
     }
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        let ring = generic_impls::interpolation_ring(RingRef::new(self), count);
+        let ring = generic_impls::interpolation_ring(RingRef::from(self), count);
         let points = multi_cartesian_product(
             (0..ring.rank()).map(|_| (0..*self.modulus()).map(|x| self.from_int_promise_reduced(x))),
             |values| ring.from_canonical_basis(values.iter().copied()),

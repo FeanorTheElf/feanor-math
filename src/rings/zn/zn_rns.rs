@@ -390,7 +390,7 @@ where
         _: EnvBindingStrength,
     ) -> std::fmt::Result {
         self.total_ring.get_ring().fmt_el(
-            &RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(value),
+            &RingRef::from(self).can_iso(&self.total_ring).unwrap().map_ref(value),
             out,
         )
     }
@@ -827,7 +827,7 @@ where
     fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!(!self.integer_ring().is_neg(&x));
         debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
-        RingRef::new(self).can_hom(self.integer_ring()).unwrap().map(x)
+        RingRef::from(self).can_hom(self.integer_ring()).unwrap().map(x)
     }
 }
 
@@ -843,7 +843,7 @@ where
     {
         if serializer.is_human_readable() {
             self.total_ring.get_ring().serialize(
-                &RingRef::new(self).can_iso(&self.total_ring).unwrap().map_ref(el),
+                &RingRef::from(self).can_iso(&self.total_ring).unwrap().map_ref(el),
                 serializer,
             )
         } else {
@@ -864,7 +864,7 @@ where
         D: serde::Deserializer<'de>,
     {
         if deserializer.is_human_readable() {
-            Ok(RingRef::new(self)
+            Ok(RingRef::from(self)
                 .can_hom(&self.total_ring)
                 .unwrap()
                 .map(self.total_ring.get_ring().deserialize(deserializer)?))

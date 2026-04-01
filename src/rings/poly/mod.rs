@@ -38,7 +38,7 @@ pub trait PolyRing: RingExtension {
     where
         I: IntoIterator<Item = (El<Self::BaseRing>, usize)>,
     {
-        let self_ring = RingRef::new(self);
+        let self_ring = RingRef::from(self);
         self.add_assign(
             lhs,
             self_ring.sum(
@@ -50,7 +50,7 @@ pub trait PolyRing: RingExtension {
 
     /// Multiplies the given polynomial with `X^rhs_power`.
     fn mul_assign_monomial(&self, lhs: &mut Self::Element, rhs_power: usize) {
-        self.mul_assign(lhs, RingRef::new(self).pow(self.indeterminate(), rhs_power));
+        self.mul_assign(lhs, RingRef::from(self).pow(self.indeterminate(), rhs_power));
     }
 
     /// Returns the coefficient of `f` that corresponds to the monomial `X^i`.
@@ -70,7 +70,7 @@ pub trait PolyRing: RingExtension {
     /// Truncates the monomials of the given polynomial from the given position on, i.e.
     /// computes the remainder of the polynomial division of `lhs` by `X^truncated_at_inclusive`.
     fn truncate_monomials(&self, lhs: &mut Self::Element, truncated_at_inclusive: usize) {
-        *lhs = RingRef::new(self).from_terms(
+        *lhs = RingRef::from(self).from_terms(
             self.terms(lhs)
                 .filter(|(_, i)| *i < truncated_at_inclusive)
                 .map(|(c, i)| (self.base_ring().clone_el(c), i)),
@@ -88,7 +88,7 @@ pub trait PolyRing: RingExtension {
     {
         assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
         assert!(from.base_ring().get_ring() == hom.domain().get_ring());
-        RingRef::new(self).from_terms(from.terms(el).map(|(c, i)| (hom.map_ref(c), i)))
+        RingRef::from(self).from_terms(from.terms(el).map(|(c, i)| (hom.map_ref(c), i)))
     }
 
     /// Possibly divides all coefficients of the polynomial by a common factor,
@@ -108,7 +108,7 @@ pub trait PolyRing: RingExtension {
             .get_ring()
             .balance_factor(self.terms(f).map(|(c, _)| c));
         if let Some(balance_factor) = &balance_factor {
-            *f = RingRef::new(self).from_terms(
+            *f = RingRef::from(self).from_terms(
                 self.terms(f)
                     .map(|(c, i)| (self.base_ring().checked_div(c, &balance_factor).unwrap(), i)),
             );

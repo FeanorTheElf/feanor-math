@@ -121,7 +121,7 @@ pub trait FreeAlgebra: RingExtension {
     /// Multiplies the given element by the `power`-th power of the canonical generator
     /// of this ring, as given by [`FreeAlgebra::canonical_gen()`].
     fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {
-        self.mul_assign(el, RingRef::new(self).pow(self.canonical_gen(), power));
+        self.mul_assign(el, RingRef::from(self).pow(self.canonical_gen(), power));
     }
 
     /// Like [`FreeAlgebra::from_canonical_basis()`], this computes the sum `sum_i vec[i] * x^i`
@@ -271,8 +271,10 @@ where
         .len()
             > 1
         {
+            drop(poly_ring);
             return Err(self);
         } else {
+            drop(poly_ring);
             return Ok(RingValue::from(AsFieldBase::promise_is_perfect_field(self)));
         }
     }
@@ -401,6 +403,7 @@ where
             &image_of_generator,
             to.inclusion()
         )));
+        drop(poly_ring);
         Self {
             from,
             to,

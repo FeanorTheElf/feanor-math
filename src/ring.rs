@@ -2,6 +2,7 @@ use std::alloc::Allocator;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
+use std::sync::Arc;
 
 use serde::{Deserialize, Serialize};
 
@@ -1146,10 +1147,11 @@ impl<'a, R: RingBase + ?Sized> Clone for RingRef<'a, R> {
 
 impl<'a, R: RingBase + ?Sized> Copy for RingRef<'a, R> {}
 
-impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
-    /// Creates a new [`RingRef`] from a reference to a [`RingBase`].
-    pub const fn new(value: &'a R) -> Self { RingRef { ring: value } }
+impl<'a, R: RingBase + ?Sized> From<&'a R> for RingRef<'a, R> {
+    fn from(value: &'a R) -> Self { RingRef { ring: value } }
+}
 
+impl<'a, R: RingBase + ?Sized> RingRef<'a, R> {
     /// Returns the stored reference to the [`RingBase`].
     ///
     /// This is almost the same as [`RingStore::get_ring()`], except for
@@ -1186,14 +1188,45 @@ impl<R: ?Sized + RingBase> RingStore for NeverRing<R> {
     fn get_ring<'a>(&'a self) -> &'a Self::Type { self.0 }
 }
 
+/// The third fundamental [`crate::ring::RingStore`]. It stores a
+/// [`RingBase`] behind an [`Arc`].
+#[repr(transparent)]
+#[derive(Debug)]
+pub struct RingArc<R: RingBase + ?Sized> {
+    ring: Arc<R>,
+}
+
+impl<R: RingBase + ?Sized> Clone for RingArc<R> {
+    fn clone(&self) -> Self {
+        Self {
+            ring: self.ring.clone(),
+        }
+    }
+}
+
+impl<R: RingBase + ?Sized> RingArc<R> {
+    /// Returns the stored [`Arc`].
+    pub fn into(self) -> Arc<R> { self.ring }
+}
+
+impl<R: RingBase + ?Sized> From<Arc<R>> for RingArc<R> {
+    fn from(value: Arc<R>) -> Self { RingArc { ring: value } }
+}
+
+impl<R: RingBase + ?Sized> RingStore for RingArc<R> {
+    type Type = R;
+
+    fn get_ring(&self) -> &R { &*self.ring }
+}
+
 /// Trait for objects that can be cloned when given access to a ring related
 /// to them or their components.
 pub trait CloneWithRing<R: ?Sized + RingBase> {
-    fn clone(&self, ring: &R) -> Self;
+    fn clone_with_ring(&self, ring: &R) -> Self;
 }
 
 impl<R: ?Sized + RingBase, A: Allocator + Clone> CloneWithRing<R> for Vec<R::Element, A> {
-    fn clone(&self, ring: &R) -> Self {
+    fn clone_with_ring(&self, ring: &R) -> Self {
         let mut result = Vec::with_capacity_in(self.len(), self.allocator().clone());
         result.extend(self.iter().map(|x| ring.clone_el(x)));
         return result;
@@ -1201,11 +1234,11 @@ impl<R: ?Sized + RingBase, A: Allocator + Clone> CloneWithRing<R> for Vec<R::Ele
 }
 
 impl<R: ?Sized + RingBase, const N: usize> CloneWithRing<R> for [R::Element; N] {
-    fn clone(&self, ring: &R) -> Self { std::array::from_fn(|i| ring.clone_el(&self[i])) }
+    fn clone_with_ring(&self, ring: &R) -> Self { std::array::from_fn(|i| ring.clone_el(&self[i])) }
 }
 
 impl<'a, T: ?Sized, R: ?Sized + RingBase> CloneWithRing<R> for &'a T {
-    fn clone(&self, _: &R) -> Self { *self }
+    fn clone_with_ring(&self, _: &R) -> Self { *self }
 }
 
 #[cfg(test)]

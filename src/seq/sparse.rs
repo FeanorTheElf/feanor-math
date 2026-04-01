@@ -94,7 +94,7 @@ impl<R: RingStore + Clone> Clone for SparseMapVector<R> {
 }
 
 impl<R: RingStore + Clone> CloneWithRing<R::Type> for SparseMapVector<R> {
-    fn clone(&self, ring: &R::Type) -> Self {
+    fn clone_with_ring(&self, ring: &R::Type) -> Self {
         assert!(self.ring.get_ring() == ring);
         Clone::clone(self)
     }

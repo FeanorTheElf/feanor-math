@@ -438,7 +438,8 @@ where
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion
         // (always adding a `&`)
         let new_base_ring = FreeAlgebraImplBase::new(Fq, 2, [Fq.neg_one(), Fq.neg_one()]);
-        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field());
+        let new_base_ring = RingRef::from(&new_base_ring);
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(new_base_ring));
         let new_x_pow_rank = mod_f_ring
             .wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank()))
             .into_iter()

@@ -578,7 +578,10 @@ where
     fn has_canonical_hom(&self, _from: &J) -> Option<Self::Homomorphism> { Some(()) }
 
     fn map_in(&self, from: &J, el: <J as RingBase>::Element, (): &Self::Homomorphism) -> Self::Element {
-        RationalFieldEl(int_cast(el, self.base_ring(), &RingRef::new(from)), self.integers.one())
+        RationalFieldEl(
+            int_cast(el, self.base_ring(), &RingRef::from(from)),
+            self.integers.one(),
+        )
     }
 }
 

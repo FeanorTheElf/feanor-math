@@ -52,53 +52,53 @@ fn test_invert_over_local_zn() {
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([1, 1, 0, 1]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([1, 3, 0, 0]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([1, 2, 3, 0]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([3, 2, 9, 0]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([1, 3, 9, 9]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([3, 1, 0, 0]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([0, 3, 9, 9]));
-    assert!(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).is_none());
+    assert!(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).is_none());
 
     let base_ring = zn_64b::Zn64B::new(257).as_field().ok().unwrap();
     let array = |data: [i32; 2]| std::array::from_fn::<_, 2, _>(|i| base_ring.int_hom().map(data[i]));
@@ -108,20 +108,20 @@ fn test_invert_over_local_zn() {
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([0, 2]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 
     let a = ring.from_canonical_basis(array([2, 0]));
     assert_el_eq!(
         &ring,
         ring.one(),
-        ring.mul(invert_over_local_zn(RingRef::new(ring.get_ring()), &a).unwrap(), a)
+        ring.mul(invert_over_local_zn(RingRef::from(ring.get_ring()), &a).unwrap(), a)
     );
 }

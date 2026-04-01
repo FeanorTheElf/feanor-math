@@ -79,7 +79,7 @@ where
         let (ext_ring, points) = ring.interpolation_points(point_count);
         return (
             Self {
-                ring: RingRef::new(ring),
+                ring: RingRef::from(ring),
                 ext_ring,
             },
             points,
@@ -444,7 +444,7 @@ where
     fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 { 0.0 }
 
     fn init_reduce_lift<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
-        RingRef::new(self)
+        RingRef::from(self)
     }
 
     fn quotient_ring_at<'ring>(
@@ -511,7 +511,7 @@ where
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, data: &'data R::LocalComputationData<'ring>, index: usize) -> Self {
         Self {
-            ring: RingRef::new(ring),
+            ring: RingRef::from(ring),
             data,
             local_ring: ring.quotient_ring_at(data, index),
             index,
@@ -633,7 +633,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
 
             fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
                 assert_eq!(0, self.characteristic($crate::primitive_int::StaticRing::<i64>::RING).unwrap());
-                let ring = $crate::ring::RingRef::new(self);
+                let ring = $crate::ring::RingRef::from(self);
                 // yield both positive and negative integers, since that keeps the absolute value of the points as small as possible
                 // (this will improve performance in some cases that are sensitive to the size of coefficients)
                 (ring, (0..count).map(|n| if n % 2 == 1 { -(((n + 1) / 2) as i32) } else { (n / 2) as i32 }).map(|n| <_ as $crate::homomorphism::Homomorphism<_, _>>::map(&ring.int_hom(), n)).collect())
@@ -673,7 +673,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                 where Self: 'ring;
 
             fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
-                RingRef::new(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
+                RingRef::from(self).abs_log2_ceil(el).unwrap_or(0) as f64 * 2f64.ln()
             }
 
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
@@ -687,7 +687,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                 }
                 return $crate::rings::zn::zn_rns::ZnRNS::new(
                     primes.into_iter().map(|Fp| $crate::rings::field::AsField::from($crate::rings::field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
-                    RingRef::new(self)
+                    RingRef::from(self)
                 );
             }
 

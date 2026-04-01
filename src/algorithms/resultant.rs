@@ -251,8 +251,6 @@ where
 #[cfg(test)]
 use crate::algorithms::buchberger::buchberger;
 #[cfg(test)]
-use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-#[cfg(test)]
 use crate::integer::BigIntRing;
 #[cfg(test)]
 use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
@@ -264,7 +262,6 @@ use crate::rings::multivariate::*;
 fn test_resultant_local_polynomial() {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
-    static_assert_impls!(RationalFieldBase<BigIntRing>: PolyTFracGCDRing);
     // we eliminate `Y`, so add it as the outer indeterminate
     let QQX = DensePolyRing::new(&QQ, "X");
     let QQXY = DensePolyRing::new(&QQX, "Y");

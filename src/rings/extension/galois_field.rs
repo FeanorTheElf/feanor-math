@@ -30,7 +30,7 @@ use crate::rings::extension::*;
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::*;
 use crate::rings::poly::PolyRing;
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::rings::poly::dense_poly::{DensePolyRing, DensePolyRingBase};
 use crate::rings::zn::zn_64b::Zn64BBase;
 use crate::rings::zn::*;
 use crate::serialization::*;
@@ -284,7 +284,12 @@ where
     /// ```
     pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
         assert!(degree >= 1);
-        let poly_ring = DensePolyRing::new_with_convolution(&base_field, "X", &allocator, &convolution_algorithm);
+        let poly_ring = RingValue::from(DensePolyRingBase::new_with_convolution(
+            &base_field,
+            "X",
+            &allocator,
+            &convolution_algorithm,
+        ));
         let mut rng = oorandom::Rand64::new(
             poly_ring
                 .base_ring()
@@ -324,7 +329,12 @@ where
         C: Copy,
     {
         assert!(degree >= 1);
-        let poly_ring = DensePolyRing::new_with_convolution(base_ring, "X", &allocator, convolution_algorithm);
+        let poly_ring = RingValue::from(DensePolyRingBase::new_with_convolution(
+            base_ring,
+            "X",
+            &allocator,
+            convolution_algorithm,
+        ));
         let mut rng = oorandom::Rand64::new(
             poly_ring
                 .base_ring()
@@ -420,7 +430,7 @@ where
         let (p, _e) = is_prime_power(&BigIntRing::RING, &new_base_ring.size(&BigIntRing::RING).unwrap()).unwrap();
         assert!(BigIntRing::RING.eq_el(&p, &self.base_ring().size(&BigIntRing::RING).unwrap()));
         let mut modulus_vec = SparseMapVector::new(self.rank(), new_base_ring.clone());
-        let x_pow_deg = RingRef::new(self).pow(self.canonical_gen(), self.rank());
+        let x_pow_deg = RingRef::from(self).pow(self.canonical_gen(), self.rank());
         let x_pow_deg = self.wrt_canonical_basis(&x_pow_deg);
         let hom = new_base_ring.can_hom(self.base_ring().integer_ring()).unwrap();
         for i in 0..self.rank() {
@@ -1162,20 +1172,14 @@ fn test_galois_field_no_trinomial() {
     feanor_tracing::DelayedLogger::init_test();
     let field = GaloisField::new(2, 24);
     assert_eq!(24, field.rank());
-    let poly_ring = DensePolyRing::new(field.base_ring(), "X");
-    poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
     let field = GaloisField::new(3, 30);
     assert_eq!(30, field.rank());
-    let poly_ring = DensePolyRing::new(field.base_ring(), "X");
-    poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
     let field = GaloisField::new(17, 32);
     assert_eq!(32, field.rank());
-    let poly_ring = DensePolyRing::new(field.base_ring(), "X");
-    poly_ring.println(&field.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
     assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
 }
 

@@ -122,7 +122,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         F: FnMut(El<R>) -> Option<El<R>>,
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::poly_div::poly_div_rem(RingRef::new(self), lhs_val, rhs, |x| {
+        let (quo, rem) = algorithms::poly_div::poly_div_rem(RingRef::from(self), lhs_val, rhs, |x| {
             left_div_lc(self.base_ring().clone_el(x)).ok_or(())
         })
         .ok()?;
@@ -520,11 +520,11 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::new(self))
+        eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::from(self))
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        <_ as PolyTFracGCDRing>::gcd(RingRef::new(self), lhs, rhs)
+        <_ as PolyTFracGCDRing>::gcd(RingRef::from(self), lhs, rhs)
     }
 }
 

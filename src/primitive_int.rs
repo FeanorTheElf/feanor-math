@@ -229,7 +229,7 @@ impl<T: PrimitiveInt> EuclideanRing for StaticRingBase<T> {
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> {
-        RingRef::new(self)
+        RingRef::from(self)
             .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
             .unwrap()
             .map(*val)
@@ -240,12 +240,12 @@ impl<T: PrimitiveInt> EuclideanRing for StaticRingBase<T> {
 
 impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
-        RingRef::new(self)
+        RingRef::from(self)
             .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
             .unwrap()
             .map(*lhs)
             .cmp(
-                &RingRef::new(self)
+                &RingRef::from(self)
                     .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
                     .unwrap()
                     .map(*rhs),
@@ -268,18 +268,18 @@ where
 
 impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     fn to_float_approx(&self, value: &Self::Element) -> f64 {
-        RingRef::new(self)
+        RingRef::from(self)
             .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
             .unwrap()
             .map(*value) as f64
     }
 
     fn from_float_approx(&self, value: f64) -> Option<Self::Element> {
-        Some(RingRef::new(self).coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, value as i128))
+        Some(RingRef::from(self).coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, value as i128))
     }
 
     fn abs_is_bit_set(&self, value: &Self::Element, i: usize) -> bool {
-        match RingRef::new(self)
+        match RingRef::from(self)
             .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
             .unwrap()
             .map(*value)
@@ -290,7 +290,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn abs_highest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        match RingRef::new(self)
+        match RingRef::from(self)
             .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
             .unwrap()
             .map(*value)
@@ -302,7 +302,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn abs_lowest_set_bit(&self, value: &Self::Element) -> Option<usize> {
-        match RingRef::new(self)
+        match RingRef::from(self)
             .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
             .unwrap()
             .map(*value)
@@ -314,9 +314,9 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn euclidean_div_pow_2(&self, value: &mut Self::Element, power: usize) {
-        *value = RingRef::new(self).coerce::<StaticRing<i128>>(
+        *value = RingRef::from(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING,
-            RingRef::new(self)
+            RingRef::from(self)
                 .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
                 .unwrap()
                 .map(*value)
@@ -325,9 +325,9 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn mul_pow_2(&self, value: &mut Self::Element, power: usize) {
-        *value = RingRef::new(self).coerce::<StaticRing<i128>>(
+        *value = RingRef::from(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING,
-            RingRef::new(self)
+            RingRef::from(self)
                 .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
                 .unwrap()
                 .map(*value)
@@ -337,7 +337,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
         assert!(log2_bound_exclusive <= T::bits() - 1);
-        RingRef::new(self).coerce::<StaticRing<i128>>(
+        RingRef::from(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING,
             ((((rng() as u128) << u64::BITS) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128,
         )
@@ -349,7 +349,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
 impl<T: PrimitiveInt> HashableElRing for StaticRingBase<T> {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         h.write_i128(
-            RingRef::new(self)
+            RingRef::from(self)
                 .can_iso::<StaticRing<i128>>(&StaticRing::<i128>::RING)
                 .unwrap()
                 .map(*el),

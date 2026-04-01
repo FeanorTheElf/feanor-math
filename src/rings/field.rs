@@ -423,7 +423,7 @@ where
 
 impl<R> FromModulusCreateableZnRing for AsFieldBase<RingValue<R>>
 where
-    R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing,
+    R: DivisibilityRing + ZnRing + FromModulusCreateableZnRing + Clone,
 {
     fn from_modulus<F, E>(create_modulus: F) -> Result<Self, E>
     where
@@ -627,7 +627,7 @@ fn test_divisibility_axioms() {
 fn test_canonical_hom_axioms_wrap_unwrap() {
     feanor_tracing::DelayedLogger::init_test();
     let R = ZnGB::new(StaticRing::<i64>::RING, 17).as_field().ok().unwrap();
-    let int_hom = RingRef::new(R.get_ring().get_delegate()).into_int_hom();
+    let int_hom = RingRef::from(R.get_ring().get_delegate()).into_int_hom();
     crate::ring::generic_tests::test_hom_axioms(int_hom.codomain(), &R, (0..17).map(|x| int_hom.map(x)));
     crate::ring::generic_tests::test_iso_axioms(int_hom.codomain(), &R, (0..17).map(|x| int_hom.map(x)));
 }

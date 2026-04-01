@@ -294,8 +294,6 @@ where
             where
                 <BaseRing<P> as RingStore>::Type: FiniteRing,
             {
-                static_assert_impls!(<BaseRing<P> as RingStore>::Type: SelfIso);
-
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
                     "X",
@@ -361,8 +359,6 @@ where
             where
                 <BaseRing<P> as RingStore>::Type: FiniteRing,
             {
-                static_assert_impls!(<BaseRing<P> as RingStore>::Type: SelfIso);
-
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
                     "X",

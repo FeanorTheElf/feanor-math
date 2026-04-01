@@ -344,7 +344,7 @@ impl<R: ?Sized + RingBase, A: Allocator + Send + Sync> ConvolutionAlgorithm<R> f
         dst: &mut [R::Element],
         ring: &R,
     ) {
-        karatsuba(self.threshold_log2, dst, lhs, rhs, RingRef::new(ring), &self.allocator);
+        karatsuba(self.threshold_log2, dst, lhs, rhs, RingRef::from(ring), &self.allocator);
     }
 
     fn prepare_convolution_operand(
@@ -374,7 +374,7 @@ impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for SchoolbookConvolution {
         dst: &mut [R::Element],
         ring: &R,
     ) {
-        schoolbook_assign_mul::<_, _, _, _, true>(dst, lhs, rhs, RingRef::new(ring));
+        schoolbook_assign_mul::<_, _, _, _, true>(dst, lhs, rhs, RingRef::from(ring));
     }
 
     fn prepare_convolution_operand(

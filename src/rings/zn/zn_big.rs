@@ -253,7 +253,7 @@ where
         self.bounded_reduce(&mut lhs.0);
     }
 
-    fn from_int(&self, value: i32) -> Self::Element { RingRef::new(self).coerce(&StaticRing::<i32>::RING, value) }
+    fn from_int(&self, value: i32) -> Self::Element { RingRef::from(self).coerce(&StaticRing::<i32>::RING, value) }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         debug_assert!(self.integer_ring.is_leq(&lhs.0, &self.twice_modulus));
@@ -368,7 +368,7 @@ where
     }
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
+        let ring = super::generic_impls::interpolation_ring(RingRef::from(self), count);
         let ZZ = self.integer_ring();
         let modulus = if ZZ.abs_log2_ceil(self.modulus()).unwrap_or(0) <= 63 {
             int_cast(ZZ.clone_el(self.modulus()), StaticRing::<i64>::RING, ZZ)
@@ -428,7 +428,7 @@ where
     I::Type: IntegerRing,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_left_div(RingRef::from(self), lhs, rhs)
     }
 
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
@@ -710,7 +710,7 @@ where
     I::Type: IntegerRing,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_div_min(RingRef::from(self), lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -719,7 +719,7 @@ where
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
         let (s, t, d) = self.integer_ring().extended_ideal_gen(&lhs.0, &rhs.0);
-        let quo = RingRef::new(self).into_can_hom(self.integer_ring()).ok().unwrap();
+        let quo = RingRef::from(self).into_can_hom(self.integer_ring()).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
 }

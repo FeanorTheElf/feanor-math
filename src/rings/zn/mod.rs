@@ -81,7 +81,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     }
 
     /// Returns whether this ring is a field, i.e. whether `n` is prime.
-    fn is_field(&self) -> bool { algorithms::miller_rabin::is_prime_base(RingRef::new(self), 10) }
+    fn is_field(&self) -> bool { algorithms::miller_rabin::is_prime_base(RingRef::from(self), 10) }
 }
 
 /// Trait for implementations of [`ZnRing`] that can be created (possibly with a
@@ -90,7 +90,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
 /// I am not yet sure whether to use this trait, or opt for a factory trait (which
 /// would then offer more flexibility).
 #[stability::unstable(feature = "enable")]
-pub trait FromModulusCreateableZnRing: Sized + ZnRing {
+pub trait FromModulusCreateableZnRing: Sized + ZnRing + Clone {
     fn from_modulus<F, E>(create_modulus: F) -> Result<Self, E>
     where
         F: FnOnce(&Self::IntegerRingBase) -> Result<El<Self::IntegerRing>, E>;
@@ -106,7 +106,7 @@ pub mod generic_impls {
     use crate::integer::{IntegerRing, IntegerRingStore};
     use crate::ordered::*;
     use crate::primitive_int::{StaticRing, StaticRingBase};
-    use crate::rings::extension::galois_field::{GaloisField, GaloisFieldOver};
+    use crate::rings::extension::galois_field::*;
     use crate::rings::zn::*;
 
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
@@ -308,7 +308,7 @@ pub mod generic_impls {
             }
         }) + 1;
         assert!(degree >= 1);
-        return GaloisField::new_with_base_field(ring, degree as usize);
+        return RingValue::from(GaloisFieldBase::new_with_base_field(ring, degree as usize));
     }
 }
 

@@ -261,7 +261,7 @@ pub trait IntegerRing:
     /// To denote digits larger than `9`, the same characters as in [`u64::from_str_radix()`]
     /// should be used.
     fn parse(&self, string: &str, base: u32) -> Result<Self::Element, ()> {
-        generic_impls::parse(RingRef::new(self), string, base)
+        generic_impls::parse(RingRef::from(self), string, base)
     }
 }
 
@@ -275,7 +275,7 @@ where
     fn has_canonical_hom(&self, _: &I) -> Option<Self::Homomorphism> { Some(()) }
 
     fn map_in(&self, from: &I, el: <I as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
-        int_cast(el, &RingRef::new(self), &RingRef::new(from))
+        int_cast(el, &RingRef::from(self), &RingRef::from(from))
     }
 
     default fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
@@ -324,7 +324,7 @@ where
     fn has_canonical_iso(&self, _: &I) -> Option<Self::Isomorphism> { Some(()) }
 
     fn map_out(&self, from: &I, el: Self::Element, _: &Self::Isomorphism) -> <I as RingBase>::Element {
-        int_cast(el, &RingRef::new(from), &RingRef::new(self))
+        int_cast(el, &RingRef::from(from), &RingRef::from(self))
     }
 }
 
@@ -354,7 +354,7 @@ pub trait IntCast<F: ?Sized + IntegerRing>: IntegerRing {
 
 impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
     default fn cast(&self, from: &F, value: F::Element) -> Self::Element {
-        generic_impls::map_from_integer_ring(RingRef::new(from), RingRef::new(self), value)
+        generic_impls::map_from_integer_ring(RingRef::from(from), RingRef::from(self), value)
     }
 }
 

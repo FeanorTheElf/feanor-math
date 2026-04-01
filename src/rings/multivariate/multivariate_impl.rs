@@ -1,6 +1,7 @@
 use std::alloc::{Allocator, Global};
 use std::cell::{RefCell, RefMut};
 use std::fmt::Debug;
+use std::sync::Arc;
 
 use atomicbox::AtomicOptionBox;
 use thread_local::ThreadLocal;
@@ -25,40 +26,10 @@ pub struct MonomialIdentifier {
     data: InternalMonomialIdentifier,
 }
 
-impl Debug for MonomialIdentifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MonomialIdentifier")
-            .field("deg", &self.data.deg)
-            .field("idx", &self.data.order)
-            .finish()
-    }
-}
-
 #[derive(Clone, Debug)]
 struct InternalMonomialIdentifier {
     deg: Exponent,
     order: OrderIdx,
-}
-
-impl InternalMonomialIdentifier {
-    fn wrap(self) -> MonomialIdentifier { MonomialIdentifier { data: self } }
-}
-
-impl PartialEq for InternalMonomialIdentifier {
-    fn eq(&self, other: &Self) -> bool {
-        let res = self.deg == other.deg && self.order == other.order;
-        return res;
-    }
-}
-
-impl Eq for InternalMonomialIdentifier {}
-
-impl Ord for InternalMonomialIdentifier {
-    fn cmp(&self, other: &Self) -> Ordering { self.deg.cmp(&other.deg).then_with(|| self.order.cmp(&other.order)) }
-}
-
-impl PartialOrd for InternalMonomialIdentifier {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 
 /// An element of [`MultivariatePolyRingImpl`].
@@ -103,8 +74,17 @@ where
 }
 
 /// [`RingStore`] corresponding to [`MultivariatePolyRingImplBase`]
-pub type MultivariatePolyRingImpl<R, A = Global> = RingValue<MultivariatePolyRingImplBase<R, A>>;
+pub type MultivariatePolyRingImpl<R, A = Global> = RingArc<MultivariatePolyRingImplBase<R, A>>;
 
+impl<R> MultivariatePolyRingImpl<R>
+where
+    R: RingStore,
+{
+    /// Creates a new instance of the ring `base_ring[X0, ..., Xn]` where `n = variable_count - 1`.
+    pub fn new(base_ring: R, variable_count: usize) -> Self {
+        RingArc::from(Arc::new(MultivariatePolyRingImplBase::new(base_ring, variable_count)))
+    }
+}
 impl<R> MultivariatePolyRingImplBase<R>
 where
     R: RingStore,
@@ -129,7 +109,6 @@ where
     /// multiplication table is precomputed. In particular, a multiplication table is
     /// precomputed for all products where one summand has degree `<= d2` and the other summand
     /// has degree `<= d1`. Note that `d1 <= d2` is required.
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
     pub fn new_with_mult_table(
         base_ring: R,
@@ -200,7 +179,7 @@ where
                     .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>();
-        RingValue::from(MultivariatePolyRingImplBase {
+        MultivariatePolyRingImplBase {
             zero: base_ring.zero(),
             base_ring,
             variable_count,
@@ -210,7 +189,7 @@ where
             cum_binomial_lookup_table,
             tmp_poly: AtomicOptionBox::none(),
             allocator,
-        })
+        }
     }
 }
 
@@ -366,7 +345,7 @@ where
 
     fn compare_degrevlex(&self, lhs: &InternalMonomialIdentifier, rhs: &InternalMonomialIdentifier) -> Ordering {
         let res = lhs.deg.cmp(&rhs.deg).then_with(|| lhs.order.cmp(&rhs.order));
-        debug_assert!(res == DegRevLex.compare(RingRef::new(self), &lhs.clone().wrap(), &rhs.clone().wrap()));
+        debug_assert!(res == DegRevLex.compare(RingRef::from(self), &lhs.clone().wrap(), &rhs.clone().wrap()));
         return res;
     }
 
@@ -439,6 +418,36 @@ where
         debug_assert!(self.is_valid(&result));
         return MultivariatePolyRingEl { data: result };
     }
+}
+
+impl Debug for MonomialIdentifier {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("MonomialIdentifier")
+            .field("deg", &self.data.deg)
+            .field("idx", &self.data.order)
+            .finish()
+    }
+}
+
+impl InternalMonomialIdentifier {
+    fn wrap(self) -> MonomialIdentifier { MonomialIdentifier { data: self } }
+}
+
+impl PartialEq for InternalMonomialIdentifier {
+    fn eq(&self, other: &Self) -> bool {
+        let res = self.deg == other.deg && self.order == other.order;
+        return res;
+    }
+}
+
+impl Eq for InternalMonomialIdentifier {}
+
+impl Ord for InternalMonomialIdentifier {
+    fn cmp(&self, other: &Self) -> Ordering { self.deg.cmp(&other.deg).then_with(|| self.order.cmp(&other.order)) }
+}
+
+impl PartialOrd for InternalMonomialIdentifier {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
 }
 
 impl<R, A> Debug for MultivariatePolyRingImplBase<R, A>
@@ -623,7 +632,7 @@ where
         out: &mut std::fmt::Formatter<'a>,
         env: EnvBindingStrength,
     ) -> std::fmt::Result {
-        super::generic_impls::print(RingRef::new(self), value, out, env)
+        super::generic_impls::print(RingRef::from(self), value, out, env)
     }
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
@@ -879,7 +888,7 @@ where
             f.data.last().map(|(c, m)| (c, m))
         } else {
             self.terms(f)
-                .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+                .max_by(|l, r| order.compare(RingRef::from(self), &l.1, &r.1))
         }
     }
 
@@ -902,15 +911,15 @@ where
             assert!({
                 let expected = self
                     .terms(f)
-                    .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
-                    .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1));
+                    .filter(|(_, m)| order.compare(RingRef::from(self), m, lt_than) == Ordering::Less)
+                    .max_by(|l, r| order.compare(RingRef::from(self), &l.1, &r.1));
                 (res.is_none() && expected.is_none()) || std::ptr::eq(res.unwrap().0, expected.unwrap().0)
             });
             return res;
         } else {
             self.terms(f)
-                .filter(|(_, m)| order.compare(RingRef::new(self), m, lt_than) == Ordering::Less)
-                .max_by(|l, r| order.compare(RingRef::new(self), &l.1, &r.1))
+                .filter(|(_, m)| order.compare(RingRef::from(self), m, lt_than) == Ordering::Less)
+                .max_by(|l, r| order.compare(RingRef::from(self), &l.1, &r.1))
         }
     }
 
@@ -966,7 +975,7 @@ where
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         assert_eq!(values.len(), self.indeterminate_count());
-        let new_ring = RingValue::from(MultivariatePolyRingImplBase {
+        let new_ring = MultivariatePolyRingImplBase {
             zero: hom.codomain().zero(),
             base_ring: hom.codomain(),
             variable_count: self.variable_count,
@@ -976,7 +985,8 @@ where
             cum_binomial_lookup_table: self.cum_binomial_lookup_table.clone(),
             tmp_poly: AtomicOptionBox::new(None),
             allocator: self.allocator.clone(),
-        });
+        };
+        let new_ring = RingRef::from(&new_ring);
         let mut result = new_ring.from_terms(self.terms(f).map(|(c, m)| {
             (
                 hom.map_ref(c),
@@ -1020,7 +1030,7 @@ where
     }
 
     fn map_in_ref(&self, from: &P, el: &<P as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        RingRef::new(self).from_terms(from.terms(el).map(|(c, m)| {
+        RingRef::from(self).from_terms(from.terms(el).map(|(c, m)| {
             (
                 self.base_ring()
                     .get_ring()
@@ -1057,7 +1067,7 @@ where
     }
 
     fn map_out(&self, from: &P, el: Self::Element, iso: &Self::Isomorphism) -> <P as RingBase>::Element {
-        RingRef::new(from).from_terms(self.terms(&el).map(|(c, m)| {
+        RingRef::from(from).from_terms(self.terms(&el).map(|(c, m)| {
             (
                 self.base_ring()
                     .get_ring()
@@ -1296,7 +1306,13 @@ fn test_monomial_small() {
 fn test_new_many_variables() {
     feanor_tracing::DelayedLogger::init_test();
     for m in 1..32 {
-        let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, m, 32, (2, 3), Global);
+        let ring = RingArc::from(Arc::new(MultivariatePolyRingImplBase::new_with_mult_table(
+            StaticRing::<i64>::RING,
+            m,
+            32,
+            (2, 3),
+            Global,
+        )));
         assert_eq!(m, ring.indeterminate_count());
     }
 }
@@ -1318,7 +1334,13 @@ fn test_evaluate_approximate_ring() {
 #[test]
 fn test_evaluate_many_variables() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MultivariatePolyRingImpl::new_with_mult_table(StaticRing::<i64>::RING, 20, 16, (4, 6), Global);
+    let ring = RingArc::from(Arc::new(MultivariatePolyRingImplBase::new_with_mult_table(
+        StaticRing::<i64>::RING,
+        20,
+        16,
+        (4, 6),
+        Global,
+    )));
     let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
     assert_eq!(
         1 + 6 + 20,

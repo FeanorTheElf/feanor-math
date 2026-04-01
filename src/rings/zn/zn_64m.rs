@@ -266,7 +266,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64M> {
     }
 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-        let ring = super::generic_impls::interpolation_ring(RingRef::new(self), count);
+        let ring = super::generic_impls::interpolation_ring(RingRef::from(self), count);
         let points = multi_cartesian_product(
             (0..ring.rank()).map(|_| (0..*self.modulus()).map(|x| self.from_int_promise_reduced(x))),
             |values| ring.from_canonical_basis(values.iter().copied()),
@@ -392,7 +392,7 @@ impl DivisibilityRing for Zn64MBase {
     type PreparedDivisorData = ();
 
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_left_div(RingRef::from(self), lhs, rhs)
     }
 
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
@@ -483,7 +483,7 @@ impl FiniteRing for Zn64MBase {
 
 impl PrincipalIdealRing for Zn64MBase {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+        super::generic_impls::checked_div_min(RingRef::from(self), lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -494,7 +494,7 @@ impl PrincipalIdealRing for Zn64MBase {
         // we can actually work in Montgomery form, since R is a unit modulo n
         let (s, t, d) =
             StaticRing::<i64>::RING.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
-        let quo = RingRef::new(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
+        let quo = RingRef::from(self).into_can_hom(StaticRing::<i64>::RING).ok().unwrap();
         (quo.map(s), quo.map(t), Zn64MEl(d as u64))
     }
 }

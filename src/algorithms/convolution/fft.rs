@@ -414,7 +414,7 @@ where
             val,
             ring,
             len_hint,
-            to_int_zn(RingRef::new(ring)),
+            to_int_zn(RingRef::from(ring)),
             Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap()),
         )
     }
@@ -435,8 +435,8 @@ where
             rhs_prep,
             dst,
             ring,
-            to_int_zn(RingRef::new(ring)),
-            from_int_zn(RingRef::new(ring)),
+            to_int_zn(RingRef::from(ring)),
+            from_int_zn(RingRef::from(ring)),
             Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap()),
         )
     }
@@ -456,8 +456,8 @@ where
             values,
             dst,
             ring,
-            to_int_zn(RingRef::new(ring)),
-            from_int_zn(RingRef::new(ring)),
+            to_int_zn(RingRef::from(ring)),
+            from_int_zn(RingRef::from(ring)),
             Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap()),
         )
     }
@@ -478,7 +478,7 @@ where
         len_hint: Option<usize>,
         ring: &I,
     ) -> Self::PreparedConvolutionOperand {
-        self.prepare_convolution_impl(val, ring, len_hint, to_int_int(RingRef::new(ring)), None)
+        self.prepare_convolution_impl(val, ring, len_hint, to_int_int(RingRef::from(ring)), None)
     }
 
     fn compute_convolution(
@@ -497,8 +497,8 @@ where
             rhs_prep,
             dst,
             ring,
-            to_int_int(RingRef::new(ring)),
-            from_int_int(RingRef::new(ring)),
+            to_int_int(RingRef::from(ring)),
+            from_int_int(RingRef::from(ring)),
             None,
         )
     }
@@ -518,8 +518,8 @@ where
             values,
             dst,
             ring,
-            to_int_int(RingRef::new(ring)),
-            from_int_int(RingRef::new(ring)),
+            to_int_int(RingRef::from(ring)),
+            from_int_int(RingRef::from(ring)),
             None,
         )
     }
