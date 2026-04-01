@@ -35,171 +35,6 @@ use crate::rings::zn::zn_64b::Zn64BBase;
 use crate::rings::zn::*;
 use crate::serialization::*;
 
-fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
-where
-    P: RingStore,
-    P::Type: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Type: ZnRing + FiniteRing + Field,
-    R: RingStore,
-    R::Type: FreeAlgebra,
-    BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
-{
-    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-    let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
-    if poly_ring.degree(&squarefree_part) != Some(degree) {
-        return None;
-    }
-    if !cantor_zassenhaus::squarefree_is_irreducible_base(&poly_ring, &mod_f_ring) {
-        return None;
-    }
-    return Some(mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
-}
-
-/// Tries to find a "small" irreducible polynomial of given degree.
-///
-/// "small" is not well-defined, but can mean sparse, or having a small `deg(f - lt(f))`.
-/// Both will lead to more efficient arithmetic in the ring `k[X]/(f)`. However, in general
-/// finding a very small `f` is hard, thus we use heuristics.
-fn find_small_irreducible_poly<P, C>(poly_ring: P, degree: usize, convolution: C, rng: &mut oorandom::Rand64) -> El<P>
-where
-    P: RingStore,
-    P::Type: PolyRing + EuclideanRing,
-    BaseRing<P>: Copy,
-    <BaseRing<P> as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
-    C: Copy + ConvolutionAlgorithm<<BaseRing<P> as RingStore>::Type>,
-{
-    let Fp = *poly_ring.base_ring();
-    let create_mod_f_ring = |f: &El<P>| {
-        let mut f_body = SparseMapVector::new(degree, poly_ring.base_ring());
-        for (c, i) in poly_ring.terms(f) {
-            if i != degree {
-                *f_body.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
-            }
-        }
-        return FreeAlgebraImpl::new_with_convolution(Fp, degree, f_body, "θ", Global, convolution);
-    };
-
-    if degree > 3 {
-        // first try trinomials, they seem to have a good chance of being irreducible
-        for _ in 0..16 {
-            let i = (StaticRing::<i64>::RING
-                .get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
-                + 1) as usize;
-            let a = Fp.random_element(|| rng.rand_u64());
-            let b = Fp.random_element(|| rng.rand_u64());
-            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)].into_iter());
-            if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
-                return result;
-            }
-        }
-
-        // next, check for cases where we can take `small_poly(X^high_power)`; these cases are characterized
-        // by the fact that we have `degree = small_d * large_d` with `large_d | #F_(q^small_d)*`
-        let ZZbig = BigIntRing::RING;
-        let ZZ = StaticRing::<i64>::RING;
-
-        let p = Fp.size(&ZZbig).unwrap();
-        let mut small_d = 1;
-        let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
-        let mut large_d = int_cast(
-            ZZbig.ideal_gen(
-                &Fq_star_order,
-                &int_cast(
-                    TryInto::<i64>::try_into(degree).unwrap() / small_d,
-                    ZZbig,
-                    StaticRing::<i64>::RING,
-                ),
-            ),
-            ZZ,
-            ZZbig,
-        );
-        let mut increased_small_d = true;
-        while increased_small_d {
-            increased_small_d = false;
-            // use a greedy approach, just add a factor to small_d if it makes large_d larger
-            for (k, _) in factor(&ZZ, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
-                let new_small_d = small_d * k;
-                let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), new_small_d as usize), ZZbig.one());
-                let new_large_d = int_cast(
-                    ZZbig.ideal_gen(
-                        &Fq_star_order,
-                        &int_cast(
-                            TryInto::<i64>::try_into(degree).unwrap() / new_small_d,
-                            ZZbig,
-                            StaticRing::<i64>::RING,
-                        ),
-                    ),
-                    ZZ,
-                    ZZbig,
-                );
-                if new_large_d > large_d {
-                    small_d = new_small_d;
-                    large_d = new_large_d;
-                    increased_small_d = true;
-                    break;
-                }
-            }
-        }
-        small_d = TryInto::<i64>::try_into(degree).unwrap() / large_d;
-        if large_d != 1 {
-            let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
-            // careful here to not get an infinite generic argument recursion
-            let Fq = GaloisField::new_internal(Fp, small_d as usize, Global, convolution);
-            // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d
-            // | #Fq*`; hence we can use `MinPoly(primitive_element)(X^large_d)`
-            let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
-                Fq.canonical_gen()
-            } else {
-                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
-            };
-            // I thought for a while that it would be enough to have a primitive `lcm(Fq_star_order,
-            // large_d^inf)`-th root of unity, however it is not guaranteed that this would indeed
-            // generate the field
-            let FqX = DensePolyRing::new(&Fq, "X");
-            let minpoly = FqX.prod((0..small_d).map(|i| {
-                FqX.from_terms(
-                    [
-                        (
-                            Fq.negate(Fq.pow_gen(
-                                Fq.clone_el(&primitive_element),
-                                &ZZbig.pow(ZZbig.clone_el(&p), i as usize),
-                                ZZbig,
-                            )),
-                            0,
-                        ),
-                        (Fq.one(), 1),
-                    ]
-                    .into_iter(),
-                )
-            }));
-            let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
-                let c_wrt_basis = Fq.wrt_canonical_basis(c);
-                assert!(c_wrt_basis.iter().skip(1).all(|x| Fp.is_zero(&x)));
-                return (c_wrt_basis.at(0), i);
-            }));
-            let f = poly_ring.evaluate(
-                &minpoly_Fp,
-                &poly_ring.from_terms([(Fp.one(), large_d as usize)].into_iter()),
-                &poly_ring.inclusion(),
-            );
-            return f;
-        }
-    }
-
-    // fallback, just generate a random irreducible polynomial
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
-        let f = poly_ring.from_terms(
-            (0..degree)
-                .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
-                .chain([(Fp.one(), degree)].into_iter()),
-        );
-        if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
-            return result;
-        }
-    }
-    unreachable!()
-}
-
 /// Implementation of a galois field `GF(p^e)`; Also known as galois field, and sometimes denoted by
 /// `Fq` where `q = p^e`.
 ///
@@ -272,9 +107,9 @@ where
 /// In particular, we implement `GaloisFieldBase<Impl>: CanHomFrom<S>` for all `S` with
 /// `Impl: CanHomFrom<S>`. It is great that we can provide such a large class of blanket impls,
 /// however this impl will then conflict with (almost) all other impls - which is the reason
-/// why we don't do it e.g. for [`AsFieldBase`].
+/// why we don't do it in other places like [`AsFieldBase`].
 ///
-/// Instead, we complement it with just the impls `FreeAlgebraImplBase<_, _, _, _>:
+/// Here, we complement it with just the impls `FreeAlgebraImplBase<_, _, _, _>:
 /// CanHomFrom<GaloisFieldBase<_>>` and `AsFieldBase<FreeAlgebraImpl<_, _, _, _>>:
 /// CanHomFrom<GaloisFieldBase<_>>`. This means that if `Impl = AsFieldBase<FreeAlgebraImpl<_, _, _,
 /// _>>`, together with the blanket implementation, it gives the very much desired self-isomorphism
@@ -282,7 +117,7 @@ where
 /// `GaloisFieldBase` does not have a canonical self-isomorphism anymore if a nonstandard `Impl` is
 /// chosen - which I believe will be very rarely the case in practice.
 #[repr(transparent)]
-pub struct GaloisFieldBase<Impl>
+pub struct GaloisFieldBase<Impl = DefaultGaloisFieldImpl>
 where
     Impl: RingStore,
     Impl::Type: Field + FreeAlgebra + FiniteRing,
@@ -290,17 +125,6 @@ where
 {
     base: Impl,
 }
-
-/// The default implementation of a finite field extension of a prime field,
-/// based on [`Zn`].
-pub type DefaultGaloisFieldImpl = AsField<
-    FreeAlgebraImpl<
-        AsField<Zn64B>,
-        SparseMapVector<AsField<Zn64B>>,
-        DynConvolution<'static, <AsField<Zn64B> as RingStore>::Type>,
-        Global,
-    >,
->;
 
 /// Implementation of finite/galois fields.
 ///
@@ -318,7 +142,25 @@ pub type GaloisFieldOver<R, C = DynConvolution<'static, <R as RingStore>::Type>,
 pub type GaloisFieldBaseOver<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> =
     GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, C, A>>>;
 
+/// The default implementation of a finite field extension of a prime field,
+/// based on [`Zn`].
+pub type DefaultGaloisFieldImpl = AsField<
+    FreeAlgebraImpl<
+        AsField<Zn64B>,
+        SparseMapVector<AsField<Zn64B>>,
+        DynConvolution<'static, <AsField<Zn64B> as RingStore>::Type>,
+        Global,
+    >,
+>;
+
 impl GaloisField {
+    /// Creates a new instance of the finite/galois field `GF(p^degree)`.
+    ///
+    /// For details, see [`GaloisFieldBase::new()`].
+    pub fn new(p: i64, degree: usize) -> Self { RingValue::from(GaloisFieldBase::new(p, degree)) }
+}
+
+impl GaloisFieldBase {
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
     ///
     /// If you need more options for configuration, consider using
@@ -357,9 +199,9 @@ impl GaloisField {
     }
 }
 
-impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Type>, Global>
+impl<'conv, R> GaloisFieldBaseOver<R, DynConvolution<'conv, R::Type>, Global>
 where
-    R: RingStore + Clone + 'conv,
+    R: RingStore + 'conv,
     R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
 {
     /// Creates a new instance of the finite/galois field that is the unique
@@ -397,11 +239,11 @@ where
     }
 }
 
-impl<R, A, C> GaloisFieldOver<R, C, A>
+impl<R, A, C> GaloisFieldBaseOver<R, C, A>
 where
-    R: RingStore + Clone,
+    R: RingStore,
     R::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
-    C: ConvolutionAlgorithm<R::Type>,
+    C: ConvolutionAlgorithm<R::Type> + Clone,
     A: Allocator + Clone + Send + Sync,
 {
     /// Creates a new instance of a finite/galois field, as given-degree extension of the
@@ -440,7 +282,6 @@ where
     ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
     /// );
     /// ```
-    #[stability::unstable(feature = "enable")]
     pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
         assert!(degree >= 1);
         let poly_ring = DensePolyRing::new_with_convolution(&base_field, "X", &allocator, &convolution_algorithm);
@@ -459,9 +300,9 @@ where
         }
         drop(poly_ring);
         drop(modulus);
-        return RingValue::from(GaloisFieldBase {
-            base: AsField::from(AsFieldBase::promise_is_perfect_field(
-                FreeAlgebraImpl::new_with_convolution(
+        return GaloisFieldBase {
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(RingValue::from(
+                FreeAlgebraImplBase::new_with_convolution(
                     base_field,
                     degree,
                     modulus_vec,
@@ -469,8 +310,8 @@ where
                     allocator,
                     convolution_algorithm,
                 ),
-            )),
-        });
+            ))),
+        };
     }
 
     /// Instantiates the galois field by calling `find_small_irreducible_poly()` with a poly ring
@@ -499,9 +340,9 @@ where
         }
         drop(poly_ring);
         drop(modulus);
-        return RingValue::from(GaloisFieldBase {
-            base: AsField::from(AsFieldBase::promise_is_perfect_field(
-                FreeAlgebraImpl::new_with_convolution(
+        return GaloisFieldBase {
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(RingValue::from(
+                FreeAlgebraImplBase::new_with_convolution(
                     base_ring,
                     degree,
                     modulus_vec,
@@ -509,15 +350,15 @@ where
                     allocator,
                     convolution_algorithm,
                 ),
-            )),
-        });
+            ))),
+        };
     }
 }
 
 impl<A, C> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, C, A>>>
 where
     A: Allocator + Clone + Send + Sync,
-    C: ConvolutionAlgorithm<AsFieldBase<Zn64B>>,
+    C: ConvolutionAlgorithm<AsFieldBase<Zn64B>> + Clone,
 {
     /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
     ///
@@ -533,12 +374,12 @@ where
     pub fn galois_ring(
         &self,
         e: usize,
-    ) -> FreeAlgebraImpl<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
+    ) -> FreeAlgebraImplBase<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
         let base_ring = Zn64B::new(StaticRing::<i64>::RING.pow(*self.base_ring().modulus(), e) as u64);
         let log2_padded_len = StaticRing::<i64>::RING
             .abs_log2_ceil(&self.rank().try_into().unwrap())
             .unwrap();
-        let convolution = Zn64B::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
+        let convolution = Zn64BBase::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
         self.galois_ring_with_convolution(
             base_ring,
             self.base.get_ring().get_delegate().allocator().clone(),
@@ -569,9 +410,9 @@ where
         new_base_ring: S,
         allocator: A2,
         convolution_algorithm: C2,
-    ) -> FreeAlgebraImpl<S, SparseMapVector<S>, C2, A2>
+    ) -> FreeAlgebraImplBase<S, SparseMapVector<S>, C2, A2>
     where
-        S: RingStore + Clone,
+        S: RingStore,
         S::Type: ZnRing + CanHomFrom<<<BaseRing<Impl> as RingStore>::Type as ZnRing>::IntegerRingBase>,
         C2: ConvolutionAlgorithm<S::Type>,
         A2: Allocator + Clone + Send + Sync,
@@ -587,7 +428,7 @@ where
                 *modulus_vec.at_mut(i) = hom.map(self.base_ring().smallest_lift(x_pow_deg.at(i)));
             }
         }
-        let result = FreeAlgebraImpl::new_with_convolution(
+        let result = FreeAlgebraImplBase::new_with_convolution(
             new_base_ring,
             self.rank(),
             modulus_vec,
@@ -654,9 +495,10 @@ where
     Impl::Type: Field + FreeAlgebra + FiniteRing,
     <BaseRing<Impl> as RingStore>::Type: ZnRing + Field,
 {
-    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(self_: S, _: Option<usize>) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Type = Self> + 'conv,
+        Self: 'conv,
     {
         Arc::new(TypeErasedConvolution::new(
             LengthExtendedConvolution::for_zn_extension(self_, 64).unwrap(),
@@ -920,8 +762,8 @@ where
     <BaseRing<Impl> as RingStore>::Type: ZnRing + Field,
     R: RingStore,
     R::Type: LinSolveRing,
-    V: VectorView<El<R>> + Send + Sync,
-    C: ConvolutionAlgorithm<R::Type>,
+    V: VectorView<El<R>> + Send + Sync + CloneWithRing<R::Type>,
+    C: ConvolutionAlgorithm<R::Type> + Clone,
     A: Allocator + Clone + Send + Sync,
     FreeAlgebraImplBase<R, V, C, A>: CanHomFrom<Impl::Type>,
 {
@@ -994,8 +836,8 @@ where
     <BaseRing<Impl> as RingStore>::Type: ZnRing + Field,
     R: RingStore,
     R::Type: LinSolveRing,
-    V: VectorView<El<R>> + Send + Sync,
-    C: ConvolutionAlgorithm<R::Type>,
+    V: VectorView<El<R>> + Send + Sync + CloneWithRing<R::Type>,
+    C: ConvolutionAlgorithm<R::Type> + Clone,
     A: Allocator + Clone + Send + Sync,
     FreeAlgebraImplBase<R, V, C, A>: CanIsoFromTo<Impl::Type>,
 {
@@ -1014,6 +856,178 @@ where
         self.get_delegate()
             .map_out(from.base.get_ring(), self.delegate(el), iso)
     }
+}
+
+fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
+where
+    P: RingStore,
+    P::Type: PolyRing + EuclideanRing,
+    <BaseRing<P> as RingStore>::Type: ZnRing + FiniteRing + Field,
+    R: RingStore,
+    R::Type: FreeAlgebra,
+    BaseRing<R>: RingStore<Type = <BaseRing<P> as RingStore>::Type>,
+{
+    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
+    if poly_ring.degree(&squarefree_part) != Some(degree) {
+        return None;
+    }
+    if !cantor_zassenhaus::squarefree_is_irreducible_base(&poly_ring, &mod_f_ring) {
+        return None;
+    }
+    return Some(mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
+}
+
+/// Tries to find a "small" irreducible polynomial of given degree.
+///
+/// "small" is not well-defined, but can mean sparse, or having a small `deg(f - lt(f))`.
+/// Both will lead to more efficient arithmetic in the ring `k[X]/(f)`. However, in general
+/// finding a very small `f` is hard, thus we use heuristics.
+fn find_small_irreducible_poly<P, C>(poly_ring: P, degree: usize, convolution: C, rng: &mut oorandom::Rand64) -> El<P>
+where
+    P: RingStore,
+    P::Type: PolyRing + EuclideanRing,
+    BaseRing<P>: Copy,
+    <BaseRing<P> as RingStore>::Type: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+    C: Copy + ConvolutionAlgorithm<<BaseRing<P> as RingStore>::Type>,
+{
+    let Fp = *poly_ring.base_ring();
+    let create_mod_f_ring = |f: &El<P>| {
+        let mut f_body = SparseMapVector::new(degree, poly_ring.base_ring());
+        for (c, i) in poly_ring.terms(f) {
+            if i != degree {
+                *f_body.at_mut(i) = poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c));
+            }
+        }
+        return RingValue::from(FreeAlgebraImplBase::new_with_convolution(
+            Fp,
+            degree,
+            f_body,
+            "θ",
+            Global,
+            convolution,
+        ));
+    };
+
+    if degree > 3 {
+        // first try trinomials, they seem to have a good chance of being irreducible
+        for _ in 0..16 {
+            let i = (StaticRing::<i64>::RING
+                .get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
+                + 1) as usize;
+            let a = Fp.random_element(|| rng.rand_u64());
+            let b = Fp.random_element(|| rng.rand_u64());
+            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)].into_iter());
+            if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
+                return result;
+            }
+        }
+
+        // next, check for cases where we can take `small_poly(X^high_power)`; these cases are characterized
+        // by the fact that we have `degree = small_d * large_d` with `large_d | #F_(q^small_d)*`
+        let ZZbig = BigIntRing::RING;
+        let ZZ = StaticRing::<i64>::RING;
+
+        let p = Fp.size(&ZZbig).unwrap();
+        let mut small_d = 1;
+        let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
+        let mut large_d = int_cast(
+            ZZbig.ideal_gen(
+                &Fq_star_order,
+                &int_cast(
+                    TryInto::<i64>::try_into(degree).unwrap() / small_d,
+                    ZZbig,
+                    StaticRing::<i64>::RING,
+                ),
+            ),
+            ZZ,
+            ZZbig,
+        );
+        let mut increased_small_d = true;
+        while increased_small_d {
+            increased_small_d = false;
+            // use a greedy approach, just add a factor to small_d if it makes large_d larger
+            for (k, _) in factor(&ZZ, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
+                let new_small_d = small_d * k;
+                let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), new_small_d as usize), ZZbig.one());
+                let new_large_d = int_cast(
+                    ZZbig.ideal_gen(
+                        &Fq_star_order,
+                        &int_cast(
+                            TryInto::<i64>::try_into(degree).unwrap() / new_small_d,
+                            ZZbig,
+                            StaticRing::<i64>::RING,
+                        ),
+                    ),
+                    ZZ,
+                    ZZbig,
+                );
+                if new_large_d > large_d {
+                    small_d = new_small_d;
+                    large_d = new_large_d;
+                    increased_small_d = true;
+                    break;
+                }
+            }
+        }
+        small_d = TryInto::<i64>::try_into(degree).unwrap() / large_d;
+        if large_d != 1 {
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
+            // careful here to not get an infinite generic argument recursion
+            let Fq = RingValue::from(GaloisFieldBase::new_internal(Fp, small_d as usize, Global, convolution));
+            // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d
+            // | #Fq*`; hence we can use `MinPoly(primitive_element)(X^large_d)`
+            let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
+                Fq.canonical_gen()
+            } else {
+                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
+            };
+            // I thought for a while that it would be enough to have a primitive `lcm(Fq_star_order,
+            // large_d^inf)`-th root of unity, however it is not guaranteed that this would indeed
+            // generate the field
+            let FqX = DensePolyRing::new(&Fq, "X");
+            let minpoly = FqX.prod((0..small_d).map(|i| {
+                FqX.from_terms(
+                    [
+                        (
+                            Fq.negate(Fq.pow_gen(
+                                Fq.clone_el(&primitive_element),
+                                &ZZbig.pow(ZZbig.clone_el(&p), i as usize),
+                                ZZbig,
+                            )),
+                            0,
+                        ),
+                        (Fq.one(), 1),
+                    ]
+                    .into_iter(),
+                )
+            }));
+            let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
+                let c_wrt_basis = Fq.wrt_canonical_basis(c);
+                assert!(c_wrt_basis.iter().skip(1).all(|x| Fp.is_zero(&x)));
+                return (c_wrt_basis.at(0), i);
+            }));
+            let f = poly_ring.evaluate(
+                &minpoly_Fp,
+                &poly_ring.from_terms([(Fp.one(), large_d as usize)].into_iter()),
+                &poly_ring.inclusion(),
+            );
+            return f;
+        }
+    }
+
+    // fallback, just generate a random irreducible polynomial
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        let f = poly_ring.from_terms(
+            (0..degree)
+                .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
+                .chain([(Fp.one(), degree)].into_iter()),
+        );
+        if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
+            return result;
+        }
+    }
+    unreachable!()
 }
 
 #[cfg(test)]
@@ -1038,9 +1052,9 @@ fn test_can_hom_from() {
     where
         R: RingStore,
         R::Type: SelfIso + LinSolveRing,
-        V: VectorView<El<R>> + Send + Sync,
+        V: VectorView<El<R>> + Send + Sync + CloneWithRing<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>,
+        C: ConvolutionAlgorithm<R::Type> + Clone,
     {
         assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, C, A>, AsFieldBase<FreeAlgebraImpl<R, V, C, A>>>();
     }
@@ -1050,9 +1064,9 @@ fn test_can_hom_from() {
     where
         R: RingStore,
         R::Type: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
-        V: VectorView<El<R>> + Send + Sync,
+        V: VectorView<El<R>> + Send + Sync + CloneWithRing<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>,
+        C: ConvolutionAlgorithm<R::Type> + Clone,
     {
         assert_impl_CanHomFrom::<
             GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>,
@@ -1065,9 +1079,9 @@ fn test_can_hom_from() {
     where
         R: RingStore,
         R::Type: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
-        V: VectorView<El<R>> + Send + Sync,
+        V: VectorView<El<R>> + Send + Sync + CloneWithRing<R::Type>,
         A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Type>,
+        C: ConvolutionAlgorithm<R::Type> + Clone,
     {
         assert_impl_CanHomFrom::<
             GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>,

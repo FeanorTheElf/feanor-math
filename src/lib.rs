@@ -35,34 +35,6 @@
 #[cfg(test)]
 extern crate test;
 
-const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
-const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
-
-#[cfg(test)]
-const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
-
-macro_rules! static_assert_impls {
-    ($type:ty: $trait:tt) => {{
-        fn assert_impls<T>()
-        where
-            T: ?Sized + $trait,
-        {
-        }
-        assert_impls::<$type>();
-    }};
-}
-
-/// Contains [`unstable_sealed::UnstableSealed`] to mark a trait "sealed" on stable.
-#[stability::unstable(feature = "enable")]
-pub mod unstable_sealed {
-
-    /// Marks a trait as "sealed" on stable. In other words, using this trait
-    /// as supertrait for another trait within `feanor-math` means that implementing
-    /// the subtrait for new types is unstable, and only available when `unstable-enable`
-    /// is active.
-    pub trait UnstableSealed {}
-}
-
 mod cow;
 pub mod function;
 mod lazy;
@@ -153,3 +125,31 @@ pub mod specialization;
 /// )));
 /// ```
 pub mod wrapper;
+
+const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
+const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
+
+#[cfg(test)]
+const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
+
+macro_rules! static_assert_impls {
+    ($type:ty: $trait:tt) => {{
+        fn assert_impls<T>()
+        where
+            T: ?Sized + $trait,
+        {
+        }
+        assert_impls::<$type>();
+    }};
+}
+
+/// Contains [`unstable_sealed::UnstableSealed`] to mark a trait "sealed" on stable.
+#[stability::unstable(feature = "enable")]
+pub mod unstable_sealed {
+
+    /// Marks a trait as "sealed" on stable. In other words, using this trait
+    /// as supertrait for another trait within `feanor-math` means that implementing
+    /// the subtrait for new types is unstable, and only available when `unstable-enable`
+    /// is active.
+    pub trait UnstableSealed {}
+}

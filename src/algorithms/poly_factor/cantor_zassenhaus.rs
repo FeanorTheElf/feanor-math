@@ -10,7 +10,7 @@ use crate::homomorphism::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::ring::*;
-use crate::rings::extension::extension_impl::FreeAlgebraImpl;
+use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
 use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
@@ -434,14 +434,11 @@ where
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
     if e % 2 != 0 {
-        // adjoin a third root of unity, this will enable use to use the main idea
+        // adjoin a third root of unity, this will enable use to use the main idea;
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion
         // (always adding a `&`)
-        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(
-            Fq,
-            2,
-            [Fq.neg_one(), Fq.neg_one()],
-        )));
+        let new_base_ring = FreeAlgebraImplBase::new(Fq, 2, [Fq.neg_one(), Fq.neg_one()]);
+        let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field());
         let new_x_pow_rank = mod_f_ring
             .wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank()))
             .into_iter()

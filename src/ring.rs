@@ -1,3 +1,4 @@
+use std::alloc::Allocator;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Deref;
@@ -620,7 +621,7 @@ macro_rules! assert_el_eq {
 /// of ring functionality, as this is against the spirit of this trait. Instead,
 /// just provide an implementation of `get_ring()` and put ring functionality in
 /// a custom implementation of [`RingBase`].
-pub trait RingStore: Sized + Send + Sync {
+pub trait RingStore: Sized + Send + Sync + Clone {
     /// The type of the stored ring.
     type Type: RingBase + ?Sized;
 
@@ -1095,11 +1096,11 @@ pub type El<R> = <<R as RingStore>::Type as RingBase>::Element;
 /// ```
 #[repr(transparent)]
 #[derive(Copy, Clone, Debug, Serialize, Deserialize)]
-pub struct RingValue<R: RingBase> {
+pub struct RingValue<R: RingBase + Clone> {
     ring: R,
 }
 
-impl<R: RingBase> RingValue<R> {
+impl<R: RingBase + Clone> RingValue<R> {
     /// Wraps the given [`RingBase`] in a [`RingValue`].
     ///
     /// This is a dedicated function instead of an implementation
@@ -1117,13 +1118,13 @@ impl<R: RingBase> RingValue<R> {
     pub fn into(self) -> R { self.ring }
 }
 
-impl<R: RingBase> RingStore for RingValue<R> {
+impl<R: RingBase + Clone> RingStore for RingValue<R> {
     type Type = R;
 
     fn get_ring(&self) -> &R { &self.ring }
 }
 
-impl<R: RingBase + Default> Default for RingValue<R> {
+impl<R: RingBase + Default + Clone> Default for RingValue<R> {
     fn default() -> Self { Self::from(R::default()) }
 }
 
@@ -1132,11 +1133,7 @@ impl<R: RingBase + Default> Default for RingValue<R> {
 ///
 /// # Why do we need this in addition to [`crate::ring::RingValue`]?
 ///
-/// Before [`RingValue::from_ref()`] was added, this was important to
-/// allow using a reference to a [`RingBase`] as [`RingStore`]. Since then,
-/// it indeed has only a marginal importance, but note that it is currently
-/// the only way of working with unsized rings (an admittedly pretty exotic
-/// case).
+/// Because [`RingValue`] requires the underlying ring to be [`Clone`].
 #[repr(transparent)]
 #[derive(Debug)]
 pub struct RingRef<'a, R: RingBase + ?Sized> {
@@ -1167,7 +1164,7 @@ impl<'a, R: RingBase + ?Sized> RingStore for RingRef<'a, R> {
     fn get_ring(&self) -> &R { self.ring }
 }
 
-impl<'a, S: Deref + Send + Sync> RingStore for S
+impl<'a, S: Deref + Send + Sync + Clone> RingStore for S
 where
     S::Target: RingStore,
 {
@@ -1179,10 +1176,36 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct NeverRing<R: ?Sized + RingBase>(!, PhantomData<R>);
 
+impl<R: ?Sized + RingBase> Clone for NeverRing<R> {
+    fn clone(&self) -> Self { self.0 }
+}
+
 impl<R: ?Sized + RingBase> RingStore for NeverRing<R> {
     type Type = R;
 
     fn get_ring<'a>(&'a self) -> &'a Self::Type { self.0 }
+}
+
+/// Trait for objects that can be cloned when given access to a ring related
+/// to them or their components.
+pub trait CloneWithRing<R: ?Sized + RingBase> {
+    fn clone(&self, ring: &R) -> Self;
+}
+
+impl<R: ?Sized + RingBase, A: Allocator + Clone> CloneWithRing<R> for Vec<R::Element, A> {
+    fn clone(&self, ring: &R) -> Self {
+        let mut result = Vec::with_capacity_in(self.len(), self.allocator().clone());
+        result.extend(self.iter().map(|x| ring.clone_el(x)));
+        return result;
+    }
+}
+
+impl<R: ?Sized + RingBase, const N: usize> CloneWithRing<R> for [R::Element; N] {
+    fn clone(&self, ring: &R) -> Self { std::array::from_fn(|i| ring.clone_el(&self[i])) }
+}
+
+impl<'a, T: ?Sized, R: ?Sized + RingBase> CloneWithRing<R> for &'a T {
+    fn clone(&self, _: &R) -> Self { *self }
 }
 
 #[cfg(test)]

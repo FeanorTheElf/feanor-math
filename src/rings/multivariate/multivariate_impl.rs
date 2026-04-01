@@ -19,67 +19,6 @@ use crate::seq::{VectorFn, VectorView};
 type Exponent = u16;
 type OrderIdx = u64;
 
-/// Computes the "cumulative binomial function" `sum_(0 <= l <= k) binomial(n + l, n)`
-fn compute_cum_binomial(n: usize, k: usize) -> u64 {
-    StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| {
-        binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING)
-            .try_into()
-            .unwrap()
-    })) as u64
-}
-
-/// Returns the index of the given monomial within the list of all degree-d monomials, ordered by
-/// DegRevLex
-fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table: &[Vec<u64>]) -> u64
-where
-    V: VectorFn<Exponent>,
-{
-    debug_assert!(d == mon.iter().sum::<Exponent>());
-    let n = mon.len();
-    let mut remaining_degree_minus_one: i64 = TryInto::<i64>::try_into(d).unwrap() - 1;
-    let mut result = 0;
-    for i in 0..(n - 1) {
-        remaining_degree_minus_one -= TryInto::<i64>::try_into(mon.at(n - 1 - i)).unwrap();
-        if remaining_degree_minus_one < 0 {
-            return result;
-        }
-        result += cum_binomial_lookup_table[n - i - 2][remaining_degree_minus_one as usize];
-    }
-    return result;
-}
-
-/// Inverse to [`enumeration_index_degrevlex()`].
-fn nth_monomial_degrevlex<F>(n: usize, d: Exponent, mut index: u64, cum_binomial_lookup_table: &[Vec<u64>], mut out: F)
-where
-    F: FnMut(usize, Exponent),
-{
-    for i in 0..n {
-        out(i, 0);
-    }
-    let mut check_degree = 0;
-    let mut remaining_degree = d as usize;
-    for i in 0..(n - 1) {
-        if index == 0 {
-            out(n - 1 - i, remaining_degree as Exponent);
-            check_degree += remaining_degree as Exponent;
-            debug_assert!(d == check_degree);
-            return;
-        }
-        let remaining_degree_minus_one = match cum_binomial_lookup_table[n - i - 2].binary_search(&index) {
-            Ok(idx) => idx,
-            Err(idx) => idx - 1,
-        };
-        index -= cum_binomial_lookup_table[n - i - 2][remaining_degree_minus_one];
-        let new_remaining_degree = remaining_degree_minus_one + 1;
-        out(n - 1 - i, (remaining_degree - new_remaining_degree) as Exponent);
-        check_degree += (remaining_degree - new_remaining_degree) as Exponent;
-        remaining_degree = new_remaining_degree;
-    }
-    out(0, remaining_degree as Exponent);
-    check_degree += remaining_degree as Exponent;
-    debug_assert!(d == check_degree);
-}
-
 /// Stores a reference to a monomial w.r.t. a given [`MultivariatePolyRingImplBase`].
 #[repr(transparent)]
 pub struct MonomialIdentifier {
@@ -166,7 +105,7 @@ where
 /// [`RingStore`] corresponding to [`MultivariatePolyRingImplBase`]
 pub type MultivariatePolyRingImpl<R, A = Global> = RingValue<MultivariatePolyRingImplBase<R, A>>;
 
-impl<R> MultivariatePolyRingImpl<R>
+impl<R> MultivariatePolyRingImplBase<R>
 where
     R: RingStore,
 {
@@ -176,7 +115,7 @@ where
     }
 }
 
-impl<R, A> MultivariatePolyRingImpl<R, A>
+impl<R, A> MultivariatePolyRingImplBase<R, A>
 where
     R: RingStore,
     A: Allocator + Send + Sync + Clone,
@@ -1127,6 +1066,67 @@ where
             )
         }))
     }
+}
+
+/// Computes the "cumulative binomial function" `sum_(0 <= l <= k) binomial(n + l, n)`
+fn compute_cum_binomial(n: usize, k: usize) -> u64 {
+    StaticRing::<i64>::RING.sum((0..(k + 1)).map(|l| {
+        binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING)
+            .try_into()
+            .unwrap()
+    })) as u64
+}
+
+/// Returns the index of the given monomial within the list of all degree-d monomials, ordered by
+/// DegRevLex
+fn enumeration_index_degrevlex<V>(d: Exponent, mon: V, cum_binomial_lookup_table: &[Vec<u64>]) -> u64
+where
+    V: VectorFn<Exponent>,
+{
+    debug_assert!(d == mon.iter().sum::<Exponent>());
+    let n = mon.len();
+    let mut remaining_degree_minus_one: i64 = TryInto::<i64>::try_into(d).unwrap() - 1;
+    let mut result = 0;
+    for i in 0..(n - 1) {
+        remaining_degree_minus_one -= TryInto::<i64>::try_into(mon.at(n - 1 - i)).unwrap();
+        if remaining_degree_minus_one < 0 {
+            return result;
+        }
+        result += cum_binomial_lookup_table[n - i - 2][remaining_degree_minus_one as usize];
+    }
+    return result;
+}
+
+/// Inverse to [`enumeration_index_degrevlex()`].
+fn nth_monomial_degrevlex<F>(n: usize, d: Exponent, mut index: u64, cum_binomial_lookup_table: &[Vec<u64>], mut out: F)
+where
+    F: FnMut(usize, Exponent),
+{
+    for i in 0..n {
+        out(i, 0);
+    }
+    let mut check_degree = 0;
+    let mut remaining_degree = d as usize;
+    for i in 0..(n - 1) {
+        if index == 0 {
+            out(n - 1 - i, remaining_degree as Exponent);
+            check_degree += remaining_degree as Exponent;
+            debug_assert!(d == check_degree);
+            return;
+        }
+        let remaining_degree_minus_one = match cum_binomial_lookup_table[n - i - 2].binary_search(&index) {
+            Ok(idx) => idx,
+            Err(idx) => idx - 1,
+        };
+        index -= cum_binomial_lookup_table[n - i - 2][remaining_degree_minus_one];
+        let new_remaining_degree = remaining_degree_minus_one + 1;
+        out(n - 1 - i, (remaining_degree - new_remaining_degree) as Exponent);
+        check_degree += (remaining_degree - new_remaining_degree) as Exponent;
+        remaining_degree = new_remaining_degree;
+    }
+    out(0, remaining_degree as Exponent);
+    check_degree += remaining_degree as Exponent;
+    debug_assert!(d == check_degree);
 }
 
 #[cfg(test)]
