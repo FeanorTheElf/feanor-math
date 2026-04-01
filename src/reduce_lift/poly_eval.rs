@@ -585,7 +585,7 @@ where
 ///             <P::Type as RingExtension>::BaseRing: RingStore<Type = Self>
 ///     {
 ///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");
-///         let hom = new_poly_ring.lifted_hom(&poly_ring, UnwrapHom::new(poly_ring.base_ring().get_ring()));
+///         let hom = new_poly_ring.lifted_hom(&poly_ring, UnwrapHom::new(poly_ring.base_ring(), new_poly_ring.base_ring()));
 ///         poly_ring.base_ring().get_ring().rev_delegate(R::resultant(&new_poly_ring, hom.map(f), hom.map(g)))
 ///     }
 /// }
