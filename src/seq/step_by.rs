@@ -1,35 +1,32 @@
 use std::marker::PhantomData;
 
-use crate::impl_specialize_sparse_wrapped_vector;
-
 use super::*;
+use crate::impl_specialize_sparse_wrapped_vector;
 
 #[derive(Debug)]
 pub struct StepBy<V: VectorView<T>, T: ?Sized> {
     base: V,
     step_by: usize,
-    element: PhantomData<T>
+    element: PhantomData<T>,
 }
 
 impl<V: VectorView<T>, T: ?Sized> StepBy<V, T> {
-
     pub fn new(base: V, step_by: usize) -> Self {
         assert!(step_by > 0);
         Self {
-            base: base,
-            step_by: step_by,
-            element: PhantomData
+            base,
+            step_by,
+            element: PhantomData,
         }
     }
 }
 
 impl<V: Clone + VectorView<T>, T: ?Sized> Clone for StepBy<V, T> {
-
     fn clone(&self) -> Self {
         Self {
             base: self.base.clone(),
             step_by: self.step_by,
-            element: PhantomData
+            element: PhantomData,
         }
     }
 }
@@ -37,7 +34,6 @@ impl<V: Clone + VectorView<T>, T: ?Sized> Clone for StepBy<V, T> {
 impl<V: Copy + VectorView<T>, T: ?Sized> Copy for StepBy<V, T> {}
 
 impl<V: VectorView<T>, T: ?Sized> VectorView<T> for StepBy<V, T> {
-
     fn len(&self) -> usize {
         if self.base.len() == 0 {
             0
@@ -46,57 +42,44 @@ impl<V: VectorView<T>, T: ?Sized> VectorView<T> for StepBy<V, T> {
         }
     }
 
-    fn at(&self, i: usize) -> &T {
-        self.base.at(i * self.step_by)
-    }
+    fn at(&self, i: usize) -> &T { self.base.at(i * self.step_by) }
 
     fn specialize_sparse<Op: SparseVectorViewOperation<T, Self>>(op: Op) -> Op::Output {
-        impl_specialize_sparse_wrapped_vector!{ op; <{ T, V, Op, }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<T, StepBy<V, T>>, T: ?Sized }
+        impl_specialize_sparse_wrapped_vector! { op; <{ T, V, Op, }> specialize_sparse where V: VectorView<T>, Op: SparseVectorViewOperation<T, StepBy<V, T>>, T: ?Sized }
     }
 }
 
 impl<V: VectorViewMut<T>, T: ?Sized> VectorViewMut<T> for StepBy<V, T> {
-
-    fn at_mut(&mut self, i: usize) -> &mut T {
-        self.base.at_mut(i * self.step_by)
-    }
+    fn at_mut(&mut self, i: usize) -> &mut T { self.base.at_mut(i * self.step_by) }
 }
 
 impl<V: SwappableVectorViewMut<T>, T: ?Sized> SwappableVectorViewMut<T> for StepBy<V, T> {
-
-    fn swap(&mut self, i: usize, j: usize) {
-        self.base.swap(i * self.step_by, j * self.step_by)
-    }
+    fn swap(&mut self, i: usize, j: usize) { self.base.swap(i * self.step_by, j * self.step_by) }
 }
 
 #[derive(Clone, Copy)]
 pub struct FilterDivisibleBy(usize);
 
-impl<'a, T> FnOnce<(&'a (usize, T), )> for FilterDivisibleBy {
+impl<'a, T> FnOnce<(&'a (usize, T),)> for FilterDivisibleBy {
     type Output = bool;
 
-    extern "rust-call" fn call_once(self, args: (&'a (usize, T), )) -> Self::Output {
-        self.call(args)
-    }
+    extern "rust-call" fn call_once(self, args: (&'a (usize, T),)) -> Self::Output { self.call(args) }
 }
 
-impl<'a, T> FnMut<(&'a (usize, T), )> for FilterDivisibleBy {
-    extern "rust-call" fn call_mut(&mut self, args: (&'a (usize, T), )) -> Self::Output {
-        self.call(args)
-    }
+impl<'a, T> FnMut<(&'a (usize, T),)> for FilterDivisibleBy {
+    extern "rust-call" fn call_mut(&mut self, args: (&'a (usize, T),)) -> Self::Output { self.call(args) }
 }
 
-impl<'a, T> Fn<(&'a (usize, T), )> for FilterDivisibleBy {
-    extern "rust-call" fn call(&self, args: (&'a (usize, T), )) -> Self::Output {
-        args.0.0 % self.0 == 0
-    }
+impl<'a, T> Fn<(&'a (usize, T),)> for FilterDivisibleBy {
+    extern "rust-call" fn call(&self, args: (&'a (usize, T),)) -> Self::Output { args.0.0 % self.0 == 0 }
 }
 
 impl<V: VectorViewSparse<T>, T: ?Sized> VectorViewSparse<T> for StepBy<V, T> {
-
-    type Iter<'a> = std::iter::Filter<V::Iter<'a>, FilterDivisibleBy>
-        where Self: 'a, 
-            T: 'a;
+    type Iter<'a>
+        = std::iter::Filter<V::Iter<'a>, FilterDivisibleBy>
+    where
+        Self: 'a,
+        T: 'a;
 
     fn nontrivial_entries<'a>(&'a self) -> Self::Iter<'a> {
         self.base.nontrivial_entries().filter(FilterDivisibleBy(self.step_by))
@@ -107,28 +90,26 @@ impl<V: VectorViewSparse<T>, T: ?Sized> VectorViewSparse<T> for StepBy<V, T> {
 pub struct StepByFn<V: VectorFn<T>, T> {
     base: V,
     step_by: usize,
-    element: PhantomData<T>
+    element: PhantomData<T>,
 }
 
 impl<V: VectorFn<T>, T> StepByFn<V, T> {
-
     pub fn new(base: V, step_by: usize) -> Self {
         assert!(step_by > 0);
         Self {
-            base: base,
-            step_by: step_by,
-            element: PhantomData
+            base,
+            step_by,
+            element: PhantomData,
         }
     }
 }
 
 impl<V: Clone + VectorFn<T>, T> Clone for StepByFn<V, T> {
-
     fn clone(&self) -> Self {
         Self {
             base: self.base.clone(),
             step_by: self.step_by,
-            element: PhantomData
+            element: PhantomData,
         }
     }
 }
@@ -136,7 +117,6 @@ impl<V: Clone + VectorFn<T>, T> Clone for StepByFn<V, T> {
 impl<V: Copy + VectorFn<T>, T> Copy for StepByFn<V, T> {}
 
 impl<V: VectorFn<T>, T> VectorFn<T> for StepByFn<V, T> {
-
     fn len(&self) -> usize {
         if self.base.len() == 0 {
             0
@@ -145,9 +125,7 @@ impl<V: VectorFn<T>, T> VectorFn<T> for StepByFn<V, T> {
         }
     }
 
-    fn at(&self, i: usize) -> T {
-        self.base.at(i * self.step_by)
-    }
+    fn at(&self, i: usize) -> T { self.base.at(i * self.step_by) }
 }
 
 #[test]

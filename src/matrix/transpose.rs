@@ -1,43 +1,30 @@
-use super::submatrix::*;
-
 use std::ops::Range;
 
+use super::submatrix::*;
+
 pub struct TransposableSubmatrix<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> {
-    data: Submatrix<'a, V, T>
+    data: Submatrix<'a, V, T>,
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> From<Submatrix<'a, V, T>> for TransposableSubmatrix<'a, V, T, false> {
-
-    fn from(value: Submatrix<'a, V, T>) -> Self {
-        Self { data: value }
-    }
+    fn from(value: Submatrix<'a, V, T>) -> Self { Self { data: value } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrix<'a, V, T, false> {
-
-    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, true> {
-        TransposableSubmatrix { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, true> { TransposableSubmatrix { data: self.data } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrix<'a, V, T, true> {
-
-    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, false> {
-        TransposableSubmatrix { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrix<'a, V, T, false> { TransposableSubmatrix { data: self.data } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Copy for TransposableSubmatrix<'a, V, T, TRANSPOSED> {}
 
 impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> Clone for TransposableSubmatrix<'a, V, T, TRANSPOSED> {
-
-    fn clone(&self) -> Self {
-        *self
-    }
+    fn clone(&self) -> Self { *self }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatrix<'a, V, T, TRANSPOSED> {
-    
     pub fn into_base(self) -> Submatrix<'a, V, T> {
         assert!(!TRANSPOSED);
         self.data
@@ -50,17 +37,25 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
 
     pub fn submatrix(self, rows: Range<usize>, cols: Range<usize>) -> Self {
         if TRANSPOSED {
-            Self { data: self.data.submatrix(cols, rows) }
+            Self {
+                data: self.data.submatrix(cols, rows),
+            }
         } else {
-            Self { data: self.data.submatrix(rows, cols) }
+            Self {
+                data: self.data.submatrix(rows, cols),
+            }
         }
     }
 
     pub fn restrict_rows(self, rows: Range<usize>) -> Self {
         if TRANSPOSED {
-            Self { data: self.data.restrict_cols(rows) }
+            Self {
+                data: self.data.restrict_cols(rows),
+            }
         } else {
-            Self { data: self.data.restrict_rows(rows) }
+            Self {
+                data: self.data.restrict_rows(rows),
+            }
         }
     }
 
@@ -71,7 +66,7 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
             self.data.into_at(i, j)
         }
     }
-    
+
     pub fn at<'b>(&'b self, i: usize, j: usize) -> &'b T {
         if TRANSPOSED {
             self.data.at(j, i)
@@ -82,9 +77,13 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
 
     pub fn restrict_cols(self, cols: Range<usize>) -> Self {
         if TRANSPOSED {
-            Self { data: self.data.restrict_rows(cols) }
+            Self {
+                data: self.data.restrict_rows(cols),
+            }
         } else {
-            Self { data: self.data.restrict_cols(cols) }
+            Self {
+                data: self.data.restrict_cols(cols),
+            }
         }
     }
 
@@ -106,32 +105,22 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
 }
 
 pub struct TransposableSubmatrixMut<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> {
-    data: SubmatrixMut<'a, V, T>
+    data: SubmatrixMut<'a, V, T>,
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrixMut<'a, V, T, false> {
-
-    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, true> {
-        TransposableSubmatrixMut { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, true> { TransposableSubmatrixMut { data: self.data } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> TransposableSubmatrixMut<'a, V, T, true> {
-
-    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, false> {
-        TransposableSubmatrixMut { data: self.data }
-    }
+    pub fn transpose(self) -> TransposableSubmatrixMut<'a, V, T, false> { TransposableSubmatrixMut { data: self.data } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T> From<SubmatrixMut<'a, V, T>> for TransposableSubmatrixMut<'a, V, T, false> {
-
-    fn from(value: SubmatrixMut<'a, V, T>) -> Self {
-        Self { data: value }
-    }
+    fn from(value: SubmatrixMut<'a, V, T>) -> Self { Self { data: value } }
 }
 
 impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatrixMut<'a, V, T, TRANSPOSED> {
-
     pub fn into_base(self) -> SubmatrixMut<'a, V, T> {
         assert!(!TRANSPOSED);
         self.data
@@ -144,17 +133,25 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
 
     pub fn submatrix(self, rows: Range<usize>, cols: Range<usize>) -> Self {
         if TRANSPOSED {
-            Self { data: self.data.submatrix(cols, rows) }
+            Self {
+                data: self.data.submatrix(cols, rows),
+            }
         } else {
-            Self { data: self.data.submatrix(rows, cols) }
+            Self {
+                data: self.data.submatrix(rows, cols),
+            }
         }
     }
 
     pub fn restrict_rows(self, rows: Range<usize>) -> Self {
         if TRANSPOSED {
-            Self { data: self.data.restrict_cols(rows) }
+            Self {
+                data: self.data.restrict_cols(rows),
+            }
         } else {
-            Self { data: self.data.restrict_rows(rows) }
+            Self {
+                data: self.data.restrict_rows(rows),
+            }
         }
     }
 
@@ -168,9 +165,13 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
 
     pub fn restrict_cols(self, cols: Range<usize>) -> Self {
         if TRANSPOSED {
-            Self { data: self.data.restrict_rows(cols) }
+            Self {
+                data: self.data.restrict_rows(cols),
+            }
         } else {
-            Self { data: self.data.restrict_cols(cols) }
+            Self {
+                data: self.data.restrict_cols(cols),
+            }
         }
     }
 
@@ -227,10 +228,14 @@ impl<'a, V: AsPointerToSlice<T>, T, const TRANSPOSED: bool> TransposableSubmatri
     }
 
     pub fn reborrow<'b>(&'b mut self) -> TransposableSubmatrixMut<'b, V, T, TRANSPOSED> {
-        TransposableSubmatrixMut { data: self.data.reborrow() }
+        TransposableSubmatrixMut {
+            data: self.data.reborrow(),
+        }
     }
 
     pub fn as_const<'b>(&'b self) -> TransposableSubmatrix<'b, V, T, TRANSPOSED> {
-        TransposableSubmatrix { data: self.data.as_const() }
+        TransposableSubmatrix {
+            data: self.data.as_const(),
+        }
     }
 }

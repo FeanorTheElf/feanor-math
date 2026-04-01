@@ -1,30 +1,29 @@
 use std::alloc::Allocator;
 use std::cmp::min;
 
-use crate::algorithms::linsolve::SolveResult;
-use crate::divisibility::*;
-use crate::matrix::*;
-use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
-use crate::ring::*;
-use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
-
 use tracing::{Level, event, instrument};
 use transform::TransformList;
 
-///
+use crate::algorithms::linsolve::SolveResult;
+use crate::divisibility::*;
+use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
+use crate::matrix::*;
+use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::ring::*;
+
 /// Transforms `A` into `A'` via transformations `L, R` such that
 /// `L A R = A'` and `A'` is diagonal.
-/// 
+///
 /// # (Non-)Uniqueness of the solution
-/// 
-/// Note that this is not the complete Smith normal form, 
+///
+/// Note that this is not the complete Smith normal form,
 /// as that requires the entries on the diagonal to divide
 /// each other. However, computing this pre-smith form is much
 /// faster, and can still be used for solving equations (the main
 /// use case). However, it is not unique.
-/// 
+///
 /// # Warning on infinite rings (in particular Z)
-/// 
+///
 /// For infinite principal ideal rings, this function is correct,
 /// but in some situations, the performance can be terrible. The
 /// reason is that no care is taken which of the many possible results
@@ -32,15 +31,15 @@ use transform::TransformList;
 /// one that has exponential size in the input. Hence, in these
 /// cases it is recommended to use another algorithm, e.g. based on
 /// LLL to perform intermediate lattice reductions.
-/// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>)
-    where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing,
-        TL: TransformTarget<R::Type>,
-        TR: TransformTarget<R::Type>,
-        V: AsPointerToSlice<El<R>>
+where
+    R: RingStore + Copy,
+    R::Type: PrincipalIdealRing,
+    TL: TransformTarget<R::Type>,
+    TR: TransformTarget<R::Type>,
+    V: AsPointerToSlice<El<R>>,
 {
     // otherwise we might not terminate...
     assert!(ring.is_noetherian());
@@ -52,7 +51,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
         let mut changed_row = true;
         while changed_row {
             changed_row = false;
-            
+
             // eliminate the column
             for i in (k + 1)..row_count {
                 if ring.is_zero(A.at(i, k)) {
@@ -66,7 +65,7 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
                     L.transform(ring, k, i, &transform);
                 }
             }
-            
+
             // now eliminate the row
             for j in (k + 1)..col_count {
                 if ring.is_zero(A.at(k, j)) {
@@ -86,26 +85,38 @@ pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: Submatrix
     }
 }
 
-///
 /// Computes a matrix `X` such that `lhs * X = rhs`, if it exists.
-/// 
+///
 /// This function will change the value of `A`, more concretely overwrite it
 /// with its "pre-smith" form as specified by [`pre_smith()`].
-/// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: SubmatrixMut<V1, El<R>>, mut rhs: SubmatrixMut<V2, El<R>>, mut out: SubmatrixMut<V3, El<R>>, _allocator: A) -> SolveResult
-    where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing,
-        V1: AsPointerToSlice<El<R>>, V2: AsPointerToSlice<El<R>>, V3: AsPointerToSlice<El<R>>,
-        A: Allocator
+pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(
+    ring: R,
+    mut lhs: SubmatrixMut<V1, El<R>>,
+    mut rhs: SubmatrixMut<V2, El<R>>,
+    mut out: SubmatrixMut<V3, El<R>>,
+    _allocator: A,
+) -> SolveResult
+where
+    R: RingStore + Copy,
+    R::Type: PrincipalIdealRing,
+    V1: AsPointerToSlice<El<R>>,
+    V2: AsPointerToSlice<El<R>>,
+    V3: AsPointerToSlice<El<R>>,
+    A: Allocator,
 {
     assert_eq!(lhs.row_count(), rhs.row_count());
     assert_eq!(lhs.col_count(), out.row_count());
     assert_eq!(rhs.col_count(), out.col_count());
 
     let mut R = TransformList::new(lhs.col_count());
-    pre_smith(ring, &mut TransformRows(rhs.reborrow(), ring.get_ring()), &mut R, lhs.reborrow());
+    pre_smith(
+        ring,
+        &mut TransformRows(rhs.reborrow(), ring.get_ring()),
+        &mut R,
+        lhs.reborrow(),
+    );
 
     for i in out.row_count()..rhs.row_count() {
         for j in 0..rhs.col_count() {
@@ -139,33 +150,48 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(ring: R, mut lhs: Submatrix
     };
 }
 
-///
 /// Computes a basis of the right-kernel of the matrix `A`, i.e. a full-rank
 /// matrix `B` such that `AB = 0` and every `x` with `Ax = 0` is of the form
 /// `x = By` for some `y`.
-/// 
+///
 /// This function will change the value of `A`, more concretely overwrite it
 /// with its "pre-smith" form as specified by [`pre_smith()`].
-/// 
+///
 /// **Note on rings with zero-divisors** If the given ring has zero-divisors,
 /// the notion of being "full-rank" is not well-defined. Instead, `B` will have
 /// the property that every minor is nonzero. Note that it is not required that
 /// every minor is invertible - this is usually not possible. For example, in
 /// `Z/6Z`, the right-kernel of `A = (2)` is `{0, 3}`, and thus the only generating
 /// set is `B = (3)`, which doesn't have a unit minor.
-/// 
 #[stability::unstable(feature = "enable")]
-pub fn kernel_basis_using_pre_smith<R, V, A>(ring: R, mut A: SubmatrixMut<V, El<R>>, allocator: A) -> OwnedMatrix<El<R>, A>
-    where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing,
-        V: AsPointerToSlice<El<R>>,
-        A: Allocator
+pub fn kernel_basis_using_pre_smith<R, V, A>(
+    ring: R,
+    mut A: SubmatrixMut<V, El<R>>,
+    allocator: A,
+) -> OwnedMatrix<El<R>, A>
+where
+    R: RingStore + Copy,
+    R::Type: PrincipalIdealRing,
+    V: AsPointerToSlice<El<R>>,
+    A: Allocator,
 {
     let mut R = TransformList::new(A.col_count());
     pre_smith(ring, &mut (), &mut R, A.reborrow());
-    
-    let annihilators = (0..A.col_count()).map(|i| if i < A.row_count() { ring.annihilator(A.at(i, i)) } else { ring.one() }).collect::<Vec<_>>();
-    let annihilators = annihilators.iter().enumerate().filter(|(_, a)| !ring.is_zero(a)).enumerate();
+
+    let annihilators = (0..A.col_count())
+        .map(|i| {
+            if i < A.row_count() {
+                ring.annihilator(A.at(i, i))
+            } else {
+                ring.one()
+            }
+        })
+        .collect::<Vec<_>>();
+    let annihilators = annihilators
+        .iter()
+        .enumerate()
+        .filter(|(_, a)| !ring.is_zero(a))
+        .enumerate();
     let mut B = OwnedMatrix::zero_in(A.col_count(), annihilators.clone().count(), ring, allocator);
     for (i, (j, a)) in annihilators {
         *B.at_mut(i, j) = ring.clone_el(a);
@@ -176,29 +202,48 @@ pub fn kernel_basis_using_pre_smith<R, V, A>(ring: R, mut A: SubmatrixMut<V, El<
 
 #[stability::unstable(feature = "enable")]
 pub fn determinant_using_pre_smith<R, V, A>(ring: R, mut matrix: SubmatrixMut<V, El<R>>, _allocator: A) -> El<R>
-    where R: RingStore + Copy,
-        R::Type: PrincipalIdealRing,
-        V:AsPointerToSlice<El<R>>,
-        A: Allocator
+where
+    R: RingStore + Copy,
+    R::Type: PrincipalIdealRing,
+    V: AsPointerToSlice<El<R>>,
+    A: Allocator,
 {
     assert_eq!(matrix.row_count(), matrix.col_count());
     let mut unit_part_rows = ring.one();
     let mut unit_part_cols = ring.one();
-    pre_smith(ring, &mut DetUnit { current_unit: &mut unit_part_rows }, &mut DetUnit { current_unit: &mut unit_part_cols }, matrix.reborrow());
-    return ring.checked_div(
-        &ring.prod((0..matrix.row_count()).map(|i| ring.clone_el(matrix.at(i, i)))),
-        &ring.prod([unit_part_rows, unit_part_cols])
-    ).unwrap();
+    pre_smith(
+        ring,
+        &mut DetUnit {
+            current_unit: &mut unit_part_rows,
+        },
+        &mut DetUnit {
+            current_unit: &mut unit_part_cols,
+        },
+        matrix.reborrow(),
+    );
+    return ring
+        .checked_div(
+            &ring.prod((0..matrix.row_count()).map(|i| ring.clone_el(matrix.at(i, i)))),
+            &ring.prod([unit_part_rows, unit_part_cols]),
+        )
+        .unwrap();
 }
 
 struct DetUnit<'a, R: ?Sized + RingBase> {
-    current_unit: &'a mut R::Element
+    current_unit: &'a mut R::Element,
 }
 
 impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
-    where R: ?Sized + RingBase
+where
+    R: ?Sized + RingBase,
 {
-    fn subtract<S: Copy + RingStore<Type = R>>(&mut self, _ring: S, _src: usize, _dst: usize, _factor: &<R as RingBase>::Element) {
+    fn subtract<S: Copy + RingStore<Type = R>>(
+        &mut self,
+        _ring: S,
+        _src: usize,
+        _dst: usize,
+        _factor: &<R as RingBase>::Element,
+    ) {
         // determinant does not change
     }
 
@@ -206,87 +251,108 @@ impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
         ring.negate_inplace(&mut self.current_unit)
     }
 
-    fn transform<S: Copy + RingStore<Type = R>>(&mut self, ring: S, _i: usize, _j: usize, transform: &[<R as RingBase>::Element; 4]) {
-        let unit = ring.sub(ring.mul_ref(&transform[0], &transform[3]), ring.mul_ref(&transform[1], &transform[2]));
+    fn transform<S: Copy + RingStore<Type = R>>(
+        &mut self,
+        ring: S,
+        _i: usize,
+        _j: usize,
+        transform: &[<R as RingBase>::Element; 4],
+    ) {
+        let unit = ring.sub(
+            ring.mul_ref(&transform[0], &transform[3]),
+            ring.mul_ref(&transform[1], &transform[2]),
+        );
         ring.mul_assign(&mut self.current_unit, unit);
     }
 }
 
 #[cfg(test)]
+use std::alloc::Global;
+#[cfg(test)]
+use std::time::Instant;
+
+#[cfg(test)]
+use test::Bencher;
+
+#[cfg(test)]
+use crate::algorithms::linsolve::LinSolveRing;
+#[cfg(test)]
+use crate::algorithms::linsolve::extension::solve_right_over_extension;
+#[cfg(test)]
+use crate::algorithms::matmul::ComputeInnerProduct;
+#[cfg(test)]
+use crate::algorithms::matmul::*;
+#[cfg(test)]
+use crate::assert_matrix_eq;
+#[cfg(test)]
+use crate::homomorphism::Homomorphism;
+#[cfg(test)]
 use crate::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::rings::extension::FreeAlgebraStore;
 #[cfg(test)]
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
 use crate::rings::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::rings::extension::FreeAlgebraStore;
+use crate::rings::zn::ZnRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
-use crate::assert_matrix_eq;
-#[cfg(test)]
-use crate::rings::zn::ZnRingStore;
-#[cfg(test)]
 use crate::seq::VectorView;
-#[cfg(test)]
-use crate::algorithms::matmul::ComputeInnerProduct;
-#[cfg(test)]
-use std::alloc::Global;
-#[cfg(test)]
-use test::Bencher;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
-#[cfg(test)]
-use crate::algorithms::linsolve::LinSolveRing;
-#[cfg(test)]
-use std::time::Instant;
-#[cfg(test)]
-use crate::algorithms::linsolve::extension::solve_right_over_extension;
-#[cfg(test)]
-use crate::algorithms::matmul::*;
 
 #[cfg(test)]
-fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(matrices: I, ring: R) -> OwnedMatrix<El<R>>
-    where R::Type: 'a,
-        V: 'a
+fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item = Submatrix<'a, V, El<R>>>>(
+    matrices: I,
+    ring: R,
+) -> OwnedMatrix<El<R>>
+where
+    R::Type: 'a,
+    V: 'a,
 {
     let mut it = matrices.into_iter();
     let fst = it.next().unwrap();
     let snd = it.next().unwrap();
     let mut new_result = OwnedMatrix::zero(fst.row_count(), snd.col_count(), &ring);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(fst), TransposableSubmatrix::from(snd), TransposableSubmatrixMut::from(new_result.data_mut()), &ring);
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(fst),
+        TransposableSubmatrix::from(snd),
+        TransposableSubmatrixMut::from(new_result.data_mut()),
+        &ring,
+    );
     let mut result = new_result;
 
     for m in it {
         let mut new_result = OwnedMatrix::zero(result.row_count(), m.col_count(), &ring);
-        STANDARD_MATMUL.matmul(TransposableSubmatrix::from(result.data()), TransposableSubmatrix::from(m), TransposableSubmatrixMut::from(new_result.data_mut()), &ring);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(result.data()),
+            TransposableSubmatrix::from(m),
+            TransposableSubmatrixMut::from(new_result.data_mut()),
+            &ring,
+        );
         result = new_result;
     }
     return result;
 }
 
-
 #[test]
 fn test_smith_integers() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
-    let mut A = OwnedMatrix::new(
-        vec![ 1, 2, 3, 4, 
-                    2, 3, 4, 5,
-                    3, 4, 5, 6 ], 
-        4
-    );
+    let mut A = OwnedMatrix::new(vec![1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6], 4);
     let original_A = A.clone_matrix(&ring);
     let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, StaticRing::<i64>::RING);
     let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, StaticRing::<i64>::RING);
-    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut());
-    
-    assert_matrix_eq!(&ring, &[
-        [1, 0, 0, 0],
-        [0,-1, 0, 0],
-        [0, 0, 0, 0]], &A);
+    pre_smith(
+        ring,
+        &mut TransformRows(L.data_mut(), ring.get_ring()),
+        &mut TransformCols(R.data_mut(), ring.get_ring()),
+        A.data_mut(),
+    );
+
+    assert_matrix_eq!(&ring, &[[1, 0, 0, 0], [0, -1, 0, 0], [0, 0, 0, 0]], &A);
 
     assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
 }
@@ -295,26 +361,23 @@ fn test_smith_integers() {
 fn test_smith_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
-    let mut A = OwnedMatrix::new(
-        vec![ 8, 3, 5, 8,
-                    0, 9, 0, 9,
-                    5, 9, 5, 14,
-                    8, 3, 5, 23,
-                    3,39, 0, 39 ],
-        4
-    );
+    let mut A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
     let original_A = A.clone_matrix(&ring);
     let mut L: OwnedMatrix<u64> = OwnedMatrix::identity(5, 5, ring);
     let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
-    pre_smith(ring, &mut TransformRows(L.data_mut(), ring.get_ring()), &mut TransformCols(R.data_mut(), ring.get_ring()), A.data_mut());
+    pre_smith(
+        ring,
+        &mut TransformRows(L.data_mut(), ring.get_ring()),
+        &mut TransformCols(R.data_mut(), ring.get_ring()),
+        A.data_mut(),
+    );
 
-    assert_matrix_eq!(&ring, &[
-        [8, 0, 0, 0],
-        [0, 3, 0, 0],
-        [0, 0, 0, 0], 
-        [0, 0, 0, 15],
-        [0, 0, 0, 0]], &A);
-        
+    assert_matrix_eq!(
+        &ring,
+        &[[8, 0, 0, 0], [0, 3, 0, 0], [0, 0, 0, 0], [0, 0, 0, 15], [0, 0, 0, 0]],
+        &A
+    );
+
     assert_matrix_eq!(&ring, &multiply([L.data(), original_A.data(), R.data()], ring), &A);
 }
 
@@ -322,24 +385,20 @@ fn test_smith_zn() {
 fn test_solve_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
-    let A = OwnedMatrix::new(
-        vec![ 8, 3, 5, 8,
-                    0, 9, 0, 9,
-                    5, 9, 5, 14,
-                    8, 3, 5, 23,
-                    3,39, 0, 39 ],
-        4
-    );
+    let A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
     let B = OwnedMatrix::new(
-        vec![11, 43, 10, 22,
-                   18,  9, 27, 27,
-                    8, 34,  7, 22,
-                   41, 13, 40, 37,
-                    3,  9,  3,  0],
-        4
+        vec![11, 43, 10, 22, 18, 9, 27, 27, 8, 34, 7, 22, 41, 13, 40, 37, 3, 9, 3, 0],
+        4,
     );
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 4, ring);
-    ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global).assert_solved();
+    ring.get_ring()
+        .solve_right(
+            A.clone_matrix(ring).data_mut(),
+            B.clone_matrix(ring).data_mut(),
+            solution.data_mut(),
+            Global,
+        )
+        .assert_solved();
 
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 }
@@ -347,40 +406,46 @@ fn test_solve_zn() {
 #[test]
 fn test_unique_solution_correct() {
     let ring = zn_static::Zn::<45>::RING;
-    let A = OwnedMatrix::new(
-        vec![ 1, 0, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 1 ],
-        4
-    );
-    let B = OwnedMatrix::new(vec![ 1, 1, 0, 0 ], 1);
+    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 4);
+    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 1);
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
-    assert_eq!(SolveResult::FoundUniqueSolution, ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global));
+    assert_eq!(
+        SolveResult::FoundUniqueSolution,
+        ring.get_ring().solve_right(
+            A.clone_matrix(ring).data_mut(),
+            B.clone_matrix(ring).data_mut(),
+            solution.data_mut(),
+            Global
+        )
+    );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
-    
-    let A = OwnedMatrix::new(
-        vec![ 1, 0, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 0 ],
-        4
-    );
-    let B = OwnedMatrix::new(vec![ 1, 1, 0, 0 ], 1);
+
+    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], 4);
+    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 1);
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
-    assert_eq!(SolveResult::FoundSomeSolution, ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global));
+    assert_eq!(
+        SolveResult::FoundSomeSolution,
+        ring.get_ring().solve_right(
+            A.clone_matrix(ring).data_mut(),
+            B.clone_matrix(ring).data_mut(),
+            solution.data_mut(),
+            Global
+        )
+    );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
-    
-    let A = OwnedMatrix::new(
-        vec![ 1, 0, 0, 0,
-                    0, 1, 0, 0,
-                    0, 0, 1, 0,
-                    0, 0, 0, 3 ],
-        4
-    );
-    let B = OwnedMatrix::new(vec![ 1, 1, 0, 0 ], 1);
+
+    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3], 4);
+    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 1);
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
-    assert_eq!(SolveResult::FoundSomeSolution, ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global));
+    assert_eq!(
+        SolveResult::FoundSomeSolution,
+        ring.get_ring().solve_right(
+            A.clone_matrix(ring).data_mut(),
+            B.clone_matrix(ring).data_mut(),
+            solution.data_mut(),
+            Global
+        )
+    );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 }
 
@@ -388,14 +453,17 @@ fn test_unique_solution_correct() {
 fn test_solve_int() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
-    let A = OwnedMatrix::new(
-        vec![3, 6, 2, 0, 4, 7,
-                   5, 5, 4, 5, 5, 5],
-        6
-    );
+    let A = OwnedMatrix::new(vec![3, 6, 2, 0, 4, 7, 5, 5, 4, 5, 5, 5], 6);
     let B: OwnedMatrix<i64> = OwnedMatrix::identity(2, 2, ring);
     let mut solution: OwnedMatrix<i64> = OwnedMatrix::zero(6, 2, ring);
-    ring.get_ring().solve_right(A.clone_matrix(ring).data_mut(), B.clone_matrix(ring).data_mut(), solution.data_mut(), Global).assert_solved();
+    ring.get_ring()
+        .solve_right(
+            A.clone_matrix(ring).data_mut(),
+            B.clone_matrix(ring).data_mut(),
+            solution.data_mut(),
+            Global,
+        )
+        .assert_solved();
 
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], &ring), &B);
 }
@@ -405,12 +473,12 @@ fn test_large() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<16>::RING;
     let data_A = [
-        [0, 0, 0, 0, 0, 0, 0, 0,11, 0, 0],
+        [0, 0, 0, 0, 0, 0, 0, 0, 11, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0,10],
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 10],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
         [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 8],
-        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]
+        [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0],
     ];
     let mut A: OwnedMatrix<u64> = OwnedMatrix::zero(6, 11, &ring);
     for i in 0..6 {
@@ -419,21 +487,29 @@ fn test_large() {
         }
     }
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(11, 11, ring);
-    assert!(ring.get_ring().solve_right(A.clone_matrix(&ring).data_mut(), A.data_mut(), solution.data_mut(), Global).is_solved());
+    assert!(
+        ring.get_ring()
+            .solve_right(
+                A.clone_matrix(&ring).data_mut(),
+                A.data_mut(),
+                solution.data_mut(),
+                Global
+            )
+            .is_solved()
+    );
 }
 
 #[test]
 fn test_determinant() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
-    let A = OwnedMatrix::new(
-        vec![1, 0, 3, 
-                   2, 1, 0, 
-                   9, 8, 7],
-        3
+    let A = OwnedMatrix::new(vec![1, 0, 3, 2, 1, 0, 9, 8, 7], 3);
+    assert_el_eq!(
+        ring,
+        (7 + 48 - 27),
+        determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global)
     );
-    assert_el_eq!(ring, (7 + 48 - 27), determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global));
-    
+
     // we need a ring that has units of order > 2 to test whether an inversion is necessary for
     // the accumulated determinant units
     #[derive(PartialEq, Clone, Copy, Debug)]
@@ -450,8 +526,11 @@ fn test_determinant() {
         fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
     }
     impl PrincipalIdealRing for TestRing {
-
-        fn extended_ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element, Self::Element) {
+        fn extended_ideal_gen(
+            &self,
+            lhs: &Self::Element,
+            rhs: &Self::Element,
+        ) -> (Self::Element, Self::Element, Self::Element) {
             self.get_delegate().extended_ideal_gen(lhs, rhs)
         }
 
@@ -459,7 +538,11 @@ fn test_determinant() {
             self.get_delegate().checked_div_min(lhs, rhs)
         }
 
-        fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
+        fn create_elimination_matrix(
+            &self,
+            a: &Self::Element,
+            b: &Self::Element,
+        ) -> ([Self::Element; 4], Self::Element) {
             assert_eq!(9, *a);
             assert_eq!(15, *b);
             assert_eq!(3, self.add(self.mul(42, *a), self.mul(2, *b)));
@@ -470,7 +553,11 @@ fn test_determinant() {
 
     let ring = RingValue::from(TestRing);
     let A = OwnedMatrix::new(vec![9, 0, 15, 3], 2);
-    assert_el_eq!(ring, 27, determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global));
+    assert_el_eq!(
+        ring,
+        27,
+        determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global)
+    );
 }
 
 #[test]
@@ -480,14 +567,23 @@ fn test_kernel_basis() {
     assert_matrix_eq!(ring, [[], []], kernel_basis_using_pre_smith(ring, A.data_mut(), Global));
 
     let mut A = OwnedMatrix::zero(2, 2, ring);
-    assert_matrix_eq!(ring, [[1, 0], [0, 1]], kernel_basis_using_pre_smith(ring, A.data_mut(), Global));
+    assert_matrix_eq!(
+        ring,
+        [[1, 0], [0, 1]],
+        kernel_basis_using_pre_smith(ring, A.data_mut(), Global)
+    );
 
     let A = OwnedMatrix::new(vec![1, 1, 2, 3, 2, 1], 3);
     let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert!(!ring.is_zero(B.at(0, 0)));
     let mut product = OwnedMatrix::zero(2, 1, ring);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(A.data()), TransposableSubmatrix::from(B.data()), TransposableSubmatrixMut::from(product.data_mut()), ring);
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(A.data()),
+        TransposableSubmatrix::from(B.data()),
+        TransposableSubmatrixMut::from(product.data_mut()),
+        ring,
+    );
     assert_matrix_eq!(ring, [[0], [0]], product);
 
     let A = OwnedMatrix::new(vec![1, 1, 1, 1, 1, 1], 2);
@@ -495,7 +591,12 @@ fn test_kernel_basis() {
     assert_eq!(1, B.col_count());
     assert!(!ring.is_zero(B.at(0, 0)));
     let mut product = OwnedMatrix::zero(3, 1, ring);
-    STANDARD_MATMUL.matmul(TransposableSubmatrix::from(A.data()), TransposableSubmatrix::from(B.data()), TransposableSubmatrixMut::from(product.data_mut()), ring);
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(A.data()),
+        TransposableSubmatrix::from(B.data()),
+        TransposableSubmatrixMut::from(product.data_mut()),
+        ring,
+    );
     assert_matrix_eq!(ring, [[0], [0], [0]], product);
 
     let ring = Zn64B::new(6);
@@ -511,15 +612,31 @@ fn time_solve_right_using_pre_smith_galois_field() {
     feanor_tracing::DelayedLogger::init_test();
     let n = 100;
     let field = GaloisField::new(257, 21);
-    let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
-    
+    let matrix = OwnedMatrix::from_fn(n, n, |i, j| {
+        field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j)
+    });
+
     let mut inv = OwnedMatrix::zero(n, n, &field);
     let mut copy = matrix.clone_matrix(&field);
     let start = Instant::now();
-    solve_right_using_pre_smith(&field, copy.data_mut(), OwnedMatrix::identity(n, n, &field).data_mut(), inv.data_mut(), Global).assert_solved();
+    solve_right_using_pre_smith(
+        &field,
+        copy.data_mut(),
+        OwnedMatrix::identity(n, n, &field).data_mut(),
+        inv.data_mut(),
+        Global,
+    )
+    .assert_solved();
     let end = Instant::now();
-    assert_el_eq!(&field, field.one(), <_ as ComputeInnerProduct>::inner_product_ref(field.get_ring(), inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())));
-    
+    assert_el_eq!(
+        &field,
+        field.one(),
+        <_ as ComputeInnerProduct>::inner_product_ref(
+            field.get_ring(),
+            inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())
+        )
+    );
+
     println!("total: {} us", (end - start).as_micros());
 }
 
@@ -529,14 +646,30 @@ fn time_solve_right_using_extension() {
     feanor_tracing::DelayedLogger::init_test();
     let n = 126;
     let field = GaloisField::new(257, 21);
-    let matrix = OwnedMatrix::from_fn(n, n, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
-    
+    let matrix = OwnedMatrix::from_fn(n, n, |i, j| {
+        field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j)
+    });
+
     let mut inv = OwnedMatrix::zero(n, n, &field);
     let mut copy = matrix.clone_matrix(&field);
     let start = Instant::now();
-    solve_right_over_extension(&field, copy.data_mut(), OwnedMatrix::identity(n, n, &field).data_mut(), inv.data_mut(), Global).assert_solved();
+    solve_right_over_extension(
+        &field,
+        copy.data_mut(),
+        OwnedMatrix::identity(n, n, &field).data_mut(),
+        inv.data_mut(),
+        Global,
+    )
+    .assert_solved();
     let end = Instant::now();
-    assert_el_eq!(&field, field.one(), <_ as ComputeInnerProduct>::inner_product_ref(field.get_ring(), inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())));
+    assert_el_eq!(
+        &field,
+        field.one(),
+        <_ as ComputeInnerProduct>::inner_product_ref(
+            field.get_ring(),
+            inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())
+        )
+    );
 
     println!("total: {} us", (end - start).as_micros());
 }
@@ -545,12 +678,37 @@ fn time_solve_right_using_extension() {
 fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
-    let field = GaloisField::create(FreeAlgebraImpl::new(base_field, 5, [base_field.int_hom().map(3), base_field.int_hom().map(-4)]).as_field().ok().unwrap());
-    let matrix = OwnedMatrix::from_fn(10, 10, |i, j| field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j));
+    let field = GaloisField::create(
+        FreeAlgebraImpl::new(
+            base_field,
+            5,
+            [base_field.int_hom().map(3), base_field.int_hom().map(-4)],
+        )
+        .as_field()
+        .ok()
+        .unwrap(),
+    );
+    let matrix = OwnedMatrix::from_fn(10, 10, |i, j| {
+        field.pow(field.int_hom().mul_map(field.canonical_gen(), i as i32 + 1), j)
+    });
     bencher.iter(|| {
         let mut inv = OwnedMatrix::zero(10, 10, &field);
         let mut copy = matrix.clone_matrix(&field);
-        solve_right_using_pre_smith(&field, copy.data_mut(), OwnedMatrix::identity(10, 10, &field).data_mut(), inv.data_mut(), Global).assert_solved();
-        assert_el_eq!(&field, field.one(), <_ as ComputeInnerProduct>::inner_product_ref(field.get_ring(), inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())));
+        solve_right_using_pre_smith(
+            &field,
+            copy.data_mut(),
+            OwnedMatrix::identity(10, 10, &field).data_mut(),
+            inv.data_mut(),
+            Global,
+        )
+        .assert_solved();
+        assert_el_eq!(
+            &field,
+            field.one(),
+            <_ as ComputeInnerProduct>::inner_product_ref(
+                field.get_ring(),
+                inv.data().col_at(4).as_iter().zip(matrix.data().row_at(4).as_iter())
+            )
+        );
     });
 }

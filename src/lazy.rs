@@ -2,31 +2,27 @@ use std::sync::OnceLock;
 
 use append_only_vec::AppendOnlyVec;
 
-///
 /// Vector whose elements are never modified but added.
 /// More general than [`AppendOnlyVec`] in that we can control
 /// at what index an element is inserted, if not present.
-/// 
 pub struct LazyVec<T> {
-    data: AppendOnlyVec<OnceLock<T>>
+    data: AppendOnlyVec<OnceLock<T>>,
 }
 
 impl<T> LazyVec<T> {
-
     pub fn new() -> Self {
         Self {
-            data: AppendOnlyVec::new()
+            data: AppendOnlyVec::new(),
         }
     }
 
     #[allow(unused)]
-    pub fn get(&self, i: usize) -> Option<&T> {
-        self.data[i].get()
-    }
+    pub fn get(&self, i: usize) -> Option<&T> { self.data[i].get() }
 
     #[allow(unused)]
     pub fn get_or_init_incremental<F>(&self, target_index: usize, mut derive_next: F) -> &T
-        where F: FnMut(usize, &T) -> T
+    where
+        F: FnMut(usize, &T) -> T,
     {
         while self.data.len() <= target_index {
             _ = self.data.push(OnceLock::new());
@@ -43,7 +39,8 @@ impl<T> LazyVec<T> {
     }
 
     pub fn get_or_init<'a, F>(&'a self, i: usize, init: F) -> &'a T
-        where F: FnOnce() -> T
+    where
+        F: FnOnce() -> T,
     {
         while self.data.len() <= i {
             _ = self.data.push(OnceLock::new());
@@ -53,17 +50,24 @@ impl<T> LazyVec<T> {
 }
 
 impl<T> Clone for LazyVec<T>
-    where T: Clone
+where
+    T: Clone,
 {
     fn clone(&self) -> Self {
         Self {
-            data: self.data.iter().map(|data| if let Some(value) = data.get() {
-                let result = OnceLock::new();
-                _ = result.set(value.clone());
-                result
-            } else {
-                OnceLock::new()
-            }).collect()
+            data: self
+                .data
+                .iter()
+                .map(|data| {
+                    if let Some(value) = data.get() {
+                        let result = OnceLock::new();
+                        _ = result.set(value.clone());
+                        result
+                    } else {
+                        OnceLock::new()
+                    }
+                })
+                .collect(),
         }
     }
 }

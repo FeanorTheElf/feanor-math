@@ -3,13 +3,12 @@ use std::mem::swap;
 
 use tracing::instrument;
 
+use crate::integer::*;
+use crate::ordered::OrderedRingStore;
+use crate::pid::*;
 use crate::ring::*;
 use crate::rings::zn::*;
-use crate::integer::*;
-use crate::pid::*;
-use crate::ordered::OrderedRingStore;
 
-///
 /// Uses an optimized version of the LLL algorithm to compute a reduced
 /// basis of the lattice
 /// ```text
@@ -18,15 +17,18 @@ use crate::ordered::OrderedRingStore;
 /// i.e. `(u, v)` such that `|u|` is minimal among all nonzero vectors of
 /// `L`, and `|v|` is minimal among all vectors of `L` that are not linearly
 /// dependent with `u`.
-/// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
-    [El<<R::Type as ZnRing>::IntegerRing>; 2], 
-    [El<<R::Type as ZnRing>::IntegerRing>; 2]
+pub fn reduce_2d_modular_relation_basis<R>(
+    Zn: R,
+    x: El<R>,
+) -> (
+    [El<<R::Type as ZnRing>::IntegerRing>; 2],
+    [El<<R::Type as ZnRing>::IntegerRing>; 2],
 )
-    where R: RingStore,
-        R::Type: ZnRing
+where
+    R: RingStore,
+    R::Type: ZnRing,
 {
     let ZZ = Zn.integer_ring();
     if Zn.is_zero(&x) {
@@ -49,10 +51,7 @@ pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
     // now use real LLL, it is likely that this does not run for many rounds anymore
     loop {
         let norm_u_sqr = ZZ.add(ZZ.pow(ZZ.clone_el(&u[0]), 2), ZZ.pow(ZZ.clone_el(&u[1]), 2));
-        let q = ZZ.rounded_div(
-            ZZ.add(ZZ.mul_ref(&u[0], &v[0]), ZZ.mul_ref(&u[1], &v[1])),
-            &norm_u_sqr
-        );
+        let q = ZZ.rounded_div(ZZ.add(ZZ.mul_ref(&u[0], &v[0]), ZZ.mul_ref(&u[1], &v[1])), &norm_u_sqr);
         ZZ.sub_assign(&mut v[0], ZZ.mul_ref(&u[0], &q));
         ZZ.sub_assign(&mut v[1], ZZ.mul_ref(&u[1], &q));
         let norm_v_sqr = ZZ.add(ZZ.pow(ZZ.clone_el(&v[0]), 2), ZZ.pow(ZZ.clone_el(&v[1]), 2));
@@ -64,16 +63,15 @@ pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
     }
 }
 
-///
 /// Returns two integers `(a, b)` with `b > 0` such that `a = bx mod n`.
-/// 
+///
 /// More concretely, this returns the `a, b` with smallest l2-norm `a^2 + b^2`
 /// such that `a = bx mod n`. In particular, if there are `a, b` with
 /// `|a| <= sqrt(n / 2)` and `b <= sqrt(n / 2)`, then these are the unique
 /// solution (up to scalar multiples).
-/// 
+///
 /// # Example
-/// 
+///
 /// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::homomorphism::*;
@@ -82,22 +80,35 @@ pub fn reduce_2d_modular_relation_basis<R>(Zn: R, x: El<R>) -> (
 /// # use feanor_math::rings::zn::zn_64b::*;
 /// # use feanor_math::algorithms::rational_reconstruction::*;
 /// let ring = Zn64B::new(100000000);
-/// assert_eq!((3, 7), balanced_rational_reconstruction(&ring, ring.checked_div(&ring.int_hom().map(3), &ring.int_hom().map(7)).unwrap()));
+/// assert_eq!(
+///     (3, 7),
+///     balanced_rational_reconstruction(
+///         &ring,
+///         ring.checked_div(&ring.int_hom().map(3), &ring.int_hom().map(7))
+///             .unwrap()
+///     )
+/// );
 /// ```
-/// 
+///
 /// # Proof
-/// 
+///
 /// We show that if there are `a, b` with `|a|, |b| <= sqrt(n / 2)`, then these
 /// form (up to scalar multiples) the unique shortest vector. If this were not the case,
 /// we would have a basis of `L = { u | u[0] x - u[1] = 0 mod n }` of two vectors both
 /// of length `< sqrt(n)`. wlog we assume it is size-reduced, however this means that
 /// the determinant of the basis is `< sqrt(n) * sqrt(n) = n = det(L)`, a contradiction.
-/// 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn balanced_rational_reconstruction<R>(Zn: R, x: El<R>) -> (El<<R::Type as ZnRing>::IntegerRing>, El<<R::Type as ZnRing>::IntegerRing>)
-    where R: RingStore,
-        R::Type: ZnRing
+pub fn balanced_rational_reconstruction<R>(
+    Zn: R,
+    x: El<R>,
+) -> (
+    El<<R::Type as ZnRing>::IntegerRing>,
+    El<<R::Type as ZnRing>::IntegerRing>,
+)
+where
+    R: RingStore,
+    R::Type: ZnRing,
 {
     let [b, a] = reduce_2d_modular_relation_basis(&Zn, x).0;
     if Zn.integer_ring().is_neg(&b) {
@@ -108,9 +119,9 @@ pub fn balanced_rational_reconstruction<R>(Zn: R, x: El<R>) -> (El<<R::Type as Z
 }
 
 #[cfg(test)]
-use crate::homomorphism::Homomorphism;
-#[cfg(test)]
 use crate::divisibility::DivisibilityRingStore;
+#[cfg(test)]
+use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 
@@ -119,7 +130,7 @@ fn test_rational_reconstruction() {
     feanor_tracing::DelayedLogger::init_test();
     let n = 2021027;
     let Zn = zn_64b::Zn64B::new(n as u64);
-    let ab_bound = (n as f64 / 2.).sqrt().floor() as i32;
+    let ab_bound = (n as f64 / 2.0).sqrt().floor() as i32;
     for a in -ab_bound..ab_bound {
         for b in 1..ab_bound {
             if a * b <= n / 2 && StaticRing::<i32>::RING.ideal_gen(&b, &a) == 1 {

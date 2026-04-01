@@ -1,24 +1,21 @@
 use std::alloc::{Allocator, Global};
-use std::ops::Range;
 use std::fmt::Debug;
+use std::ops::Range;
 
 use tracing::instrument;
 
-use crate::algorithms::unity_root::*;
-use crate::divisibility::{DivisibilityRingStore, DivisibilityRing};
-use crate::rings::zn::*;
-use crate::seq::SwappableVectorViewMut;
-use crate::ring::*;
-use crate::seq::VectorViewMut;
-use crate::homomorphism::*;
-use crate::algorithms::fft::*;
-use crate::rings::float_complex::*;
 use super::complex_fft::*;
+use crate::algorithms::fft::*;
+use crate::algorithms::unity_root::*;
+use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::homomorphism::*;
+use crate::rings::float_complex::*;
+use crate::rings::zn::*;
+use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 
-///
 /// An optimized implementation of the Cooley-Tukey FFT algorithm, to compute
 /// the Fourier transform of an array with power-of-two length.
-/// 
+///
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
@@ -30,14 +27,17 @@ use super::complex_fft::*;
 /// // this ring has a 256-th primitive root of unity
 /// let ring = Zn64B::new(257);
 /// let fft_table = CooleyTuckeyFFT::for_zn(ring, 8).unwrap();
-/// let mut data = [ring.one()].into_iter().chain((0..255).map(|_| ring.zero())).collect::<Vec<_>>();
+/// let mut data = [ring.one()]
+///     .into_iter()
+///     .chain((0..255).map(|_| ring.zero()))
+///     .collect::<Vec<_>>();
 /// fft_table.unordered_fft(&mut data, &ring);
 /// assert_el_eq!(ring, ring.one(), data[0]);
 /// assert_el_eq!(ring, ring.one(), data[1]);
 /// ```
-/// 
+///
 /// # Convention
-/// 
+///
 /// This implementation does not follows the standard convention for the mathematical
 /// DFT, by performing the standard/forward FFT with the inverse root of unity `z^-1`.
 /// In other words, the forward FFT computes
@@ -62,24 +62,24 @@ use super::complex_fft::*;
 /// let inv_root_of_unity = ring.invert(&root_of_unity).unwrap();
 /// assert_el_eq!(ring, ring.add(ring.one(), inv_root_of_unity), data[1]);
 /// ```
-/// 
+///
 /// # On optimizations
-/// 
+///
 /// I tried my best to make this as fast as possible in general, with special focus
 /// on the Number-theoretic transform case. I did not implement the following
 /// optimizations, for the following reasons:
-///  - Larger butterflies: This would improve data locality, but decrease twiddle
-///    locality (or increase arithmetic operation count). Since I focused mainly on
-///    the `Z/nZ` case, where the twiddles are larger than the ring elements (since they
-///    have additional data to speed up multiplications), this is not sensible.
-///  - The same reasoning applies to a SplitRadix approach, which only actually decreases
-///    the total number of operations if multiplication-by-`i` is free.
-/// 
-pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase,
-        H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator + Sync + Send
+///  - Larger butterflies: This would improve data locality, but decrease twiddle locality (or
+///    increase arithmetic operation count). Since I focused mainly on the `Z/nZ` case, where the
+///    twiddles are larger than the ring elements (since they have additional data to speed up
+///    multiplications), this is not sensible.
+///  - The same reasoning applies to a SplitRadix approach, which only actually decreases the total
+///    number of operations if multiplication-by-`i` is free.
+pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase,
+    H: Homomorphism<R_twiddle, R_main>,
+    A: Allocator + Sync + Send,
 {
     hom: H,
     root_of_unity: R_main::Element,
@@ -90,21 +90,27 @@ pub struct CooleyTuckeyFFT<R_main, R_twiddle, H, A = Global>
     inv_root_of_unity_list: Vec<Vec<R_twiddle::Element>>,
     allocator: A,
     two_inv: R_twiddle::Element,
-    n_inv: R_twiddle::Element
+    n_inv: R_twiddle::Element,
 }
 
-///
 /// Assumes that `index` has only the least significant `bits` bits set.
 /// Then computes the value that results from reversing the least significant `bits`
 /// bits.
-/// 
 pub fn bitreverse(index: usize, bits: usize) -> usize {
     index.reverse_bits().checked_shr(usize::BITS - bits as u32).unwrap_or(0)
 }
 
 #[inline(never)]
-fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize, twiddles: &[S], butterfly: F)
-    where F: Fn(&mut T, &mut T, &S) + Clone
+fn butterfly_loop<T, S, F>(
+    log2_n: usize,
+    data: &mut [T],
+    butterfly_range: Range<usize>,
+    stride_range: Range<usize>,
+    log2_step: usize,
+    twiddles: &[S],
+    butterfly: F,
+) where
+    F: Fn(&mut T, &mut T, &S) + Clone,
 {
     assert_eq!(1 << log2_n, data.len());
     assert!(log2_step < log2_n);
@@ -118,17 +124,23 @@ fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range
     assert!(butterfly_range.start <= butterfly_range.end);
     assert!(butterfly_range.end <= (1 << log2_step));
     assert!(butterfly_range.end <= twiddles.len());
-    
+
     let current_data = &mut data[(stride_range.start + butterfly_range.start * 2 * stride)..];
     let stride_range_len = stride_range.end - stride_range.start;
-    
+
     if stride == 1 && stride_range_len == 1 {
-        for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.as_chunks_mut::<2>().0.iter_mut()) {
+        for (twiddle, butterfly_data) in twiddles[butterfly_range]
+            .iter()
+            .zip(current_data.as_chunks_mut::<2>().0.iter_mut())
+        {
             let [a, b] = butterfly_data.each_mut();
             butterfly(a, b, &twiddle);
         }
     } else if stride_range_len >= 1 {
-        for (twiddle, butterfly_data) in twiddles[butterfly_range].iter().zip(current_data.chunks_mut(2 * stride)) {
+        for (twiddle, butterfly_data) in twiddles[butterfly_range]
+            .iter()
+            .zip(current_data.chunks_mut(2 * stride))
+        {
             let (first, second) = butterfly_data[..(stride + stride_range_len)].split_at_mut(stride);
             let (first_chunks, first_rem) = first[..stride_range_len].as_chunks_mut::<4>();
             let (second_chunks, second_rem) = second.as_chunks_mut::<4>();
@@ -145,276 +157,310 @@ fn butterfly_loop<T, S, F>(log2_n: usize, data: &mut [T], butterfly_range: Range
     }
 }
 
-impl<R_main, H> CooleyTuckeyFFT<R_main, Complex64Base, H, Global> 
-    where R_main: ?Sized + RingBase,
-        H: Homomorphism<Complex64Base, R_main>
+impl<R_main, H> CooleyTuckeyFFT<R_main, Complex64Base, H, Global>
+where
+    R_main: ?Sized + RingBase,
+    H: Homomorphism<Complex64Base, R_main>,
 {
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for the complex field, using the given homomorphism
     /// to connect the ring implementation for twiddles with the main ring implementation.
-    /// 
+    ///
     /// This function is mainly provided for parity with other rings, since in the complex case
     /// it currently does not make much sense to use a different homomorphism than the identity.
     /// Hence, it is simpler to use [`CooleyTuckeyFFT::for_complex()`].
-    /// 
     pub fn for_complex_with_hom(hom: H, log2_n: usize) -> Self {
         let CC = *hom.domain().get_ring();
         Self::new_with_pows_with_hom(hom, |i| CC.root_of_unity(i, 1 << log2_n), log2_n)
     }
 }
 
-impl<R> CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<R>, Global> 
-    where R: RingStore<Type = Complex64Base>
+impl<R> CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<R>, Global>
+where
+    R: RingStore<Type = Complex64Base>,
 {
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for the complex field.
-    /// 
-    pub fn for_complex(ring: R, log2_n: usize) -> Self {
-        Self::for_complex_with_hom(ring.into_identity(), log2_n)
-    }
+    pub fn for_complex(ring: R, log2_n: usize) -> Self { Self::for_complex_with_hom(ring.into_identity(), log2_n) }
 }
 
-impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>, Global> 
-    where R: RingStore,
-        R::Type: DivisibilityRing
+impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>, Global>
+where
+    R: RingStore,
+    R::Type: DivisibilityRing,
 {
+    /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the given root of unity.
     ///
-    /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the given root of unity. 
-    /// 
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
-    /// 
     pub fn new(ring: R, root_of_unity: El<R>, log2_n: usize) -> Self {
         Self::new_with_hom(ring.into_identity(), root_of_unity, log2_n)
     }
 
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the passed function to
     /// provide the necessary roots of unity.
-    /// 
+    ///
     /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
     /// primitive root of unity.
-    /// 
-    pub fn new_with_pows<F>(ring: R, root_of_unity_pow: F, log2_n: usize) -> Self 
-        where F: FnMut(i64) -> El<R>
+    pub fn new_with_pows<F>(ring: R, root_of_unity_pow: F, log2_n: usize) -> Self
+    where
+        F: FnMut(i64) -> El<R>,
     {
         Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_pow, log2_n)
     }
 
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for a prime field, assuming it has a characteristic
     /// congruent to 1 modulo `2^log2_n`.
-    /// 
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
-        where R::Type: ZnRing
+    where
+        R::Type: ZnRing,
     {
         Self::for_zn_with_hom(ring.into_identity(), log2_n)
     }
 }
 
-impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main>
+impl<R_main, R_twiddle, H> CooleyTuckeyFFT<R_main, R_twiddle, H, Global>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase + DivisibilityRing,
+    H: Homomorphism<R_twiddle, R_main>,
 {
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for the given rings, using the given root of unity.
-    /// 
+    ///
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
-    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
-    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like
     /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
-    /// 
+    ///
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
-    /// 
     #[instrument(skip_all, level = "trace")]
     pub fn new_with_hom(hom: H, root_of_unity: R_twiddle::Element, log2_n: usize) -> Self {
         let ring = hom.domain();
-        let root_of_unity_pow = |i: i64| if i >= 0 {
-            ring.pow(ring.clone_el(&root_of_unity), i as usize)
-        } else {
-            ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize)).unwrap()
+        let root_of_unity_pow = |i: i64| {
+            if i >= 0 {
+                ring.pow(ring.clone_el(&root_of_unity), i as usize)
+            } else {
+                ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize))
+                    .unwrap()
+            }
         };
         let result = CooleyTuckeyFFT::create(&hom, root_of_unity_pow, log2_n, Global);
-        
+
         return CooleyTuckeyFFT {
             root_of_unity_list: result.root_of_unity_list,
             inv_root_of_unity_list: result.inv_root_of_unity_list,
             two_inv: result.two_inv,
             n_inv: result.n_inv,
-            root_of_unity: result.root_of_unity, 
-            log2_n: result.log2_n, 
+            root_of_unity: result.root_of_unity,
+            log2_n: result.log2_n,
             allocator: result.allocator,
-            hom: hom, 
+            hom,
         };
     }
 
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for the given rings, using the given function to create
     /// the necessary powers of roots of unity.
-    /// 
+    ///
     /// Concretely, `root_of_unity_pow(i)` should return `z^i`, where `z` is a `2^log2_n`-th
     /// primitive root of unity.
-    /// 
+    ///
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
-    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
-    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like
     /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
-    /// 
-    pub fn new_with_pows_with_hom<F>(hom: H, root_of_unity_pow: F, log2_n: usize) -> Self 
-        where F: FnMut(i64) -> R_twiddle::Element
+    pub fn new_with_pows_with_hom<F>(hom: H, root_of_unity_pow: F, log2_n: usize) -> Self
+    where
+        F: FnMut(i64) -> R_twiddle::Element,
     {
         Self::create(hom, root_of_unity_pow, log2_n, Global)
     }
 
-    ///
     /// Creates an [`CooleyTuckeyFFT`] for the given prime fields, assuming they have
     /// a characteristic congruent to 1 modulo `2^log2_n`.
-    /// 
+    ///
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
-    /// precomputed will be stored as elements of `R`, while the main FFT computations will be 
-    /// performed in `S`. This allows both implicit ring conversions, and using patterns like 
+    /// precomputed will be stored as elements of `R`, while the main FFT computations will be
+    /// performed in `S`. This allows both implicit ring conversions, and using patterns like
     /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
-    /// 
     pub fn for_zn_with_hom(hom: H, log2_n: usize) -> Option<Self>
-        where R_twiddle: ZnRing
+    where
+        R_twiddle: ZnRing,
     {
         let root_of_unity = get_prim_root_of_unity_zn(hom.domain(), 1 << log2_n)?;
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 }
 
-impl<R_main, R_twiddle, H, A> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator + Sync + Send
+impl<R_main, R_twiddle, H, A> PartialEq for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase + DivisibilityRing,
+    H: Homomorphism<R_twiddle, R_main>,
+    A: Allocator + Sync + Send,
 {
     fn eq(&self, other: &Self) -> bool {
-        self.ring().get_ring() == other.ring().get_ring() &&
-            self.log2_n == other.log2_n &&
-            self.ring().eq_el(self.root_of_unity(self.ring()), other.root_of_unity(self.ring()))
+        self.ring().get_ring() == other.ring().get_ring()
+            && self.log2_n == other.log2_n
+            && self
+                .ring()
+                .eq_el(self.root_of_unity(self.ring()), other.root_of_unity(self.ring()))
     }
 }
 
-impl<R_main, R_twiddle, H, A> Debug for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator + Sync + Send
+impl<R_main, R_twiddle, H, A> Debug for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase + DivisibilityRing,
+    H: Homomorphism<R_twiddle, R_main>,
+    A: Allocator + Sync + Send,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("CooleyTuckeyFFT")
             .field("ring", &self.ring().get_ring())
             .field("n", &(1 << self.log2_n))
-            .field("root_of_unity", &self.ring().formatted_el(&self.root_of_unity(self.ring())))
+            .field(
+                "root_of_unity",
+                &self.ring().formatted_el(&self.root_of_unity(self.ring())),
+            )
             .finish()
     }
 }
 
-impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main> + Clone,
-        A: Allocator + Sync + Send + Clone
+impl<R_main, R_twiddle, H, A> Clone for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase + DivisibilityRing,
+    H: Homomorphism<R_twiddle, R_main> + Clone,
+    A: Allocator + Sync + Send + Clone,
 {
     fn clone(&self) -> Self {
         Self {
             two_inv: self.hom.domain().clone_el(&self.two_inv),
             n_inv: self.hom.domain().clone_el(&self.n_inv),
             hom: self.hom.clone(),
-            inv_root_of_unity_list: self.inv_root_of_unity_list.iter().map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect()).collect(),
-            root_of_unity_list: self.root_of_unity_list.iter().map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect()).collect(),
+            inv_root_of_unity_list: self
+                .inv_root_of_unity_list
+                .iter()
+                .map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect())
+                .collect(),
+            root_of_unity_list: self
+                .root_of_unity_list
+                .iter()
+                .map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect())
+                .collect(),
             root_of_unity: self.hom.codomain().clone_el(&self.root_of_unity),
             log2_n: self.log2_n,
-            allocator: self.allocator.clone()
+            allocator: self.allocator.clone(),
         }
     }
 }
 
-///
 /// A helper trait that defines the Cooley-Tukey butterfly operation.
 /// It is default-implemented for all rings, but for increase FFT performance, some rings
 /// might wish to provide a specialization.
-/// 
+///
 /// # Why not a subtrait of [`Homomorphism`]?
-/// 
+///
 /// With the current design, indeed making this a subtrait of [`Homomorphism`] would
 /// indeed be the conceptually most fitting choice. It would allow specializing on
-/// the twiddle ring, the main ring and the inclusion. 
-/// 
-/// Unfortunately, there is a technical issue: With the current `min_specialization`, 
-/// we can only specialize on concrete type. If this is a subtrait of [`Homomorphism`], this 
+/// the twiddle ring, the main ring and the inclusion.
+///
+/// Unfortunately, there is a technical issue: With the current `min_specialization`,
+/// we can only specialize on concrete type. If this is a subtrait of [`Homomorphism`], this
 /// means we can only specialize on, say, `CanHom<ZnFastmul, Zn>`, which then does not give a
 /// specialization for `CanHom<&ZnFastmul, Zn>` - in other words, we would specialize on
 /// the [`RingStore`], and not on the [`RingBase`] as we should. Hence, we'll keep this
 /// suboptimal design until full specialization works.
-/// 
 pub trait CooleyTuckeyButterfly<S>: RingBase
-    where S: ?Sized + RingBase
+where
+    S: ?Sized + RingBase,
 {
+    /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] -
+    /// twiddle * values[i2])`.
     ///
-    /// Should compute `(values[i1], values[i2]) := (values[i1] + twiddle * values[i2], values[i1] - twiddle * values[i2])`.
-    /// 
     /// It is guaranteed that the input elements are either outputs of
     /// [`CooleyTuckeyButterfly::butterfly()`] or of [`CooleyTuckeyButterfly::prepare_for_fft()`].
-    /// 
+    ///
     /// Deprecated in favor of [`CooleyTuckeyButterfly::butterfly_new()`].
-    /// 
     #[deprecated]
-    fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
+    fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(
+        &self,
+        hom: H,
+        values: &mut V,
+        twiddle: &S::Element,
+        i1: usize,
+        i2: usize,
+    );
 
+    /// Should compute `(values[i1], values[i2]) := (values[i1] + values[i2], (values[i1] -
+    /// values[i2]) * twiddle)`
     ///
-    /// Should compute `(values[i1], values[i2]) := (values[i1] + values[i2], (values[i1] - values[i2]) * twiddle)`
-    /// 
     /// It is guaranteed that the input elements are either outputs of
-    /// [`CooleyTuckeyButterfly::inv_butterfly()`] or of [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
-    /// 
+    /// [`CooleyTuckeyButterfly::inv_butterfly()`] or of
+    /// [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
+    ///
     /// Deprecated in favor of [`CooleyTuckeyButterfly::inv_butterfly_new()`].
-    /// 
     #[deprecated]
-    fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &S::Element, i1: usize, i2: usize);
-    
-    ///
-    /// Should compute `(x, y) := (x + twiddle * y, x - twiddle * y)`.
-    /// 
-    /// It is guaranteed that the input elements are either outputs of
-    /// [`CooleyTuckeyButterfly::butterfly_new()`] or of [`CooleyTuckeyButterfly::prepare_for_fft()`].
-    /// 
-    fn butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element);
-    
-    ///
-    /// Should compute `(x, y) := (x + y, (x - y) * twiddle)`
-    /// 
-    /// It is guaranteed that the input elements are either outputs of
-    /// [`CooleyTuckeyButterfly::inv_butterfly_new()`] or of [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
-    /// 
-    fn inv_butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element);
+    fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(
+        &self,
+        hom: H,
+        values: &mut V,
+        twiddle: &S::Element,
+        i1: usize,
+        i2: usize,
+    );
 
+    /// Should compute `(x, y) := (x + twiddle * y, x - twiddle * y)`.
     ///
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterfly::butterfly_new()`] or of
+    /// [`CooleyTuckeyButterfly::prepare_for_fft()`].
+    fn butterfly_new<H: Homomorphism<S, Self>>(
+        hom: H,
+        x: &mut Self::Element,
+        y: &mut Self::Element,
+        twiddle: &S::Element,
+    );
+
+    /// Should compute `(x, y) := (x + y, (x - y) * twiddle)`
+    ///
+    /// It is guaranteed that the input elements are either outputs of
+    /// [`CooleyTuckeyButterfly::inv_butterfly_new()`] or of
+    /// [`CooleyTuckeyButterfly::prepare_for_inv_fft()`].
+    fn inv_butterfly_new<H: Homomorphism<S, Self>>(
+        hom: H,
+        x: &mut Self::Element,
+        y: &mut Self::Element,
+        twiddle: &S::Element,
+    );
+
     /// Possibly pre-processes elements before the FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::butterfly_new()`]
-    /// that the inputs are in this form.
-    /// 
+    /// bring ring element into a certain form, and assume during
+    /// [`CooleyTuckeyButterfly::butterfly_new()`] that the inputs are in this form.
     #[inline(always)]
     fn prepare_for_fft(&self, _value: &mut Self::Element) {}
-    
-    ///
+
     /// Possibly pre-processes elements before the inverse FFT starts. Here you can
-    /// bring ring element into a certain form, and assume during [`CooleyTuckeyButterfly::inv_butterfly_new()`]
-    /// that the inputs are in this form.
-    /// 
+    /// bring ring element into a certain form, and assume during
+    /// [`CooleyTuckeyButterfly::inv_butterfly_new()`] that the inputs are in this form.
     #[inline(always)]
     fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
 #[allow(deprecated)]
 impl<R, S> CooleyTuckeyButterfly<S> for R
-    where S: ?Sized + RingBase, R: ?Sized + RingBase
+where
+    S: ?Sized + RingBase,
+    R: ?Sized + RingBase,
 {
     #[inline(always)]
-    default fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(
+        &self,
+        hom: H,
+        values: &mut V,
+        twiddle: &<S as RingBase>::Element,
+        i1: usize,
+        i2: usize,
+    ) {
         hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
@@ -423,23 +469,40 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
 
     #[inline(always)]
     #[allow(deprecated)]
-    default fn butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element) {
+    default fn butterfly_new<H: Homomorphism<S, Self>>(
+        hom: H,
+        x: &mut Self::Element,
+        y: &mut Self::Element,
+        twiddle: &S::Element,
+    ) {
         let mut values = [hom.codomain().clone_el(x), hom.codomain().clone_el(y)];
         <Self as CooleyTuckeyButterfly<S>>::butterfly(hom.codomain().get_ring(), &hom, &mut values, twiddle, 0, 1);
         [*x, *y] = values;
     }
 
     #[inline(always)]
-    default fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(&self, hom: H, values: &mut V, twiddle: &<S as RingBase>::Element, i1: usize, i2: usize) {
+    default fn inv_butterfly<V: VectorViewMut<Self::Element>, H: Homomorphism<S, Self>>(
+        &self,
+        hom: H,
+        values: &mut V,
+        twiddle: &<S as RingBase>::Element,
+        i1: usize,
+        i2: usize,
+    ) {
         let new_a = self.add_ref(values.at(i1), values.at(i2));
         let a = std::mem::replace(values.at_mut(i1), new_a);
         self.sub_self_assign(values.at_mut(i2), a);
         hom.mul_assign_ref_map(values.at_mut(i2), twiddle);
     }
-    
+
     #[inline(always)]
     #[allow(deprecated)]
-    default fn inv_butterfly_new<H: Homomorphism<S, Self>>(hom: H, x: &mut Self::Element, y: &mut Self::Element, twiddle: &S::Element) {
+    default fn inv_butterfly_new<H: Homomorphism<S, Self>>(
+        hom: H,
+        x: &mut Self::Element,
+        y: &mut Self::Element,
+        twiddle: &S::Element,
+    ) {
         let mut values = [hom.codomain().clone_el(x), hom.codomain().clone_el(y)];
         <Self as CooleyTuckeyButterfly<S>>::inv_butterfly(hom.codomain().get_ring(), &hom, &mut values, twiddle, 0, 1);
         [*x, *y] = values;
@@ -447,62 +510,66 @@ impl<R, S> CooleyTuckeyButterfly<S> for R
 
     #[inline(always)]
     default fn prepare_for_fft(&self, _value: &mut Self::Element) {}
-    
+
     #[inline(always)]
     default fn prepare_for_inv_fft(&self, _value: &mut Self::Element) {}
 }
 
-impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator + Sync + Send
+impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase + DivisibilityRing,
+    H: Homomorphism<R_twiddle, R_main>,
+    A: Allocator + Sync + Send,
 {
-    ///
     /// Most general way to create a [`CooleyTuckeyFFT`].
-    /// 
+    ///
     /// This is currently the same as [`CooleyTuckeyFFT::new_with_pows_with_hom()`], except
-    /// that it additionally accepts an Allocator + Sync + Send, which is used to copy the input data in
-    /// cases where the input data layout is not optimal for the algorithm.
-    /// 
+    /// that it additionally accepts an Allocator + Sync + Send, which is used to copy the input
+    /// data in cases where the input data layout is not optimal for the algorithm.
     #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn create<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize, allocator: A) -> Self 
-        where F: FnMut(i64) -> R_twiddle::Element
+    pub fn create<F>(hom: H, mut root_of_unity_pow: F, log2_n: usize, allocator: A) -> Self
+    where
+        F: FnMut(i64) -> R_twiddle::Element,
     {
         let ring = hom.domain();
         assert!(ring.is_commutative());
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_pow2(&ring, &root_of_unity_pow(1), log2_n));
-        assert!(hom.codomain().get_ring().is_approximate() || is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map(root_of_unity_pow(1)), log2_n));
+        assert!(
+            hom.codomain().get_ring().is_approximate()
+                || is_prim_root_of_unity_pow2(&hom.codomain(), &hom.map(root_of_unity_pow(1)), log2_n)
+        );
 
         let root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(-i), log2_n);
         let inv_root_of_unity_list = Self::create_root_of_unity_list(|i| root_of_unity_pow(i), log2_n);
         let root_of_unity = root_of_unity_pow(1);
-        
+
         let store_twiddle_ring = root_of_unity_list.len();
         CooleyTuckeyFFT {
             root_of_unity_list: root_of_unity_list.into_iter().take(store_twiddle_ring).collect(),
             inv_root_of_unity_list: inv_root_of_unity_list.into_iter().take(store_twiddle_ring).collect(),
             two_inv: hom.domain().invert(&hom.domain().int_hom().map(2)).unwrap(),
             n_inv: hom.domain().invert(&hom.domain().int_hom().map(1 << log2_n)).unwrap(),
-            root_of_unity: hom.map(root_of_unity), 
-            hom, 
-            log2_n, 
-            allocator
+            root_of_unity: hom.map(root_of_unity),
+            hom,
+            log2_n,
+            allocator,
         }
     }
 
-    ///
     /// Replaces the ring that this object can compute FFTs over, assuming that the current
     /// twiddle factors can be mapped into the new ring with the given homomorphism.
-    /// 
+    ///
     /// In particular, this function does not recompute twiddles, but uses a different
     /// homomorphism to map the current twiddles into a new ring. Hence, it is extremely
-    /// cheap. 
-    /// 
+    /// cheap.
     #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(self, new_hom: H_new) -> (CooleyTuckeyFFT<R_new, R_twiddle, H_new, A>, H) {
+    pub fn change_ring<R_new: ?Sized + RingBase, H_new: Homomorphism<R_twiddle, R_new>>(
+        self,
+        new_hom: H_new,
+    ) -> (CooleyTuckeyFFT<R_new, R_twiddle, H_new, A>, H) {
         let ring = new_hom.codomain();
         let root_of_unity = if self.log2_n == 0 {
             new_hom.codomain().one()
@@ -518,17 +585,18 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
                 inv_root_of_unity_list: self.inv_root_of_unity_list,
                 two_inv: self.two_inv,
                 n_inv: self.n_inv,
-                root_of_unity: root_of_unity, 
-                hom: new_hom, 
-                log2_n: self.log2_n, 
-                allocator: self.allocator
+                root_of_unity,
+                hom: new_hom,
+                log2_n: self.log2_n,
+                allocator: self.allocator,
             },
-            self.hom
+            self.hom,
         );
     }
 
     fn create_root_of_unity_list<F>(mut root_of_unity_pow: F, log2_n: usize) -> Vec<Vec<R_twiddle::Element>>
-        where F: FnMut(i64) -> R_twiddle::Element
+    where
+        F: FnMut(i64) -> R_twiddle::Element,
     {
         let mut twiddles: Vec<Vec<R_twiddle::Element>> = (0..log2_n).map(|_| Vec::new()).collect();
         for log2_step in 0..log2_n {
@@ -540,16 +608,11 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
         return twiddles;
     }
 
-    ///
     /// Returns the ring over which this object can compute FFTs.
-    /// 
-    pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore {
-        self.hom.codomain()
-    }
+    pub fn ring<'a>(&'a self) -> &'a <H as Homomorphism<R_twiddle, R_main>>::CodomainStore { self.hom.codomain() }
 
-    /// 
     /// Computes the main butterfly step, either forward or backward (without division by two).
-    /// 
+    ///
     /// The forward butterfly is
     /// ```text
     ///   (a, b) -> (a + twiddle * b, a - twiddle * b)
@@ -558,13 +621,18 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     /// ```text
     ///   (u, v) -> (u + v, twiddle * (u - v))
     /// ```
-    /// 
+    ///
     /// The `#[inline(never)]` here is absolutely important for performance!
     /// No idea why...
-    /// 
     #[inline(never)]
     #[instrument(skip_all, level = "trace")]
-    fn butterfly_step_main<const INV: bool, const IS_PREPARED: bool>(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
+    fn butterfly_step_main<const INV: bool, const IS_PREPARED: bool>(
+        &self,
+        data: &mut [R_main::Element],
+        butterfly_range: Range<usize>,
+        stride_range: Range<usize>,
+        log2_step: usize,
+    ) {
         let twiddles = if INV {
             &self.inv_root_of_unity_list[log2_step]
         } else {
@@ -585,108 +653,143 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
                 <R_main as CooleyTuckeyButterfly<R_twiddle>>::butterfly_new(&self.hom, a, b, twiddle);
             }
         };
-        butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, twiddles, butterfly);
+        butterfly_loop(
+            self.log2_n,
+            data,
+            butterfly_range,
+            stride_range,
+            log2_step,
+            twiddles,
+            butterfly,
+        );
     }
-    
-    ///
+
     /// The definitions are
     /// ```text
     ///   u = a/2 + twiddle * b/2,
     ///   v = a/2 - twiddle * b/2
     /// ```
-    /// 
     #[inline(never)]
     #[instrument(skip_all, level = "trace")]
-    fn butterfly_ub_from_ab(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
-        butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, &self.root_of_unity_list[log2_step], |a, b, twiddle| {
-            *a = self.hom.mul_ref_snd_map(
-                self.ring().add_ref_fst(a, self.hom.mul_ref_map(b, twiddle)),
-                &self.two_inv
-            );
-        });
+    fn butterfly_ub_from_ab(
+        &self,
+        data: &mut [R_main::Element],
+        butterfly_range: Range<usize>,
+        stride_range: Range<usize>,
+        log2_step: usize,
+    ) {
+        butterfly_loop(
+            self.log2_n,
+            data,
+            butterfly_range,
+            stride_range,
+            log2_step,
+            &self.root_of_unity_list[log2_step],
+            |a, b, twiddle| {
+                *a = self.hom.mul_ref_snd_map(
+                    self.ring().add_ref_fst(a, self.hom.mul_ref_map(b, twiddle)),
+                    &self.two_inv,
+                );
+            },
+        );
     }
 
-    ///
     /// The definitions are
     /// ```text
     ///   u = a/2 + twiddle * b/2,
     ///   v = a/2 - twiddle * b/2
     /// ```
-    /// 
     #[inline(never)]
     #[instrument(skip_all, level = "trace")]
-    fn butterfly_uv_from_ub(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
-        butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, &self.root_of_unity_list[log2_step], |a, b, twiddle| {
-            *b = self.ring().sub_ref_fst(a, self.hom.mul_ref_map(b, twiddle));
-        });
+    fn butterfly_uv_from_ub(
+        &self,
+        data: &mut [R_main::Element],
+        butterfly_range: Range<usize>,
+        stride_range: Range<usize>,
+        log2_step: usize,
+    ) {
+        butterfly_loop(
+            self.log2_n,
+            data,
+            butterfly_range,
+            stride_range,
+            log2_step,
+            &self.root_of_unity_list[log2_step],
+            |a, b, twiddle| {
+                *b = self.ring().sub_ref_fst(a, self.hom.mul_ref_map(b, twiddle));
+            },
+        );
     }
 
-    ///
     /// The definitions are
     /// ```text
     ///   u = a/2 + twiddle * b/2,
     ///   v = a/2 - twiddle * b/2
     /// ```
-    /// 
     #[inline(never)]
     #[instrument(skip_all, level = "trace")]
-    fn butterfly_ab_from_ub(&self, data: &mut [R_main::Element], butterfly_range: Range<usize>, stride_range: Range<usize>, log2_step: usize) {
-        butterfly_loop(self.log2_n, data, butterfly_range, stride_range, log2_step, &self.root_of_unity_list[log2_step], |a, b, twiddle| {
-            *a = self.ring().add_ref(a, a);
-            self.ring().sub_assign(a, self.hom.mul_ref_map(b, twiddle));
-        });
+    fn butterfly_ab_from_ub(
+        &self,
+        data: &mut [R_main::Element],
+        butterfly_range: Range<usize>,
+        stride_range: Range<usize>,
+        log2_step: usize,
+    ) {
+        butterfly_loop(
+            self.log2_n,
+            data,
+            butterfly_range,
+            stride_range,
+            log2_step,
+            &self.root_of_unity_list[log2_step],
+            |a, b, twiddle| {
+                *a = self.ring().add_ref(a, a);
+                self.ring().sub_assign(a, self.hom.mul_ref_map(b, twiddle));
+            },
+        );
     }
 
-    ///
     /// Returns a reference to the allocator currently used for temporary allocations by this FFT.
-    /// 
     #[stability::unstable(feature = "enable")]
-    pub fn allocator(&self) -> &A {
-        &self.allocator
-    }
+    pub fn allocator(&self) -> &A { &self.allocator }
 
-    ///
     /// Replaces the allocator used for temporary allocations by this FFT.
-    /// 
     #[stability::unstable(feature = "enable")]
-    pub fn with_allocator<A_new: Allocator + Sync + Send>(self, allocator: A_new) -> CooleyTuckeyFFT<R_main, R_twiddle, H, A_new> {
+    pub fn with_allocator<A_new: Allocator + Sync + Send>(
+        self,
+        allocator: A_new,
+    ) -> CooleyTuckeyFFT<R_main, R_twiddle, H, A_new> {
         CooleyTuckeyFFT {
             root_of_unity_list: self.root_of_unity_list,
             inv_root_of_unity_list: self.inv_root_of_unity_list,
             two_inv: self.two_inv,
             n_inv: self.n_inv,
-            root_of_unity: self.root_of_unity, 
-            hom: self.hom, 
-            log2_n: self.log2_n, 
-            allocator: allocator
+            root_of_unity: self.root_of_unity,
+            hom: self.hom,
+            log2_n: self.log2_n,
+            allocator,
         }
     }
 
-    ///
     /// Returns a reference to the homomorphism that is used to map the stored twiddle
     /// factors into main ring, over which FFTs are computed.
-    /// 
     #[stability::unstable(feature = "enable")]
-    pub fn hom(&self) -> &H {
-        &self.hom
-    }
+    pub fn hom(&self) -> &H { &self.hom }
 
-    ///
     /// Computes the unordered, truncated FFT.
-    /// 
+    ///
     /// The truncated FFT is the standard DFT, applied to a list for which only the first
     /// `nonzero_entries` entries are nonzero, and the (bitreversed) result truncated to
     /// length `nonzero_entries`.
-    /// 
+    ///
     /// Therefore, this function is equivalent to the following pseudocode
     /// ```text
     /// data[nonzero_entries..] = 0;
     /// unordered_fft(data);
     /// data[nonzero_entries] = unspecified;
     /// ```
-    /// 
+    ///
     /// It can be inverted using [`CooleyTuckey::unordered_truncated_fft_inv()`].
-    /// 
     #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
     pub fn unordered_truncated_fft(&self, data: &mut [R_main::Element], nonzero_entries: usize) {
@@ -706,19 +809,17 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             self.butterfly_step_main::<false, true>(data, 0..butterfly_count, 0..stride, log2_step);
         }
     }
-    
-    ///
+
     /// Computes the inverse of the unordered, truncated FFT.
-    /// 
+    ///
     /// The truncated FFT is the standard DFT, applied to a list for which only the first
     /// `nonzero_entries` entries are nonzero, and the (bitreversed) result truncated to
     /// length `nonzero_entries`. Therefore, this function computes a list of `nonzero_entries`
-    /// many values, followed by zeros, whose DFT agrees with the input on the first `nonzero_entries`
-    /// many elements.
-    /// 
+    /// many values, followed by zeros, whose DFT agrees with the input on the first
+    /// `nonzero_entries` many elements.
     #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn unordered_truncated_fft_inv(&self, data: &mut [R_main::Element], nonzero_entries: usize) {   
+    pub fn unordered_truncated_fft_inv(&self, data: &mut [R_main::Element], nonzero_entries: usize) {
         assert_eq!(self.len(), data.len());
         assert!(nonzero_entries > self.len() / 2);
         assert!(nonzero_entries <= self.len());
@@ -740,7 +841,12 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
                 let current_block = nonzero_entries / (2 * stride);
                 let known_area = nonzero_entries % (2 * stride);
                 if known_area >= stride {
-                    self.butterfly_uv_from_ub(data, current_block..(current_block + 1), (known_area - stride)..stride, log2_step);
+                    self.butterfly_uv_from_ub(
+                        data,
+                        current_block..(current_block + 1),
+                        (known_area - stride)..stride,
+                        log2_step,
+                    );
                 } else {
                     self.butterfly_ub_from_ab(data, current_block..(current_block + 1), known_area..stride, log2_step);
                 }
@@ -750,7 +856,12 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
                 let current_block = nonzero_entries / (2 * stride);
                 let known_area = nonzero_entries % (2 * stride);
                 if known_area >= stride {
-                    self.butterfly_step_main::<true, false>(data, current_block..(current_block + 1), 0..stride, log2_step);
+                    self.butterfly_step_main::<true, false>(
+                        data,
+                        current_block..(current_block + 1),
+                        0..stride,
+                        log2_step,
+                    );
                 } else {
                     self.butterfly_ab_from_ub(data, current_block..(current_block + 1), 0..stride, log2_step);
                 }
@@ -760,14 +871,14 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
             self.hom.mul_assign_ref_map(&mut data[i], &self.n_inv);
         }
     }
-    
-    ///
-    /// Permutes the given list of length `n` according to `values[bitreverse(i, log2(n))] = values[i]`.
-    /// This is exactly the permutation that is implicitly applied by [`CooleyTuckeyFFT::unordered_fft()`].
-    /// 
+
+    /// Permutes the given list of length `n` according to `values[bitreverse(i, log2(n))] =
+    /// values[i]`. This is exactly the permutation that is implicitly applied by
+    /// [`CooleyTuckeyFFT::unordered_fft()`].
     #[instrument(skip_all, level = "trace")]
-    pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V) 
-        where V: SwappableVectorViewMut<T>
+    pub fn bitreverse_permute_inplace<V, T>(&self, mut values: V)
+    where
+        V: SwappableVectorViewMut<T>,
     {
         assert!(values.len() == 1 << self.log2_n);
         for i in 0..(1 << self.log2_n) {
@@ -778,32 +889,28 @@ impl<R_main, R_twiddle, H, A> CooleyTuckeyFFT<R_main, R_twiddle, H, A>
     }
 }
 
-impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R_twiddle, H, A> 
-    where R_main: ?Sized + RingBase,
-        R_twiddle: ?Sized + RingBase + DivisibilityRing,
-        H: Homomorphism<R_twiddle, R_main>,
-        A: Allocator + Sync + Send
+impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R_twiddle, H, A>
+where
+    R_main: ?Sized + RingBase,
+    R_twiddle: ?Sized + RingBase + DivisibilityRing,
+    H: Homomorphism<R_twiddle, R_main>,
+    A: Allocator + Sync + Send,
 {
-    fn len(&self) -> usize {
-        1 << self.log2_n
-    }
+    fn len(&self) -> usize { 1 << self.log2_n }
 
     fn root_of_unity<S: Copy + RingStore<Type = R_main>>(&self, ring: S) -> &R_main::Element {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         &self.root_of_unity
     }
 
-    fn unordered_fft_permutation(&self, i: usize) -> usize {
-        bitreverse(i, self.log2_n)
-    }
+    fn unordered_fft_permutation(&self, i: usize) -> usize { bitreverse(i, self.log2_n) }
 
-    fn unordered_fft_permutation_inv(&self, i: usize) -> usize {
-        bitreverse(i, self.log2_n)
-    }
+    fn unordered_fft_permutation_inv(&self, i: usize) -> usize { bitreverse(i, self.log2_n) }
 
     fn fft<V, S>(&self, mut values: V, ring: S)
-        where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-            S: RingStore<Type = R_main> + Copy 
+    where
+        V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
+        S: RingStore<Type = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -812,8 +919,9 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
     }
 
     fn inv_fft<V, S>(&self, mut values: V, ring: S)
-        where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-            S: RingStore<Type = R_main> + Copy 
+    where
+        V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
+        S: RingStore<Type = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -822,8 +930,9 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
     }
 
     fn unordered_fft<V, S>(&self, mut values: V, ring: S)
-        where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-            S: RingStore<Type = R_main> + Copy 
+    where
+        V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
+        S: RingStore<Type = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -838,10 +947,11 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
             }
         }
     }
-    
+
     fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
-        where V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-            S: RingStore<Type = R_main> + Copy 
+    where
+        V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
+        S: RingStore<Type = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -858,9 +968,10 @@ impl<R_main, R_twiddle, H, A> FFTAlgorithm<R_main> for CooleyTuckeyFFT<R_main, R
     }
 }
 
-impl<H, A> FFTErrorEstimate for CooleyTuckeyFFT<Complex64Base, Complex64Base, H, A> 
-    where H: Homomorphism<Complex64Base, Complex64Base>,
-        A: Allocator + Sync + Send
+impl<H, A> FFTErrorEstimate for CooleyTuckeyFFT<Complex64Base, Complex64Base, H, A>
+where
+    H: Homomorphism<Complex64Base, Complex64Base>,
+    A: Allocator + Sync + Send,
 {
     fn expected_absolute_error(&self, input_bound: f64, input_error: f64) -> f64 {
         // the butterfly performs a multiplication with a root of unity, and an addition
@@ -868,20 +979,20 @@ impl<H, A> FFTErrorEstimate for CooleyTuckeyFFT<Complex64Base, Complex64Base, H,
         let addition_absolute_error = input_bound * f64::EPSILON;
         let butterfly_absolute_error = multiply_absolute_error + addition_absolute_error;
         // the operator inf-norm of the FFT is its length
-        return 2. * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
+        return 2.0 * self.len() as f64 * butterfly_absolute_error + self.len() as f64 * input_error;
     }
 }
 
 #[cfg(test)]
-use crate::primitive_int::*;
+use crate::field::*;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Fp;
+use crate::primitive_int::*;
 #[cfg(test)]
 use crate::rings::zn::zn_big;
 #[cfg(test)]
 use crate::rings::zn::zn_static;
 #[cfg(test)]
-use crate::field::*;
+use crate::rings::zn::zn_static::Fp;
 
 #[test]
 fn test_bitreverse_fft_inplace_basic() {
@@ -977,7 +1088,10 @@ fn test_for_zn() {
 
 #[cfg(test)]
 fn run_fft_bench_round<R, S, H>(fft: &CooleyTuckeyFFT<S, R, H>, data: &Vec<S::Element>, copy: &mut Vec<S::Element>)
-    where R: ZnRing, S: ZnRing, H: Homomorphism<R, S>
+where
+    R: ZnRing,
+    S: ZnRing,
+    H: Homomorphism<R, S>,
 {
     copy.clear();
     copy.extend(data.iter().map(|x| fft.ring().clone_el(x)));
@@ -994,11 +1108,11 @@ fn bench_fft_zn_big(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_big::ZnGB::new(StaticRing::<i128>::RING, 1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2))
+        .map(|i| ring.int_hom().map(i))
+        .collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
-    bencher.iter(|| {
-        run_fft_bench_round(&fft, &data, &mut copy)
-    });
+    bencher.iter(|| run_fft_bench_round(&fft, &data, &mut copy));
 }
 
 #[bench]
@@ -1006,11 +1120,11 @@ fn bench_fft_zn_64(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(1073872897);
     let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2))
+        .map(|i| ring.int_hom().map(i))
+        .collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
-    bencher.iter(|| {
-        run_fft_bench_round(&fft, &data, &mut copy)
-    });
+    bencher.iter(|| run_fft_bench_round(&fft, &data, &mut copy));
 }
 
 #[bench]
@@ -1019,11 +1133,11 @@ fn bench_fft_zn_64_fastmul(bencher: &mut test::Bencher) {
     let ring = zn_64b::Zn64B::new(1073872897);
     let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
     let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
-    let data = (0..(1 << BENCH_SIZE_LOG2)).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    let data = (0..(1 << BENCH_SIZE_LOG2))
+        .map(|i| ring.int_hom().map(i))
+        .collect::<Vec<_>>();
     let mut copy = Vec::with_capacity(1 << BENCH_SIZE_LOG2);
-    bencher.iter(|| {
-        run_fft_bench_round(&fft, &data, &mut copy)
-    });
+    bencher.iter(|| run_fft_bench_round(&fft, &data, &mut copy));
 }
 
 #[test]
@@ -1032,9 +1146,11 @@ fn test_approximate_fft() {
     let CC = Complex64::RING;
     for log2_n in [4, 7, 11, 15] {
         let fft = CooleyTuckeyFFT::new_with_pows(CC, |x| CC.root_of_unity(x, 1 << log2_n), log2_n);
-        let mut array = (0..(1 << log2_n)).map(|i|  CC.root_of_unity(i.try_into().unwrap(), 1 << log2_n)).collect::<Vec<_>>();
+        let mut array = (0..(1 << log2_n))
+            .map(|i| CC.root_of_unity(i.try_into().unwrap(), 1 << log2_n))
+            .collect::<Vec<_>>();
         fft.fft(&mut array, CC);
-        let err = fft.expected_absolute_error(1., 0.);
+        let err = fft.expected_absolute_error(1.0, 0.0);
         assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
         assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
         for i in 2..fft.len() {
@@ -1047,7 +1163,10 @@ fn test_approximate_fft() {
 fn test_size_1_fft() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<17>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(&ring, 0).unwrap().change_ring(ring.identity()).0;
+    let fft = CooleyTuckeyFFT::for_zn(&ring, 0)
+        .unwrap()
+        .change_ring(ring.identity())
+        .0;
     let values: [u64; 1] = [3];
     let mut work = values;
     fft.unordered_fft(&mut work, ring);
@@ -1059,9 +1178,14 @@ fn test_size_1_fft() {
 }
 
 #[cfg(any(test, feature = "generic_tests"))]
-pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(ring: R, base: S, edge_case_elements: I, test_twiddle: &El<S>)
-    where R::Type: CanHomFrom<S::Type>,
-        S::Type: DivisibilityRing
+pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(
+    ring: R,
+    base: S,
+    edge_case_elements: I,
+    test_twiddle: &El<S>,
+) where
+    R::Type: CanHomFrom<S::Type>,
+    S::Type: DivisibilityRing,
 {
     let test_inv_twiddle = base.invert(&test_twiddle).unwrap();
     let elements = edge_case_elements.collect::<Vec<_>>();
@@ -1069,11 +1193,18 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
 
     for a in &elements {
         for b in &elements {
-
             let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
             <R::Type as CooleyTuckeyButterfly<S::Type>>::butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
-            assert_el_eq!(ring, ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &x);
-            assert_el_eq!(ring, ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))), &y);
+            assert_el_eq!(
+                ring,
+                ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))),
+                &x
+            );
+            assert_el_eq!(
+                ring,
+                ring.sub_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))),
+                &y
+            );
 
             <R::Type as CooleyTuckeyButterfly<S::Type>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
@@ -1094,5 +1225,10 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
 #[test]
 fn test_butterfly() {
     feanor_tracing::DelayedLogger::init_test();
-    generic_test_cooley_tuckey_butterfly(zn_static::F17, zn_static::F17, 0..17, &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap());
+    generic_test_cooley_tuckey_butterfly(
+        zn_static::F17,
+        zn_static::F17,
+        0..17,
+        &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap(),
+    );
 }

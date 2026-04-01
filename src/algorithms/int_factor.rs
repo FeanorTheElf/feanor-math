@@ -2,50 +2,48 @@ use tracing::instrument;
 
 use crate::algorithms::ec_factor::lenstra_ec_factor;
 use crate::divisibility::DivisibilityRingStore;
-use crate::ordered::OrderedRing;
-use crate::ordered::OrderedRingStore;
-use crate::primitive_int::StaticRing;
-use crate::primitive_int::StaticRingBase;
-use crate::ring::*;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::algorithms;
-use crate::rings::zn::choose_zn_impl;
-use crate::rings::zn::ZnOperation;
-use crate::rings::zn::ZnRing;
-use crate::rings::zn::ZnRingStore;
-use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
+use crate::ordered::{OrderedRing, OrderedRingStore};
+use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::ring::*;
+use crate::rings::zn::{ZnOperation, ZnRing, ZnRingStore, choose_zn_impl};
+use crate::{DEFAULT_PROBABILISTIC_REPETITIONS, algorithms};
 
 struct ECFactorInt<I>
-    where I: RingStore,
-        I::Type: IntegerRing 
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
-    result_ring: I
+    result_ring: I,
 }
 
 impl<I> ZnOperation for ECFactorInt<I>
-    where I: RingStore,
-        I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
-    type Output<'a> = El<I>
-        where Self: 'a;
+    type Output<'a>
+        = El<I>
+    where
+        Self: 'a;
 
     fn call<'a, R>(self, ring: R) -> El<I>
-        where Self: 'a, 
-            R: 'a + RingStore, 
-            R::Type: ZnRing
+    where
+        Self: 'a,
+        R: 'a + RingStore,
+        R::Type: ZnRing,
     {
         int_cast(lenstra_ec_factor(&ring), self.result_ring, ring.integer_ring())
     }
 }
 
-///
 /// If the given integer is a power of a prime `p`, returns `Some((p, ln(n)/ln(p)))`.
-/// 
 #[instrument(skip_all, level = "trace")]
 pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
-    where I: RingStore + Copy,
-        I::Type: IntegerRing
+where
+    I: RingStore + Copy,
+    I::Type: IntegerRing,
 {
     if algorithms::miller_rabin::is_prime(ZZ, n, DEFAULT_PROBABILISTIC_REPETITIONS) {
         return Some((ZZ.clone_el(n), 1));
@@ -59,8 +57,9 @@ pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
 }
 
 fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
-    where I: RingStore + Copy,
-        I::Type: IntegerRing
+where
+    I: RingStore + Copy,
+    I::Type: IntegerRing,
 {
     assert!(!ZZ.is_zero(n));
     for i in (2..=ZZ.abs_log2_ceil(n).unwrap()).rev() {
@@ -72,15 +71,14 @@ fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
     return None;
 }
 
-///
 /// Factors the given integer.
-/// 
+///
 /// Returns a list of all factors with their multipliplicities.
-/// 
 #[instrument(skip_all, level = "trace")]
-pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)> 
-    where I: RingStore + Copy, 
-        I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>
+pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
+where
+    I: RingStore + Copy,
+    I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>,
 {
     const SMALL_PRIME_BOUND: i32 = 10000;
     let mut result = Vec::new();
@@ -153,23 +151,23 @@ pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
                 result.push((ZZ.clone_el(p1), m1 + m2));
                 _ = iter1.next().unwrap();
                 _ = iter2.next().unwrap();
-            },
+            }
             (Some((p1, m1)), Some((p2, _m2))) if ZZ.is_lt(p1, p2) => {
                 result.push((ZZ.clone_el(p1), *m1));
                 _ = iter1.next().unwrap();
-            },
+            }
             (Some((_p1, _m1)), Some((p2, m2))) => {
                 result.push((ZZ.clone_el(p2), *m2));
                 _ = iter2.next().unwrap();
-            },
+            }
             (Some((p1, m1)), None) => {
                 result.push((ZZ.clone_el(p1), *m1));
                 _ = iter1.next().unwrap();
-            },
+            }
             (None, Some((p2, m2))) => {
                 result.push((ZZ.clone_el(p2), *m2));
                 _ = iter2.next().unwrap();
-            },
+            }
             (None, None) => {
                 return result;
             }
@@ -177,31 +175,62 @@ pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
     }
 }
 
-
 #[test]
 fn test_factor() {
     feanor_tracing::DelayedLogger::init_test();
     let ZZbig = BigIntRing::RING;
-    assert_eq!(vec![(3, 2), (5, 1), (29, 1)], factor(&StaticRing::<i64>::RING, 3 * 3 * 5 * 29));
+    assert_eq!(
+        vec![(3, 2), (5, 1), (29, 1)],
+        factor(&StaticRing::<i64>::RING, 3 * 3 * 5 * 29)
+    );
     assert_eq!(vec![(2, 8)], factor(&StaticRing::<i64>::RING, 256));
     assert_eq!(vec![(1009, 2)], factor(&StaticRing::<i64>::RING, 1009 * 1009));
     assert_eq!(vec![(0, 1)], factor(&StaticRing::<i64>::RING, 0));
     assert_eq!(Vec::<(i64, usize)>::new(), factor(&StaticRing::<i64>::RING, 1));
     assert_eq!(vec![(-1, 1)], factor(&StaticRing::<i64>::RING, -1));
-    assert_eq!(vec![(257, 1), (1009, 2)], factor(&StaticRing::<i128>::RING, 257 * 1009 * 1009));
+    assert_eq!(
+        vec![(257, 1), (1009, 2)],
+        factor(&StaticRing::<i128>::RING, 257 * 1009 * 1009)
+    );
 
-    let expected = vec![(ZZbig.int_hom().map(-1), 1), (ZZbig.int_hom().map(32771), 1), (ZZbig.int_hom().map(65537), 1)];
-    let actual = factor(&ZZbig, ZZbig.mul(ZZbig.int_hom().map(-32771), ZZbig.int_hom().map(65537)));
+    let expected = vec![
+        (ZZbig.int_hom().map(-1), 1),
+        (ZZbig.int_hom().map(32771), 1),
+        (ZZbig.int_hom().map(65537), 1),
+    ];
+    let actual = factor(
+        &ZZbig,
+        ZZbig.mul(ZZbig.int_hom().map(-32771), ZZbig.int_hom().map(65537)),
+    );
     assert_eq!(expected.len(), actual.len());
-    for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in expected.iter().zip(actual.iter()) {
+    for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in
+        expected.iter().zip(actual.iter())
+    {
         assert_eq!(expected_multiplicity, actual_multiplicity);
         assert!(ZZbig.eq_el(expected_factor, actual_factor));
     }
 
-    let expected = vec![(ZZbig.int_hom().map(257), 2), (ZZbig.int_hom().map(32771), 1), (ZZbig.int_hom().map(65537), 2)];
-    let actual = factor(&ZZbig, ZZbig.prod([ZZbig.int_hom().map(257 * 257), ZZbig.int_hom().map(32771), ZZbig.int_hom().map(65537), ZZbig.int_hom().map(65537)].into_iter()));
+    let expected = vec![
+        (ZZbig.int_hom().map(257), 2),
+        (ZZbig.int_hom().map(32771), 1),
+        (ZZbig.int_hom().map(65537), 2),
+    ];
+    let actual = factor(
+        &ZZbig,
+        ZZbig.prod(
+            [
+                ZZbig.int_hom().map(257 * 257),
+                ZZbig.int_hom().map(32771),
+                ZZbig.int_hom().map(65537),
+                ZZbig.int_hom().map(65537),
+            ]
+            .into_iter(),
+        ),
+    );
     assert_eq!(expected.len(), actual.len());
-    for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in expected.iter().zip(actual.iter()) {
+    for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in
+        expected.iter().zip(actual.iter())
+    {
         assert_eq!(expected_multiplicity, actual_multiplicity);
         assert!(ZZbig.eq_el(expected_factor, actual_factor));
     }
@@ -216,5 +245,8 @@ fn test_is_prime_power() {
 #[test]
 fn test_is_prime_power_large_n() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(Some((5, 25)), is_prime_power(&StaticRing::<i64>::RING, &StaticRing::<i64>::RING.pow(5, 25)));
+    assert_eq!(
+        Some((5, 25)),
+        is_prime_power(&StaticRing::<i64>::RING, &StaticRing::<i64>::RING.pow(5, 25))
+    );
 }

@@ -3,61 +3,60 @@ use std::marker::PhantomData;
 
 use tracing::instrument;
 
-use crate::cow::*;
+use super::ConvolutionAlgorithm;
+use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
-use crate::algorithms::fft::FFTAlgorithm;
-use crate::lazy::LazyVec;
-use crate::primitive_int::StaticRingBase;
-use crate::integer::*;
-use crate::ring::*;
-use crate::seq::*;
-use crate::primitive_int::*;
+use crate::cow::*;
 use crate::homomorphism::*;
+use crate::integer::*;
+use crate::lazy::LazyVec;
+use crate::primitive_int::{StaticRingBase, *};
+use crate::ring::*;
 use crate::rings::float_complex::*;
 use crate::rings::zn::*;
-
-use super::ConvolutionAlgorithm;
+use crate::seq::*;
 
 const CC: Complex64 = Complex64::RING;
 
 #[stability::unstable(feature = "enable")]
 pub struct FFTConvolution<A = Global> {
     allocator: A,
-    fft_tables: LazyVec<CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>>>
+    fft_tables: LazyVec<CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>>>,
 }
 
 #[stability::unstable(feature = "enable")]
 pub struct PreparedConvolutionOperand<R, A = Global>
-    where R: ?Sized + RingBase,
-        A: Send + Sync + Allocator + Clone
+where
+    R: ?Sized + RingBase,
+    A: Send + Sync + Allocator + Clone,
 {
     ring: PhantomData<Box<R>>,
     fft_data: LazyVec<Vec<El<Complex64>, A>>,
-    log2_data_size: usize
+    log2_data_size: usize,
 }
 
 impl FFTConvolution<Global> {
-    
     #[stability::unstable(feature = "enable")]
-    pub fn new() -> Self {
-        Self::new_with_alloc(Global)
-    }
+    pub fn new() -> Self { Self::new_with_alloc(Global) }
 }
 
 impl<A> FFTConvolution<A>
-    where A: Send + Sync + Allocator + Clone
+where
+    A: Send + Sync + Allocator + Clone,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new_with_alloc(allocator: A) -> Self {
         Self {
-            allocator: allocator,
-            fft_tables: LazyVec::new()
+            allocator,
+            fft_tables: LazyVec::new(),
         }
     }
 
     fn get_fft_table(&self, log2_len: usize) -> &CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>> {
-        return self.fft_tables.get_or_init(log2_len, || CooleyTuckeyFFT::for_complex(CC, log2_len));
+        return self
+            .fft_tables
+            .get_or_init(log2_len, || CooleyTuckeyFFT::for_complex(CC, log2_len));
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -68,19 +67,23 @@ impl<A> FFTConvolution<A>
         _ring: &R,
         log2_len: usize,
         mut to_int: ToInt,
-        log2_el_size: Option<usize>
+        log2_el_size: Option<usize>,
     ) -> MyCow<'a, Vec<El<Complex64>, A>>
-        where R: ?Sized + RingBase,
-            V: VectorView<R::Element>,
-            ToInt: FnMut(&R::Element) -> i64
+    where
+        R: ?Sized + RingBase,
+        V: VectorView<R::Element>,
+        ToInt: FnMut(&R::Element) -> i64,
     {
         let log2_data_size = if let Some(log2_data_size) = log2_el_size {
             if let Some(data_prep) = data_prep {
                 assert_eq!(log2_data_size, data_prep.log2_data_size);
             }
-            log2_data_size 
+            log2_data_size
         } else {
-            data.as_iter().map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+            data.as_iter()
+                .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
+                .max()
+                .unwrap()
         };
         assert!(data.len() <= (1 << log2_len));
         assert!(self.has_sufficient_precision(log2_len, log2_data_size));
@@ -97,7 +100,7 @@ impl<A> FFTConvolution<A>
             MyCow::Borrowed(data_prep.fft_data.get_or_init(log2_len, compute_result))
         } else {
             MyCow::Owned(compute_result())
-        }
+        };
     }
 
     #[stability::unstable(feature = "enable")]
@@ -107,10 +110,12 @@ impl<A> FFTConvolution<A>
 
     fn convolution_result_error(&self, log2_len: usize, log2_input_size: usize) -> f64 {
         let fft_table = self.get_fft_table(log2_len);
-        let input_size = 2f64.powi(log2_input_size.try_into().unwrap());
-        fft_table.expected_absolute_error(input_size * input_size, input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.))
+        let input_size = 2.0f64.powi(log2_input_size.try_into().unwrap());
+        fft_table.expected_absolute_error(
+            input_size * input_size,
+            input_size * input_size * f64::EPSILON + fft_table.expected_absolute_error(input_size, 0.0),
+        )
     }
-
 
     fn prepare_convolution_impl<R, ToInt>(
         &self,
@@ -118,20 +123,24 @@ impl<A> FFTConvolution<A>
         ring: &R,
         length_hint: Option<usize>,
         mut to_int: ToInt,
-        ring_log2_el_size: Option<usize>
+        ring_log2_el_size: Option<usize>,
     ) -> PreparedConvolutionOperand<R, A>
-        where R: ?Sized + RingBase,
-            ToInt: FnMut(&R::Element) -> i64
+    where
+        R: ?Sized + RingBase,
+        ToInt: FnMut(&R::Element) -> i64,
     {
         let log2_data_size = if let Some(log2_data_size) = ring_log2_el_size {
-            log2_data_size 
+            log2_data_size
         } else {
-            data.as_iter().map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap_or(0)
+            data.as_iter()
+                .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
+                .max()
+                .unwrap_or(0)
         };
         let result = PreparedConvolutionOperand {
             fft_data: LazyVec::new(),
             ring: PhantomData,
-            log2_data_size: log2_data_size
+            log2_data_size,
         };
         // if a length-hint is given, initialize the corresponding length entry;
         // this might avoid confusing performance characteristics when the user does
@@ -156,11 +165,11 @@ impl<A> FFTConvolution<A>
         ring: &R,
         mut to_int: ToInt,
         mut from_int: FromInt,
-        ring_log2_el_size: Option<usize>
-    )
-        where R: ?Sized + RingBase,
-            ToInt: FnMut(&R::Element) -> i64,
-            FromInt: FnMut(i64) -> R::Element
+        ring_log2_el_size: Option<usize>,
+    ) where
+        R: ?Sized + RingBase,
+        ToInt: FnMut(&R::Element) -> i64,
+        FromInt: FnMut(i64) -> R::Element,
     {
         if lhs.len() == 0 || rhs.len() == 0 {
             return;
@@ -193,21 +202,36 @@ impl<A> FFTConvolution<A>
     #[instrument(skip_all, level = "trace")]
     fn compute_convolution_sum_impl<R, ToInt, FromInt>(
         &self,
-        values: &[(&[R::Element], Option<&PreparedConvolutionOperand<R, A>>, &[R::Element], Option<&PreparedConvolutionOperand<R, A>>)],
+        values: &[(
+            &[R::Element],
+            Option<&PreparedConvolutionOperand<R, A>>,
+            &[R::Element],
+            Option<&PreparedConvolutionOperand<R, A>>,
+        )],
         dst: &mut [R::Element],
         ring: &R,
         mut to_int: ToInt,
         mut from_int: FromInt,
-        ring_log2_el_size: Option<usize>
-    )
-        where R: ?Sized + RingBase,
-            ToInt: FnMut(&R::Element) -> i64,
-            FromInt: FnMut(i64) -> R::Element
+        ring_log2_el_size: Option<usize>,
+    ) where
+        R: ?Sized + RingBase,
+        ToInt: FnMut(&R::Element) -> i64,
+        FromInt: FnMut(i64) -> R::Element,
     {
         if values.len() == 0 {
             return;
         }
-        let len = values.iter().map(|(l, _, r, _)| if l.len() == 0 || r.len() == 0 { 0 } else { l.len() + r.len() - 1}).max().unwrap();
+        let len = values
+            .iter()
+            .map(|(l, _, r, _)| {
+                if l.len() == 0 || r.len() == 0 {
+                    0
+                } else {
+                    l.len() + r.len() - 1
+                }
+            })
+            .max()
+            .unwrap();
         if len == 0 {
             return;
         }
@@ -217,7 +241,7 @@ impl<A> FFTConvolution<A>
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize(1 << log2_len, CC.zero());
 
-        let mut current_error = 0.;
+        let mut current_error = 0.0;
         for (lhs, lhs_prep, rhs, rhs_prep) in values {
             if lhs.len() == 0 || rhs.len() == 0 {
                 continue;
@@ -227,11 +251,15 @@ impl<A> FFTConvolution<A>
             let lhs_rhs_log2_size = if let Some(ring_log2_el_size) = ring_log2_el_size {
                 ring_log2_el_size
             } else {
-                lhs.as_iter().chain(rhs.as_iter()).map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0)).max().unwrap()
+                lhs.as_iter()
+                    .chain(rhs.as_iter())
+                    .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
+                    .max()
+                    .unwrap()
             };
-            
+
             if current_error + self.convolution_result_error(log2_len, lhs_rhs_log2_size) >= 0.5 {
-                current_error = 0.;
+                current_error = 0.0;
                 self.get_fft_table(log2_len).unordered_inv_fft(&mut *buffer, CC);
                 for i in 0..len {
                     let result = CC.closest_gaussian_int(buffer[i]);
@@ -242,7 +270,7 @@ impl<A> FFTConvolution<A>
                     buffer[i] = CC.zero();
                 }
             }
-            
+
             let mut lhs_fft = self.get_fft_data(lhs, *lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
             let mut rhs_fft = self.get_fft_data(rhs, *rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
             if rhs_fft.is_owned() {
@@ -266,108 +294,140 @@ impl<A> FFTConvolution<A>
 }
 
 fn to_int_int<I>(ring: I) -> impl use<I> + Fn(&El<I>) -> i64
-    where I: RingStore, I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     move |x| int_cast(ring.clone_el(x), StaticRing::<i64>::RING, &ring)
 }
 
 fn from_int_int<I>(ring: I) -> impl use<I> + Fn(i64) -> El<I>
-    where I: RingStore, I::Type: IntegerRing
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     move |x| int_cast(x, &ring, StaticRing::<i64>::RING)
 }
 
 fn to_int_zn<R>(ring: R) -> impl use<R> + Fn(&El<R>) -> i64
-    where R: RingStore, R::Type: ZnRing
+where
+    R: RingStore,
+    R::Type: ZnRing,
 {
-    move |x| int_cast(ring.smallest_lift(ring.clone_el(x)), StaticRing::<i64>::RING, ring.integer_ring())
+    move |x| {
+        int_cast(
+            ring.smallest_lift(ring.clone_el(x)),
+            StaticRing::<i64>::RING,
+            ring.integer_ring(),
+        )
+    }
 }
 
 fn from_int_zn<R>(ring: R) -> impl use<R> + Fn(i64) -> El<R>
-    where R: RingStore, R::Type: ZnRing
+where
+    R: RingStore,
+    R::Type: ZnRing,
 {
     let hom = ring.can_hom(ring.integer_ring()).unwrap().into_raw_hom();
-    move |x| ring.get_ring().map_in(ring.integer_ring().get_ring(), int_cast(x, ring.integer_ring(), StaticRing::<i64>::RING), &hom)
+    move |x| {
+        ring.get_ring().map_in(
+            ring.integer_ring().get_ring(),
+            int_cast(x, ring.integer_ring(), StaticRing::<i64>::RING),
+            &hom,
+        )
+    }
 }
 
 impl<A> Clone for FFTConvolution<A>
-    where A: Send + Sync + Allocator + Clone
+where
+    A: Send + Sync + Allocator + Clone,
 {
     fn clone(&self) -> Self {
         Self {
             allocator: self.allocator.clone(),
-            fft_tables: self.fft_tables.clone()
+            fft_tables: self.fft_tables.clone(),
         }
     }
 }
 
 impl<A> From<FFTConvolutionZn<A>> for FFTConvolution<A>
-    where A: Allocator
+where
+    A: Allocator,
 {
-    fn from(value: FFTConvolutionZn<A>) -> Self {
-        value.base
-    }
+    fn from(value: FFTConvolutionZn<A>) -> Self { value.base }
 }
 
 impl<'a, A> From<&'a FFTConvolutionZn<A>> for &'a FFTConvolution<A>
-    where A: Allocator
+where
+    A: Allocator,
 {
-    fn from(value: &'a FFTConvolutionZn<A>) -> Self {
-        &value.base
-    }
+    fn from(value: &'a FFTConvolutionZn<A>) -> Self { &value.base }
 }
 
 impl<A> From<FFTConvolution<A>> for FFTConvolutionZn<A>
-    where A: Allocator
+where
+    A: Allocator,
 {
-    fn from(value: FFTConvolution<A>) -> Self {
-        FFTConvolutionZn { base: value }
-    }
+    fn from(value: FFTConvolution<A>) -> Self { FFTConvolutionZn { base: value } }
 }
 
 impl<'a, A> From<&'a FFTConvolution<A>> for &'a FFTConvolutionZn<A>
-    where A: Allocator
+where
+    A: Allocator,
 {
-    fn from(value: &'a FFTConvolution<A>) -> Self {
-        unsafe { std::mem::transmute(value) }
-    }
+    fn from(value: &'a FFTConvolution<A>) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
 #[stability::unstable(feature = "enable")]
 #[repr(transparent)]
 pub struct FFTConvolutionZn<A = Global> {
-    base: FFTConvolution<A>
+    base: FFTConvolution<A>,
 }
 
 impl<A> Clone for FFTConvolutionZn<A>
-    where A: Send + Sync + Allocator + Clone
+where
+    A: Send + Sync + Allocator + Clone,
 {
     fn clone(&self) -> Self {
-        Self { base: self.base.clone() }
+        Self {
+            base: self.base.clone(),
+        }
     }
 }
 
 impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
-    where R: ?Sized + ZnRing + CanHomFrom<StaticRingBase<i64>>,
-        A: Send + Sync + Allocator + Clone
+where
+    R: ?Sized + ZnRing + CanHomFrom<StaticRingBase<i64>>,
+    A: Send + Sync + Allocator + Clone,
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, A>;
 
-    fn supports_ring(&self, _ring: &R) -> bool {
-        true
-    }
+    fn supports_ring(&self, _ring: &R) -> bool { true }
 
-    fn prepare_convolution_operand(&self, val: &[R::Element], len_hint: Option<usize>, ring: &R) -> Self::PreparedConvolutionOperand {
+    fn prepare_convolution_operand(
+        &self,
+        val: &[R::Element],
+        len_hint: Option<usize>,
+        ring: &R,
+    ) -> Self::PreparedConvolutionOperand {
         self.base.prepare_convolution_impl(
             val,
             ring,
             len_hint,
             to_int_zn(RingRef::new(ring)),
-            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap()),
         )
     }
 
-    fn compute_convolution(&self, lhs: &[R::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[R::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [R::Element], ring: &R) {
+    fn compute_convolution(
+        &self,
+        lhs: &[R::Element],
+        lhs_prep: Option<&Self::PreparedConvolutionOperand>,
+        rhs: &[R::Element],
+        rhs_prep: Option<&Self::PreparedConvolutionOperand>,
+        dst: &mut [R::Element],
+        ring: &R,
+    ) {
         self.base.compute_convolution_impl(
             lhs,
             lhs_prep,
@@ -377,43 +437,59 @@ impl<R, A> ConvolutionAlgorithm<R> for FFTConvolutionZn<A>
             ring,
             to_int_zn(RingRef::new(ring)),
             from_int_zn(RingRef::new(ring)),
-            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap()),
         )
     }
 
-    fn compute_convolution_sum(&self, values: &[(&[R::Element], Option<&Self::PreparedConvolutionOperand>, &[R::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [R::Element], ring: &R) {
+    fn compute_convolution_sum(
+        &self,
+        values: &[(
+            &[R::Element],
+            Option<&Self::PreparedConvolutionOperand>,
+            &[R::Element],
+            Option<&Self::PreparedConvolutionOperand>,
+        )],
+        dst: &mut [R::Element],
+        ring: &R,
+    ) {
         self.base.compute_convolution_sum_impl(
             values,
             dst,
             ring,
             to_int_zn(RingRef::new(ring)),
             from_int_zn(RingRef::new(ring)),
-            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap())
+            Some(ring.integer_ring().abs_log2_ceil(ring.modulus()).unwrap()),
         )
     }
 }
 
 impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
-    where I: ?Sized + IntegerRing,
-        A: Send + Sync + Allocator + Clone
+where
+    I: ?Sized + IntegerRing,
+    A: Send + Sync + Allocator + Clone,
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<I, A>;
 
-    fn supports_ring(&self, _ring: &I) -> bool {
-        true
+    fn supports_ring(&self, _ring: &I) -> bool { true }
+
+    fn prepare_convolution_operand(
+        &self,
+        val: &[I::Element],
+        len_hint: Option<usize>,
+        ring: &I,
+    ) -> Self::PreparedConvolutionOperand {
+        self.prepare_convolution_impl(val, ring, len_hint, to_int_int(RingRef::new(ring)), None)
     }
 
-    fn prepare_convolution_operand(&self, val: &[I::Element], len_hint: Option<usize>, ring: &I) -> Self::PreparedConvolutionOperand {
-        self.prepare_convolution_impl(
-            val,
-            ring,
-            len_hint,
-            to_int_int(RingRef::new(ring)),
-            None
-        )
-    }
-
-    fn compute_convolution(&self, lhs: &[I::Element], lhs_prep: Option<&Self::PreparedConvolutionOperand>, rhs: &[I::Element], rhs_prep: Option<&Self::PreparedConvolutionOperand>, dst: &mut [I::Element], ring: &I) {
+    fn compute_convolution(
+        &self,
+        lhs: &[I::Element],
+        lhs_prep: Option<&Self::PreparedConvolutionOperand>,
+        rhs: &[I::Element],
+        rhs_prep: Option<&Self::PreparedConvolutionOperand>,
+        dst: &mut [I::Element],
+        ring: &I,
+    ) {
         self.compute_convolution_impl(
             lhs,
             lhs_prep,
@@ -423,18 +499,28 @@ impl<I, A> ConvolutionAlgorithm<I> for FFTConvolution<A>
             ring,
             to_int_int(RingRef::new(ring)),
             from_int_int(RingRef::new(ring)),
-            None
+            None,
         )
     }
 
-    fn compute_convolution_sum(&self, values: &[(&[I::Element], Option<&Self::PreparedConvolutionOperand>, &[I::Element], Option<&Self::PreparedConvolutionOperand>)], dst: &mut [I::Element], ring: &I) {
+    fn compute_convolution_sum(
+        &self,
+        values: &[(
+            &[I::Element],
+            Option<&Self::PreparedConvolutionOperand>,
+            &[I::Element],
+            Option<&Self::PreparedConvolutionOperand>,
+        )],
+        dst: &mut [I::Element],
+        ring: &I,
+    ) {
         self.compute_convolution_sum_impl(
             values,
             dst,
             ring,
             to_int_int(RingRef::new(ring)),
             from_int_int(RingRef::new(ring)),
-            None
+            None,
         )
     }
 }

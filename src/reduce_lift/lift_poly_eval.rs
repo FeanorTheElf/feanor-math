@@ -1,80 +1,89 @@
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::divisibility::{DivisibilityRing, Domain};
+use crate::field::*;
 use crate::homomorphism::*;
 use crate::ring::*;
-use crate::field::*;
 use crate::rings::finite::FiniteRing;
 use crate::specialization::FiniteRingSpecializable;
 
-///
 /// Trait for rings that can be temporarily replaced by an extension when we need more points,
 /// e.g. for interpolation.
-/// 
+///
 /// Note that a trivial implementation is possible for every ring of characteristic 0, since
-/// these already have infinitely many points whose pairwise differences are non-zero-divisors. 
-/// Such an implementation can be added to new types using the macro [`impl_interpolation_base_ring_char_zero!`].
-/// 
+/// these already have infinitely many points whose pairwise differences are non-zero-divisors.
+/// Such an implementation can be added to new types using the macro
+/// [`impl_interpolation_base_ring_char_zero!`].
 pub trait InterpolationBaseRing: DivisibilityRing {
-
-    ///
     /// The type of the extension ring we can switch to to get more points.
-    /// 
+    ///
     /// For the reason why there are so many quite specific trait bounds here:
     /// See the doc of [`LiftPolyEvalRing::LocalRingBase`].
-    /// 
     type ExtendedRingBase<'a>: ?Sized + Domain + LinSolveRing + ComputeResultantRing + SelfIso
-        where Self: 'a;
+    where
+        Self: 'a;
 
     type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
-        where Self: 'a;
+    where
+        Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
-        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>;
+    where
+        Self: 'a,
+        S: RingStore<Type = Self::ExtendedRingBase<'a>>;
 
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
-        where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>;
+    where
+        Self: 'a,
+        S: RingStore<Type = Self::ExtendedRingBase<'a>>;
 
-    ///
     /// Returns `count` points such that the difference between any two of them
     /// is a non-zero-divisor.
-    /// 
+    ///
     /// Any two calls must give elements in the same order.
-    /// 
     fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>);
 }
 
-///
 /// [`RingStore`] for [`InterpolationBaseRing`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub trait InterpolationBaseRingStore: RingStore
-    where Self::Type: InterpolationBaseRing
-{}
+where
+    Self::Type: InterpolationBaseRing,
+{
+}
 
 impl<R> InterpolationBaseRingStore for R
-    where R: RingStore, R::Type: InterpolationBaseRing
-{}
+where
+    R: RingStore,
+    R::Type: InterpolationBaseRing,
+{
+}
 
-///
 /// The inclusion map `R -> S` for a ring `R` and one of its extensions `S`
 /// as given by [`InterpolationBaseRing`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub struct ToExtRingMap<'a, R>
-    where R: ?Sized + InterpolationBaseRing
+where
+    R: ?Sized + InterpolationBaseRing,
 {
     ring: RingRef<'a, R>,
-    ext_ring: R::ExtendedRing<'a>
+    ext_ring: R::ExtendedRing<'a>,
 }
 
 impl<'a, R> ToExtRingMap<'a, R>
-    where R: ?Sized + InterpolationBaseRing
+where
+    R: ?Sized + InterpolationBaseRing,
 {
     #[stability::unstable(feature = "enable")]
     pub fn for_interpolation(ring: &'a R, point_count: usize) -> (Self, Vec<El<R::ExtendedRing<'a>>>) {
         let (ext_ring, points) = ring.interpolation_points(point_count);
-        return (Self { ring: RingRef::new(ring), ext_ring: ext_ring }, points);
+        return (
+            Self {
+                ring: RingRef::new(ring),
+                ext_ring,
+            },
+            points,
+        );
     }
 
     #[stability::unstable(feature = "enable")]
@@ -84,34 +93,30 @@ impl<'a, R> ToExtRingMap<'a, R>
 }
 
 impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
-    where R: ?Sized + InterpolationBaseRing
+where
+    R: ?Sized + InterpolationBaseRing,
 {
     type CodomainStore = R::ExtendedRing<'a>;
     type DomainStore = RingRef<'a, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.ext_ring
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.ext_ring }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.ring
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::ExtendedRingBase<'a> as RingBase>::Element {
         self.ring.get_ring().in_extension(&self.ext_ring, x)
     }
 }
 
-///
 /// Trait for rings that support lifting evaluations of a polynomial modulo a product
-/// of prime ideals to the original ring. 
-/// 
+/// of prime ideals to the original ring.
+///
 /// More concretely, a ring `R` implementing this trait should be endowed with a norm-like map
 /// ```text
 ///   |.|: R  ->  [0, ∞) u { -∞ }
 /// ```
 /// For the exact properties expected of this map, see [`LiftPolyEvalRing::ln_pseudo_norm()`].
-/// 
+///
 /// Furthermore, for any bound `b`, the ring should be able to provide prime ideals
 /// `p1, ..., pk` together with the rings `Ri = R / pi`, such that the restricted
 /// reduction map
@@ -121,51 +126,52 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// is injective.
 /// This means that a computation can be performed in the simpler ring `R1 x ... x Rk`,
 /// and - assuming the result is of pseudo-norm `<= b`, mapped back to `R`.
-/// 
+///
 /// The standard use case is the evaluation of a multivariate polynomial `f(X1, ..., Xm)`
 /// over this ring. The trait is designed to enable the following approach:
-///  - Given ring elements `a1, ..., am`, compute an upper bound `B` on `|f(a1, ..., am)|`.
-///    The values `|ai|` are given by [`LiftPolyEvalRing::pseudo_norm()`].
-///  - Get a sufficient number of prime ideals, using [`LiftPolyEvalRing::local_computation()`] 
-///  - Compute `f(a1 mod pi, ..., am mod pi) mod pi` for each prime `pi` within the ring given by 
+///  - Given ring elements `a1, ..., am`, compute an upper bound `B` on `|f(a1, ..., am)|`. The
+///    values `|ai|` are given by [`LiftPolyEvalRing::pseudo_norm()`].
+///  - Get a sufficient number of prime ideals, using [`LiftPolyEvalRing::local_computation()`]
+///  - Compute `f(a1 mod pi, ..., am mod pi) mod pi` for each prime `pi` within the ring given by
 ///    [`LiftPolyEvalRing::local_ring_at()`]. The reductions `ai mod pj` are given by
 ///    [`LiftPolyEvalRing::reduce()`].
 ///  - Recombine the results to an element of `R` by using [`LiftPolyEvalRing::lift_combine()`].
-/// 
+///
 /// # Relationship with [`crate::reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`]
-/// 
+///
 /// There are generally two ways of computing something via a reduce-modulo-primes-then-lift
 /// approach. Either one can take many different prime ideals, or one can take a large power
 /// of a single/a small amount of prime ideals.
-/// 
+///
 /// This trait is for the former approach, which is especially suitable when the computation to
-/// perform can be written as a polynomial evaluation. In particular, this applicable to determinants,
-/// resultant, and (with some caveats) solving linear systems.
-/// 
+/// perform can be written as a polynomial evaluation. In particular, this applicable to
+/// determinants, resultant, and (with some caveats) solving linear systems.
+///
 /// On the other hand, when factoring polynomials or computing their gcds, it is common to instead
 /// rely on Hensel lifting to compute the result modulo a large power of a single prime, or very
-/// few primes. This approach is formalized by [`crate::reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`].
-/// 
+/// few primes. This approach is formalized by
+/// [`crate::reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`].
+///
 /// # Type-level recursion in feanor-math
-/// 
+///
 /// [`LiftPolyEvalRing`] and [`PolyLiftFactorsDomain`] are the two traits in feanor-math which
 /// use type-level recursion with blanket implementations. The idea is simple: If our ring is an
 /// [`LiftPolyEvalRing`], whose quotients are again [`LiftPolyEvalRing`], whose quotients are
 /// again [`LiftPolyEvalRing`] and so on, ending with a finite field. Then, for all kinds of
-/// operations which are actually just polynomial evaluations (resultants, determinants, unique-solution
-/// linear systems, ...) we already have all the information for an efficient algorithm. However,
-/// providing this through blanket implementations is not that simple. We now explain how it is
-/// done in feanor-math.
-/// 
+/// operations which are actually just polynomial evaluations (resultants, determinants,
+/// unique-solution linear systems, ...) we already have all the information for an efficient
+/// algorithm. However, providing this through blanket implementations is not that simple. We now
+/// explain how it is done in feanor-math.
+///
 /// The proper solution:
 /// ```compile_fail,E0391
 /// #![feature(min_specialization)]
 /// // Some special property, in practice this might be LinSolveRing, ComputeResultantRing, FactorPolyRing, ...
 /// pub trait SpecialProperty {
-/// 
+///
 ///     fn foo<'a>(&'a self);
 /// }
-/// 
+///
 /// impl<T> SpecialProperty for T
 ///     where T: Recursive,
 ///         for<'a> T::PrevCase<'a>: SpecialProperty
@@ -175,60 +181,60 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 ///         <T::PrevCase<'a> as SpecialProperty>::foo(&self.map_down());
 ///     }
 /// }
-/// 
+///
 /// // Newtype to allow `&'a T: SpecialProperty` without conflicting with above blanket impl
 /// pub struct RefWrapper<'a, T>(&'a T);
-/// 
+///
 /// impl<'a, T: Recursive> SpecialProperty for RefWrapper<'a, T> {
-/// 
+///
 ///     fn foo<'b>(&'b self) {
 ///         self.0.foo()
 ///     }
 /// }
-/// 
+///
 /// // The main recursion type
 /// pub trait Recursive {
-/// 
+///
 ///     type PrevCase<'a> where Self: 'a;
-/// 
+///
 ///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a>;
 /// }
-/// 
+///
 /// #[derive(Clone, Copy)]
 /// pub struct BaseCase;
-/// 
+///
 /// impl Recursive for BaseCase {
-/// 
+///
 ///     type PrevCase<'a> = Self where Self: 'a;
-/// 
+///
 ///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> { *self }
 /// }
-/// 
+///
 /// impl SpecialProperty for BaseCase {
-/// 
+///
 ///     fn foo<'a>(&'a self) {
 ///         println!("BaseCaseSpecial")
 ///     }
 /// }
-/// 
+///
 /// pub struct RecursiveCase<T: Recursive>(T);
-/// 
+///
 /// impl<T: Recursive> Recursive for RecursiveCase<T> {
-/// 
+///
 ///     type PrevCase<'a> = RefWrapper<'a, T> where Self: 'a;
-/// 
+///
 ///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> {
 ///         RefWrapper(&self.0)
 ///     }
 /// }
-/// 
+///
 /// fn run_type_recursion<'b, T>(t: &'b T)
 ///     where T: 'b + Recursive,
 ///         for<'a> T::PrevCase<'a>: SpecialProperty
 /// {
 ///     t.foo()
 /// }
-/// 
+///
 /// run_type_recursion(&BaseCase);
 /// run_type_recursion(&RecursiveCase(BaseCase));
 /// ```
@@ -253,16 +259,16 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 /// if the compiler would accept the first variant, this would work out fine - the only effect
 /// of `NonSpecialBaseCase: !SpecialProperty` would then be that also
 /// `RecursiveCase<NonSpecialBaseCase>: !SpecialProperty`, which of course makes sense.
-/// 
+///
 /// However, for now we stay with this workaround, which then looks as follows:
 /// ```
 /// #![feature(min_specialization)]
 /// // Some special property, in practice this might be LinSolveRing, ComputeResultantRing, FactorPolyRing, ...
 /// pub trait SpecialProperty {
-/// 
+///
 ///     fn foo<'a>(&'a self);
 /// }
-/// 
+///
 /// impl<T> SpecialProperty for T
 ///     where T: Recursive
 /// {
@@ -271,232 +277,259 @@ impl<'a, R> Homomorphism<R, R::ExtendedRingBase<'a>> for ToExtRingMap<'a, R>
 ///         <T::PrevCase<'a> as SpecialProperty>::foo(&self.map_down());
 ///     }
 /// }
-/// 
+///
 /// // Newtype to allow `&'a T: SpecialProperty` without conflicting with above blanket impl
 /// pub struct RefWrapper<'a, T: SpecialProperty>(&'a T);
-/// 
+///
 /// impl<'a, T: Recursive> SpecialProperty for RefWrapper<'a, T> {
-/// 
+///
 ///     fn foo<'b>(&'b self) {
 ///         self.0.foo()
 ///     }
 /// }
-/// 
+///
 /// // The main recursion type
 /// pub trait Recursive {
-/// 
+///
 ///     type PrevCase<'a>: SpecialProperty where Self: 'a;
-/// 
+///
 ///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a>;
 /// }
-/// 
+///
 /// #[derive(Clone, Copy)]
 /// pub struct BaseCase;
-/// 
+///
 /// impl Recursive for BaseCase {
-/// 
+///
 ///     type PrevCase<'a> = Self where Self: 'a;
-/// 
+///
 ///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> { *self }
 /// }
-/// 
+///
 /// impl SpecialProperty for BaseCase {
-/// 
+///
 ///     fn foo<'a>(&'a self) {
 ///         println!("BaseCaseSpecial")
 ///     }
 /// }
-/// 
+///
 /// pub struct RecursiveCase<T: Recursive + SpecialProperty>(T);
-/// 
+///
 /// impl<T: Recursive> Recursive for RecursiveCase<T> {
-/// 
+///
 ///     type PrevCase<'a> = RefWrapper<'a, T> where Self: 'a;
-/// 
+///
 ///     fn map_down<'a>(&'a self) -> Self::PrevCase<'a> {
 ///         RefWrapper(&self.0)
 ///     }
 /// }
-/// 
+///
 /// fn run_type_recursion<'b, T>(t: &'b T)
 ///     where T: 'b + Recursive
 /// {
 ///     t.foo()
 /// }
-/// 
+///
 /// run_type_recursion(&BaseCase);
 /// run_type_recursion(&RecursiveCase(BaseCase));
 /// ```
-/// 
 pub trait LiftPolyEvalRing: RingBase + FiniteRingSpecializable {
-    
-    ///
     /// The type of the ring we get once quotienting by a prime ideal.
-    /// 
+    ///
     /// The proper solution would be to just require `LocalRingBase<'ring>: ?Sized + RingBase`.
     /// Algorithms which require this type to provide additional functionality (like being
     /// a [`ComputeResultantRing`]) should then add a constraint
     /// ```ignore
     ///   for<'ring> R::LocalRingBase<'ring>: ComputeResultantRing
     /// ```
-    /// However, this causes problems, more concretely an error 
+    /// However, this causes problems, more concretely an error
     /// "cycle detected when computing whether impls specialize one another".
     /// More on that in the trait-level doc.
-    /// 
+    ///
     /// Hence, we have to already bound `LocalRingBase` by all the traits that are reasonably
     /// required by some algorithms. This clearly makes it a lot less generic than it should be,
     /// but so far it worked out without too much trouble.
-    /// 
     type LocalRingBase<'ring>: ?Sized + Domain + LinSolveRing + ComputeResultantRing + SelfIso
-        where Self: 'ring;
+    where
+        Self: 'ring;
 
     type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
-        where Self: 'ring;
+    where
+        Self: 'ring;
 
-    ///
     /// A collection of prime ideals of the ring, and additionally any data required to reconstruct
     /// a small ring element from its projections onto each prime ideal.
-    /// 
     type LocalComputationData<'ring>: Send + Sync
-        where Self: 'ring;
+    where
+        Self: 'ring;
 
-    ///
     /// Computes an upper bound of the natural logarithm of the pseudo-norm of a ring element.
-    /// 
+    ///
     /// The valuation should be
     ///  - sub-additive, i.e. `|x + y| <= |x| + |y|`
     ///  - sub-multiplicative, i.e. `|xy| <= |x| |y|`
-    ///  - "semi-non-archimedean" (this is not a standard property), which we define as
-    ///    `|x1 + ... + xn| <= |n| max_i |xi|`
-    /// 
+    ///  - "semi-non-archimedean" (this is not a standard property), which we define as `|x1 + ... +
+    ///    xn| <= |n| max_i |xi|`
+    ///
     /// Note that together with the last property, we can bound the evaluation of a
     /// multivariate polynomial `f(X1, ..., Xn) = sum_I a_I X^I` at `x1, ..., xn` by
     /// ```text
     ///   |#{ I | a_I != 0}| max_I |a_I| |x1|^deg_X1(f) ... |xn|^deg_Xn(f)
     /// ```
     /// where `deg_Xi(f)` is the degree of `f` as a polynomial in `Xi`.
-    /// 
     fn ln_pseudo_norm(&self, el: &Self::Element) -> f64;
 
-    ///
     /// Sets up the context for a new polynomial evaluation, whose output
     /// should have pseudo norm less than the given bound.
-    /// 
     fn init_reduce_lift<'ring>(&'ring self, ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring>;
 
-    ///
     /// Returns the number `k` of quotient rings that are required
     /// to get the correct result of the given computation.
-    /// 
     fn prime_ideal_count<'ring>(&self, computation: &Self::LocalComputationData<'ring>) -> usize
-        where Self: 'ring;
+    where
+        Self: 'ring;
 
-    ///
     /// Returns the `i`-th local ring belonging to the given computation.
-    /// 
-    fn quotient_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
-        where Self: 'ring;
+    fn quotient_ring_at<'ring>(
+        &self,
+        computation: &Self::LocalComputationData<'ring>,
+        i: usize,
+    ) -> Self::LocalRing<'ring>
+    where
+        Self: 'ring;
 
-    ///
     /// Computes the map `R -> R1 x ... x Rk`, i.e. maps the given element into each of
     /// the local rings.
-    /// 
-    fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
-        where Self: 'ring;
+    fn reduce<'ring>(
+        &self,
+        computation: &Self::LocalComputationData<'ring>,
+        el: &Self::Element,
+    ) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+    where
+        Self: 'ring;
 
-    ///
     /// Computes a preimage under the map `R -> R1 x ... x Rk`, i.e. a ring element `x` that reduces
     /// to each of the given local rings under the map [`LiftPolyEvalRing::reduce()`].
-    /// 
+    ///
     /// The result should have pseudo-norm bounded by the bound given when the computation
     /// was initialized, via [`LiftPolyEvalRing::local_computation()`].
-    /// 
-    fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
-        where Self: 'ring;
+    fn lift_combine<'ring>(
+        &self,
+        computation: &Self::LocalComputationData<'ring>,
+        el: &[<Self::LocalRingBase<'ring> as RingBase>::Element],
+    ) -> Self::Element
+    where
+        Self: 'ring;
 }
 
 impl<R> LiftPolyEvalRing for R
-    where R: ?Sized + FiniteRing + Field + SelfIso
+where
+    R: ?Sized + FiniteRing + Field + SelfIso,
 {
-    type LocalComputationData<'ring> = RingRef<'ring, Self>
-        where Self: 'ring;
+    type LocalComputationData<'ring>
+        = RingRef<'ring, Self>
+    where
+        Self: 'ring;
 
-    type LocalRing<'ring> = RingRef<'ring, Self>
-        where Self: 'ring;
+    type LocalRing<'ring>
+        = RingRef<'ring, Self>
+    where
+        Self: 'ring;
 
-    type LocalRingBase<'ring> = Self
-        where Self: 'ring;
+    type LocalRingBase<'ring>
+        = Self
+    where
+        Self: 'ring;
 
-    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 {
-        0.
-    }
+    fn ln_pseudo_norm(&self, _el: &Self::Element) -> f64 { 0.0 }
 
     fn init_reduce_lift<'ring>(&'ring self, _ln_pseudo_norm_bound: f64) -> Self::LocalComputationData<'ring> {
         RingRef::new(self)
     }
 
-    fn quotient_ring_at<'ring>(&self, computation: &Self::LocalComputationData<'ring>, _i: usize) -> Self::LocalRing<'ring>
-        where Self: 'ring
+    fn quotient_ring_at<'ring>(
+        &self,
+        computation: &Self::LocalComputationData<'ring>,
+        _i: usize,
+    ) -> Self::LocalRing<'ring>
+    where
+        Self: 'ring,
     {
         *computation
     }
 
     fn prime_ideal_count<'ring>(&self, _computation: &Self::LocalComputationData<'ring>) -> usize
-        where Self: 'ring
+    where
+        Self: 'ring,
     {
         1
     }
 
-    fn reduce<'ring>(&self, _computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
-        where Self: 'ring
+    fn reduce<'ring>(
+        &self,
+        _computation: &Self::LocalComputationData<'ring>,
+        el: &Self::Element,
+    ) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+    where
+        Self: 'ring,
     {
         vec![self.clone_el(el)]
     }
 
-    fn lift_combine<'ring>(&self, _computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
-        where Self: 'ring
+    fn lift_combine<'ring>(
+        &self,
+        _computation: &Self::LocalComputationData<'ring>,
+        el: &[<Self::LocalRingBase<'ring> as RingBase>::Element],
+    ) -> Self::Element
+    where
+        Self: 'ring,
     {
         assert_eq!(1, el.len());
         return self.clone_el(&el[0]);
     }
 }
 
-///
 /// The map `R -> R/p` for a ring `R` and one of its local quotients `R/p` as
 /// given by [`LiftPolyEvalRing`].
-/// 
 #[stability::unstable(feature = "enable")]
 pub struct LiftPolyEvalRingReductionMap<'ring, 'data, R>
-    where R: 'ring + ?Sized + LiftPolyEvalRing, 'ring: 'data
+where
+    R: 'ring + ?Sized + LiftPolyEvalRing,
+    'ring: 'data,
 {
     ring: RingRef<'data, R>,
     data: &'data R::LocalComputationData<'ring>,
     local_ring: R::LocalRing<'ring>,
-    index: usize
+    index: usize,
 }
 
 impl<'ring, 'data, R> LiftPolyEvalRingReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + LiftPolyEvalRing, 'ring: 'data
+where
+    R: 'ring + ?Sized + LiftPolyEvalRing,
+    'ring: 'data,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: &'data R, data: &'data R::LocalComputationData<'ring>, index: usize) -> Self {
-        Self { ring: RingRef::new(ring), data: data, local_ring: ring.quotient_ring_at(data, index), index: index }
+        Self {
+            ring: RingRef::new(ring),
+            data,
+            local_ring: ring.quotient_ring_at(data, index),
+            index,
+        }
     }
 }
 
 impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalRingReductionMap<'ring, 'data, R>
-    where R: 'ring +?Sized + LiftPolyEvalRing, 'ring: 'data
+where
+    R: 'ring + ?Sized + LiftPolyEvalRing,
+    'ring: 'data,
 {
     type CodomainStore = R::LocalRing<'ring>;
     type DomainStore = RingRef<'data, R>;
 
-    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore {
-        &self.local_ring
-    }
+    fn codomain<'b>(&'b self) -> &'b Self::CodomainStore { &self.local_ring }
 
-    fn domain<'b>(&'b self) -> &'b Self::DomainStore {
-        &self.ring
-    }
+    fn domain<'b>(&'b self) -> &'b Self::DomainStore { &self.ring }
 
     fn map(&self, x: <R as RingBase>::Element) -> <R::LocalRingBase<'ring> as RingBase>::Element {
         let ring_ref: &'data R = self.ring.into();
@@ -505,11 +538,10 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalR
     }
 }
 
-///
 /// Generates an implementation of [`crate::reduce_lift::poly_eval::InterpolationBaseRing`]
 /// for a ring of characteristic zero. Not that in this case, the only sensible implementation
 /// is trivial, since the ring itself has enough elements for any interpolation task.
-/// 
+///
 /// # Example
 /// ```rust
 /// # use std::fmt::Debug;
@@ -551,16 +583,16 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalR
 ///     fn has_canonical_iso(&self, from: &Self) -> Option<()> { if self == from { Some(()) } else { None } }
 ///     fn map_out(&self, _from: &Self, x: <Self as RingBase>::Element, (): &()) -> <Self as RingBase>::Element { x }
 /// }
-/// 
+///
 /// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
-/// 
+///
 /// // now we can use `InterpolationBaseRing`-functionality
 /// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());
 /// let (embedding, points) = ToExtRingMap::for_interpolation(&ring, 3);
 /// assert_eq!(0, points[0]);
 /// assert_eq!(-1, points[1]);
 /// assert_eq!(1, points[2]);
-/// 
+///
 /// // There is a problem here, described in LiftPolyEvalRing::LocalRingBase.
 /// // Short version: we need to manually impl ComputeResultantRing
 /// impl<R: ComputeResultantRing> ComputeResultantRing for MyRingWrapper<R> {
@@ -576,12 +608,11 @@ impl<'ring, 'data, R> Homomorphism<R, R::LocalRingBase<'ring>> for LiftPolyEvalR
 ///     }
 /// }
 /// ```
-/// 
 #[macro_export]
 macro_rules! impl_interpolation_base_ring_char_zero {
     (<{$($gen_args:tt)*}> InterpolationBaseRing for $self_type:ty where $($constraints:tt)*) => {
         impl<$($gen_args)*> $crate::reduce_lift::lift_poly_eval::InterpolationBaseRing for $self_type where $($constraints)* {
-                
+
             type ExtendedRing<'a> = RingRef<'a, Self>
                 where Self: 'a;
 
@@ -614,15 +645,14 @@ macro_rules! impl_interpolation_base_ring_char_zero {
     }
 }
 
-///
 /// Implements [`LiftPolyEvalRing`] for an integer ring.
-/// 
-/// This uses a default implementation, where the prime ideals are given by the largest prime numbers
-/// such that the corresponding residue field can be implemented using [`crate::rings::zn::zn_64b::Zn`]. 
-/// This should be suitable in almost all scenarios.
-/// 
-/// The syntax is the same as for other impl-macros, see e.g. [`crate::impl_interpolation_base_ring_char_zero!`].
-/// 
+///
+/// This uses a default implementation, where the prime ideals are given by the largest prime
+/// numbers such that the corresponding residue field can be implemented using
+/// [`crate::rings::zn::zn_64b::Zn`]. This should be suitable in almost all scenarios.
+///
+/// The syntax is the same as for other impl-macros, see e.g.
+/// [`crate::impl_interpolation_base_ring_char_zero!`].
 #[macro_export]
 macro_rules! impl_eval_poly_locally_for_ZZ {
     (LiftPolyEvalRing for $int_ring_type:ty) => {

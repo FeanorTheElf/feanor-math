@@ -1,8 +1,8 @@
 use tracing::instrument;
 
+use crate::integer::*;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
-use crate::integer::*;
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
@@ -24,18 +24,22 @@ pub fn erathostenes(B: u64) -> Vec<u64> {
     return primes;
 }
 
-pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>> 
-    where I: RingStore,
-        I::Type: IntegerRing
+pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>>
+where
+    I: RingStore,
+    I::Type: IntegerRing,
 {
     let bound = int_cast(ZZ.clone_el(B), StaticRing::<i128>::RING, &ZZ) as u64;
-    erathostenes(bound).into_iter().map(|p| int_cast(p as i128, &ZZ, StaticRing::<i128>::RING)).collect()
+    erathostenes(bound)
+        .into_iter()
+        .map(|p| int_cast(p as i128, &ZZ, StaticRing::<i128>::RING))
+        .collect()
 }
 
 #[cfg(test)]
-use crate::algorithms;
-#[cfg(test)]
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
+#[cfg(test)]
+use crate::algorithms;
 
 #[test]
 fn test_enumerate_primes() {
@@ -50,6 +54,10 @@ fn test_enumerate_primes() {
 fn test_enumerate_primes_large() {
     feanor_tracing::DelayedLogger::init_test();
     for p in enumerate_primes(&StaticRing::<i64>::RING, &100000) {
-        assert!(algorithms::miller_rabin::is_prime(&StaticRing::<i64>::RING, &p, DEFAULT_PROBABILISTIC_REPETITIONS));
+        assert!(algorithms::miller_rabin::is_prime(
+            &StaticRing::<i64>::RING,
+            &p,
+            DEFAULT_PROBABILISTIC_REPETITIONS
+        ));
     }
 }
