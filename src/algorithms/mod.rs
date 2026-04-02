@@ -75,8 +75,6 @@ pub mod resultant;
 /// Contains [`sqr_mul::generic_abs_square_and_multiply()`] and other functions
 /// for computing a power of an element in a generic monoid.
 pub mod sqr_mul;
-/// Contains algorithms to find roots of unity in finite fields.
-pub mod unity_root;
 /// Contains implementations to extend [`crate::rings::extension::number_field::NumberField`]s by
 /// adjoining additional roots of polynomials.
 // pub mod splitting_field;

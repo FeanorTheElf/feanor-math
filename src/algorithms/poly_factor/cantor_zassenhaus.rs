@@ -2,8 +2,8 @@ use oorandom;
 use tracing::instrument;
 
 use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::is_prime_power;
-use crate::algorithms::unity_root::get_prim_root_of_unity;
 use crate::divisibility::DivisibilityRingStore;
 use crate::field::{Field, FieldStore};
 use crate::homomorphism::*;
@@ -372,7 +372,7 @@ where
     assert_el_eq!(ZZ, ZZ.power_of_two(e), q);
 
     let mut rng = oorandom::Rand64::new((ZZ.default_hash(&q) as u128) | ((seed as u128) << u64::BITS));
-    let zeta3 = get_prim_root_of_unity(&Fq, 3).unwrap();
+    let zeta3 = get_prim_root_of_unity(&Fq, &ZZ.int_hom().map(3)).unwrap();
     let exp = if (d * e) % 2 == 0 {
         ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(d * e), ZZ.one()), &ZZ.int_hom().map(3))
             .unwrap()

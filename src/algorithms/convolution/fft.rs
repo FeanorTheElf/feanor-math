@@ -1,6 +1,7 @@
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
 
+use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::ConvolutionAlgorithm;
@@ -10,7 +11,6 @@ use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::lazy::LazyVec;
 use crate::primitive_int::{StaticRingBase, *};
 use crate::ring::*;
 use crate::rings::float_complex::*;
@@ -22,7 +22,7 @@ const CC: Complex64 = Complex64::RING;
 #[stability::unstable(feature = "enable")]
 pub struct FFTConvolution<A = Global> {
     allocator: A,
-    fft_tables: LazyVec<CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>>>,
+    fft_tables: FrozenMap<usize, Box<CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>>>>,
 }
 
 #[stability::unstable(feature = "enable")]
@@ -32,7 +32,7 @@ where
     A: Send + Sync + Allocator + Clone,
 {
     ring: PhantomData<Box<R>>,
-    fft_data: LazyVec<Vec<El<Complex64>, A>>,
+    fft_data: FrozenMap<usize, Box<Vec<El<Complex64>, A>>>,
     log2_data_size: usize,
 }
 
@@ -49,14 +49,17 @@ where
     pub fn new_with_alloc(allocator: A) -> Self {
         Self {
             allocator,
-            fft_tables: LazyVec::new(),
+            fft_tables: FrozenMap::new(),
         }
     }
 
     fn get_fft_table(&self, log2_len: usize) -> &CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<Complex64>> {
-        return self
-            .fft_tables
-            .get_or_init(log2_len, || CooleyTuckeyFFT::for_complex(CC, log2_len));
+        if let Some(res) = self.fft_tables.get(&log2_len) {
+            res
+        } else {
+            self.fft_tables
+                .insert(log2_len, Box::new(CooleyTuckeyFFT::for_complex(CC, log2_len)))
+        }
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -97,7 +100,11 @@ where
         };
 
         return if let Some(data_prep) = data_prep {
-            MyCow::Borrowed(data_prep.fft_data.get_or_init(log2_len, compute_result))
+            if let Some(res) = data_prep.fft_data.get(&log2_len) {
+                MyCow::Borrowed(res)
+            } else {
+                MyCow::Borrowed(data_prep.fft_data.insert(log2_len, Box::new(compute_result())))
+            }
         } else {
             MyCow::Owned(compute_result())
         };
@@ -138,7 +145,7 @@ where
                 .unwrap_or(0)
         };
         let result = PreparedConvolutionOperand {
-            fft_data: LazyVec::new(),
+            fft_data: FrozenMap::new(),
             ring: PhantomData,
             log2_data_size,
         };

@@ -8,20 +8,21 @@ use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use sparse::SparseMapVector;
+use tracing::instrument;
 use zn_64b::Zn64B;
 
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::convolution::*;
+use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
-use crate::algorithms::unity_root::*;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::divisibility::{DivisibilityRingStore, Domain};
 use crate::field::*;
 use crate::integer::*;
-use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::pid::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
 use crate::rings::extension::extension_impl::FreeAlgebraImpl;
@@ -30,7 +31,7 @@ use crate::rings::extension::*;
 use crate::rings::field::{AsField, AsFieldBase};
 use crate::rings::finite::*;
 use crate::rings::poly::PolyRing;
-use crate::rings::poly::dense_poly::{DensePolyRing, DensePolyRingBase};
+use crate::rings::poly::dense_poly::DensePolyRingBase;
 use crate::rings::zn::zn_64b::Zn64BBase;
 use crate::rings::zn::*;
 use crate::serialization::*;
@@ -380,7 +381,6 @@ where
     /// galois field.
     ///
     /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
-    #[stability::unstable(feature = "enable")]
     pub fn galois_ring(
         &self,
         e: usize,
@@ -414,7 +414,6 @@ where
     /// galois field.
     ///
     /// See also [`GaloisFieldBase::galois_ring()`] for a simpler version of this function.
-    #[stability::unstable(feature = "enable")]
     pub fn galois_ring_with_convolution<S, A2, C2>(
         &self,
         new_base_ring: S,
@@ -449,7 +448,6 @@ where
         return result;
     }
 
-    #[stability::unstable(feature = "enable")]
     pub fn unwrap_self(self) -> Impl { self.base }
 }
 
@@ -510,9 +508,9 @@ where
         S: RingStore<Type = Self> + 'conv,
         Self: 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(
-            LengthExtendedConvolution::for_zn_extension(self_, 64).unwrap(),
-        ))
+        LengthExtendedConvolution::for_zn_extension(self_, 64)
+            .map(|x| Arc::new(TypeErasedConvolution::new(x)) as DynConvolution<'conv, _>)
+            .unwrap_or_else(|_| Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(0, Global))))
     }
 }
 
@@ -573,22 +571,6 @@ where
     <BaseRing<Impl> as RingStore>::Type: ZnRing + Field,
 {
 }
-
-// impl<Impl> LinSolveRing for GaloisFieldBase<Impl>
-//     where Impl: RingStore,
-//         Impl::Type: Field + FreeAlgebra + FiniteRing,
-//         <BaseRing<Impl> as RingStore>::Type: ZnRing + Field
-// {
-//     fn solve_right<V1, V2, V3, A>(&self, lhs: crate::matrix::SubmatrixMut<V1, Self::Element>,
-// rhs: crate::matrix::SubmatrixMut<V2, Self::Element>, out: crate::matrix::SubmatrixMut<V3,
-// Self::Element>, allocator: A) -> crate::algorithms::linsolve::SolveResult         where V1:
-// crate::matrix::AsPointerToSlice<Self::Element>,             V2:
-// crate::matrix::AsPointerToSlice<Self::Element>,             V3:
-// crate::matrix::AsPointerToSlice<Self::Element>,             A: Allocator
-//     {
-//         unimplemented!()
-//     }
-// }
 
 impl<Impl> EuclideanRing for GaloisFieldBase<Impl>
 where
@@ -868,6 +850,7 @@ where
     }
 }
 
+#[instrument(skip_all, level = "trace")]
 fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
 where
     P: RingStore,
@@ -893,6 +876,7 @@ where
 /// "small" is not well-defined, but can mean sparse, or having a small `deg(f - lt(f))`.
 /// Both will lead to more efficient arithmetic in the ring `k[X]/(f)`. However, in general
 /// finding a very small `f` is hard, thus we use heuristics.
+#[instrument(skip_all, level = "trace")]
 fn find_small_irreducible_poly<P, C>(poly_ring: P, degree: usize, convolution: C, rng: &mut oorandom::Rand64) -> El<P>
 where
     P: RingStore,
@@ -934,25 +918,27 @@ where
         }
 
         // next, check for cases where we can take `small_poly(X^high_power)`; these cases are characterized
-        // by the fact that we have `degree = small_d * large_d` with `large_d | #F_(q^small_d)*`
+        // by the fact that we have `degree = small_d * padding_d * large_d` with `large_d | #F_(q^small_d)*`
         let ZZbig = BigIntRing::RING;
         let ZZ = StaticRing::<i64>::RING;
 
         let p = Fp.size(&ZZbig).unwrap();
         let mut small_d = 1;
-        let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
-        let mut large_d = int_cast(
-            ZZbig.ideal_gen(
-                &Fq_star_order,
-                &int_cast(
-                    TryInto::<i64>::try_into(degree).unwrap() / small_d,
-                    ZZbig,
-                    StaticRing::<i64>::RING,
+        let mut large_d = {
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
+            int_cast(
+                ZZbig.ideal_gen(
+                    &Fq_star_order,
+                    &int_cast(
+                        TryInto::<i64>::try_into(degree).unwrap() / small_d,
+                        ZZbig,
+                        StaticRing::<i64>::RING,
+                    ),
                 ),
-            ),
-            ZZ,
-            ZZbig,
-        );
+                ZZ,
+                ZZbig,
+            )
+        };
         let mut increased_small_d = true;
         while increased_small_d {
             increased_small_d = false;
@@ -980,23 +966,20 @@ where
                 }
             }
         }
-        small_d = TryInto::<i64>::try_into(degree).unwrap() / large_d;
+
+        let base_degree = TryInto::<i64>::try_into(degree).unwrap() / large_d;
         if large_d != 1 {
-            let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), small_d as usize), ZZbig.one());
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(ZZbig.clone_el(&p), base_degree as usize), ZZbig.one());
             // careful here to not get an infinite generic argument recursion
-            let Fq = RingValue::from(GaloisFieldBase::new_internal(Fp, small_d as usize, Global, convolution));
+            let Fq = RingValue::from(GaloisFieldBase::new_internal(Fp, base_degree as usize, Global, convolution));
             // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d
             // | #Fq*`; hence we can use `MinPoly(primitive_element)(X^large_d)`
-            let primitive_element = if is_prim_root_of_unity_gen(&Fq, &Fq.canonical_gen(), &Fq_star_order, ZZbig) {
-                Fq.canonical_gen()
-            } else {
-                get_prim_root_of_unity_gen(&Fq, &Fq_star_order, ZZbig, &Fq_star_order).unwrap()
-            };
-            // I thought for a while that it would be enough to have a primitive `lcm(Fq_star_order,
+            let primitive_element = get_prim_root_of_unity(&Fq, &Fq_star_order).unwrap();
+            // I thought for a while that it would be enough to have a primitive `gcd(Fq_star_order,
             // large_d^inf)`-th root of unity, however it is not guaranteed that this would indeed
             // generate the field
             let FqX = DensePolyRing::new(&Fq, "X");
-            let minpoly = FqX.prod((0..small_d).map(|i| {
+            let minpoly = FqX.prod((0..base_degree).map(|i| {
                 FqX.from_terms(
                     [
                         (
@@ -1172,7 +1155,7 @@ fn test_galois_field_no_trinomial() {
     feanor_tracing::DelayedLogger::init_test();
     let field = GaloisField::new(2, 24);
     assert_eq!(24, field.rank());
-    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+    assert!(field.clone().into().unwrap_self().into().unwrap_self().as_field().is_ok());
 
     let field = GaloisField::new(3, 30);
     assert_eq!(30, field.rank());

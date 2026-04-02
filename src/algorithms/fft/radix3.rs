@@ -2,9 +2,9 @@ use std::alloc::{Allocator, Global};
 
 use tracing::instrument;
 
+use crate::algorithms::cyclotomic::{get_prim_root_of_unity_zn, is_prim_root_of_unity_general};
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::*;
-use crate::algorithms::unity_root::{get_prim_root_of_unity_zn, is_prim_root_of_unity};
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::primitive_int::StaticRing;
@@ -160,7 +160,7 @@ where
         let n = ZZ.pow(3, log3_n) as usize;
         assert!(
             hom.codomain().get_ring().is_approximate()
-                || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_pow(1)), n)
+                || is_prim_root_of_unity_general(hom.codomain(), &hom.map(root_of_unity_pow(1)), n)
         );
 
         return Self {
@@ -208,7 +208,7 @@ where
             new_hom.map_ref(root_of_unity)
         };
         assert!(ring.is_commutative());
-        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity, self.len()));
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_general(&ring, &root_of_unity, self.len()));
 
         return (
             CooleyTukeyRadix3FFT {

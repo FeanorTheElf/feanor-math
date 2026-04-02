@@ -3,10 +3,12 @@ use std::fmt::Debug;
 
 use tracing::instrument;
 
+use crate::algorithms::cyclotomic::{
+    get_prim_root_of_unity_pow2_zn, get_prim_root_of_unity_zn, is_prim_root_of_unity_general,
+};
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
-use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::integer::IntegerRingStore;
@@ -254,7 +256,7 @@ where
         let log2_m = StaticRing::<i64>::RING
             .abs_log2_ceil(&(n * 2).try_into().unwrap())
             .unwrap();
-        let root_of_unity_m = get_prim_root_of_unity_zn(hom.domain(), 1 << log2_m)?;
+        let root_of_unity_m = get_prim_root_of_unity_pow2_zn(hom.domain(), log2_m)?;
         return Some(Self::new_with_hom(
             hom,
             root_of_unity_2n,
@@ -283,11 +285,11 @@ where
         assert!(hom.codomain().is_commutative());
         assert!(
             hom.domain().get_ring().is_approximate()
-                || is_prim_root_of_unity(hom.domain(), &root_of_unity_n_pows(1), n)
+                || is_prim_root_of_unity_general(hom.domain(), &root_of_unity_n_pows(1), n)
         );
         assert!(
             hom.codomain().get_ring().is_approximate()
-                || is_prim_root_of_unity(hom.codomain(), &hom.map(root_of_unity_n_pows(1)), n)
+                || is_prim_root_of_unity_general(hom.codomain(), &hom.map(root_of_unity_n_pows(1)), n)
         );
 
         let (twiddle_fft, old_hom) = m_fft_table.change_ring(hom.domain().identity());

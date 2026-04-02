@@ -37,8 +37,6 @@ extern crate test;
 
 mod cow;
 pub mod function;
-mod lazy;
-
 /// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
 #[macro_use]
 pub mod ring;

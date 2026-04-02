@@ -2,6 +2,7 @@ use std::alloc::{Allocator, Global};
 use std::cmp::{max, min};
 use std::marker::PhantomData;
 
+use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::ConvolutionAlgorithm;
@@ -10,7 +11,6 @@ use crate::algorithms::miller_rabin::is_prime;
 use crate::divisibility::*;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::lazy::LazyVec;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::zn::zn_64b::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
@@ -38,8 +38,8 @@ pub struct RNSConvolution<
     CreateC: Send + Sync + Fn(Zn64B) -> C,
 {
     integer_ring: I,
-    rns_rings: LazyVec<zn_rns::ZnRNS<Zn64B, I, A>>,
-    convolutions: LazyVec<C>,
+    rns_rings: FrozenMap<usize, Box<zn_rns::ZnRNS<Zn64B, I, A>>>,
+    convolutions: FrozenMap<usize, Box<C>>,
     create_convolution: CreateC,
     required_root_of_unity_log2: usize,
     allocator: A,
@@ -70,7 +70,7 @@ where
     R: ?Sized + RingBase,
     C: ConvolutionAlgorithm<Zn64BBase>,
 {
-    prepared: LazyVec<C::PreparedConvolutionOperand>,
+    prepared: FrozenMap<usize, Box<C::PreparedConvolutionOperand>>,
     log2_data_size: usize,
     ring: PhantomData<R>,
     len_hint: Option<usize>,
@@ -211,8 +211,8 @@ where
         let result = Self {
             integer_ring,
             create_convolution,
-            convolutions: LazyVec::new(),
-            rns_rings: LazyVec::new(),
+            convolutions: FrozenMap::new(),
+            rns_rings: FrozenMap::new(),
             required_root_of_unity_log2,
             allocator,
         };
@@ -223,7 +223,7 @@ where
             result.integer_ring.clone(),
             result.allocator.clone(),
         );
-        _ = result.rns_rings.get_or_init(0, || initial_ring);
+        _ = result.rns_rings.insert(1, Box::new(initial_ring));
         return result;
     }
 
@@ -242,19 +242,31 @@ where
     }
 
     fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::ZnRNS<Zn64B, I, A> {
-        self.rns_rings.get_or_init_incremental(moduli_count - 1, |_, prev| {
-            zn_rns::ZnRNS::new_with_alloc(
-                prev.as_iter()
-                    .cloned()
-                    .chain([Zn64B::new(
-                        Self::sample_next_prime(self.required_root_of_unity_log2, *prev.at(prev.len() - 1).modulus())
+        if let Some(ring) = self.rns_rings.get(&moduli_count) {
+            return ring;
+        }
+        for i in (1..moduli_count).rev() {
+            if let Some(prev_ring) = self.rns_rings.get(&i) {
+                let next_ring = zn_rns::ZnRNS::new_with_alloc(
+                    prev_ring
+                        .as_iter()
+                        .cloned()
+                        .chain([Zn64B::new(
+                            Self::sample_next_prime(
+                                self.required_root_of_unity_log2,
+                                *prev_ring.at(prev_ring.len() - 1).modulus(),
+                            )
                             .unwrap() as u64,
-                    )])
-                    .collect(),
-                self.integer_ring.clone(),
-                self.allocator.clone(),
-            )
-        })
+                        )])
+                        .collect(),
+                    self.integer_ring.clone(),
+                    self.allocator.clone(),
+                );
+                _ = self.rns_rings.insert(i + 1, Box::new(next_ring));
+                return self.get_rns_ring(moduli_count);
+            }
+        }
+        unreachable!()
     }
 
     fn get_rns_factor(&self, i: usize) -> &Zn64B {
@@ -263,8 +275,12 @@ where
     }
 
     fn get_convolution(&self, i: usize) -> &C {
-        self.convolutions
-            .get_or_init(i, || (self.create_convolution)(*self.get_rns_factor(i)))
+        if let Some(conv) = self.convolutions.get(&i) {
+            conv
+        } else {
+            self.convolutions
+                .insert(i, Box::new((self.create_convolution)(*self.get_rns_factor(i))))
+        }
     }
 
     /// "width" refers to the number of RNS factors we need
@@ -340,13 +356,18 @@ where
     where
         R: ?Sized + RingBase,
     {
-        data_prep.prepared.get_or_init(rns_index, || {
-            self.get_convolution(rns_index).prepare_convolution_operand(
-                data,
-                data_prep.len_hint,
-                self.get_rns_factor(rns_index).get_ring(),
+        if let Some(res) = data_prep.prepared.get(&rns_index) {
+            res
+        } else {
+            data_prep.prepared.insert(
+                rns_index,
+                Box::new(self.get_convolution(rns_index).prepare_convolution_operand(
+                    data,
+                    data_prep.len_hint,
+                    self.get_rns_factor(rns_index).get_ring(),
+                )),
             )
-        })
+        }
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -535,7 +556,7 @@ where
         return PreparedConvolutionOperand {
             ring: PhantomData,
             len_hint: length_hint,
-            prepared: LazyVec::new(),
+            prepared: FrozenMap::new(),
             log2_data_size: input_size_log2,
         };
     }

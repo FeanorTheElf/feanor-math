@@ -513,7 +513,6 @@ pub mod generic_tests {
 
     use super::*;
     use crate::homomorphism::*;
-    use crate::ring::*;
 
     pub fn test_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
     where

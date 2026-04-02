@@ -234,7 +234,6 @@ impl NumberFieldBase {
     ///
     /// If the given polynomial is not integral or not monic, consider using
     /// [`NumberField::try_adjoin_root()`] instead.
-    #[stability::unstable(feature = "enable")]
     pub fn try_new<P>(poly_ring: P, generating_poly: &El<P>) -> Option<Self>
     where
         P: RingStore,
@@ -424,6 +423,7 @@ where
         NumberFieldBase { base: implementation }
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn into_choose_complex_embedding<S: RingStore<Type = Self>>(self_: S) -> ComplexEmbedding<S, Impl, I> {
         let ZZ = self_.base_ring().base_ring();
         let poly_ring = DensePolyRing::new(ZZ, "X");
@@ -438,6 +438,7 @@ where
         };
     }
 
+    #[stability::unstable(feature = "enable")]
     pub fn choose_complex_embedding<'a>(&'a self) -> ComplexEmbedding<RingRef<'a, Self>, Impl, I> {
         Self::into_choose_complex_embedding(RingRef::from(self))
     }

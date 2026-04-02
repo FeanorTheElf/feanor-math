@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::sync::atomic::{AtomicUsize, Ordering};
 
-use append_only_vec::AppendOnlyVec;
+use elsa::sync::FrozenVec;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tracing::{Level, Span, event, instrument, span};
 
@@ -544,7 +544,7 @@ where
         let spolys_to_reduce = &open[spolys_to_reduce_index..];
         let considered_spolys = spolys_to_reduce.len();
 
-        let new_polys = AppendOnlyVec::new();
+        let new_polys: FrozenVec<Box<(<<P as RingStore>::Type as RingBase>::Element, Vec<usize>)>> = FrozenVec::new();
         let reduced_to_zero = AtomicUsize::new(0);
 
         let outer_span = Span::current();
@@ -560,7 +560,7 @@ where
                 );
 
                 if !ring.is_zero(&f) {
-                    _ = new_polys.push(expand_lm(ring, f, order));
+                    _ = new_polys.push(Box::new(expand_lm(ring, f, order)));
                 } else {
                     _ = reduced_to_zero.fetch_add(1, Ordering::Relaxed);
                 }
@@ -601,7 +601,7 @@ where
             current_deg = 0;
             update_basis(
                 ring,
-                new_polys.iter().map(|(f, _)| ring.clone_el(f)),
+                new_polys.iter().map(|x| &**x).map(|(f, _)| ring.clone_el(f)),
                 &mut basis,
                 &mut open,
                 order,
@@ -609,7 +609,7 @@ where
                 &mut sort_spolys,
             );
 
-            reducers.extend(new_polys.into_iter());
+            reducers.extend(new_polys.into_iter().map(|x| *x));
             reducers = inter_reduce(ring, reducers, order);
             sort_reducers(&mut reducers);
             event!(

@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 
+use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::ConvolutionAlgorithm;
@@ -7,7 +8,6 @@ use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
 use crate::integer::*;
-use crate::lazy::LazyVec;
 use crate::primitive_int::StaticRing;
 use crate::ring::*;
 use crate::rings::zn::*;
@@ -25,7 +25,7 @@ where
     A: Allocator + Clone + Send + Sync,
 {
     hom: H,
-    fft_algos: LazyVec<CooleyTuckeyFFT<R_main, R_twiddle, H>>,
+    fft_algos: FrozenMap<usize, Box<CooleyTuckeyFFT<R_main, R_twiddle, H>>>,
     allocator: A,
 }
 
@@ -73,9 +73,26 @@ where
     #[stability::unstable(feature = "enable")]
     pub fn new_with_hom(hom: H, allocator: A) -> Self {
         Self {
-            fft_algos: LazyVec::new(),
+            fft_algos: FrozenMap::new(),
             hom,
             allocator,
+        }
+    }
+
+    #[stability::unstable(feature = "enable")]
+    pub fn change_ring<R_main_new, H_new>(self, hom: H_new) -> NTTConvolution<R_main_new, R_twiddle, H_new, A>
+    where
+        R_main_new: ?Sized + RingBase,
+        H_new: Clone + Homomorphism<R_twiddle, R_main_new>,
+    {
+        let new_map = FrozenMap::new();
+        for (log2_len, fft) in self.fft_algos.into_tuple_vec().into_iter() {
+            _ = new_map.insert(log2_len, Box::new(fft.change_ring(hom.clone()).0));
+        }
+        NTTConvolution {
+            fft_algos: new_map,
+            hom,
+            allocator: self.allocator,
         }
     }
 
@@ -84,10 +101,17 @@ where
     pub fn ring(&self) -> RingRef<'_, R_main> { RingRef::from(self.hom.codomain().get_ring()) }
 
     fn get_ntt_table<'a>(&'a self, log2_n: usize) -> &'a CooleyTuckeyFFT<R_main, R_twiddle, H> {
-        self.fft_algos.get_or_init(log2_n, || {
-            CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n)
-                .expect("NTTConvolution was instantiated with parameters that don't support this length")
-        })
+        if let Some(res) = self.fft_algos.get(&log2_n) {
+            res
+        } else {
+            self.fft_algos.insert(
+                log2_n,
+                Box::new(
+                    CooleyTuckeyFFT::for_zn_with_hom(self.hom.clone(), log2_n)
+                        .expect("NTTConvolution was instantiated with parameters that don't support this length"),
+                ),
+            )
+        }
     }
 
     #[instrument(skip_all, level = "trace")]

@@ -2,11 +2,11 @@ use std::alloc::Allocator;
 
 use tracing::instrument;
 
+use crate::algorithms::cyclotomic::*;
 use crate::algorithms::fft::complex_fft::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3FFT;
 use crate::algorithms::fft::*;
-use crate::algorithms::unity_root::is_prim_root_of_unity;
 use crate::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
 use crate::rings::float_complex::*;
@@ -107,7 +107,7 @@ where
         let ring = new_hom.codomain();
         let root_of_unity = new_hom.map_ref(&self.root_of_unity_twiddle);
         assert!(ring.is_commutative());
-        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity(&ring, &root_of_unity, self.len()));
+        assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_general(&ring, &root_of_unity, self.len()));
 
         return (
             GeneralCooleyTukeyFFT {
@@ -164,7 +164,7 @@ where
         assert!(ring.is_commutative());
         assert!(
             ring.get_ring().is_approximate()
-                || is_prim_root_of_unity(
+                || is_prim_root_of_unity_general(
                     ring,
                     &hom.map(root_of_unity_pows(1)),
                     left_table.len() * right_table.len()
@@ -410,8 +410,6 @@ use std::alloc::Global;
 #[cfg(test)]
 use crate::algorithms::fft::bluestein::BluesteinFFT;
 #[cfg(test)]
-use crate::algorithms::unity_root::*;
-#[cfg(test)]
 use crate::rings::zn::zn_64b;
 #[cfg(test)]
 use crate::rings::zn::zn_static::{Fp, Zn};
@@ -466,7 +464,7 @@ fn test_fft_long() {
 fn test_fft_unordered() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<1409>::RING;
-    let z = get_prim_root_of_unity(ring, 64 * 11).unwrap();
+    let z = get_prim_root_of_unity_zn(ring, 64 * 11).unwrap();
     let fft = GeneralCooleyTukeyFFT::new(
         ring,
         ring.pow(z, 4),
@@ -498,7 +496,7 @@ fn test_fft_unordered() {
 fn test_unordered_fft_permutation_inv() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<1409>::RING;
-    let z = get_prim_root_of_unity(ring, 64 * 11).unwrap();
+    let z = get_prim_root_of_unity_zn(ring, 64 * 11).unwrap();
     let fft = GeneralCooleyTukeyFFT::new(
         ring,
         ring.pow(z, 4),

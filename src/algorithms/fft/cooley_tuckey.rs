@@ -5,8 +5,8 @@ use std::ops::Range;
 use tracing::instrument;
 
 use super::complex_fft::*;
+use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2_zn, is_prim_root_of_unity_pow2};
 use crate::algorithms::fft::*;
-use crate::algorithms::unity_root::*;
 use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::rings::float_complex::*;
@@ -274,8 +274,8 @@ where
         Self::create(hom, root_of_unity_pow, log2_n, Global)
     }
 
-    /// Creates an [`CooleyTuckeyFFT`] for the given prime fields, assuming they have
-    /// a characteristic congruent to 1 modulo `2^log2_n`.
+    /// Creates an [`CooleyTuckeyFFT`] for the given ring `Z/nZ`, assuming it has primitive
+    /// `2^log2_n`-th roots of unity.
     ///
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be
@@ -285,7 +285,7 @@ where
     where
         R_twiddle: ZnRing,
     {
-        let root_of_unity = get_prim_root_of_unity_zn(hom.domain(), 1 << log2_n)?;
+        let root_of_unity = get_prim_root_of_unity_pow2_zn(hom.domain(), log2_n)?;
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 }
@@ -1229,6 +1229,6 @@ fn test_butterfly() {
         zn_static::F17,
         zn_static::F17,
         0..17,
-        &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap(),
+        &get_prim_root_of_unity_pow2_zn(zn_static::F17, 4).unwrap(),
     );
 }
