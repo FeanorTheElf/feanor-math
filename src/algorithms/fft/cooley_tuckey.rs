@@ -176,16 +176,16 @@ where
 
 impl<R> CooleyTuckeyFFT<Complex64Base, Complex64Base, Identity<R>, Global>
 where
-    R: RingStore<Type = Complex64Base>,
+    R: RingStore<Ring = Complex64Base>,
 {
     /// Creates an [`CooleyTuckeyFFT`] for the complex field.
     pub fn for_complex(ring: R, log2_n: usize) -> Self { Self::for_complex_with_hom(ring.into_identity(), log2_n) }
 }
 
-impl<R> CooleyTuckeyFFT<R::Type, R::Type, Identity<R>, Global>
+impl<R> CooleyTuckeyFFT<R::Ring, R::Ring, Identity<R>, Global>
 where
     R: RingStore,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     /// Creates an [`CooleyTuckeyFFT`] for the given ring, using the given root of unity.
     ///
@@ -211,7 +211,7 @@ where
     /// congruent to 1 modulo `2^log2_n`.
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
     where
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         Self::for_zn_with_hom(ring.into_identity(), log2_n)
     }
@@ -237,9 +237,9 @@ where
         let ring = hom.domain();
         let root_of_unity_pow = |i: i64| {
             if i >= 0 {
-                ring.pow(ring.clone_el(&root_of_unity), i as usize)
+                ring.pow(root_of_unity.clone(), i as usize)
             } else {
-                ring.invert(&ring.pow(ring.clone_el(&root_of_unity), (-i) as usize))
+                ring.invert(&ring.pow(root_of_unity.clone(), (-i) as usize))
                     .unwrap()
             }
         };
@@ -334,20 +334,20 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            two_inv: self.hom.domain().clone_el(&self.two_inv),
-            n_inv: self.hom.domain().clone_el(&self.n_inv),
+            two_inv: self.two_inv.clone(),
+            n_inv: self.n_inv.clone(),
             hom: self.hom.clone(),
             inv_root_of_unity_list: self
                 .inv_root_of_unity_list
                 .iter()
-                .map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect())
+                .map(|list| list.iter().map(|x| x.clone()).collect())
                 .collect(),
             root_of_unity_list: self
                 .root_of_unity_list
                 .iter()
-                .map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect())
+                .map(|list| list.iter().map(|x| x.clone()).collect())
                 .collect(),
-            root_of_unity: self.hom.codomain().clone_el(&self.root_of_unity),
+            root_of_unity: self.root_of_unity.clone(),
             log2_n: self.log2_n,
             allocator: self.allocator.clone(),
         }
@@ -475,7 +475,7 @@ where
         y: &mut Self::Element,
         twiddle: &S::Element,
     ) {
-        let mut values = [hom.codomain().clone_el(x), hom.codomain().clone_el(y)];
+        let mut values = [x.clone(), y.clone()];
         <Self as CooleyTuckeyButterfly<S>>::butterfly(hom.codomain().get_ring(), &hom, &mut values, twiddle, 0, 1);
         [*x, *y] = values;
     }
@@ -503,7 +503,7 @@ where
         y: &mut Self::Element,
         twiddle: &S::Element,
     ) {
-        let mut values = [hom.codomain().clone_el(x), hom.codomain().clone_el(y)];
+        let mut values = [x.clone(), y.clone()];
         <Self as CooleyTuckeyButterfly<S>>::inv_butterfly(hom.codomain().get_ring(), &hom, &mut values, twiddle, 0, 1);
         [*x, *y] = values;
     }
@@ -898,7 +898,7 @@ where
 {
     fn len(&self) -> usize { 1 << self.log2_n }
 
-    fn root_of_unity<S: Copy + RingStore<Type = R_main>>(&self, ring: S) -> &R_main::Element {
+    fn root_of_unity<S: Copy + RingStore<Ring = R_main>>(&self, ring: S) -> &R_main::Element {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         &self.root_of_unity
     }
@@ -910,7 +910,7 @@ where
     fn fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -921,7 +921,7 @@ where
     fn inv_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -932,7 +932,7 @@ where
     fn unordered_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -940,7 +940,7 @@ where
             self.unordered_truncated_fft(data, 1 << self.log2_n);
         } else {
             let mut data = Vec::with_capacity_in(1 << self.log2_n, self.allocator());
-            data.extend(values.clone_ring_els(ring).iter());
+            data.extend(values.clone_els().iter());
             self.unordered_truncated_fft(&mut data, 1 << self.log2_n);
             for (i, x) in data.into_iter().enumerate() {
                 *values.at_mut(i) = x;
@@ -951,7 +951,7 @@ where
     fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -959,7 +959,7 @@ where
             self.unordered_truncated_fft_inv(data, 1 << self.log2_n);
         } else {
             let mut data = Vec::with_capacity_in(1 << self.log2_n, self.allocator());
-            data.extend(values.clone_ring_els(ring).iter());
+            data.extend(values.clone_els().iter());
             self.unordered_truncated_fft_inv(&mut data, 1 << self.log2_n);
             for (i, x) in data.into_iter().enumerate() {
                 *values.at_mut(i) = x;
@@ -1094,7 +1094,7 @@ where
     H: Homomorphism<R, S>,
 {
     copy.clear();
-    copy.extend(data.iter().map(|x| fft.ring().clone_el(x)));
+    copy.extend(data.iter().map(|x| x.clone()));
     fft.unordered_fft(&mut copy[..], &fft.ring());
     fft.unordered_inv_fft(&mut copy[..], &fft.ring());
     assert_el_eq!(fft.ring(), copy[0], data[0]);
@@ -1184,8 +1184,8 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
     edge_case_elements: I,
     test_twiddle: &El<S>,
 ) where
-    R::Type: CanHomFrom<S::Type>,
-    S::Type: DivisibilityRing,
+    R::Ring: CanHomFrom<S::Ring>,
+    S::Ring: DivisibilityRing,
 {
     let test_inv_twiddle = base.invert(&test_twiddle).unwrap();
     let elements = edge_case_elements.collect::<Vec<_>>();
@@ -1193,8 +1193,8 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
 
     for a in &elements {
         for b in &elements {
-            let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
-            <R::Type as CooleyTuckeyButterfly<S::Type>>::butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
+            let [mut x, mut y] = [a.clone(), b.clone()];
+            <R::Ring as CooleyTuckeyButterfly<S::Ring>>::butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
             assert_el_eq!(
                 ring,
                 ring.add_ref_fst(a, ring.mul_ref_fst(b, hom.map_ref(test_twiddle))),
@@ -1206,16 +1206,16 @@ pub fn generic_test_cooley_tuckey_butterfly<R: RingStore, S: RingStore, I: Itera
                 &y
             );
 
-            <R::Type as CooleyTuckeyButterfly<S::Type>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
+            <R::Ring as CooleyTuckeyButterfly<S::Ring>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &y);
 
-            let [mut x, mut y] = [ring.clone_el(a), ring.clone_el(b)];
-            <R::Type as CooleyTuckeyButterfly<S::Type>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
+            let [mut x, mut y] = [a.clone(), b.clone()];
+            <R::Ring as CooleyTuckeyButterfly<S::Ring>>::inv_butterfly_new(&hom, &mut x, &mut y, &test_twiddle);
             assert_el_eq!(ring, ring.add_ref(a, b), &x);
             assert_el_eq!(ring, ring.mul(ring.sub_ref(a, b), hom.map_ref(test_twiddle)), &y);
 
-            <R::Type as CooleyTuckeyButterfly<S::Type>>::butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
+            <R::Ring as CooleyTuckeyButterfly<S::Ring>>::butterfly_new(&hom, &mut x, &mut y, &test_inv_twiddle);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 2), &x);
             assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 2), &y);
         }

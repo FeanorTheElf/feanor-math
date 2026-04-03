@@ -13,7 +13,7 @@ use crate::ring::*;
 pub fn bisect_floor<R, F>(ZZ: R, left: El<R>, right: El<R>, mut func: F) -> El<R>
 where
     R: RingStore,
-    R::Type: IntegerRing,
+    R::Ring: IntegerRing,
     F: FnMut(&El<R>) -> El<R>,
 {
     assert!(ZZ.is_lt(&left, &right));
@@ -47,10 +47,10 @@ where
 pub fn find_root_floor<R, F>(ZZ: R, approx: El<R>, mut func: F) -> El<R>
 where
     R: RingStore,
-    R::Type: IntegerRing,
+    R::Ring: IntegerRing,
     F: FnMut(&El<R>) -> El<R>,
 {
-    let mut left = ZZ.clone_el(&approx);
+    let mut left = approx.clone();
     let mut step = ZZ.one();
     while ZZ.is_pos(&func(&left)) {
         ZZ.sub_assign_ref(&mut left, &step);
@@ -97,7 +97,7 @@ where
 pub fn root_floor<R>(ZZ: R, n: El<R>, root: usize) -> El<R>
 where
     R: RingStore,
-    R::Type: IntegerRing,
+    R::Ring: IntegerRing,
 {
     assert!(root > 0);
     if root == 1 {
@@ -114,16 +114,16 @@ where
         ZZ.from_float_approx(ZZ.to_float_approx(&n).powf(1.0 / root as f64))
             .unwrap_or(ZZ.zero()),
         |x| {
-            let x_pow_root_half = ZZ.pow(ZZ.clone_el(x), root / 2);
+            let x_pow_root_half = ZZ.pow(x.clone(), root / 2);
             // we first make a size estimate, mainly to avoid situations (high `root`) where we get avoidable
             // integer overflow (also might improve performance)
             if ZZ.abs_log2_ceil(x).unwrap_or(0) >= 2
                 && (ZZ.abs_log2_ceil(&x_pow_root_half).unwrap() - 1) * 2 >= log2_ceil_n
             {
                 if ZZ.is_neg(x) {
-                    return ZZ.negate(ZZ.clone_el(&n));
+                    return ZZ.negate(n.clone());
                 } else {
-                    return ZZ.clone_el(&n);
+                    return n.clone();
                 }
             } else {
                 let x_pow_root = if root % 2 == 0 {

@@ -34,7 +34,7 @@ where
     fn clone(&self) -> Self {
         Self {
             base: self.base.clone(),
-            max_ideal_gen: self.clone_el(&self.max_ideal_gen),
+            max_ideal_gen: self.max_ideal_gen.clone(),
             nilpotent_power: self.nilpotent_power,
         }
     }
@@ -112,7 +112,7 @@ where
 {
     #[stability::unstable(feature = "enable")]
     pub fn from_localpir(ring: R) -> Self {
-        let max_ideal_gen = ring.clone_el(ring.max_ideal_gen());
+        let max_ideal_gen = ring.max_ideal_gen().clone();
         let nilpotent_power = ring.nilpotent_power();
         Self::from(AsLocalPIRBase::promise_is_local_pir(
             ring,
@@ -154,7 +154,7 @@ where
     pub fn unwrap_element(&self, el: <Self as RingBase>::Element) -> El<R> { el.0 }
 
     #[stability::unstable(feature = "enable")]
-    pub fn unwrap_self(self) -> R { self.base }
+    pub fn unwrap_self) -> R { self.base }
 }
 
 impl<R: DivisibilityRingStore> DelegateRing for AsLocalPIRBase<R>
@@ -252,7 +252,7 @@ where
                 return Some(self.one());
             } else if self.is_zero(lhs) {
                 return Some(
-                    RingRef::new(self).pow(self.clone_el(self.max_ideal_gen()), e - self.valuation(rhs).unwrap()),
+                    RingRef::new(self).pow(self.max_ideal_gen().clone(), e - self.valuation(rhs).unwrap()),
                 );
             } else {
                 // the constraint `rhs * result = lhs` already fixes the evaluation of `result`
@@ -271,9 +271,9 @@ where
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
         if self.checked_left_div(lhs, rhs).is_some() {
-            (self.zero(), self.one(), self.clone_el(rhs))
+            (self.zero(), self.one(), rhs.clone())
         } else {
-            (self.one(), self.zero(), self.clone_el(lhs))
+            (self.one(), self.zero(), lhs.clone())
         }
     }
 
@@ -281,13 +281,13 @@ where
         if let Some(quo) = self.checked_left_div(b, a) {
             (
                 [self.one(), self.zero(), self.negate(quo), self.one()],
-                self.clone_el(a),
+                a.clone(),
             )
         } else {
             let quo = self.checked_left_div(a, b).unwrap();
             (
                 [self.zero(), self.one(), self.one(), self.negate(quo)],
-                self.clone_el(b),
+                b.clone(),
             )
         }
     }

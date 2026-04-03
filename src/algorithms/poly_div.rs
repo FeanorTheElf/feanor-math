@@ -23,7 +23,7 @@ use crate::rings::poly::*;
 pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
 where
     P: RingStore,
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
     F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
 {
     assert!(poly_ring.degree(rhs).is_some());
@@ -73,7 +73,7 @@ where
 pub fn poly_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div_lc: F) -> Result<El<P>, E>
 where
     P: RingStore,
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
     F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
 {
     assert!(poly_ring.degree(rhs).is_some());
@@ -114,13 +114,13 @@ pub const FAST_POLY_DIV_THRESHOLD: usize = 32;
 pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_div_lc: F) -> Result<(El<P>, El<P>), E>
 where
     P: RingStore + Copy,
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
     F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
 {
     fn fast_poly_div_impl<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F) -> Result<(El<P>, El<P>), E>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing,
+        P::Ring: PolyRing,
         F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
     {
         let deg_g = poly_ring.degree(g).unwrap();
@@ -147,7 +147,7 @@ where
             poly_ring
                 .terms(&f)
                 .filter(|(_, i)| *i >= split_degree_f)
-                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_f)),
+                .map(|(c, i)| (c.clone(), i - split_degree_f)),
         );
         let mut f_lower = f;
         poly_ring.truncate_monomials(&mut f_lower, split_degree_f);
@@ -155,12 +155,12 @@ where
             poly_ring
                 .terms(&g)
                 .filter(|(_, i)| *i >= split_degree_g)
-                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - split_degree_g)),
+                .map(|(c, i)| (c.clone(), i - split_degree_g)),
         );
-        let mut g_lower = poly_ring.clone_el(g);
+        let mut g_lower = g.clone();
         poly_ring.truncate_monomials(&mut g_lower, split_degree_g);
 
-        let (q_upper, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_upper), &g_upper, &mut *left_div_lc)?;
+        let (q_upper, r) = fast_poly_div_impl(poly_ring, f_upper.clone(), &g_upper, &mut *left_div_lc)?;
         debug_assert!(
             poly_ring.degree(&q_upper).is_none()
                 || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g
@@ -171,7 +171,7 @@ where
             &mut f_lower,
             poly_ring
                 .terms(&r)
-                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f)),
+                .map(|(c, i)| (c.clone(), i + split_degree_f)),
         );
         debug_assert!(
             poly_ring.degree(&f_lower).is_none()
@@ -182,7 +182,7 @@ where
             &mut f_lower,
             poly_ring.terms(&g_lower).map(|(c, i)| {
                 (
-                    poly_ring.base_ring().negate(poly_ring.base_ring().clone_el(c)),
+                    poly_ring.base_ring().negate(c.clone()),
                     i + split_degree_f - split_degree_g,
                 )
             }),
@@ -193,13 +193,13 @@ where
                     <= max(deg_f + split_degree_g - deg_g, deg_g + split_degree_f - split_degree_g)
         );
 
-        let (mut q_lower, r) = fast_poly_div_impl(poly_ring, poly_ring.clone_el(&f_lower), g, &mut *left_div_lc)?;
+        let (mut q_lower, r) = fast_poly_div_impl(poly_ring, f_lower.clone(), g, &mut *left_div_lc)?;
 
         poly_ring.get_ring().add_assign_from_terms(
             &mut q_lower,
             poly_ring
                 .terms(&q_upper)
-                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i + split_degree_f - split_degree_g)),
+                .map(|(c, i)| (c.clone(), i + split_degree_f - split_degree_g)),
         );
         return Ok((q_lower, r));
     }
@@ -232,8 +232,8 @@ fn test_fast_poly_div() {
     });
     assert_el_eq!(
         &ZZX,
-        ZZX.div_rem_monic(ZZX.clone_el(&f), &g).0,
-        fast_poly_div_rem(&ZZX, ZZX.clone_el(&f), &g, |c| Ok(ZZ.clone_el(c)))
+        ZZX.div_rem_monic(f.clone(), &g).0,
+        fast_poly_div_rem(&ZZX, f.clone(), &g, |c| Ok(c.clone()))
             .unwrap_or_else(no_error)
             .0
     );

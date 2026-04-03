@@ -56,10 +56,10 @@ pub trait FractionField: Field + RingExtension {
 #[stability::unstable(feature = "enable")]
 pub trait FractionFieldStore: RingStore
 where
-    Self::Type: FractionField,
+    Self::Ring: FractionField,
 {
     delegate! { FractionField, fn as_fraction(&self, el: El<Self>) -> (El<BaseRing<Self>>, El<BaseRing<Self>>) }
     delegate! { FractionField, fn from_fraction(&self, num: El<BaseRing<Self>>, den: El<BaseRing<Self>>) -> El<Self> }
 }
 
-impl<R: RingStore> FractionFieldStore for R where R::Type: FractionField {}
+impl<R: RingStore> FractionFieldStore for R where R::Ring: FractionField {}

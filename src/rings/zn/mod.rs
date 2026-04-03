@@ -31,7 +31,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// there seems to be a problem with associated type bounds, hence we cannot use `Integers:
     /// IntegerRingStore` or `Integers: RingStore<Type: IntegerRing>`
     type IntegerRingBase: IntegerRing + ?Sized;
-    type IntegerRing: RingStore<Type = Self::IntegerRingBase>;
+    type IntegerRing: RingStore<Ring = Self::IntegerRingBase>;
 
     fn integer_ring(&self) -> &Self::IntegerRing;
     fn modulus(&self) -> &El<Self::IntegerRing>;
@@ -71,7 +71,7 @@ pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRing
     /// in `0, 1, ..., n - 1` is needed instead, use [`ZnRing::smallest_positive_lift()`].
     fn smallest_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
         let result = self.smallest_positive_lift(el);
-        let mut mod_half = self.integer_ring().clone_el(self.modulus());
+        let mut mod_half = self.modulus().clone();
         self.integer_ring().euclidean_div_pow_2(&mut mod_half, 1);
         if self.integer_ring().is_gt(&result, &mod_half) {
             return self.integer_ring().sub_ref_snd(result, self.modulus());
@@ -247,14 +247,14 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>) -> Option<El<R>>
     where
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         if ring.is_zero(lhs) {
             return Some(ring.zero());
         }
         let int_ring = ring.integer_ring();
-        let lhs_lift = ring.smallest_positive_lift(ring.clone_el(lhs));
-        let rhs_lift = ring.smallest_positive_lift(ring.clone_el(rhs));
+        let lhs_lift = ring.smallest_positive_lift(lhs.clone());
+        let rhs_lift = ring.smallest_positive_lift(rhs.clone());
         let (s, _, d) = int_ring.extended_ideal_gen(&rhs_lift, ring.modulus());
         if let Some(quotient) = int_ring.checked_div(&lhs_lift, &d) {
             Some(ring.mul(ring.coerce(int_ring, quotient), ring.coerce(int_ring, s)))
@@ -266,7 +266,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn checked_div_min<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>) -> Option<El<R>>
     where
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         if ring.is_zero(lhs) && ring.is_zero(rhs) {
             return Some(ring.one());
@@ -276,7 +276,7 @@ pub mod generic_impls {
         let rhs_ann = int_ring
             .checked_div(
                 ring.modulus(),
-                &int_ring.ideal_gen(ring.modulus(), &ring.smallest_positive_lift(ring.clone_el(rhs))),
+                &int_ring.ideal_gen(ring.modulus(), &ring.smallest_positive_lift(rhs.clone())),
             )
             .unwrap();
         let some_sol = ring.smallest_positive_lift(ring.checked_div(lhs, rhs)?);
@@ -292,16 +292,16 @@ pub mod generic_impls {
     pub fn interpolation_ring<'conv, R: ZnRingStore>(
         ring: R,
         count: usize,
-    ) -> GaloisFieldOver<R, DynConvolution<'conv, R::Type>>
+    ) -> GaloisFieldOver<R, DynConvolution<'conv, R::Ring>>
     where
         R: 'conv + Clone,
-        R::Type: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+        R::Ring: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
     {
         let ZZbig = BigIntRing::RING;
-        let modulus = int_cast(ring.integer_ring().clone_el(ring.modulus()), ZZbig, ring.integer_ring());
+        let modulus = int_cast(ring.modulus().clone(), ZZbig, ring.integer_ring());
         let count = int_cast(count.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING);
         let degree = int_bisect::find_root_floor(StaticRing::<i64>::RING, 1, |d| {
-            if *d > 0 && ZZbig.is_gt(&ZZbig.pow(ZZbig.clone_el(&modulus), *d as usize), &count) {
+            if *d > 0 && ZZbig.is_gt(&ZZbig.pow(modulus.clone(), *d as usize), &count) {
                 1
             } else {
                 -1
@@ -315,13 +315,13 @@ pub mod generic_impls {
 /// The [`crate::ring::RingStore`] corresponding to [`ZnRing`].
 pub trait ZnRingStore: FiniteRingStore
 where
-    Self::Type: ZnRing,
+    Self::Ring: ZnRing,
 {
-    delegate! { ZnRing, fn integer_ring(&self) -> &<Self::Type as ZnRing>::IntegerRing }
-    delegate! { ZnRing, fn modulus(&self) -> &El<<Self::Type as ZnRing>::IntegerRing> }
-    delegate! { ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
-    delegate! { ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
-    delegate! { ZnRing, fn any_lift(&self, el: El<Self>) -> El<<Self::Type as ZnRing>::IntegerRing> }
+    delegate! { ZnRing, fn integer_ring(&self) -> &<Self::Ring as ZnRing>::IntegerRing }
+    delegate! { ZnRing, fn modulus(&self) -> &El<<Self::Ring as ZnRing>::IntegerRing> }
+    delegate! { ZnRing, fn smallest_positive_lift(&self, el: El<Self>) -> El<<Self::Ring as ZnRing>::IntegerRing> }
+    delegate! { ZnRing, fn smallest_lift(&self, el: El<Self>) -> El<<Self::Ring as ZnRing>::IntegerRing> }
+    delegate! { ZnRing, fn any_lift(&self, el: El<Self>) -> El<<Self::Ring as ZnRing>::IntegerRing> }
     delegate! { ZnRing, fn is_field(&self) -> bool }
 
     fn as_field(self) -> Result<RingValue<AsFieldBase<Self>>, Self>
@@ -336,7 +336,7 @@ where
     }
 }
 
-impl<R: RingStore> ZnRingStore for R where R::Type: ZnRing {}
+impl<R: RingStore> ZnRingStore for R where R::Ring: ZnRing {}
 
 /// Trait for algorithms that require some implementation of
 /// `Z/nZ`, but do not care which.
@@ -351,7 +351,7 @@ pub trait ZnOperation {
     where
         Self: 'a,
         R: 'a + RingStore,
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
         El<R>: Send;
 }
 
@@ -400,7 +400,7 @@ pub trait ZnOperation {
 pub fn choose_zn_impl<'a, I, F>(ZZ: I, n: El<I>, f: F) -> F::Output<'a>
 where
     I: 'a + RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     F: ZnOperation,
 {
     if ZZ.abs_highest_set_bit(&n).unwrap_or(0) < 57 {
@@ -427,7 +427,7 @@ fn test_choose_zn_impl() {
         fn call<'a, R>(self, Zn: R)
         where
             R: 'a + RingStore,
-            R::Type: ZnRing,
+            R::Ring: ZnRing,
         {
             let value = Zn.coerce(
                 Zn.integer_ring(),
@@ -459,25 +459,25 @@ enum ReductionMapRequirements {
 pub struct ZnReductionMap<R, S>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
     S: RingStore,
-    S::Type: ZnRing,
+    S::Ring: ZnRing,
 {
     from: R,
     to: S,
     fraction_of_quotients: El<R>,
-    to_modulus: El<<R::Type as ZnRing>::IntegerRing>,
-    to_from_int: <S::Type as CanHomFrom<<S::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
-    from_from_int: <R::Type as CanHomFrom<<R::Type as ZnRing>::IntegerRingBase>>::Homomorphism,
+    to_modulus: El<<R::Ring as ZnRing>::IntegerRing>,
+    to_from_int: <S::Ring as CanHomFrom<<S::Ring as ZnRing>::IntegerRingBase>>::Homomorphism,
+    from_from_int: <R::Ring as CanHomFrom<<R::Ring as ZnRing>::IntegerRingBase>>::Homomorphism,
     map_forward_requirement: ReductionMapRequirements,
 }
 
 impl<R, S> ZnReductionMap<R, S>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
     S: RingStore,
-    S::Type: ZnRing,
+    S::Ring: ZnRing,
 {
     pub fn new(from: R, to: S) -> Option<Self> {
         let from_char = from.characteristic(&BigIntRing::RING).unwrap();
@@ -497,7 +497,7 @@ where
             Some(Self {
                 map_forward_requirement,
                 to_modulus: int_cast(
-                    to.integer_ring().clone_el(to.modulus()),
+                    to.modulus().clone(),
                     from.integer_ring(),
                     to.integer_ring(),
                 ),
@@ -579,15 +579,15 @@ where
         self.smallest_lift(x)
     }
 
-    pub fn smallest_lift_ref(&self, x: &El<S>) -> El<R> { self.smallest_lift(self.codomain().clone_el(x)) }
+    pub fn smallest_lift_ref(&self, x: &El<S>) -> El<R> { self.smallest_lift(x.clone()) }
 }
 
-impl<R, S> Homomorphism<R::Type, S::Type> for ZnReductionMap<R, S>
+impl<R, S> Homomorphism<R::Ring, S::Ring> for ZnReductionMap<R, S>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
     S: RingStore,
-    S::Type: ZnRing,
+    S::Ring: ZnRing,
 {
     type CodomainStore = S;
     type DomainStore = R;
@@ -620,27 +620,27 @@ pub mod generic_tests {
 
     pub fn test_zn_axioms<R: RingStore>(R: R)
     where
-        R::Type: ZnRing,
-        <R::Type as ZnRing>::IntegerRingBase: CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i32>>,
+        R::Ring: ZnRing,
+        <R::Ring as ZnRing>::IntegerRingBase: CanIsoFromTo<StaticRingBase<i128>> + CanIsoFromTo<StaticRingBase<i32>>,
     {
         let ZZ = R.integer_ring();
         let n = R.modulus();
 
-        assert!(R.is_zero(&R.coerce(ZZ, ZZ.clone_el(n))));
+        assert!(R.is_zero(&R.coerce(ZZ, n.clone())));
         assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
 
         if ZZ.is_lt(n, &ZZ.power_of_two(7)) {
             let mut k = ZZ.one();
             while ZZ.is_lt(&k, &n) {
-                assert!(!R.is_zero(&R.coerce(ZZ, ZZ.clone_el(&k))));
+                assert!(!R.is_zero(&R.coerce(ZZ, k.clone())));
                 ZZ.add_assign(&mut k, ZZ.one());
             }
 
-            let all_elements = (0..int_cast(R.integer_ring().clone_el(n), StaticRing::<i32>::RING, R.integer_ring()))
+            let all_elements = (0..int_cast(n.clone(), StaticRing::<i32>::RING, R.integer_ring()))
                 .map(|x| R.int_hom().map(x))
                 .collect::<Vec<_>>();
             assert_eq!(
-                int_cast(ZZ.clone_el(n), &StaticRing::<i128>::RING, &ZZ) as usize,
+                int_cast(n.clone(), &StaticRing::<i128>::RING, &ZZ) as usize,
                 all_elements.len()
             );
             for (i, x) in all_elements.iter().enumerate() {
@@ -653,7 +653,7 @@ pub mod generic_tests {
 
     pub fn test_map_in_large_int<R: RingStore>(R: R)
     where
-        <R as RingStore>::Type: ZnRing + CanHomFrom<BigIntRingBase>,
+        <R as RingStore>::Ring: ZnRing + CanHomFrom<BigIntRingBase>,
     {
         let ZZ_big = BigIntRing::RING;
         let n = ZZ_big.power_of_two(1000);

@@ -23,19 +23,19 @@ pub trait InterpolationBaseRing: DivisibilityRing {
     where
         Self: 'a;
 
-    type ExtendedRing<'a>: RingStore<Type = Self::ExtendedRingBase<'a>> + Clone
+    type ExtendedRing<'a>: RingStore<Ring = Self::ExtendedRingBase<'a>> + Clone
     where
         Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>;
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>;
 
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>;
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>;
 
     /// Returns `count` points such that the difference between any two of them
     /// is a non-zero-divisor.
@@ -48,14 +48,14 @@ pub trait InterpolationBaseRing: DivisibilityRing {
 #[stability::unstable(feature = "enable")]
 pub trait InterpolationBaseRingStore: RingStore
 where
-    Self::Type: InterpolationBaseRing,
+    Self::Ring: InterpolationBaseRing,
 {
 }
 
 impl<R> InterpolationBaseRingStore for R
 where
     R: RingStore,
-    R::Type: InterpolationBaseRing,
+    R::Ring: InterpolationBaseRing,
 {
 }
 
@@ -353,7 +353,7 @@ pub trait LiftPolyEvalRing: RingBase + FiniteRingSpecializable {
     where
         Self: 'ring;
 
-    type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
+    type LocalRing<'ring>: RingStore<Ring = Self::LocalRingBase<'ring>>
     where
         Self: 'ring;
 
@@ -473,7 +473,7 @@ where
     where
         Self: 'ring,
     {
-        vec![self.clone_el(el)]
+        vec![el.clone()]
     }
 
     fn lift_combine<'ring>(
@@ -485,7 +485,7 @@ where
         Self: 'ring,
     {
         assert_eq!(1, el.len());
-        return self.clone_el(&el[0]);
+        return el[0].clone();
     }
 }
 
@@ -598,8 +598,8 @@ where
 /// impl<R: ComputeResultantRing> ComputeResultantRing for MyRingWrapper<R> {
 ///     fn resultant_with_controller<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, _: Controller) -> Self::Element
 ///         where P: RingStore + Copy,
-///             P::Type: PolyRing,
-///             BaseRing<P>: RingStore<Type = Self>,
+///             P::Ring: PolyRing,
+///             BaseRing<P>: RingStore<Ring = Self>,
 ///             Controller: ComputationController
 ///     {
 ///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");
@@ -620,13 +620,13 @@ macro_rules! impl_interpolation_base_ring_char_zero {
                 where Self: 'a;
 
             fn in_base<'a, S>(&self, _ext_ring: S, el: El<S>) -> Option<Self::Element>
-                where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+                where Self: 'a, S: RingStore<Ring = Self::ExtendedRingBase<'a>>
             {
                 Some(el)
             }
 
             fn in_extension<'a, S>(&self, _ext_ring: S, el: Self::Element) -> El<S>
-                where Self: 'a, S: RingStore<Type = Self::ExtendedRingBase<'a>>
+                where Self: 'a, S: RingStore<Ring = Self::ExtendedRingBase<'a>>
             {
                 el
             }
@@ -706,7 +706,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn reduce<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &Self::Element) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
                 where Self: 'ring
             {
-                <_ as $crate::seq::VectorView<_>>::as_iter(&computation.get_congruence(&computation.coerce(RingValue::from_ref(self), self.clone_el(el)))).map(|x| *x).collect()
+                <_ as $crate::seq::VectorView<_>>::as_iter(&computation.get_congruence(&computation.coerce(RingValue::from_ref(self), el.clone()))).map(|x| *x).collect()
             }
 
             fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element

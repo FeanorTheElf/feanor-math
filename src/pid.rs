@@ -129,7 +129,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
 /// to provide a convenient interface to the `PrincipalIdealRing`-functions.
 pub trait PrincipalIdealRingStore: RingStore
 where
-    Self::Type: PrincipalIdealRing,
+    Self::Ring: PrincipalIdealRing,
 {
     delegate! { PrincipalIdealRing, fn checked_div_min(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate! { PrincipalIdealRing, fn extended_ideal_gen(&self, lhs: &El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>, El<Self>) }
@@ -148,7 +148,7 @@ where
 impl<R> PrincipalIdealRingStore for R
 where
     R: RingStore,
-    R::Type: PrincipalIdealRing,
+    R::Ring: PrincipalIdealRing,
 {
 }
 
@@ -204,7 +204,7 @@ pub trait EuclideanRing: PrincipalIdealRing {
 /// [`RingStore`] for [`EuclideanRing`]s
 pub trait EuclideanRingStore: RingStore + DivisibilityRingStore
 where
-    Self::Type: EuclideanRing,
+    Self::Ring: EuclideanRing,
 {
     delegate! { EuclideanRing, fn euclidean_div_rem(&self, lhs: El<Self>, rhs: &El<Self>) -> (El<Self>, El<Self>) }
     delegate! { EuclideanRing, fn euclidean_div(&self, lhs: El<Self>, rhs: &El<Self>) -> El<Self> }
@@ -215,7 +215,7 @@ where
 impl<R> EuclideanRingStore for R
 where
     R: RingStore,
-    R::Type: EuclideanRing,
+    R::Ring: EuclideanRing,
 {
 }
 
@@ -232,7 +232,7 @@ pub mod generic_tests {
 
     pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where
-        R::Type: EuclideanRing,
+        R::Ring: EuclideanRing,
     {
         assert!(ring.is_commutative());
         assert!(ring.is_noetherian());
@@ -242,19 +242,19 @@ pub mod generic_tests {
                 if ring.is_zero(b) {
                     continue;
                 }
-                let (q, r) = ring.euclidean_div_rem(ring.clone_el(a), b);
+                let (q, r) = ring.euclidean_div_rem(a.clone(), b);
                 assert!(
                     ring.euclidean_deg(b).is_none()
                         || ring.euclidean_deg(&r).unwrap_or(usize::MAX) < ring.euclidean_deg(b).unwrap()
                 );
-                assert_el_eq!(ring, a, ring.add(ring.mul(q, ring.clone_el(b)), r));
+                assert_el_eq!(ring, a, ring.add(ring.mul(q, b.clone()), r));
             }
         }
     }
 
     pub fn test_principal_ideal_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where
-        R::Type: PrincipalIdealRing,
+        R::Ring: PrincipalIdealRing,
     {
         assert!(ring.is_commutative());
         assert!(ring.is_noetherian());
@@ -328,7 +328,7 @@ pub mod generic_tests {
         let ZZbig = BigIntRing::RING;
         let char = ring.characteristic(ZZbig).unwrap();
         if !ZZbig.is_zero(&char) && !ZZbig.is_one(&char) && ZZbig.is_leq(&char, &ZZbig.power_of_two(30)) {
-            let p = factor(ZZbig, ZZbig.clone_el(&char)).into_iter().next().unwrap().0;
+            let p = factor(ZZbig, char.clone()).into_iter().next().unwrap().0;
             let expected = ring.int_hom().map(int_cast(
                 ZZbig.checked_div(&char, &p).unwrap(),
                 StaticRing::<i32>::RING,

@@ -144,8 +144,8 @@ pub fn interpolate<P, V1, V2, A: Allocator>(
 ) -> Result<El<P>, InterpolationError>
 where
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
     V1: VectorFn<El<BaseRing<P>>>,
     V2: VectorFn<El<BaseRing<P>>>,
 {
@@ -160,7 +160,7 @@ where
         if let Some(d) = poly_ring.degree(poly) {
             poly_ring.from_terms((0..d).rev().scan(base_ring.zero(), |current, i| {
                 base_ring.add_assign_ref(current, poly_ring.coefficient_at(poly, i + 1));
-                let result = base_ring.clone_el(current);
+                let result = current.clone();
                 base_ring.mul_assign_ref(current, a);
                 return Some((result, i));
             }))
@@ -197,7 +197,7 @@ where
     } else {
         let mut factors = Vec::with_capacity_in(x.len(), &allocator);
         factors.resize_with(x.len(), || base_ring.zero());
-        product_except_one(base_ring, (&denoms[..]).into_clone_ring_els(base_ring), &mut factors);
+        product_except_one(base_ring, (&denoms[..]).into_clone_els(), &mut factors);
         let denominator = base_ring.mul_ref(&factors[0], &denoms[0]);
         for (factor, y) in factors.iter_mut().zip(y.iter()) {
             base_ring.mul_assign(factor, y);
@@ -225,8 +225,8 @@ pub fn interpolate_multivariate<P, V1, V2, A, A2>(
 ) -> Result<El<P>, InterpolationError>
 where
     P: RingStore,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
     V1: VectorFn<V2>,
     V2: VectorFn<El<BaseRing<P>>>,
     A: Allocator + Send + Sync,
@@ -256,14 +256,14 @@ where
                     &uni_poly_ring,
                     interpolation_points.at(i),
                     (&values[..])
-                        .into_clone_ring_els(poly_ring.base_ring())
+                        .into_clone_els()
                         .restrict(block_start..(block_start + outer_block_size + 1 - leading_dim))
                         .step_by_fn(leading_dim),
                     &allocator,
                 )?;
                 for j in 0..len {
                     values[block_start + leading_dim * j] =
-                        poly_ring.base_ring().clone_el(uni_poly_ring.coefficient_at(&poly, j));
+                        uni_poly_ring.coefficient_at(&poly, j).clone();
                 }
             }
         }
@@ -398,7 +398,7 @@ fn test_interpolate_multivariate() {
                 ring.int_hom().map(expected),
                 poly_ring.evaluate(
                     &poly,
-                    [ring.int_hom().map(x), ring.int_hom().map(y)].into_clone_ring_els(&ring),
+                    [ring.int_hom().map(x), ring.int_hom().map(y)].into_clone_els(),
                     &ring.identity()
                 )
             );
@@ -421,7 +421,7 @@ fn test_interpolate_multivariate() {
                     poly_ring.evaluate(
                         &poly,
                         [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)]
-                            .into_clone_ring_els(&ring),
+                            .into_clone_els(),
                         &ring.identity()
                     )
                 );

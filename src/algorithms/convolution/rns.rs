@@ -32,7 +32,7 @@ pub struct RNSConvolution<
     CreateC = CreateNTTConvolution,
 > where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -55,7 +55,7 @@ pub struct RNSConvolutionZn<
     CreateC = CreateNTTConvolution,
 > where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -88,7 +88,7 @@ where
 impl<I, C, A, CreateC> From<RNSConvolutionZn<I, C, A, CreateC>> for RNSConvolution<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -99,7 +99,7 @@ where
 impl<'a, I, C, A, CreateC> From<&'a RNSConvolutionZn<I, C, A, CreateC>> for &'a RNSConvolution<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -110,7 +110,7 @@ where
 impl<I, C, A, CreateC> From<RNSConvolution<I, C, A, CreateC>> for RNSConvolutionZn<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -121,7 +121,7 @@ where
 impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RNSConvolutionZn<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -181,7 +181,7 @@ impl RNSConvolution {
 impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -565,7 +565,7 @@ where
 impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
@@ -585,7 +585,7 @@ where
             val,
             ring,
             len_hint,
-            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::from(ring)),
+            |x| int_cast(x.clone(), &self.integer_ring, RingRef::from(ring)),
             None,
         )
     }
@@ -606,7 +606,7 @@ where
             rhs_prep,
             dst,
             ring,
-            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::from(ring)),
+            |x| int_cast(x.clone(), &self.integer_ring, RingRef::from(ring)),
             |x| int_cast(x, RingRef::from(ring), &self.integer_ring),
             None,
         )
@@ -627,7 +627,7 @@ where
             values,
             dst,
             ring,
-            |x| int_cast(ring.clone_el(x), &self.integer_ring, RingRef::from(ring)),
+            |x| int_cast(x.clone(), &self.integer_ring, RingRef::from(ring)),
             |x| int_cast(x, RingRef::from(ring), &self.integer_ring),
             None,
         )
@@ -637,11 +637,11 @@ where
 impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, CreateC>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
     CreateC: Send + Sync + Fn(Zn64B) -> C,
-    R: ?Sized + ZnRing + CanHomFrom<I::Type>,
+    R: ?Sized + ZnRing + CanHomFrom<I::Ring>,
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
 
@@ -659,7 +659,7 @@ where
             len_hint,
             |x| {
                 int_cast(
-                    ring.smallest_lift(ring.clone_el(x)),
+                    ring.smallest_lift(x.clone()),
                     &self.base.integer_ring,
                     ring.integer_ring(),
                 )
@@ -687,7 +687,7 @@ where
             ring,
             |x| {
                 int_cast(
-                    ring.smallest_lift(ring.clone_el(x)),
+                    ring.smallest_lift(x.clone()),
                     &self.base.integer_ring,
                     ring.integer_ring(),
                 )
@@ -715,7 +715,7 @@ where
             ring,
             |x| {
                 int_cast(
-                    ring.smallest_lift(ring.clone_el(x)),
+                    ring.smallest_lift(x.clone()),
                     &self.base.integer_ring,
                     ring.integer_ring(),
                 )

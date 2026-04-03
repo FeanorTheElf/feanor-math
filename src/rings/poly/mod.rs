@@ -73,7 +73,7 @@ pub trait PolyRing: RingExtension {
         *lhs = RingRef::from(self).from_terms(
             self.terms(lhs)
                 .filter(|(_, i)| *i < truncated_at_inclusive)
-                .map(|(c, i)| (self.base_ring().clone_el(c), i)),
+                .map(|(c, i)| (c.clone(), i)),
         )
     }
 
@@ -84,7 +84,7 @@ pub trait PolyRing: RingExtension {
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
     where
         P: ?Sized + PolyRing,
-        H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>,
+        H: Homomorphism<<P::BaseRing as RingStore>::Ring, <Self::BaseRing as RingStore>::Ring>,
     {
         assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
         assert!(from.base_ring().get_ring() == hom.domain().get_ring());
@@ -101,7 +101,7 @@ pub trait PolyRing: RingExtension {
     #[stability::unstable(feature = "enable")]
     fn balance_poly(&self, f: &mut Self::Element) -> Option<El<Self::BaseRing>>
     where
-        <Self::BaseRing as RingStore>::Type: DivisibilityRing,
+        <Self::BaseRing as RingStore>::Ring: DivisibilityRing,
     {
         let balance_factor = self
             .base_ring()
@@ -125,7 +125,7 @@ pub trait PolyRing: RingExtension {
     /// # use feanor_math::primitive_int::*;
     /// let ring = dense_poly::DensePolyRing::new(StaticRing::<i32>::RING, "X");
     /// let x = ring.indeterminate();
-    /// let poly = ring.add(ring.clone_el(&x), ring.pow(x, 2));
+    /// let poly = ring.add(x.clone(), ring.pow(x, 2));
     /// assert_eq!(
     ///     12,
     ///     ring.evaluate(&poly, &3, &StaticRing::<i32>::RING.identity())
@@ -134,10 +134,10 @@ pub trait PolyRing: RingExtension {
     fn evaluate<R, H>(&self, f: &Self::Element, value: &R::Element, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
+        H: Homomorphism<<Self::BaseRing as RingStore>::Ring, R>,
     {
         hom.codomain().sum(self.terms(f).map(|(c, i)| {
-            let result = hom.codomain().pow(hom.codomain().clone_el(value), i);
+            let result = hom.codomain().pow(value.clone(), i);
             hom.mul_ref_snd_map(result, c)
         }))
     }
@@ -146,7 +146,7 @@ pub trait PolyRing: RingExtension {
 /// [`RingStore`] corresponding to [`PolyRing`].
 pub trait PolyRingStore: RingStore
 where
-    Self::Type: PolyRing,
+    Self::Ring: PolyRing,
 {
     delegate! { PolyRing, fn indeterminate(&self) -> El<Self> }
     delegate! { PolyRing, fn degree(&self, f: &El<Self>) -> Option<usize> }
@@ -160,7 +160,7 @@ where
     }
 
     /// See [`PolyRing::terms()`].
-    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as PolyRing>::TermsIterator<'a> { self.get_ring().terms(f) }
+    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Ring as PolyRing>::TermsIterator<'a> { self.get_ring().terms(f) }
 
     /// Computes the polynomial from the given terms.
     ///
@@ -233,7 +233,7 @@ where
     /// ```
     fn normalize(&self, mut f: El<Self>) -> El<Self>
     where
-        <BaseRing<Self> as RingStore>::Type: DivisibilityRing + Domain,
+        <BaseRing<Self> as RingStore>::Ring: DivisibilityRing + Domain,
     {
         if self.is_zero(&f) {
             return f;
@@ -253,7 +253,7 @@ where
     fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<BaseRing<Self> as RingStore>::Type, R>,
+        H: Homomorphism<<BaseRing<Self> as RingStore>::Ring, R>,
     {
         self.get_ring().evaluate(f, value, hom)
     }
@@ -266,8 +266,8 @@ where
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
     where
         P: RingStore,
-        P::Type: PolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>,
+        P::Ring: PolyRing,
+        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
     {
         CoefficientHom { from, to: self, hom }
     }
@@ -277,8 +277,8 @@ where
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
     where
         P: RingStore,
-        P::Type: PolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>,
+        P::Ring: PolyRing,
+        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
     {
         self.into_lifted_hom(from, hom)
     }
@@ -368,7 +368,7 @@ where
     #[stability::unstable(feature = "enable")]
     fn balance_poly(&self, f: &mut El<Self>) -> Option<El<BaseRing<Self>>>
     where
-        <BaseRing<Self> as RingStore>::Type: DivisibilityRing,
+        <BaseRing<Self> as RingStore>::Ring: DivisibilityRing,
     {
         self.get_ring().balance_poly(f)
     }
@@ -383,11 +383,11 @@ pub struct CoefficientHom<PFrom, PTo, H>
 where
     PFrom: RingStore,
     PTo: RingStore,
-    PFrom::Type: PolyRing,
-    PTo::Type: PolyRing,
+    PFrom::Ring: PolyRing,
+    PTo::Ring: PolyRing,
     H: Homomorphism<
-            <<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type,
-            <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
+            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
         >,
 {
     from: PFrom,
@@ -395,15 +395,15 @@ where
     hom: H,
 }
 
-impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
+impl<PFrom, PTo, H> Homomorphism<PFrom::Ring, PTo::Ring> for CoefficientHom<PFrom, PTo, H>
 where
     PFrom: RingStore,
     PTo: RingStore,
-    PFrom::Type: PolyRing,
-    PTo::Type: PolyRing,
+    PFrom::Ring: PolyRing,
+    PTo::Ring: PolyRing,
     H: Homomorphism<
-            <<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type,
-            <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
+            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
         >,
 {
     type DomainStore = PFrom;
@@ -413,14 +413,14 @@ where
 
     fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
 
-    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element { self.map_ref(&x) }
+    fn map(&self, x: <PFrom::Ring as RingBase>::Element) -> <PTo::Ring as RingBase>::Element { self.map_ref(&x) }
 
-    fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+    fn map_ref(&self, x: &<PFrom::Ring as RingBase>::Element) -> <PTo::Ring as RingBase>::Element {
         self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
     }
 }
 
-impl<R: RingStore> PolyRingStore for R where R::Type: PolyRing {}
+impl<R: RingStore> PolyRingStore for R where R::Ring: PolyRing {}
 
 /// Computes the formal derivative of a polynomial.
 ///
@@ -431,7 +431,7 @@ impl<R: RingStore> PolyRingStore for R where R::Type: PolyRing {}
 pub fn derive_poly<P>(poly_ring: P, poly: &El<P>) -> El<P>
 where
     P: PolyRingStore,
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
 {
     poly_ring.from_terms(poly_ring.terms(poly).filter(|(_, i)| *i > 0).map(|(c, i)| {
         (
@@ -452,12 +452,12 @@ pub mod generic_impls {
     #[allow(type_alias_bounds)]
     #[stability::unstable(feature = "enable")]
     pub type Homomorphism<P1: PolyRing, P2: PolyRing> =
-        <<P2::BaseRing as RingStore>::Type as CanHomFrom<<P1::BaseRing as RingStore>::Type>>::Homomorphism;
+        <<P2::BaseRing as RingStore>::Ring as CanHomFrom<<P1::BaseRing as RingStore>::Ring>>::Homomorphism;
 
     #[stability::unstable(feature = "enable")]
     pub fn has_canonical_hom<P1: PolyRing, P2: PolyRing>(from: &P1, to: &P2) -> Option<Homomorphism<P1, P2>>
     where
-        <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>,
+        <P2::BaseRing as RingStore>::Ring: CanHomFrom<<P1::BaseRing as RingStore>::Ring>,
     {
         to.base_ring().get_ring().has_canonical_hom(from.base_ring().get_ring())
     }
@@ -470,7 +470,7 @@ pub mod generic_impls {
         hom: &Homomorphism<P1, P2>,
     ) -> P2::Element
     where
-        <P2::BaseRing as RingStore>::Type: CanHomFrom<<P1::BaseRing as RingStore>::Type>,
+        <P2::BaseRing as RingStore>::Ring: CanHomFrom<<P1::BaseRing as RingStore>::Ring>,
     {
         let mut result = to.zero();
         to.add_assign_from_terms(
@@ -479,7 +479,7 @@ pub mod generic_impls {
                 (
                     to.base_ring()
                         .get_ring()
-                        .map_in(from.base_ring().get_ring(), from.base_ring().clone_el(c), hom),
+                        .map_in(from.base_ring().get_ring(), c.clone(), hom),
                     i,
                 )
             }),
@@ -490,7 +490,7 @@ pub mod generic_impls {
     #[allow(type_alias_bounds)]
     #[stability::unstable(feature = "enable")]
     pub type Isomorphism<P1: PolyRing, P2: PolyRing> =
-        <<P2::BaseRing as RingStore>::Type as CanIsoFromTo<<P1::BaseRing as RingStore>::Type>>::Isomorphism;
+        <<P2::BaseRing as RingStore>::Ring as CanIsoFromTo<<P1::BaseRing as RingStore>::Ring>>::Isomorphism;
 
     #[stability::unstable(feature = "enable")]
     pub fn map_out<P1: PolyRing, P2: PolyRing>(
@@ -500,7 +500,7 @@ pub mod generic_impls {
         iso: &Isomorphism<P1, P2>,
     ) -> P1::Element
     where
-        <P2::BaseRing as RingStore>::Type: CanIsoFromTo<<P1::BaseRing as RingStore>::Type>,
+        <P2::BaseRing as RingStore>::Ring: CanIsoFromTo<<P1::BaseRing as RingStore>::Ring>,
     {
         let mut result = from.zero();
         from.add_assign_from_terms(
@@ -509,7 +509,7 @@ pub mod generic_impls {
                 (
                     to.base_ring()
                         .get_ring()
-                        .map_out(from.base_ring().get_ring(), to.base_ring().clone_el(c), iso),
+                        .map_out(from.base_ring().get_ring(), c.clone(), iso),
                     i,
                 )
             }),
@@ -594,17 +594,17 @@ pub mod generic_impls {
 /// the two indeterminates of a polynomial ring in two indeterminates.
 ///
 /// Coefficients are mapped from `R` to `S` using the given homomorphism.
-pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> impl Homomorphism<P1::Type, P2::Type>
+pub fn transpose_indeterminates<P1, P2, H>(from: P1, to: P2, base_hom: H) -> impl Homomorphism<P1::Ring, P2::Ring>
 where
     P1: RingStore,
-    P1::Type: PolyRing,
+    P1::Ring: PolyRing,
     P2: RingStore,
-    P2::Type: PolyRing,
-    <BaseRing<P1> as RingStore>::Type: PolyRing,
-    <BaseRing<P2> as RingStore>::Type: PolyRing,
+    P2::Ring: PolyRing,
+    <BaseRing<P1> as RingStore>::Ring: PolyRing,
+    <BaseRing<P2> as RingStore>::Ring: PolyRing,
     H: Homomorphism<
-            <<<BaseRing<P1> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type,
-            <<<BaseRing<P2> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<<BaseRing<P1> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring,
+            <<<BaseRing<P2> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring,
         >,
 {
     LambdaHom::new(from, to, move |from, to, x| {
@@ -637,7 +637,7 @@ pub mod generic_tests {
         ring: R,
         interesting_base_ring_elements: I,
     ) where
-        R::Type: PolyRing,
+        R::Ring: PolyRing,
     {
         let x = ring.indeterminate();
         let elements = interesting_base_ring_elements.collect::<Vec<_>>();
@@ -692,7 +692,7 @@ pub mod generic_tests {
                                 ),
                                 ring.mul(
                                     ring.inclusion().map_ref(b),
-                                    ring.mul(ring.inclusion().map_ref(d), ring.pow(ring.clone_el(&x), 2)),
+                                    ring.mul(ring.inclusion().map_ref(d), ring.pow(x.clone(), 2)),
                                 ),
                             ]
                             .into_iter(),
@@ -712,15 +712,15 @@ pub mod generic_tests {
                         [
                             ring.inclusion().map_ref(a),
                             ring.mul_ref_snd(ring.inclusion().map_ref(b), &x),
-                            ring.mul(ring.inclusion().map_ref(c), ring.pow(ring.clone_el(&x), 3)),
+                            ring.mul(ring.inclusion().map_ref(c), ring.pow(x.clone(), 3)),
                         ]
                         .into_iter(),
                     );
                     let actual = ring.from_terms(
                         [
-                            (ring.base_ring().clone_el(a), 0),
-                            (ring.base_ring().clone_el(c), 3),
-                            (ring.base_ring().clone_el(b), 1),
+                            (a.clone(), 0),
+                            (c.clone(), 3),
+                            (b.clone(), 1),
                         ]
                         .into_iter(),
                     );
@@ -728,7 +728,7 @@ pub mod generic_tests {
                     assert_el_eq!(
                         ring,
                         f,
-                        ring.from_terms(ring.terms(&f).map(|(c, i)| (ring.base_ring().clone_el(c), i)))
+                        ring.from_terms(ring.terms(&f).map(|(c, i)| (c.clone(), i)))
                     );
                 }
             }
@@ -739,16 +739,16 @@ pub mod generic_tests {
             for b in &elements {
                 for c in &elements {
                     let f = ring
-                        .from_terms([(ring.base_ring().clone_el(a), 0), (ring.base_ring().clone_el(b), 3)].into_iter());
+                        .from_terms([(a.clone(), 0), (b.clone(), 3)].into_iter());
                     let g = ring.from_terms(
                         [
-                            (ring.base_ring().negate(ring.base_ring().clone_el(c)), 0),
+                            (ring.base_ring().negate(c.clone()), 0),
                             (ring.base_ring().one(), 1),
                         ]
                         .into_iter(),
                     );
 
-                    let (quo, rem) = ring.div_rem_monic(ring.clone_el(&f), &g);
+                    let (quo, rem) = ring.div_rem_monic(f.clone(), &g);
                     assert_el_eq!(
                         &ring,
                         &ring.from_terms(
@@ -756,7 +756,7 @@ pub mod generic_tests {
                                 ring.base_ring().add_ref_fst(
                                     a,
                                     ring.base_ring()
-                                        .mul_ref_fst(b, ring.base_ring().pow(ring.base_ring().clone_el(c), 3))
+                                        .mul_ref_fst(b, ring.base_ring().pow(c.clone(), 3))
                                 ),
                                 0
                             )]
@@ -774,16 +774,16 @@ pub mod generic_tests {
             for b in &elements {
                 for i in 2..5 {
                     let a = ring.from_terms([
-                        (ring.base_ring().clone_el(a), 0),
+                        (a.clone(), 0),
                         (ring.base_ring().one(), 3),
-                        (ring.base_ring().clone_el(b), 4),
+                        (b.clone(), 4),
                         (ring.base_ring().one(), 5),
                     ]);
-                    let mut a_trunc = ring.clone_el(&a);
+                    let mut a_trunc = a.clone();
                     ring.truncate_monomials(&mut a_trunc, i);
                     assert_el_eq!(
                         &ring,
-                        ring.div_rem_monic(ring.clone_el(&a), &ring.from_terms([(ring.base_ring().one(), i)]))
+                        ring.div_rem_monic(a.clone(), &ring.from_terms([(ring.base_ring().one(), i)]))
                             .1,
                         a_trunc
                     );
@@ -802,7 +802,7 @@ pub mod generic_tests {
                     base_ring.one(),
                     base_ring.add(
                         base_ring.mul_ref_snd(hom.map(3), a),
-                        base_ring.mul(hom.map(7), base_ring.pow(base_ring.clone_el(a), 3))
+                        base_ring.mul(hom.map(7), base_ring.pow(a.clone(), 3))
                     )
                 ),
                 &ring.evaluate(&f, a, &base_ring.identity())

@@ -36,9 +36,9 @@ use crate::ring::*;
 pub fn pre_smith<R, TL, TR, V>(ring: R, L: &mut TL, R: &mut TR, mut A: SubmatrixMut<V, El<R>>)
 where
     R: RingStore + Copy,
-    R::Type: PrincipalIdealRing,
-    TL: TransformTarget<R::Type>,
-    TR: TransformTarget<R::Type>,
+    R::Ring: PrincipalIdealRing,
+    TL: TransformTarget<R::Ring>,
+    TR: TransformTarget<R::Ring>,
     V: AsPointerToSlice<El<R>>,
 {
     // otherwise we might not terminate...
@@ -100,7 +100,7 @@ pub fn solve_right_using_pre_smith<R, V1, V2, V3, A>(
 ) -> SolveResult
 where
     R: RingStore + Copy,
-    R::Type: PrincipalIdealRing,
+    R::Ring: PrincipalIdealRing,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
     V3: AsPointerToSlice<El<R>>,
@@ -171,7 +171,7 @@ pub fn kernel_basis_using_pre_smith<R, V, A>(
 ) -> OwnedMatrix<El<R>, A>
 where
     R: RingStore + Copy,
-    R::Type: PrincipalIdealRing,
+    R::Ring: PrincipalIdealRing,
     V: AsPointerToSlice<El<R>>,
     A: Allocator,
 {
@@ -194,7 +194,7 @@ where
         .enumerate();
     let mut B = OwnedMatrix::zero_in(A.col_count(), annihilators.clone().count(), ring, allocator);
     for (i, (j, a)) in annihilators {
-        *B.at_mut(i, j) = ring.clone_el(a);
+        *B.at_mut(i, j) = a.clone();
     }
     R.replay_transposed(ring, &mut TransformRows(B.data_mut(), ring.get_ring()));
     return B;
@@ -204,7 +204,7 @@ where
 pub fn determinant_using_pre_smith<R, V, A>(ring: R, mut matrix: SubmatrixMut<V, El<R>>, _allocator: A) -> El<R>
 where
     R: RingStore + Copy,
-    R::Type: PrincipalIdealRing,
+    R::Ring: PrincipalIdealRing,
     V: AsPointerToSlice<El<R>>,
     A: Allocator,
 {
@@ -223,7 +223,7 @@ where
     );
     return ring
         .checked_div(
-            &ring.prod((0..matrix.row_count()).map(|i| ring.clone_el(matrix.at(i, i)))),
+            &ring.prod((0..matrix.row_count()).map(|i| matrix.at(i, i).clone())),
             &ring.prod([unit_part_rows, unit_part_cols]),
         )
         .unwrap();
@@ -237,7 +237,7 @@ impl<'a, R> TransformTarget<R> for DetUnit<'a, R>
 where
     R: ?Sized + RingBase,
 {
-    fn subtract<S: Copy + RingStore<Type = R>>(
+    fn subtract<S: Copy + RingStore<Ring = R>>(
         &mut self,
         _ring: S,
         _src: usize,
@@ -247,11 +247,11 @@ where
         // determinant does not change
     }
 
-    fn swap<S: Copy + RingStore<Type = R>>(&mut self, ring: S, _i: usize, _j: usize) {
+    fn swap<S: Copy + RingStore<Ring = R>>(&mut self, ring: S, _i: usize, _j: usize) {
         ring.negate_inplace(&mut self.current_unit)
     }
 
-    fn transform<S: Copy + RingStore<Type = R>>(
+    fn transform<S: Copy + RingStore<Ring = R>>(
         &mut self,
         ring: S,
         _i: usize,
@@ -309,7 +309,7 @@ fn multiply<'a, R: RingStore, V: AsPointerToSlice<El<R>>, I: IntoIterator<Item =
     ring: R,
 ) -> OwnedMatrix<El<R>>
 where
-    R::Type: 'a,
+    R::Ring: 'a,
     V: 'a,
 {
     let mut it = matrices.into_iter();
@@ -342,7 +342,7 @@ fn test_smith_integers() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i64>::RING;
     let mut A = OwnedMatrix::new(vec![1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6], 4);
-    let original_A = A.clone_matrix(&ring);
+    let original_A = A.clone();
     let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, StaticRing::<i64>::RING);
     let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, StaticRing::<i64>::RING);
     pre_smith(
@@ -362,7 +362,7 @@ fn test_smith_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
     let mut A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
-    let original_A = A.clone_matrix(&ring);
+    let original_A = A.clone();
     let mut L: OwnedMatrix<u64> = OwnedMatrix::identity(5, 5, ring);
     let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
     pre_smith(
@@ -393,8 +393,8 @@ fn test_solve_zn() {
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 4, ring);
     ring.get_ring()
         .solve_right(
-            A.clone_matrix(ring).data_mut(),
-            B.clone_matrix(ring).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             solution.data_mut(),
             Global,
         )
@@ -412,8 +412,8 @@ fn test_unique_solution_correct() {
     assert_eq!(
         SolveResult::FoundUniqueSolution,
         ring.get_ring().solve_right(
-            A.clone_matrix(ring).data_mut(),
-            B.clone_matrix(ring).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             solution.data_mut(),
             Global
         )
@@ -426,8 +426,8 @@ fn test_unique_solution_correct() {
     assert_eq!(
         SolveResult::FoundSomeSolution,
         ring.get_ring().solve_right(
-            A.clone_matrix(ring).data_mut(),
-            B.clone_matrix(ring).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             solution.data_mut(),
             Global
         )
@@ -440,8 +440,8 @@ fn test_unique_solution_correct() {
     assert_eq!(
         SolveResult::FoundSomeSolution,
         ring.get_ring().solve_right(
-            A.clone_matrix(ring).data_mut(),
-            B.clone_matrix(ring).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             solution.data_mut(),
             Global
         )
@@ -458,8 +458,8 @@ fn test_solve_int() {
     let mut solution: OwnedMatrix<i64> = OwnedMatrix::zero(6, 2, ring);
     ring.get_ring()
         .solve_right(
-            A.clone_matrix(ring).data_mut(),
-            B.clone_matrix(ring).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             solution.data_mut(),
             Global,
         )
@@ -490,7 +490,7 @@ fn test_large() {
     assert!(
         ring.get_ring()
             .solve_right(
-                A.clone_matrix(&ring).data_mut(),
+                A.clone().data_mut(),
                 A.data_mut(),
                 solution.data_mut(),
                 Global
@@ -507,7 +507,7 @@ fn test_determinant() {
     assert_el_eq!(
         ring,
         (7 + 48 - 27),
-        determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global)
+        determinant_using_pre_smith(ring, A.clone().data_mut(), Global)
     );
 
     // we need a ring that has units of order > 2 to test whether an inversion is necessary for
@@ -556,7 +556,7 @@ fn test_determinant() {
     assert_el_eq!(
         ring,
         27,
-        determinant_using_pre_smith(ring, A.clone_matrix(&ring).data_mut(), Global)
+        determinant_using_pre_smith(ring, A.clone().data_mut(), Global)
     );
 }
 
@@ -574,7 +574,7 @@ fn test_kernel_basis() {
     );
 
     let A = OwnedMatrix::new(vec![1, 1, 2, 3, 2, 1], 3);
-    let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
+    let B = kernel_basis_using_pre_smith(ring, A.clone().data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert!(!ring.is_zero(B.at(0, 0)));
     let mut product = OwnedMatrix::zero(2, 1, ring);
@@ -587,7 +587,7 @@ fn test_kernel_basis() {
     assert_matrix_eq!(ring, [[0], [0]], product);
 
     let A = OwnedMatrix::new(vec![1, 1, 1, 1, 1, 1], 2);
-    let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
+    let B = kernel_basis_using_pre_smith(ring, A.clone().data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert!(!ring.is_zero(B.at(0, 0)));
     let mut product = OwnedMatrix::zero(3, 1, ring);
@@ -601,7 +601,7 @@ fn test_kernel_basis() {
 
     let ring = Zn64B::new(6);
     let A = OwnedMatrix::new(vec![ring.int_hom().map(2)], 1);
-    let B = kernel_basis_using_pre_smith(ring, A.clone_matrix(ring).data_mut(), Global);
+    let B = kernel_basis_using_pre_smith(ring, A.clone().data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert_matrix_eq!(ring, [[ring.int_hom().map(3)]], B);
 }
@@ -617,7 +617,7 @@ fn time_solve_right_using_pre_smith_galois_field() {
     });
 
     let mut inv = OwnedMatrix::zero(n, n, &field);
-    let mut copy = matrix.clone_matrix(&field);
+    let mut copy = matrix.clone();
     let start = Instant::now();
     solve_right_using_pre_smith(
         &field,
@@ -651,7 +651,7 @@ fn time_solve_right_using_extension() {
     });
 
     let mut inv = OwnedMatrix::zero(n, n, &field);
-    let mut copy = matrix.clone_matrix(&field);
+    let mut copy = matrix.clone();
     let start = Instant::now();
     solve_right_over_extension(
         &field,
@@ -693,7 +693,7 @@ fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
     });
     bencher.iter(|| {
         let mut inv = OwnedMatrix::zero(10, 10, &field);
-        let mut copy = matrix.clone_matrix(&field);
+        let mut copy = matrix.clone();
         solve_right_using_pre_smith(
             &field,
             copy.data_mut(),

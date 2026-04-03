@@ -17,8 +17,8 @@ use crate::rings::poly::*;
 pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
 where
     P: RingStore,
-    P::Type: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Type: FiniteRing + Field + SelfIso,
+    P::Ring: PolyRing + EuclideanRing,
+    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
 {
     assert!(!poly_ring.is_zero(&f));
     let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
@@ -33,7 +33,7 @@ where
 
     let mut result = Vec::new();
     let mut unit = poly_ring.base_ring().one();
-    let mut el = poly_ring.clone_el(&f);
+    let mut el = f.clone();
 
     // we repeatedly remove the square-free part
     while !poly_ring.is_unit(&el) {
@@ -42,7 +42,7 @@ where
 
         // factor the square-free part into distinct-degree factors
         let distinct_degree_factors =
-            cantor_zassenhaus::distinct_degree_factorization(&poly_ring, poly_ring.clone_el(&sqrfree_part));
+            cantor_zassenhaus::distinct_degree_factorization(&poly_ring, sqrfree_part.clone());
         for (d, factor_d) in distinct_degree_factors.into_iter().enumerate() {
             let mut stack = Vec::new();
             stack.push(factor_d);
@@ -67,11 +67,11 @@ where
                         result.push((current, 1));
                     }
                 } else if even_char {
-                    let factor = cantor_zassenhaus::cantor_zassenhaus_even(&poly_ring, poly_ring.clone_el(&current), d);
+                    let factor = cantor_zassenhaus::cantor_zassenhaus_even(&poly_ring, current.clone(), d);
                     stack.push(poly_ring.checked_div(&current, &factor).unwrap());
                     stack.push(factor);
                 } else {
-                    let factor = cantor_zassenhaus::cantor_zassenhaus(&poly_ring, poly_ring.clone_el(&current), d);
+                    let factor = cantor_zassenhaus::cantor_zassenhaus(&poly_ring, current.clone(), d);
                     stack.push(poly_ring.checked_div(&current, &factor).unwrap());
                     stack.push(factor);
                 }

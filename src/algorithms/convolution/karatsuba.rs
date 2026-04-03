@@ -44,7 +44,7 @@ where
     }
 }
 
-fn slice_assign<R, V1, V2>(mut dst: V1, src: V2, ring: R)
+fn slice_assign<R, V1, V2>(mut dst: V1, src: V2, _ring: R)
 where
     R: RingStore,
     V1: VectorViewMut<El<R>>,
@@ -52,7 +52,7 @@ where
 {
     assert_eq!(dst.len(), src.len());
     for i in 0..dst.len() {
-        *dst.at_mut(i) = ring.clone_el(src.at(i));
+        *dst.at_mut(i) = src.at(i).clone();
     }
 }
 
@@ -195,7 +195,7 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(
         A: Allocator,
     {
         let mut new = Vec::with_capacity_in(len, allocator);
-        new.extend(data.clone_ring_els(ring).iter());
+        new.extend(data.clone_els().iter());
         if new.len() < len {
             new.resize_with(len, || ring.zero());
         }

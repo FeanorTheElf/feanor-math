@@ -84,19 +84,12 @@ impl<R: RingStore + Clone> Debug for SparseMapVector<R> {
 impl<R: RingStore + Clone> Clone for SparseMapVector<R> {
     fn clone(&self) -> Self {
         SparseMapVector {
-            data: self.data.iter().map(|(i, c)| (*i, self.ring.clone_el(c))).collect(),
-            modify_entry: (self.modify_entry.0, self.ring.clone_el(&self.modify_entry.1)),
-            zero: self.ring.clone_el(&self.zero),
+            data: self.data.iter().map(|(i, c)| (*i, c.clone())).collect(),
+            modify_entry: (self.modify_entry.0, self.modify_entry.1.clone()),
+            zero: self.zero.clone(),
             ring: self.ring.clone(),
             len: self.len,
         }
-    }
-}
-
-impl<R: RingStore + Clone> CloneWithRing<R::Type> for SparseMapVector<R> {
-    fn clone_with_ring(&self, ring: &R::Type) -> Self {
-        assert!(self.ring.get_ring() == ring);
-        Clone::clone(self)
     }
 }
 
@@ -172,7 +165,7 @@ impl<R: RingStore> VectorViewMut<El<R>> for SparseMapVector<R> {
         if i == self.modify_entry.0 {
             return &mut self.modify_entry.1;
         }
-        let new_value = self.ring.clone_el(self.data.get(&i).unwrap_or(&self.zero));
+        let new_value = self.data.get(&i).unwrap_or(&self.zero).clone();
         self.enter_in_map((i, new_value));
         return &mut self.modify_entry.1;
     }

@@ -13,7 +13,7 @@ use crate::{DEFAULT_PROBABILISTIC_REPETITIONS, algorithms};
 struct ECFactorInt<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     result_ring: I,
 }
@@ -21,7 +21,7 @@ where
 impl<I> ZnOperation for ECFactorInt<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Output<'a>
         = El<I>
@@ -32,7 +32,7 @@ where
     where
         Self: 'a,
         R: 'a + RingStore,
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         int_cast(lenstra_ec_factor(&ring), self.result_ring, ring.integer_ring())
     }
@@ -43,10 +43,10 @@ where
 pub fn is_prime_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     if algorithms::miller_rabin::is_prime(ZZ, n, DEFAULT_PROBABILISTIC_REPETITIONS) {
-        return Some((ZZ.clone_el(n), 1));
+        return Some((n.clone(), 1));
     }
     let (p, e) = is_power(ZZ, n)?;
     if algorithms::miller_rabin::is_prime(ZZ, &p, DEFAULT_PROBABILISTIC_REPETITIONS) {
@@ -59,13 +59,13 @@ where
 fn is_power<I>(ZZ: I, n: &El<I>) -> Option<(El<I>, usize)>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     assert!(!ZZ.is_zero(n));
     for i in (2..=ZZ.abs_log2_ceil(n).unwrap()).rev() {
-        let root = algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i);
+        let root = algorithms::int_bisect::root_floor(ZZ, n.clone(), i);
         if ZZ.eq_el(&ZZ.pow(root, i), n) {
-            return Some((algorithms::int_bisect::root_floor(ZZ, ZZ.clone_el(n), i), i));
+            return Some((algorithms::int_bisect::root_floor(ZZ, n.clone(), i), i));
         }
     }
     return None;
@@ -78,7 +78,7 @@ where
 pub fn factor<I>(ZZ: I, mut n: El<I>) -> Vec<(El<I>, usize)>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>,
+    I::Ring: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>,
 {
     const SMALL_PRIME_BOUND: i32 = 10000;
     let mut result = Vec::new();
@@ -135,7 +135,7 @@ where
     }
 
     // then we use EC factor to factor the result
-    let m = choose_zn_impl(ZZ, ZZ.clone_el(&n), ECFactorInt { result_ring: ZZ });
+    let m = choose_zn_impl(ZZ, n.clone(), ECFactorInt { result_ring: ZZ });
 
     let mut factors1 = factor(ZZ, ZZ.checked_div(&n, &m).unwrap());
     let mut factors2 = factor(ZZ, m);
@@ -148,24 +148,24 @@ where
     loop {
         match (iter1.peek(), iter2.peek()) {
             (Some((p1, m1)), Some((p2, m2))) if ZZ.eq_el(p1, p2) => {
-                result.push((ZZ.clone_el(p1), m1 + m2));
+                result.push((p1.clone(), m1 + m2));
                 _ = iter1.next().unwrap();
                 _ = iter2.next().unwrap();
             }
             (Some((p1, m1)), Some((p2, _m2))) if ZZ.is_lt(p1, p2) => {
-                result.push((ZZ.clone_el(p1), *m1));
+                result.push((p1.clone(), *m1));
                 _ = iter1.next().unwrap();
             }
             (Some((_p1, _m1)), Some((p2, m2))) => {
-                result.push((ZZ.clone_el(p2), *m2));
+                result.push((p2.clone(), *m2));
                 _ = iter2.next().unwrap();
             }
             (Some((p1, m1)), None) => {
-                result.push((ZZ.clone_el(p1), *m1));
+                result.push((p1.clone(), *m1));
                 _ = iter1.next().unwrap();
             }
             (None, Some((p2, m2))) => {
-                result.push((ZZ.clone_el(p2), *m2));
+                result.push((p2.clone(), *m2));
                 _ = iter2.next().unwrap();
             }
             (None, None) => {

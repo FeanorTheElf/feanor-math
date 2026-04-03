@@ -32,11 +32,11 @@ fn hensel_lift_linear<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R::LocalRingBase<'ring>>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R::LocalRingBase<'ring>>,
     P2: RingStore,
-    P2::Type: PolyRing + PrincipalIdealRing,
-    BaseRing<P2>: RingStore<Type = R::LocalFieldBase<'ring>>,
+    P2::Ring: PolyRing + PrincipalIdealRing,
+    BaseRing<P2>: RingStore<Ring = R::LocalFieldBase<'ring>>,
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(base_poly_ring.base_ring().is_one(base_poly_ring.lc(factors.0).unwrap()));
@@ -109,7 +109,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
     #[instrument(skip_all, level = "trace")]
     fn div_rem_poly<S>(&self, poly_ring: S, poly: El<S>) -> (El<S>, El<S>)
     where
-        S: RingStore<Type = P>,
+        S: RingStore<Ring = P>,
     {
         assert!(poly_ring.degree(&poly).unwrap_or(0) <= self.n);
         let scaled_quotient = poly_ring.mul_ref(&poly, &self.neg_Xn_div_poly);
@@ -117,14 +117,14 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
             poly_ring
                 .terms(&scaled_quotient)
                 .filter(|(_, i)| *i >= self.n)
-                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i - self.n)),
+                .map(|(c, i)| (c.clone(), i - self.n)),
         );
         let remainder = poly_ring.add(poly, poly_ring.mul_ref(&quotient, &self.poly));
         let truncated_remainder = poly_ring.from_terms(
             poly_ring
                 .terms(&remainder)
                 .filter(|(_, i)| *i < self.poly_deg)
-                .map(|(c, i)| (poly_ring.base_ring().clone_el(c), i)),
+                .map(|(c, i)| (c.clone(), i)),
         );
         return (poly_ring.negate(quotient), truncated_remainder);
     }
@@ -132,7 +132,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
     #[instrument(skip_all, level = "trace")]
     fn new<S>(poly_ring: S, poly: El<S>, other_d: usize, start_e: usize) -> Self
     where
-        S: RingStore<Type = P> + Copy,
+        S: RingStore<Ring = P> + Copy,
     {
         let poly_deg = poly_ring.degree(&poly).unwrap();
         let n = poly_deg + other_d;
@@ -153,7 +153,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
     #[instrument(skip_all, level = "trace")]
     fn lift<S>(&mut self, poly_ring: S, delta_poly: El<S>, new_e: usize)
     where
-        S: RingStore<Type = P> + Copy,
+        S: RingStore<Ring = P> + Copy,
     {
         assert!(new_e <= 2 * self.e);
         self.e = new_e;
@@ -189,11 +189,11 @@ fn hensel_lift_quadratic<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R::LocalRingBase<'ring>>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R::LocalRingBase<'ring>>,
     P2: RingStore,
-    P2::Type: PolyRing + PrincipalIdealRing,
-    BaseRing<P2>: RingStore<Type = R::LocalFieldBase<'ring>>,
+    P2::Ring: PolyRing + PrincipalIdealRing,
+    BaseRing<P2>: RingStore<Ring = R::LocalFieldBase<'ring>>,
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(base_poly_ring.base_ring().is_one(base_poly_ring.lc(factors.0).unwrap()));
@@ -312,11 +312,11 @@ fn hensel_lift_bezout_identity_quadratic<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R::LocalRingBase<'ring>>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R::LocalRingBase<'ring>>,
     P2: RingStore,
-    P2::Type: PolyRing + PrincipalIdealRing,
-    BaseRing<P2>: RingStore<Type = R::LocalFieldBase<'ring>>,
+    P2::Ring: PolyRing + PrincipalIdealRing,
+    BaseRing<P2>: RingStore<Ring = R::LocalFieldBase<'ring>>,
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(g).unwrap()));
@@ -419,8 +419,8 @@ where
 pub fn local_zn_ring_bezout_identity<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> Option<(El<P>, El<P>)>
 where
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
 {
     if poly_ring.is_zero(f) {
         if poly_ring.is_one(g) {
@@ -438,7 +438,7 @@ where
     let Zpe = poly_ring.base_ring();
     let ZZ = Zpe.integer_ring();
     let (p, e) = is_prime_power(ZZ, Zpe.modulus()).unwrap();
-    let wrapped_ring: IntegersWithZnQuotient<<BaseRing<P> as RingStore>::Type> = IntegersWithZnQuotient::new(ZZ, p);
+    let wrapped_ring: IntegersWithZnQuotient<<BaseRing<P> as RingStore>::Ring> = IntegersWithZnQuotient::new(ZZ, p);
     let reduction_context = wrapped_ring.reduction_context(e);
 
     let Zpe_to_Zp = reduction_context.intermediate_ring_to_field_reduction(0);
@@ -473,18 +473,18 @@ fn hensel_lift_factorization_internal<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore + Copy,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R::LocalRingBase<'ring>>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R::LocalRingBase<'ring>>,
     P2: RingStore + Copy,
-    P2::Type: PolyRing + PrincipalIdealRing,
-    BaseRing<P2>: RingStore<Type = R::LocalFieldBase<'ring>>,
+    P2::Ring: PolyRing + PrincipalIdealRing,
+    BaseRing<P2>: RingStore<Ring = R::LocalFieldBase<'ring>>,
 {
     if factors.len() == 1 {
-        return vec![target_poly_ring.clone_el(f)];
+        return vec![f.clone()];
     }
     let (g, h) = (
         factors.at(0),
-        base_poly_ring.prod(factors.as_iter().skip(1).map(|h| base_poly_ring.clone_el(h))),
+        base_poly_ring.prod(factors.as_iter().skip(1).map(|h| h.clone())),
     );
     let (g_lifted, h_lifted) = hensel_lift_quadratic(reduction_map, target_poly_ring, base_poly_ring, &f, (g, &h));
     let mut result = hensel_lift_factorization_internal(
@@ -513,11 +513,11 @@ pub fn hensel_lift_factorization<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore + Copy,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R::LocalRingBase<'ring>>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R::LocalRingBase<'ring>>,
     P2: RingStore + Copy,
-    P2::Type: PolyRing + PrincipalIdealRing,
-    BaseRing<P2>: RingStore<Type = R::LocalFieldBase<'ring>>,
+    P2::Ring: PolyRing + PrincipalIdealRing,
+    BaseRing<P2>: RingStore<Ring = R::LocalFieldBase<'ring>>,
 {
     assert!(target_poly_ring.base_ring().is_one(target_poly_ring.lc(f).unwrap()));
     assert!(

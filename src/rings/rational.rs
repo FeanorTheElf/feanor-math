@@ -69,7 +69,7 @@ use crate::specialization::*;
 /// ```
 pub struct RationalFieldBase<I: RingStore>
 where
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     integers: I,
 }
@@ -77,7 +77,7 @@ where
 impl<I> Clone for RationalFieldBase<I>
 where
     I: RingStore + Clone,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn clone(&self) -> Self {
         Self {
@@ -89,7 +89,7 @@ where
 impl<I> Copy for RationalFieldBase<I>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     El<I>: Copy,
 {
 }
@@ -97,7 +97,7 @@ where
 impl<I> Debug for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Q") }
 }
@@ -108,12 +108,12 @@ pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
 pub struct RationalFieldEl<I>(El<I>, El<I>)
 where
     I: RingStore,
-    I::Type: IntegerRing;
+    I::Ring: IntegerRing;
 
 impl<I> Debug for RationalFieldEl<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     El<I>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -127,7 +127,7 @@ where
 impl<I> Clone for RationalFieldEl<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     El<I>: Clone,
 {
     fn clone(&self) -> Self { RationalFieldEl(self.0.clone(), self.1.clone()) }
@@ -136,7 +136,7 @@ where
 impl<I> Copy for RationalFieldEl<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     El<I>: Copy,
 {
 }
@@ -144,7 +144,7 @@ where
 impl<I> PartialEq for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn eq(&self, other: &Self) -> bool { self.integers.get_ring() == other.integers.get_ring() }
 }
@@ -152,7 +152,7 @@ where
 impl<I> RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     /// The numerator of the fully reduced fraction.
     ///
@@ -217,7 +217,7 @@ where
             let new_den = self.integers.mul_ref(&lhs.1, &rhs.1);
             let (quo, rem) = self
                 .integers
-                .euclidean_div_rem(self.integers.clone_el(&current_den), &new_den);
+                .euclidean_div_rem(current_den.clone(), &new_den);
             if self.integers.is_zero(&rem) {
                 current_num = self
                     .integers
@@ -242,7 +242,7 @@ where
 impl<I> RationalField<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     /// Returns the fraction field of the given integer ring.
     pub const fn new(integers: I) -> Self { RingValue::from(RationalFieldBase { integers }) }
@@ -257,7 +257,7 @@ where
 impl<I> RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
         let mut gcd = self.integers.ideal_gen(&*value.0, &*value.1);
@@ -278,7 +278,7 @@ where
 impl<I> RingBase for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Element = RationalFieldEl<I>;
 
@@ -299,15 +299,11 @@ where
         }
     }
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        RationalFieldEl(self.integers.clone_el(&val.0), self.integers.clone_el(&val.1))
-    }
-
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         if self.integers.is_zero(&rhs.0) {
             // do nothing
         } else if self.integers.is_zero(&lhs.0) {
-            *lhs = self.clone_el(rhs);
+            *lhs = rhs.clone();
         } else if self.integers.is_one(&lhs.1) && self.integers.is_one(&rhs.1) {
             self.integers.add_assign_ref(&mut lhs.0, &rhs.0);
         } else {
@@ -345,7 +341,7 @@ where
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
         self.integers
-            .eq_el(&value.0, &self.integers.negate(self.integers.clone_el(&value.1)))
+            .eq_el(&value.0, &self.integers.negate(value.1.clone()))
     }
 
     fn is_approximate(&self) -> bool { false }
@@ -356,7 +352,7 @@ where
 
     fn characteristic<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
     where
-        J::Type: IntegerRing,
+        J::Ring: IntegerRing,
     {
         Some(ZZ.zero())
     }
@@ -395,7 +391,7 @@ where
 
 impl<I: RingStore> HashableElRing for RationalFieldBase<I>
 where
-    I::Type: IntegerRing + HashableElRing,
+    I::Ring: IntegerRing + HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.0, &el.1)));
@@ -407,18 +403,18 @@ where
 
 impl<I: RingStore> StrassenHint for RationalFieldBase<I>
 where
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     default fn strassen_threshold(&self) -> usize { usize::MAX }
 }
 
 impl<I: RingStore> DefaultConvolutionRing for RationalFieldBase<I>
 where
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
-        S: RingStore<Type = Self> + 'conv,
+        S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
         Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
@@ -428,7 +424,7 @@ where
 impl<I> RingExtension for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type BaseRing = I;
 
@@ -445,7 +441,7 @@ where
 impl<I> Serialize for RationalFieldBase<I>
 where
     I: RingStore + Serialize,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -458,7 +454,7 @@ where
 impl<'de, I> Deserialize<'de> for RationalFieldBase<I>
 where
     I: RingStore + Deserialize<'de>,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -473,7 +469,7 @@ where
 impl<I> SerializableElementRing for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing + SerializableElementRing,
+    I::Ring: IntegerRing + SerializableElementRing,
 {
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
     where
@@ -522,9 +518,9 @@ where
 impl<I, J> CanHomFrom<RationalFieldBase<J>> for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     J: RingStore,
-    J::Type: IntegerRing,
+    J::Ring: IntegerRing,
 {
     type Homomorphism = ();
 
@@ -546,9 +542,9 @@ where
 impl<I, J> CanIsoFromTo<RationalFieldBase<J>> for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     J: RingStore,
-    J::Type: IntegerRing,
+    J::Ring: IntegerRing,
 {
     type Isomorphism = ();
 
@@ -570,7 +566,7 @@ where
 impl<I, J> CanHomFrom<J> for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     J: IntegerRing,
 {
     type Homomorphism = ();
@@ -588,7 +584,7 @@ where
 impl<I> DivisibilityRing for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -596,7 +592,7 @@ where
         } else if self.is_zero(rhs) {
             None
         } else {
-            let mut result = self.clone_el(lhs);
+            let mut result = lhs.clone();
             self.mul_assign_raw(&mut result, (&rhs.1, &rhs.0));
             Some(result)
         }
@@ -626,12 +622,12 @@ where
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
 }
 
-impl_interpolation_base_ring_char_zero! { <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Type: IntegerRing + ComputeResultantRing }
+impl_interpolation_base_ring_char_zero! { <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Ring: IntegerRing + ComputeResultantRing }
 
 impl<I> PrincipalIdealRing for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -648,9 +644,9 @@ where
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return (self.zero(), self.zero(), self.zero());
         } else if self.is_zero(lhs) {
-            return (self.zero(), self.one(), self.clone_el(rhs));
+            return (self.zero(), self.one(), rhs.clone());
         } else {
-            return (self.one(), self.zero(), self.clone_el(lhs));
+            return (self.one(), self.zero(), lhs.clone());
         }
     }
 }
@@ -658,7 +654,7 @@ where
 impl<I> EuclideanRing for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
 
@@ -671,28 +667,28 @@ where
 impl<I> Domain for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
 }
 
 impl<I> PerfectField for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
 }
 
 impl<I> Field for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
 }
 
 impl<I> FiniteRingSpecializable for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
 }
@@ -700,7 +696,7 @@ where
 impl<I> FractionField for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>) { (el.0, el.1) }
 }
@@ -708,7 +704,7 @@ where
 impl<I> OrderedRing for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> std::cmp::Ordering {
         assert!(self.integers.is_pos(&lhs.1) && self.integers.is_pos(&rhs.1));
@@ -730,7 +726,7 @@ impl<T> Deref for DerefT<T> {
 impl<I> ComputeInnerProduct for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn inner_product_ref<'a, J: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(
         &self,
@@ -762,13 +758,13 @@ where
 impl<I> PolyTFracGCDRing for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         assert!(!poly_ring.is_zero(poly));
         let QQX = &poly_ring;
@@ -802,13 +798,13 @@ where
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         if poly_ring.is_zero(lhs) {
-            return poly_ring.clone_el(rhs);
+            return rhs.clone();
         } else if poly_ring.is_zero(rhs) {
-            return poly_ring.clone_el(lhs);
+            return lhs.clone();
         }
         let QQX = &poly_ring;
         let QQ = QQX.base_ring();

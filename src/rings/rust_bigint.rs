@@ -149,13 +149,6 @@ impl<A: Allocator + Send + Sync + Clone> PartialEq for RustBigintRingBase<A> {
 impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
     type Element = RustBigint<A>;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        // allocate it with our allocator
-        let mut result_data = Vec::with_capacity_in(val.1.len(), self.allocator.clone());
-        result_data.extend(val.1.iter().copied());
-        RustBigint(val.0, result_data)
-    }
-
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         match (lhs, rhs) {
             (RustBigint(false, lhs_val), RustBigint(false, rhs_val))
@@ -264,7 +257,7 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         Some(other_ZZ.zero())
     }
@@ -377,7 +370,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
             return result as i64;
         };
 
-        let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
+        let [mut a, mut b] = [lhs.clone(), rhs.clone()];
         let [mut sa, mut ta, mut sb, mut tb] = [self.one(), self.zero(), self.zero(), self.one()];
 
         while let Some(mut i_a) = self.abs_highest_set_bit(&a)
@@ -500,7 +493,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
             return result as i64;
         };
 
-        let [mut a, mut b] = [self.clone_el(lhs), self.clone_el(rhs)];
+        let [mut a, mut b] = [lhs.clone(), rhs.clone()];
 
         while let Some(mut i_a) = self.abs_highest_set_bit(&a)
             && let Some(mut i_b) = self.abs_highest_set_bit(&b)

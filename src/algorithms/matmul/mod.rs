@@ -91,7 +91,7 @@ pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>,
-        S: RingStore<Type = R> + Copy;
+        S: RingStore<Ring = R> + Copy;
 
     /// Computes the matrix product of `lhs` and `rhs`, and stores the result in `dst`.
     ///
@@ -109,7 +109,7 @@ pub trait MatmulAlgorithm<R: ?Sized + RingBase> {
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         for i in 0..dst.row_count() {
             for j in 0..dst.col_count() {
@@ -136,7 +136,7 @@ where
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         (**self).add_matmul(lhs, rhs, dst, ring)
     }
@@ -151,7 +151,7 @@ where
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         (**self).matmul(lhs, rhs, dst, ring)
     }
@@ -197,7 +197,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         strassen::<_, _, _, _, _, T1, T2, T3>(
             true,
@@ -220,7 +220,7 @@ impl<R: ?Sized + RingBase, A: Allocator> MatmulAlgorithm<R> for StrassenAlgorith
         V1: AsPointerToSlice<R::Element>,
         V2: AsPointerToSlice<R::Element>,
         V3: AsPointerToSlice<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         strassen::<_, _, _, _, _, T1, T2, T3>(
             false,

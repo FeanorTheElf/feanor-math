@@ -77,7 +77,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     /// let fgg = P.prod(
     ///     [&f, &g, &g, &P.int_hom().map(6)]
     ///         .iter()
-    ///         .map(|poly| P.clone_el(poly)),
+    ///         .map(|poly| poly.clone()),
     /// );
     /// let (factorization, unit) = <RationalFieldBase<_> as FactorPolyField>::factor_poly(&P, &fgg);
     /// assert_eq!(2, factorization.len());
@@ -96,8 +96,8 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Type = Self>;
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRing<P>: RingStore<Ring = Self>;
 
     /// Returns whether the given polynomial is irreducible over the base field.
     ///
@@ -106,8 +106,8 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     fn is_irred<P>(poly_ring: P, poly: &El<P>) -> bool
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         let factorization = Self::factor_poly(poly_ring, poly).0;
         return factorization.len() == 1 && factorization[0].1 == 1;
@@ -121,8 +121,8 @@ where
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         poly_factor_finite_field(poly_ring, poly)
     }
@@ -131,14 +131,14 @@ where
 impl<I> FactorPolyField for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
-    Zn64BBase: CanHomFrom<I::Type>,
+    I::Ring: IntegerRing,
+    Zn64BBase: CanHomFrom<I::Ring>,
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         poly_factor_rational(poly_ring, poly)
     }
@@ -159,7 +159,7 @@ fn test_factor_rational_poly() {
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(
         &poly_ring,
-        &poly_ring.prod([poly_ring.clone_el(&f), poly_ring.clone_el(&f), poly_ring.clone_el(&g)].into_iter()),
+        &poly_ring.prod([f.clone(), f.clone(), g.clone()].into_iter()),
     );
     assert_eq!(2, actual.len());
     assert_el_eq!(poly_ring, f, actual[0].0);
@@ -199,9 +199,9 @@ fn test_factor_nonmonic_poly() {
         &poly_ring,
         &poly_ring.prod(
             [
-                poly_ring.clone_el(&f),
-                poly_ring.clone_el(&f),
-                poly_ring.clone_el(&g),
+                f.clone(),
+                f.clone(),
+                g.clone(),
                 poly_ring.int_hom().map(100),
             ]
             .into_iter(),
@@ -224,7 +224,7 @@ fn test_factor_fp() {
     let f = poly_ring.from_terms([(1, 0), (2, 1), (1, 3)].into_iter());
     let g = poly_ring.from_terms([(1, 0), (1, 1)].into_iter());
     let h = poly_ring.from_terms([(2, 0), (1, 2)].into_iter());
-    let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| poly_ring.clone_el(poly)));
+    let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| (*poly).clone()));
     let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &fgghhh);
     assert_el_eq!(Fp, Fp.one(), unit);
 

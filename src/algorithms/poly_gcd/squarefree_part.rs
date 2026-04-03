@@ -38,11 +38,11 @@ fn power_decomposition_from_local_power_decomposition<'ring, 'data, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore + Copy,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R>,
     P2: RingStore,
-    P2::Type: PolyRing,
-    BaseRing<P2>: RingStore<Type = R::LocalRingBase<'ring>>,
+    P2::Ring: PolyRing,
+    BaseRing<P2>: RingStore<Ring = R::LocalRingBase<'ring>>,
 {
     assert_eq!(reduction.len(), local_power_decompositions.len());
     assert_eq!(reduction.len(), SXs.len());
@@ -70,7 +70,7 @@ where
     // polynomials might after all still turn out to be perfect powers; the alternative to this
     // check here would be to check previously if all "factors" really divide f; I believe this is
     // faster
-    if !RX.eq_el(&poly, &RX.prod(result.iter().map(|(f, k)| RX.pow(RX.clone_el(f), *k)))) {
+    if !RX.eq_el(&poly, &RX.prod(result.iter().map(|(f, k)| RX.pow(f.clone(), *k)))) {
         return None;
     }
     return Some(result);
@@ -93,10 +93,10 @@ fn compute_local_power_decomposition<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore + Copy,
-    P1::Type: PolyRing,
-    BaseRing<P1>: RingStore<Type = R>,
+    P1::Ring: PolyRing,
+    BaseRing<P1>: RingStore<Ring = R>,
     P2: RingStore + Copy,
-    P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
+    P2::Ring: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
     R::LocalRing<'ring>: 'local,
 {
     assert!(SX.base_ring().get_ring() == S_to_F.domain().get_ring());
@@ -117,7 +117,7 @@ where
                 S_to_F.ideal(),
                 (S_to_F.domain().get_ring(), S_to_F.from_e()),
                 S_to_F.max_ideal_idx(),
-                R.clone_el(c),
+                c.clone(),
             ),
             i,
         )
@@ -151,8 +151,8 @@ where
 pub fn poly_power_decomposition_monic_local<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
 where
     P: RingStore + Copy,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain,
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
 
@@ -197,7 +197,7 @@ where
                             perfect_power: 1,
                         }]
                     {
-                        return vec![(poly_ring.clone_el(poly), 1)];
+                        return vec![(poly.clone(), 1)];
                     } else if signature.is_some() && &signature.as_ref().unwrap()[..] != &new_signature[..] {
                         event!(Level::TRACE, "signature_mismatch");
                         continue 'try_random_ideal;
@@ -237,8 +237,8 @@ where
 pub fn poly_power_decomposition_local<P>(poly_ring: P, mut f: El<P>) -> Vec<(El<P>, usize)>
 where
     P: RingStore + Copy,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing,
 {
     assert!(!poly_ring.is_zero(&f));
     _ = poly_ring.balance_poly(&mut f);
@@ -256,7 +256,7 @@ where
     debug_assert!(
         poly_ring
             .checked_div(
-                &poly_ring.prod(result.iter().map(|(fi, i)| poly_ring.pow(poly_ring.clone_el(fi), *i))),
+                &poly_ring.prod(result.iter().map(|(fi, i)| poly_ring.pow(fi.clone(), *i))),
                 &f
             )
             .is_some()
@@ -282,8 +282,8 @@ where
 pub fn poly_squarefree_part_local<P>(poly_ring: P, f: El<P>) -> El<P>
 where
     P: RingStore + Copy,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing,
 {
     assert!(!poly_ring.is_zero(&f));
     let mut result = poly_ring.prod(
@@ -314,7 +314,7 @@ fn test_squarefree_part_local() {
         ]
     });
     let multiply_out = |list: &[(El<DensePolyRing<_>>, usize)]| {
-        poly_ring.prod(list.iter().map(|(g, k)| poly_ring.pow(poly_ring.clone_el(g), *k)))
+        poly_ring.prod(list.iter().map(|(g, k)| poly_ring.pow(g.clone(), *k)))
     };
     let assert_eq = |expected: &[(El<DensePolyRing<_>>, usize)], actual: &[(El<DensePolyRing<_>>, usize)]| {
         assert!(expected.is_sorted_by_key(|(_, k)| *k));
@@ -326,7 +326,7 @@ fn test_squarefree_part_local() {
         }
     };
 
-    let expected = [(poly_ring.clone_el(&f1), 1)];
+    let expected = [(f1.clone(), 1)];
     let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 
@@ -334,22 +334,22 @@ fn test_squarefree_part_local() {
     let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 
-    let expected = [(poly_ring.clone_el(&f2), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
+    let expected = [(f2.clone(), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
     let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 
     let expected = [
         (poly_ring.mul_ref(&f1, &f2), 1),
-        (poly_ring.clone_el(&f4), 2),
-        (poly_ring.clone_el(&f3), 3),
+        (f4.clone(), 2),
+        (f3.clone(), 3),
     ];
     let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
 
     let expected = [
         (poly_ring.mul_ref(&f1, &f2), 2),
-        (poly_ring.clone_el(&f4), 4),
-        (poly_ring.clone_el(&f3), 6),
+        (f4.clone(), 4),
+        (f3.clone(), 6),
     ];
     let actual = poly_power_decomposition_monic_local(&poly_ring, &multiply_out(&expected));
     assert_eq(&expected, &actual);
@@ -371,12 +371,12 @@ fn random_test_poly_power_decomposition_local() {
             &poly_ring.prod(
                 [&f, &g, &g, &h, &h, &h, &h, &h]
                     .into_iter()
-                    .map(|poly| poly_ring.clone_el(poly)),
+                    .map(|poly| poly.clone()),
             ),
         )
         .0;
 
-        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly_ring.clone_el(&poly));
+        let mut power_decomp = poly_power_decomposition_local(&poly_ring, poly.clone());
         for (f, _k) in &mut power_decomp {
             *f = make_primitive(&poly_ring, &f).0;
         }
@@ -387,7 +387,7 @@ fn random_test_poly_power_decomposition_local() {
             poly_ring.prod(
                 power_decomp
                     .iter()
-                    .map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), *k))
+                    .map(|(poly, k)| poly_ring.pow(poly.clone(), *k))
             )
         );
         assert!(
@@ -396,7 +396,7 @@ fn random_test_poly_power_decomposition_local() {
                     power_decomp
                         .iter()
                         .filter(|(_, k)| k % 5 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), k / 5))
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 5))
                 ),
                 &make_primitive(&poly_ring, &h).0
             )
@@ -407,7 +407,7 @@ fn random_test_poly_power_decomposition_local() {
                     power_decomp
                         .iter()
                         .filter(|(_, k)| k % 2 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly_ring.clone_el(poly), k / 2))
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
                 ),
                 &make_primitive(&poly_ring, &g).0
             )

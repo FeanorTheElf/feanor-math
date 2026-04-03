@@ -11,10 +11,10 @@ use std::any::Any;
 use std::cmp::{Ordering, max};
 
 /// Type of coefficients of multivariate polynomials of the given ring.
-pub type PolyCoeff<P> = El<<<P as RingStore>::Type as RingExtension>::BaseRing>;
+pub type PolyCoeff<P> = El<<<P as RingStore>::Ring as RingExtension>::BaseRing>;
 
 /// Type of monomials of multivariate polynomials of the given ring.
-pub type PolyMonomial<P> = <<P as RingStore>::Type as MultivariatePolyRing>::Monomial;
+pub type PolyMonomial<P> = <<P as RingStore>::Ring as MultivariatePolyRing>::Monomial;
 
 /// Trait for multivariate polynomial rings.
 pub trait MultivariatePolyRing: RingExtension {
@@ -124,7 +124,7 @@ pub trait MultivariatePolyRing: RingExtension {
     fn map_terms<P, H>(&self, from: &P, el: &P::Element, hom: H) -> Self::Element
     where
         P: ?Sized + MultivariatePolyRing,
-        H: Homomorphism<<P::BaseRing as RingStore>::Type, <Self::BaseRing as RingStore>::Type>,
+        H: Homomorphism<<P::BaseRing as RingStore>::Ring, <Self::BaseRing as RingStore>::Ring>,
     {
         assert!(self.base_ring().get_ring() == hom.codomain().get_ring());
         assert!(from.base_ring().get_ring() == hom.domain().get_ring());
@@ -225,7 +225,7 @@ pub trait MultivariatePolyRing: RingExtension {
     fn evaluate<R, V, H>(&self, f: &Self::Element, value: V, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<Self::BaseRing as RingStore>::Type, R>,
+        H: Homomorphism<<Self::BaseRing as RingStore>::Ring, R>,
         V: VectorFn<R::Element>,
     {
         assert_eq!(self.indeterminate_count(), value.len());
@@ -235,7 +235,7 @@ pub trait MultivariatePolyRing: RingExtension {
                 hom.codomain().prod(
                     (0..self.indeterminate_count()).map(|i| hom.codomain().pow(value.at(i), self.exponent_at(m, i))),
                 ),
-                hom.domain().clone_el(c),
+                c.clone(),
             )
         }))
     }
@@ -255,7 +255,7 @@ pub trait MultivariatePolyRing: RingExtension {
             let new_m = self.create_monomial(
                 (0..self.indeterminate_count()).map(|i| if i == var { 0 } else { self.exponent_at(m, i) }),
             );
-            parts[self.exponent_at(m, var)].push((self.base_ring().clone_el(c), new_m));
+            parts[self.exponent_at(m, var)].push((c.clone(), new_m));
         }
         if let Some(first) = parts.pop() {
             let mut current = self.zero();
@@ -276,10 +276,10 @@ pub trait MultivariatePolyRing: RingExtension {
 /// [`RingStore`] for [`MultivariatePolyRing`]
 pub trait MultivariatePolyRingStore: RingStore
 where
-    Self::Type: MultivariatePolyRing,
+    Self::Ring: MultivariatePolyRing,
 {
     delegate! { MultivariatePolyRing, fn indeterminate_count(&self) -> usize }
-    delegate! { MultivariatePolyRing, fn indeterminate(&self, i: usize) -> <Self::Type as MultivariatePolyRing>::Monomial }
+    delegate! { MultivariatePolyRing, fn indeterminate(&self, i: usize) -> <Self::Ring as MultivariatePolyRing>::Monomial }
     delegate! { MultivariatePolyRing, fn create_term(&self, coeff: PolyCoeff<Self>, monomial: PolyMonomial<Self>) -> El<Self> }
     delegate! { MultivariatePolyRing, fn exponent_at(&self, m: &PolyMonomial<Self>, var_index: usize) -> usize }
     delegate! { MultivariatePolyRing, fn expand_monomial_to(&self, m: &PolyMonomial<Self>, out: &mut [usize]) -> () }
@@ -341,7 +341,7 @@ where
     /// Returns an iterator over all nonzero terms of the polynomial.
     ///
     /// For details, see [`MultivariatePolyRing::terms()`].
-    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Type as MultivariatePolyRing>::TermIter<'a> {
+    fn terms<'a>(&'a self, f: &'a El<Self>) -> <Self::Ring as MultivariatePolyRing>::TermIter<'a> {
         self.get_ring().terms(f)
     }
 
@@ -361,7 +361,7 @@ where
     fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<BaseRing<Self> as RingStore>::Type, R>,
+        H: Homomorphism<<BaseRing<Self> as RingStore>::Ring, R>,
         V: VectorFn<R::Element>,
     {
         self.get_ring().evaluate(f, value, hom)
@@ -372,8 +372,8 @@ where
     fn into_lifted_hom<P, H>(self, from: P, hom: H) -> CoefficientHom<P, Self, H>
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>,
+        P::Ring: MultivariatePolyRing,
+        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
     {
         CoefficientHom { from, to: self, hom }
     }
@@ -386,8 +386,8 @@ where
     fn lifted_hom<'a, P, H>(&'a self, from: P, hom: H) -> CoefficientHom<P, &'a Self, H>
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Type, <BaseRing<Self> as RingStore>::Type>,
+        P::Ring: MultivariatePolyRing,
+        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
     {
         self.into_lifted_hom(from, hom)
     }
@@ -503,7 +503,7 @@ where
 impl<P> MultivariatePolyRingStore for P
 where
     P: RingStore,
-    P::Type: MultivariatePolyRing,
+    P::Ring: MultivariatePolyRing,
 {
 }
 
@@ -517,7 +517,7 @@ pub trait MonomialOrder: Clone {
     fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing;
+        P::Ring: MultivariatePolyRing;
 
     /// Checks whether two monomials are equal.
     ///
@@ -526,7 +526,7 @@ pub trait MonomialOrder: Clone {
     fn eq_mon<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> bool
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing,
+        P::Ring: MultivariatePolyRing,
     {
         self.compare(ring, lhs, rhs) == Ordering::Equal
     }
@@ -604,7 +604,7 @@ impl MonomialOrder for DegRevLex {
     fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing,
+        P::Ring: MultivariatePolyRing,
     {
         let lhs_deg = ring.monomial_deg(lhs);
         let rhs_deg = ring.monomial_deg(rhs);
@@ -637,7 +637,7 @@ impl MonomialOrder for Lex {
     fn compare<P>(&self, ring: P, lhs: &PolyMonomial<P>, rhs: &PolyMonomial<P>) -> Ordering
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing,
+        P::Ring: MultivariatePolyRing,
     {
         for i in 0..ring.indeterminate_count() {
             match ring.exponent_at(lhs, i).cmp(&ring.exponent_at(rhs, i)) {
@@ -658,11 +658,11 @@ pub struct CoefficientHom<PFrom, PTo, H>
 where
     PFrom: RingStore,
     PTo: RingStore,
-    PFrom::Type: MultivariatePolyRing,
-    PTo::Type: MultivariatePolyRing,
+    PFrom::Ring: MultivariatePolyRing,
+    PTo::Ring: MultivariatePolyRing,
     H: Homomorphism<
-            <<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type,
-            <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
+            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
         >,
 {
     from: PFrom,
@@ -670,15 +670,15 @@ where
     hom: H,
 }
 
-impl<PFrom, PTo, H> Homomorphism<PFrom::Type, PTo::Type> for CoefficientHom<PFrom, PTo, H>
+impl<PFrom, PTo, H> Homomorphism<PFrom::Ring, PTo::Ring> for CoefficientHom<PFrom, PTo, H>
 where
     PFrom: RingStore,
     PTo: RingStore,
-    PFrom::Type: MultivariatePolyRing,
-    PTo::Type: MultivariatePolyRing,
+    PFrom::Ring: MultivariatePolyRing,
+    PTo::Ring: MultivariatePolyRing,
     H: Homomorphism<
-            <<PFrom::Type as RingExtension>::BaseRing as RingStore>::Type,
-            <<PTo::Type as RingExtension>::BaseRing as RingStore>::Type,
+            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
+            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
         >,
 {
     type DomainStore = PFrom;
@@ -688,9 +688,9 @@ where
 
     fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
 
-    fn map(&self, x: <PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element { self.map_ref(&x) }
+    fn map(&self, x: <PFrom::Ring as RingBase>::Element) -> <PTo::Ring as RingBase>::Element { self.map_ref(&x) }
 
-    fn map_ref(&self, x: &<PFrom::Type as RingBase>::Element) -> <PTo::Type as RingBase>::Element {
+    fn map_ref(&self, x: &<PFrom::Ring as RingBase>::Element) -> <PTo::Ring as RingBase>::Element {
         self.to.get_ring().map_terms(self.from.get_ring(), x, &self.hom)
     }
 }
@@ -704,7 +704,7 @@ pub mod generic_impls {
     pub fn print<P>(ring: P, poly: &El<P>, out: &mut Formatter, env: EnvBindingStrength) -> Result
     where
         P: RingStore,
-        P::Type: MultivariatePolyRing,
+        P::Ring: MultivariatePolyRing,
     {
         if ring.is_zero(poly) {
             ring.base_ring()
@@ -764,15 +764,16 @@ pub mod generic_impls {
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
+    use crate::seq::VectorView;
+
     use super::*;
-    use crate::seq::*;
 
     #[stability::unstable(feature = "enable")]
     pub fn test_poly_ring_axioms<P: RingStore, I: Iterator<Item = PolyCoeff<P>>>(
         ring: P,
         interesting_base_ring_elements: I,
     ) where
-        P::Type: MultivariatePolyRing,
+        P::Ring: MultivariatePolyRing,
     {
         let elements = interesting_base_ring_elements.collect::<Vec<_>>();
         let n = ring.indeterminate_count();
@@ -890,7 +891,7 @@ pub mod generic_tests {
                             ring.inclusion().mul_ref_map(&x0_v, a),
                             ring.inclusion().mul_ref_map(&x1_v, b),
                         );
-                        let g = ring.add(ring.inclusion().mul_ref_map(&x0_v, c), ring.clone_el(&x1_v));
+                        let g = ring.add(ring.inclusion().mul_ref_map(&x0_v, c), x1_v.clone());
                         let h = ring.from_terms(
                             [
                                 (base_ring.mul_ref(a, c), ring.clone_monomial(&x0_2)),
@@ -898,7 +899,7 @@ pub mod generic_tests {
                                     base_ring.add_ref_snd(base_ring.mul_ref(b, c), a),
                                     ring.clone_monomial(&x0x1),
                                 ),
-                                (base_ring.clone_el(b), ring.clone_monomial(&x1_2)),
+                                (b.clone(), ring.clone_monomial(&x1_2)),
                             ]
                             .into_iter(),
                         );
@@ -912,17 +913,17 @@ pub mod generic_tests {
                 for b in &elements {
                     for c in &elements {
                         let f = ring.from_terms([
-                            (base_ring.clone_el(a), ring.clone_monomial(&one)),
-                            (base_ring.clone_el(c), ring.clone_monomial(&x0_2)),
+                            (a.clone(), ring.clone_monomial(&one)),
+                            (c.clone(), ring.clone_monomial(&x0_2)),
                             (base_ring.one(), ring.clone_monomial(&x0x1)),
                         ]);
                         let g = ring.from_terms([
-                            (base_ring.clone_el(b), ring.clone_monomial(&x0)),
+                            (b.clone(), ring.clone_monomial(&x0)),
                             (base_ring.one(), ring.clone_monomial(&x0_2)),
                         ]);
                         let h = ring.from_terms([
-                            (base_ring.clone_el(a), ring.clone_monomial(&one)),
-                            (base_ring.clone_el(b), ring.clone_monomial(&x0)),
+                            (a.clone(), ring.clone_monomial(&one)),
+                            (b.clone(), ring.clone_monomial(&x0)),
                             (base_ring.add_ref_fst(c, base_ring.one()), ring.clone_monomial(&x0_2)),
                             (base_ring.one(), ring.clone_monomial(&x0x1)),
                         ]);
@@ -936,15 +937,15 @@ pub mod generic_tests {
                 for b in &elements {
                     for c in &elements {
                         let mut f = ring.from_terms([
-                            (base_ring.clone_el(a), ring.clone_monomial(&one)),
-                            (base_ring.clone_el(b), ring.clone_monomial(&x0)),
-                            (base_ring.clone_el(c), ring.clone_monomial(&x0_2)),
+                            (a.clone(), ring.clone_monomial(&one)),
+                            (b.clone(), ring.clone_monomial(&x0)),
+                            (c.clone(), ring.clone_monomial(&x0_2)),
                             (base_ring.one(), ring.clone_monomial(&x0x1)),
                         ]);
                         let h = ring.from_terms([
-                            (base_ring.clone_el(a), ring.clone_monomial(&x0_2)),
-                            (base_ring.clone_el(b), ring.clone_monomial(&x0_3)),
-                            (base_ring.clone_el(c), ring.clone_monomial(&x0_4)),
+                            (a.clone(), ring.clone_monomial(&x0_2)),
+                            (b.clone(), ring.clone_monomial(&x0_3)),
+                            (c.clone(), ring.clone_monomial(&x0_4)),
                             (base_ring.one(), ring.clone_monomial(&x0_3x1)),
                         ]);
                         let m = ring.clone_monomial(&x0_2);
@@ -968,18 +969,18 @@ pub mod generic_tests {
                         [
                             base_ring.int_hom().map(3),
                             base_ring.int_hom().mul_ref_map(a, &10),
-                            base_ring.negate(base_ring.pow(base_ring.clone_el(a), 2)),
+                            base_ring.negate(base_ring.pow(a.clone(), 2)),
                             base_ring.mul_ref(a, b),
                         ],
                     );
-                    let values = [base_ring.clone_el(a), base_ring.clone_el(b)]
+                    let values = [a.clone(), b.clone()]
                         .into_iter()
                         .chain((0..(ring.indeterminate_count() - 2)).map(|_| base_ring.zero()))
                         .collect::<Vec<_>>();
                     assert_el_eq!(
                         &base_ring,
                         &expected,
-                        &ring.evaluate(&f, values.into_clone_ring_els(base_ring), &base_ring.identity())
+                        &ring.evaluate(&f, values.into_clone_els(), &base_ring.identity())
                     );
                 }
             }

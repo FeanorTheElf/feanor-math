@@ -172,7 +172,7 @@ pub fn extend_galois_field<K>(poly_ring: DensePolyRing<K>, irred_poly: &El<Dense
 
             let mut modulus = SparseMapVector::new(total_rank, Fp.clone());
             for (x, i) in FpX.terms(&gen_poly).filter(|(_, i)| *i < total_rank) {
-                *modulus.at_mut(i) = Fp.clone_el(x);
+                *modulus.at_mut(i) = x.clone();
             }
             _ = modulus.at_mut(0);
             let potential_result = FreeAlgebraImpl::new(

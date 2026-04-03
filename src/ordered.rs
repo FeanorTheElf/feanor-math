@@ -16,7 +16,7 @@ pub trait OrderedRing: RingBase {
     /// Returns whether `abs(lhs)` is [`Ordering::Less`], [`Ordering::Equal`] or
     /// [`Ordering::Greater`] than `abs(rhs)`.
     fn abs_cmp(&self, lhs: &Self::Element, rhs: &Self::Element) -> Ordering {
-        self.cmp(&self.abs(self.clone_el(lhs)), &self.abs(self.clone_el(rhs)))
+        self.cmp(&self.abs(lhs.clone()), &self.abs(rhs.clone()))
     }
 
     /// Returns whether `lhs <= rhs`.
@@ -56,7 +56,7 @@ pub trait OrderedRing: RingBase {
 /// to provide a convenient interface to the `OrderedRing`-functions.
 pub trait OrderedRingStore: RingStore
 where
-    Self::Type: OrderedRing,
+    Self::Ring: OrderedRing,
 {
     delegate! { OrderedRing, fn cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
     delegate! { OrderedRing, fn abs_cmp(&self, lhs: &El<Self>, rhs: &El<Self>) -> Ordering }
@@ -75,6 +75,6 @@ where
 impl<R: ?Sized> OrderedRingStore for R
 where
     R: RingStore,
-    R::Type: OrderedRing,
+    R::Ring: OrderedRing,
 {
 }

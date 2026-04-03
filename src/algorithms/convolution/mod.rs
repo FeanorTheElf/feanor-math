@@ -455,7 +455,7 @@ impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> f
 pub trait DefaultConvolutionRing: RingBase {
     fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
-        S: RingStore<Type = Self> + 'conv,
+        S: RingStore<Ring = Self> + 'conv,
         // I would have thought this was implied by the above, but apparently it isn't
         Self: 'conv;
 }
@@ -463,7 +463,7 @@ pub trait DefaultConvolutionRing: RingBase {
 impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
     default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
-        S: RingStore<Type = Self> + 'conv,
+        S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
         Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(0, Global)))
@@ -516,7 +516,7 @@ pub mod generic_tests {
 
     pub fn test_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
     where
-        C: ConvolutionAlgorithm<R::Type>,
+        C: ConvolutionAlgorithm<R::Ring>,
         R: RingStore,
     {
         for lhs_len in [0, 1, 2, 3, 4, 15] {
@@ -539,7 +539,7 @@ pub mod generic_tests {
                             0
                         }
                     })
-                    .map(|x| ring.mul(ring.int_hom().map(x), ring.pow(ring.clone_el(&scale), 2)))
+                    .map(|x| ring.mul(ring.int_hom().map(x), ring.pow(scale.clone(), 2)))
                     .collect::<Vec<_>>();
 
                 let mut actual = Vec::new();
@@ -565,13 +565,13 @@ pub mod generic_tests {
                             0
                         }
                     })
-                    .map(|x| ring.mul(ring.int_hom().map(x), ring.pow(ring.clone_el(&scale), 2)))
+                    .map(|x| ring.mul(ring.int_hom().map(x), ring.pow(scale.clone(), 2)))
                     .collect::<Vec<_>>();
 
                 let mut actual = Vec::new();
                 actual.extend(
                     (0..(lhs_len + rhs_len))
-                        .map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(ring.clone_el(&scale), 2))),
+                        .map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(scale.clone(), 2))),
                 );
                 convolution.compute_convolution(&lhs, None, &rhs, None, &mut actual, ring.get_ring());
                 for i in 0..(lhs_len + rhs_len) {
@@ -584,7 +584,7 @@ pub mod generic_tests {
 
     fn test_prepared_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
     where
-        C: ConvolutionAlgorithm<R::Type>,
+        C: ConvolutionAlgorithm<R::Ring>,
         R: RingStore,
     {
         for lhs_len in [0, 1, 2, 3, 4, 14, 15] {
@@ -607,7 +607,7 @@ pub mod generic_tests {
                             0
                         }
                     })
-                    .map(|x| ring.mul(ring.int_hom().map(x), ring.pow(ring.clone_el(&scale), 2)))
+                    .map(|x| ring.mul(ring.int_hom().map(x), ring.pow(scale.clone(), 2)))
                     .collect::<Vec<_>>();
 
                 let mut actual = Vec::new();

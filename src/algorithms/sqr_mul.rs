@@ -39,7 +39,7 @@ pub fn generic_abs_square_and_multiply<T, U, F, H, I>(
 ) -> T
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     F: FnMut(T) -> T,
     H: FnMut(&U, T) -> T,
 {
@@ -70,7 +70,7 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(
 ) -> Result<T, E>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     F: FnMut(T) -> Result<T, E>,
     H: FnMut(&U, T) -> Result<T, E>,
 {
@@ -111,7 +111,7 @@ pub fn generic_pow_shortest_chain_table<T, F, G, H, I, E>(
 ) -> Result<T, E>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     F: FnMut(&T, &T) -> Result<T, E>,
     G: FnMut(&T) -> Result<T, E>,
     H: FnMut(&T) -> T,
@@ -162,7 +162,7 @@ where
 
     let bitlen = int_ring.abs_highest_set_bit(power).unwrap() + 1;
     if bitlen < LOG2_BOUND {
-        let power = int_cast(int_ring.clone_el(&power), StaticRing::<i32>::RING, &int_ring) as usize;
+        let power = int_cast(power.clone(), StaticRing::<i32>::RING, &int_ring) as usize;
         eval_power_using_table(power, &mut mul, &mut double, &mut table, &mut mult_count)?;
         return Ok(table.into_iter().nth(power).unwrap().unwrap());
     }
@@ -377,12 +377,12 @@ fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
                 &536903680,
                 StaticRing::<i64>::RING,
                 |a| {
-                    let mut res = ring.clone_el(a);
+                    let mut res = a.clone();
                     ring.square(&mut res);
                     return Ok(res);
                 },
                 |a, b| Ok(ring.mul_ref(a, b)),
-                |a| ring.clone_el(a),
+                |a| a.clone(),
                 ring.one()
             )
             .unwrap()

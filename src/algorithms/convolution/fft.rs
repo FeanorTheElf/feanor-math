@@ -303,15 +303,15 @@ where
 fn to_int_int<I>(ring: I) -> impl use<I> + Fn(&El<I>) -> i64
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
-    move |x| int_cast(ring.clone_el(x), StaticRing::<i64>::RING, &ring)
+    move |x| int_cast(x.clone(), StaticRing::<i64>::RING, &ring)
 }
 
 fn from_int_int<I>(ring: I) -> impl use<I> + Fn(i64) -> El<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     move |x| int_cast(x, &ring, StaticRing::<i64>::RING)
 }
@@ -319,11 +319,11 @@ where
 fn to_int_zn<R>(ring: R) -> impl use<R> + Fn(&El<R>) -> i64
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     move |x| {
         int_cast(
-            ring.smallest_lift(ring.clone_el(x)),
+            ring.smallest_lift(x.clone()),
             StaticRing::<i64>::RING,
             ring.integer_ring(),
         )
@@ -333,7 +333,7 @@ where
 fn from_int_zn<R>(ring: R) -> impl use<R> + Fn(i64) -> El<R>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let hom = ring.can_hom(ring.integer_ring()).unwrap().into_raw_hom();
     move |x| {

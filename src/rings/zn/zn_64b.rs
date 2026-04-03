@@ -230,8 +230,6 @@ impl Debug for Zn64BBase {
 impl RingBase for Zn64BBase {
     type Element = Zn64BEl;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
-
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         debug_assert!(lhs.0 <= self.repr_bound());
         debug_assert!(rhs.0 <= self.repr_bound());
@@ -296,7 +294,7 @@ impl RingBase for Zn64BBase {
 
     fn characteristic<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.size(other_ZZ)
     }
@@ -320,7 +318,7 @@ impl RingBase for Zn64BBase {
 
     fn pow_gen<R: RingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
     where
-        R::Type: IntegerRing,
+        R::Ring: IntegerRing,
     {
         assert!(!integers.is_neg(power));
         algorithms::sqr_mul::generic_abs_square_and_multiply(
@@ -386,7 +384,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
         let wrt_basis = ext_ring.wrt_canonical_basis(&el);
         if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
@@ -399,7 +397,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
         ext_ring.inclusion().map(el)
     }
@@ -455,7 +453,7 @@ impl ComputeInnerProduct for Zn64BBase {
     where
         Self::Element: 'a,
     {
-        self.inner_product(els.into_iter().map(|(l, r)| (self.clone_el(l), r)))
+        self.inner_product(els.into_iter().map(|(l, r)| (l.clone(), r)))
     }
 
     fn inner_product_ref<'a, I: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(
@@ -465,7 +463,7 @@ impl ComputeInnerProduct for Zn64BBase {
     where
         Self::Element: 'a,
     {
-        self.inner_product_ref_fst(els.into_iter().map(|(l, r)| (l, self.clone_el(r))))
+        self.inner_product_ref_fst(els.into_iter().map(|(l, r)| (l, r.clone())))
     }
 }
 
@@ -473,7 +471,7 @@ impl_eq_based_self_iso! { Zn64BBase }
 
 impl<I: RingStore> CanHomFrom<zn_big::ZnGBBase<I>> for Zn64BBase
 where
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Homomorphism = ();
 
@@ -511,7 +509,7 @@ where
 
 impl<I: RingStore> CanIsoFromTo<zn_big::ZnGBBase<I>> for Zn64BBase
 where
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Isomorphism = <zn_big::ZnGBBase<I> as CanHomFrom<StaticRingBase<i64>>>::Homomorphism;
 
@@ -709,7 +707,7 @@ impl FiniteRing for Zn64BBase {
 
     fn size<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         if other_ZZ.get_ring().representable_bits().is_none()
             || self.integer_ring().abs_log2_ceil(&(self.modulus() + 1)) <= other_ZZ.get_ring().representable_bits()
@@ -745,7 +743,7 @@ impl StrassenHint for Zn64BBase {
 impl DefaultConvolutionRing for Zn64BBase {
     default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
-        S: RingStore<Type = Self> + 'conv,
+        S: RingStore<Ring = Self> + 'conv,
     {
         Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(6, Global)))
     }
@@ -1241,7 +1239,7 @@ impl_field_wrap_unwrap_isos! { Zn64BBase, Zn64BBase }
 impl<I> CanHomFrom<zn_big::ZnGBBase<I>> for AsFieldBase<Zn64B>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Homomorphism = <Zn64BBase as CanHomFrom<zn_big::ZnGBBase<I>>>::Homomorphism;
 
@@ -1262,7 +1260,7 @@ where
 impl<I> CanIsoFromTo<zn_big::ZnGBBase<I>> for AsFieldBase<Zn64B>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Isomorphism = <Zn64BBase as CanIsoFromTo<zn_big::ZnGBBase<I>>>::Isomorphism;
 

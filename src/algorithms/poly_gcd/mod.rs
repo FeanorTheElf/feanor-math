@@ -88,8 +88,8 @@ pub trait PolyTFracGCDRing {
     fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         poly_ring.prod(Self::power_decomposition(poly_ring, poly).into_iter().map(|(f, _)| f))
     }
@@ -103,8 +103,8 @@ pub trait PolyTFracGCDRing {
     fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Type = Self>;
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRing<P>: RingStore<Ring = Self>;
 
     /// Computes the greatest common divisor of two polynomials `f, g` over the fraction field,
     /// which is the largest-degree polynomial `d` such that `d | a f, a g` for some
@@ -133,8 +133,8 @@ pub trait PolyTFracGCDRing {
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Type = Self>;
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRing<P>: RingStore<Ring = Self>;
 }
 
 /// Computes the map
@@ -147,8 +147,8 @@ pub trait PolyTFracGCDRing {
 pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<BaseRing<P>>) -> El<P>
 where
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
     if poly_ring.is_zero(f) {
         return poly_ring.zero();
@@ -159,7 +159,7 @@ where
         if i == d {
             (ring.checked_div(c, a).unwrap(), d)
         } else {
-            (ring.mul_ref_fst(c, ring.pow(ring.clone_el(a), d - i - 1)), i)
+            (ring.mul_ref_fst(c, ring.pow(a.clone(), d - i - 1)), i)
         }
     }));
     return result;
@@ -171,8 +171,8 @@ where
 pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<BaseRing<P>>) -> El<P>
 where
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
     if poly_ring.is_zero(g) {
         return poly_ring.zero();
@@ -183,7 +183,7 @@ where
         if i == d {
             (ring.mul_ref(c, a), d)
         } else {
-            (ring.checked_div(c, &ring.pow(ring.clone_el(a), d - i - 1)).unwrap(), i)
+            (ring.checked_div(c, &ring.pow(a.clone(), d - i - 1)).unwrap(), i)
         }
     }));
     return result;
@@ -196,8 +196,8 @@ where
 pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<BaseRing<P>>)
 where
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing + Domain,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing + Domain,
 {
     if poly_ring.is_zero(f) {
         return (poly_ring.zero(), poly_ring.base_ring().one());
@@ -235,8 +235,8 @@ where
 pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 where
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing + Domain,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
     assert!(poly_ring.degree(&f).unwrap() % k == 0);
     let d = poly_ring.degree(&f).unwrap() / k;
@@ -247,7 +247,7 @@ where
     result_reversed.push(ring.one());
     for i in 1..=d {
         let g = poly_ring.pow(
-            poly_ring.from_terms((0..i).map(|j| (ring.clone_el(&result_reversed[j]), j))),
+            poly_ring.from_terms((0..i).map(|j| (result_reversed[j].clone(), j))),
             k,
         );
         let partition_sum = poly_ring.coefficient_at(&g, i);
@@ -259,7 +259,7 @@ where
     }
 
     let result = poly_ring.from_terms(result_reversed.into_iter().enumerate().map(|(i, c)| (c, d - i)));
-    if poly_ring.eq_el(&f, &poly_ring.pow(poly_ring.clone_el(&result), k)) {
+    if poly_ring.eq_el(&f, &poly_ring.pow(result.clone(), k)) {
         return Some(result);
     } else {
         return None;
@@ -273,26 +273,26 @@ where
     default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         struct PowerDecompositionOperation<'a, P>(P, &'a El<P>)
         where
             P: RingStore + Copy,
-            P::Type: PolyRing,
-            <BaseRing<P> as RingStore>::Type: DivisibilityRing + SelfIso;
+            P::Ring: PolyRing,
+            <BaseRing<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
 
-        impl<'a, P> FiniteRingOperation<<BaseRing<P> as RingStore>::Type> for PowerDecompositionOperation<'a, P>
+        impl<'a, P> FiniteRingOperation<<BaseRing<P> as RingStore>::Ring> for PowerDecompositionOperation<'a, P>
         where
             P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
+            P::Ring: PolyRing + DivisibilityRing,
+            <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
         {
             type Output = Vec<(El<P>, usize)>;
 
             fn execute(self) -> Vec<(El<P>, usize)>
             where
-                <BaseRing<P> as RingStore>::Type: FiniteRing,
+                <BaseRing<P> as RingStore>::Ring: FiniteRing,
             {
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
@@ -303,7 +303,7 @@ where
                         new_poly_ring
                             .base_ring()
                             .get_ring()
-                            .rev_delegate(self.0.base_ring().clone_el(c)),
+                            .rev_delegate(c.clone()),
                         i,
                     )
                 }));
@@ -316,7 +316,7 @@ where
                                     new_poly_ring
                                         .base_ring()
                                         .get_ring()
-                                        .unwrap_element(new_poly_ring.base_ring().clone_el(c)),
+                                        .unwrap_element(c.clone()),
                                     i,
                                 )
                             })),
@@ -328,7 +328,7 @@ where
 
             fn fallback(self) -> Self::Output {
                 let poly_ring = self.0;
-                poly_power_decomposition_local(poly_ring, poly_ring.clone_el(self.1))
+                poly_power_decomposition_local(poly_ring, self.1.clone())
             }
         }
 
@@ -338,26 +338,26 @@ where
     default fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
-        P::Type: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Type = Self>,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRing<P>: RingStore<Ring = Self>,
     {
         struct PolyGCDOperation<'a, P>(P, &'a El<P>, &'a El<P>)
         where
             P: RingStore + Copy,
-            P::Type: PolyRing,
-            <BaseRing<P> as RingStore>::Type: DivisibilityRing + SelfIso;
+            P::Ring: PolyRing,
+            <BaseRing<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
 
-        impl<'a, P> FiniteRingOperation<<BaseRing<P> as RingStore>::Type> for PolyGCDOperation<'a, P>
+        impl<'a, P> FiniteRingOperation<<BaseRing<P> as RingStore>::Ring> for PolyGCDOperation<'a, P>
         where
             P: RingStore + Copy,
-            P::Type: PolyRing + DivisibilityRing,
-            <BaseRing<P> as RingStore>::Type: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
+            P::Ring: PolyRing + DivisibilityRing,
+            <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
         {
             type Output = El<P>;
 
             fn execute(self) -> El<P>
             where
-                <BaseRing<P> as RingStore>::Type: FiniteRing,
+                <BaseRing<P> as RingStore>::Ring: FiniteRing,
             {
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
@@ -368,7 +368,7 @@ where
                         new_poly_ring
                             .base_ring()
                             .get_ring()
-                            .rev_delegate(self.0.base_ring().clone_el(c)),
+                            .rev_delegate(c.clone()),
                         i,
                     )
                 }));
@@ -377,7 +377,7 @@ where
                         new_poly_ring
                             .base_ring()
                             .get_ring()
-                            .rev_delegate(self.0.base_ring().clone_el(c)),
+                            .rev_delegate(c.clone()),
                         i,
                     )
                 }));
@@ -387,7 +387,7 @@ where
                         new_poly_ring
                             .base_ring()
                             .get_ring()
-                            .unwrap_element(new_poly_ring.base_ring().clone_el(c)),
+                            .unwrap_element(c.clone()),
                         i,
                     )
                 }));
@@ -395,7 +395,7 @@ where
 
             fn fallback(self) -> Self::Output {
                 let poly_ring = self.0;
-                poly_gcd_local(poly_ring, poly_ring.clone_el(self.1), poly_ring.clone_el(self.2))
+                poly_gcd_local(poly_ring, self.1.clone(), self.2.clone())
             }
         }
 
@@ -424,7 +424,7 @@ fn test_poly_root() {
         assert_el_eq!(
             &poly_ring,
             &f,
-            poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap()
+            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
         );
     }
 
@@ -435,7 +435,7 @@ fn test_poly_root() {
         assert_el_eq!(
             &poly_ring,
             &f,
-            poly_root(&poly_ring, &poly_ring.pow(poly_ring.clone_el(&f), k), k).unwrap()
+            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
         );
     }
 }

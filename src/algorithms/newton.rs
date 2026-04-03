@@ -33,8 +33,8 @@ pub fn absolute_error_of_poly_eval<P>(
 ) -> f64
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Type = Complex64Base>,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRing<P>: RingStore<Ring = Complex64Base>,
 {
     let CC = Complex64::RING;
     let mut current = point;
@@ -59,8 +59,8 @@ fn bound_distance_to_root<P>(
 ) -> Result<f64, PrecisionError>
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Type = Complex64Base>,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRing<P>: RingStore<Ring = Complex64Base>,
 {
     let CC = Complex64::RING;
     let f = poly;
@@ -112,8 +112,8 @@ fn newton_with_initial<P>(
 ) -> Result<(El<Complex64>, f64), PrecisionError>
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Type = Complex64Base>,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRing<P>: RingStore<Ring = Complex64Base>,
 {
     let CC = Complex64::RING;
     let f_prime = derive_poly(&poly_ring, f);
@@ -138,8 +138,8 @@ fn find_approximate_complex_root_squarefree<P>(
 ) -> Result<(El<Complex64>, f64), PrecisionError>
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Type = Complex64Base>,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRing<P>: RingStore<Ring = Complex64Base>,
 {
     let mut rng = Rand64::new(1);
     let CC = Complex64::RING;
@@ -209,13 +209,13 @@ where
 pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex64>, f64), PrecisionError>
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: IntegerRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(ZZX.degree(f).unwrap_or(0) > 0);
     let CC = Complex64::RING;
     assert!(
-        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(f)), f)
+        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, f.clone()), f)
             .is_some(),
         "polynomial must be square-free"
     );
@@ -242,14 +242,14 @@ where
 pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec<(El<Complex64>, f64)>, PrecisionError>
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: IntegerRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(ZZX.degree(poly).unwrap_or(0) > 0);
     let CC = Complex64::RING;
     let ZZ_to_CC = CC.can_hom(ZZX.base_ring()).unwrap();
     assert!(
-        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, ZZX.clone_el(poly)), poly)
+        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, poly.clone()), poly)
             .is_some(),
         "polynomial must be square-free"
     );
@@ -258,7 +258,7 @@ where
 
     let d = ZZX.degree(poly).unwrap();
     let f = ZZX_to_CCX.map_ref(poly);
-    let mut remaining_poly = CCX.clone_el(&f);
+    let mut remaining_poly = f.clone();
     let mut result = Vec::new();
     for i in 0..ZZX.degree(&poly).unwrap() {
         let (next_root_initial, _) = find_approximate_complex_root_squarefree(&CCX, &remaining_poly, d - i)?;

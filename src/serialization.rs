@@ -27,14 +27,14 @@ pub trait SerializableElementRing: RingBase {
 #[derive(Clone)]
 pub struct DeserializeWithRing<R: RingStore>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     ring: R,
 }
 
 impl<R> DeserializeWithRing<R>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
     R: RingStore,
 {
     #[stability::unstable(feature = "enable")]
@@ -43,7 +43,7 @@ where
 
 impl<'de, R> DeserializeSeed<'de> for DeserializeWithRing<R>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
     R: RingStore,
 {
     type Value = El<R>;
@@ -61,7 +61,7 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct SerializeWithRing<'a, R: RingStore>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     ring: R,
     el: &'a El<R>,
@@ -69,7 +69,7 @@ where
 
 impl<'a, R: RingStore> SerializeWithRing<'a, R>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(el: &'a El<R>, ring: R) -> Self { Self { el, ring } }
@@ -77,7 +77,7 @@ where
 
 impl<'a, R: RingStore> Serialize for SerializeWithRing<'a, R>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -92,7 +92,7 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct SerializeOwnedWithRing<R: RingStore>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     ring: R,
     el: El<R>,
@@ -100,7 +100,7 @@ where
 
 impl<R: RingStore> SerializeOwnedWithRing<R>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(el: El<R>, ring: R) -> Self { Self { el, ring } }
@@ -108,7 +108,7 @@ where
 
 impl<R: RingStore> Serialize for SerializeOwnedWithRing<R>
 where
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -127,7 +127,7 @@ pub mod generic_tests {
     #[stability::unstable(feature = "enable")]
     pub fn test_serialization<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where
-        R::Type: SerializableElementRing,
+        R::Ring: SerializableElementRing,
     {
         let edge_case_elements = edge_case_elements.collect::<Vec<_>>();
 

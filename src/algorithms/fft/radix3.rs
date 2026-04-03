@@ -81,17 +81,17 @@ fn threeadic_reverse(mut number: usize, log3_n: usize) -> usize {
     return result;
 }
 
-impl<R> CooleyTukeyRadix3FFT<R::Type, R::Type, Identity<R>>
+impl<R> CooleyTukeyRadix3FFT<R::Ring, R::Ring, Identity<R>>
 where
     R: RingStore,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     /// Creates an [`CooleyTukeyRadix3FFT`] for a prime field, assuming it has a characteristic
     /// congruent to 1 modulo `3^lo32_n`.
     #[stability::unstable(feature = "enable")]
     pub fn for_zn(ring: R, log3_n: usize) -> Option<Self>
     where
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         let n = ZZ.pow(3, log3_n);
         let root_of_unity = get_prim_root_of_unity_zn(&ring, n as usize)?;
@@ -120,10 +120,10 @@ where
         let ring = hom.domain();
         let pow_zeta = |i: i64| {
             if i < 0 {
-                ring.invert(&ring.pow(ring.clone_el(&zeta), (-i).try_into().unwrap()))
+                ring.invert(&ring.pow(zeta.clone(), (-i).try_into().unwrap()))
                     .unwrap()
             } else {
-                ring.pow(ring.clone_el(&zeta), i.try_into().unwrap())
+                ring.pow(zeta.clone(), i.try_into().unwrap())
             }
         };
         let result = CooleyTukeyRadix3FFT::create(&hom, pow_zeta, log3_n, Global);
@@ -193,7 +193,7 @@ where
             let root_of_unity = self
                 .hom
                 .domain()
-                .pow(self.hom.domain().clone_el(&self.third_root_of_unity), 2);
+                .pow(self.third_root_of_unity.clone(), 2);
             debug_assert!(self.ring().eq_el(
                 &self.hom.map_ref(&root_of_unity),
                 self.root_of_unity(self.hom.codomain())
@@ -265,7 +265,7 @@ where
             let current = &mut result[i];
             for j in 0..ZZ.pow(3, i) {
                 let base_twiddle = pow_zeta(-(threeadic_reverse(j as usize, log3_n - 1) as i64));
-                current.push(ring.clone_el(&base_twiddle));
+                current.push(base_twiddle.clone());
                 current.push(ring.pow(ring.mul_ref_snd(base_twiddle, &third_root_of_unity), 2));
             }
         }
@@ -281,7 +281,7 @@ where
             let current = &mut result[i];
             for j in 0..ZZ.pow(3, i) {
                 let base_twiddle = pow_zeta(threeadic_reverse(j as usize, log3_n - 1) as i64);
-                current.push(ring.clone_el(&base_twiddle));
+                current.push(base_twiddle.clone());
                 current.push(ring.pow(base_twiddle, 2));
             }
         }
@@ -368,15 +368,15 @@ where
             inv_twiddles: self
                 .inv_twiddles
                 .iter()
-                .map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect())
+                .map(|list| list.iter().map(|x| x.clone()).collect())
                 .collect(),
             twiddles: self
                 .twiddles
                 .iter()
-                .map(|list| list.iter().map(|x| self.hom.domain().clone_el(x)).collect())
+                .map(|list| list.iter().map(|x| x.clone()).collect())
                 .collect(),
-            main_root_of_unity: self.hom.codomain().clone_el(&self.main_root_of_unity),
-            third_root_of_unity: self.hom.domain().clone_el(&self.third_root_of_unity),
+            main_root_of_unity: self.main_root_of_unity.clone(),
+            third_root_of_unity: self.third_root_of_unity.clone(),
             log3_n: self.log3_n,
             allocator: self.allocator.clone(),
         }
@@ -402,7 +402,7 @@ where
     fn unordered_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<R_main::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.hom.codomain().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -410,7 +410,7 @@ where
             self.fft_impl(data);
         } else {
             let mut data = Vec::with_capacity_in(self.len(), &self.allocator);
-            data.extend(values.clone_ring_els(ring).iter());
+            data.extend(values.clone_els().iter());
             self.fft_impl(&mut data);
             for (i, x) in data.into_iter().enumerate() {
                 *values.at_mut(i) = x;
@@ -421,7 +421,7 @@ where
     fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<R_main::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.hom.codomain().get_ring(), "unsupported ring");
         assert_eq!(self.len(), values.len());
@@ -429,7 +429,7 @@ where
             self.inv_fft_impl(data);
         } else {
             let mut data = Vec::with_capacity_in(self.len(), &self.allocator);
-            data.extend(values.clone_ring_els(ring).iter());
+            data.extend(values.clone_els().iter());
             self.inv_fft_impl(&mut data);
             for (i, x) in data.into_iter().enumerate() {
                 *values.at_mut(i) = x;
@@ -439,7 +439,7 @@ where
 
     fn root_of_unity<S>(&self, ring: S) -> &R_main::Element
     where
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.hom.codomain().get_ring(), "unsupported ring");
         &self.main_root_of_unity
@@ -687,13 +687,13 @@ pub mod generic_tests {
         test_zeta: &El<S>,
         test_twiddle: &El<S>,
     ) where
-        R::Type: CanHomFrom<S::Type>,
-        S::Type: DivisibilityRing,
+        R::Ring: CanHomFrom<S::Ring>,
+        S::Ring: DivisibilityRing,
     {
         assert!(base.is_zero(&base.sum([
             base.one(),
-            base.clone_el(&test_zeta),
-            base.pow(base.clone_el(&test_zeta), 2)
+            test_zeta.clone(),
+            base.pow(test_zeta.clone(), 2)
         ])));
         let test_inv_twiddle = base.invert(&test_twiddle).unwrap();
         let elements = edge_case_elements.collect::<Vec<_>>();
@@ -702,11 +702,11 @@ pub mod generic_tests {
         for a in &elements {
             for b in &elements {
                 for c in &elements {
-                    let [mut x, mut y, mut z] = [ring.clone_el(a), ring.clone_el(b), ring.clone_el(c)];
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(ring.get_ring(), &mut x);
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(ring.get_ring(), &mut y);
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_fft(ring.get_ring(), &mut z);
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::butterfly(
+                    let [mut x, mut y, mut z] = [a.clone(), b.clone(), c.clone()];
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::prepare_for_fft(ring.get_ring(), &mut x);
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::prepare_for_fft(ring.get_ring(), &mut y);
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::prepare_for_fft(ring.get_ring(), &mut z);
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::butterfly(
                         &hom,
                         &mut x,
                         &mut y,
@@ -734,17 +734,17 @@ pub mod generic_tests {
                         &z
                     );
 
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(ring.get_ring(), &mut x);
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(ring.get_ring(), &mut y);
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::prepare_for_inv_fft(ring.get_ring(), &mut z);
-                    <R::Type as CooleyTukeyRadix3Butterfly<S::Type>>::inv_butterfly(
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::prepare_for_inv_fft(ring.get_ring(), &mut x);
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::prepare_for_inv_fft(ring.get_ring(), &mut y);
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::prepare_for_inv_fft(ring.get_ring(), &mut z);
+                    <R::Ring as CooleyTukeyRadix3Butterfly<S::Ring>>::inv_butterfly(
                         &hom,
                         &mut x,
                         &mut y,
                         &mut z,
                         &test_zeta,
                         &test_inv_twiddle,
-                        &base.pow(base.clone_el(&test_inv_twiddle), 2),
+                        &base.pow(test_inv_twiddle.clone(), 2),
                     );
                     assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(a, 3), &x);
                     assert_el_eq!(ring, ring.int_hom().mul_ref_fst_map(b, 3), &y);

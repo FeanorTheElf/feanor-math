@@ -275,7 +275,7 @@ pub trait Domain: DivisibilityRing {}
 /// to provide a convenient interface to the `DivisibilityRing`-functions.
 pub trait DivisibilityRingStore: RingStore
 where
-    Self::Type: DivisibilityRing,
+    Self::Ring: DivisibilityRing,
 {
     delegate! { DivisibilityRing, fn checked_left_div(&self, lhs: &El<Self>, rhs: &El<Self>) -> Option<El<Self>> }
     delegate! { DivisibilityRing, fn divides_left(&self, lhs: &El<Self>, rhs: &El<Self>) -> bool }
@@ -288,7 +288,7 @@ where
 impl<R> DivisibilityRingStore for R
 where
     R: RingStore,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
 }
 
@@ -300,13 +300,13 @@ pub mod generic_tests {
 
     pub fn test_divisibility_axioms<R: DivisibilityRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where
-        R::Type: DivisibilityRing,
+        R::Ring: DivisibilityRing,
     {
         let elements = edge_case_elements.collect::<Vec<_>>();
 
         for a in &elements {
             for b in &elements {
-                let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
+                let ab = ring.mul(a.clone(), b.clone());
                 let c = ring.checked_left_div(&ab, &a);
                 assert!(
                     c.is_some(),
@@ -316,7 +316,7 @@ pub mod generic_tests {
                     ring.formatted_el(&a)
                 );
                 assert!(
-                    ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())),
+                    ring.eq_el(&ab, &ring.mul_ref_snd(a.clone(), c.as_ref().unwrap())),
                     "Division failed: {} * {} != {} but {} = checked_div({}, {})",
                     ring.formatted_el(a),
                     ring.formatted_el(c.as_ref().unwrap()),
@@ -327,7 +327,7 @@ pub mod generic_tests {
                 );
 
                 if !ring.is_unit(a) {
-                    let ab_plus_one = ring.add(ring.clone_el(&ab), ring.one());
+                    let ab_plus_one = ring.add(ab.clone(), ring.one());
                     let c = ring.checked_left_div(&ab_plus_one, &a);
                     assert!(
                         c.is_none(),
@@ -338,7 +338,7 @@ pub mod generic_tests {
                         ring.formatted_el(c.as_ref().unwrap())
                     );
 
-                    let ab_minus_one = ring.sub(ring.clone_el(&ab), ring.one());
+                    let ab_minus_one = ring.sub(ab.clone(), ring.one());
                     let c = ring.checked_left_div(&ab_minus_one, &a);
                     assert!(
                         c.is_none(),
@@ -373,9 +373,9 @@ pub mod generic_tests {
         }
 
         for a in &elements {
-            let a_prepared_divisor = PreparedDivisor::new(ring.get_ring(), ring.clone_el(a));
+            let a_prepared_divisor = PreparedDivisor::new(ring.get_ring(), a.clone());
             for b in &elements {
-                let ab = ring.mul(ring.clone_el(a), ring.clone_el(b));
+                let ab = ring.mul(a.clone(), b.clone());
                 let c = a_prepared_divisor.checked_left_div_by(&ab, ring.get_ring());
                 assert!(
                     c.is_some(),
@@ -385,7 +385,7 @@ pub mod generic_tests {
                     ring.formatted_el(&a)
                 );
                 assert!(
-                    ring.eq_el(&ab, &ring.mul_ref_snd(ring.clone_el(a), c.as_ref().unwrap())),
+                    ring.eq_el(&ab, &ring.mul_ref_snd(a.clone(), c.as_ref().unwrap())),
                     "Division failed: {} * {} != {} but {} = checked_div({}, {})",
                     ring.formatted_el(a),
                     ring.formatted_el(c.as_ref().unwrap()),
@@ -396,7 +396,7 @@ pub mod generic_tests {
                 );
 
                 if !ring.get_ring().is_unit_prepared(&a_prepared_divisor) {
-                    let ab_plus_one = ring.add(ring.clone_el(&ab), ring.one());
+                    let ab_plus_one = ring.add(ab.clone(), ring.one());
                     let c = a_prepared_divisor.checked_left_div_by(&ab_plus_one, ring.get_ring());
                     assert!(
                         c.is_none(),
@@ -407,7 +407,7 @@ pub mod generic_tests {
                         ring.formatted_el(c.as_ref().unwrap())
                     );
 
-                    let ab_minus_one = ring.sub(ring.clone_el(&ab), ring.one());
+                    let ab_minus_one = ring.sub(ab.clone(), ring.one());
                     let c = a_prepared_divisor.checked_left_div_by(&ab_minus_one, ring.get_ring());
                     assert!(
                         c.is_none(),

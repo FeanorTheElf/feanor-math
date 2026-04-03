@@ -41,7 +41,7 @@ fn assert_lattice_isomorphic<R, S, V1, V2>(
     V2: AsPointerToSlice<El<R>>,
     R: RingStore,
     S: RingStore,
-    S::Type: IntegerRing + CanHomFrom<R::Type>,
+    S::Ring: IntegerRing + CanHomFrom<R::Ring>,
 {
     use std::alloc::Global;
 
@@ -64,8 +64,8 @@ fn assert_lattice_isomorphic<R, S, V1, V2>(
     assert!(
         solve_right_using_pre_smith(
             &large_ring,
-            A.clone_matrix(&large_ring).data_mut(),
-            B.clone_matrix(&large_ring).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             U.data_mut(),
             Global
         )
@@ -75,8 +75,8 @@ fn assert_lattice_isomorphic<R, S, V1, V2>(
     assert!(
         solve_right_using_pre_smith(
             &large_ring,
-            B.clone_matrix(&large_ring).data_mut(),
-            A.clone_matrix(&large_ring).data_mut(),
+            B.clone().data_mut(),
+            A.clone().data_mut(),
             U.data_mut(),
             Global
         )
@@ -94,10 +94,10 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
     R: RingStore,
-    S: RingStore<Type = RationalFieldBase<I>>,
-    S::Type: CanHomFrom<R::Type>,
+    S: RingStore<Ring = RationalFieldBase<I>>,
+    S::Ring: CanHomFrom<R::Ring>,
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     use std::alloc::Global;
 
@@ -143,8 +143,8 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
     assert!(
         solve_right_using_pre_smith(
             large_ring.base_ring(),
-            A.clone_matrix(large_ring.base_ring()).data_mut(),
-            B.clone_matrix(large_ring.base_ring()).data_mut(),
+            A.clone().data_mut(),
+            B.clone().data_mut(),
             U.data_mut(),
             Global
         )
@@ -154,8 +154,8 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
     assert!(
         solve_right_using_pre_smith(
             large_ring.base_ring(),
-            B.clone_matrix(large_ring.base_ring()).data_mut(),
-            A.clone_matrix(large_ring.base_ring()).data_mut(),
+            B.clone().data_mut(),
+            A.clone().data_mut(),
             U.data_mut(),
             Global
         )

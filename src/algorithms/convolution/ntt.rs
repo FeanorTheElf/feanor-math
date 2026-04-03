@@ -40,10 +40,10 @@ where
     ntt_data: Vec<R::Element, A>,
 }
 
-impl<R> NTTConvolution<R::Type, R::Type, Identity<R>>
+impl<R> NTTConvolution<R::Ring, R::Ring, Identity<R>>
 where
     R: RingStore + Clone,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     /// Creates a new [`NTTConvolution`].
     ///
@@ -131,7 +131,7 @@ where
 
         let compute_result = || {
             let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-            result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
+            result.extend(data.as_iter().map(|x| x.clone()));
             result.resize_with(1 << log2_len, || self.ring().zero());
             self.get_ntt_table(log2_len)
                 .unordered_truncated_fft(&mut result, significant_entries);
@@ -179,7 +179,7 @@ where
         }
         let lhs_ntt_data = lhs_ntt.to_mut_with(|data| {
             let mut copied_data = Vec::with_capacity_in(data.len(), self.allocator.clone());
-            copied_data.extend(data.iter().map(|x| self.ring().clone_el(x)));
+            copied_data.extend(data.iter().map(|x| x.clone()));
             copied_data
         });
 
@@ -214,7 +214,7 @@ where
             .unwrap();
 
         let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
-        result.extend(data.as_iter().map(|x| self.ring().clone_el(x)));
+        result.extend(data.as_iter().map(|x| x.clone()));
         result.resize_with(1 << log2_len, || self.ring().zero());
         self.get_ntt_table(log2_len)
             .unordered_truncated_fft(&mut result, significant_entries);

@@ -32,11 +32,11 @@ where
     hom: H,
 }
 
-impl<R, T1, T2> GeneralCooleyTukeyFFT<R::Type, R::Type, Identity<R>, T1, T2>
+impl<R, T1, T2> GeneralCooleyTukeyFFT<R::Ring, R::Ring, Identity<R>, T1, T2>
 where
     R: RingStore,
-    T1: FFTAlgorithm<R::Type>,
-    T2: FFTAlgorithm<R::Type>,
+    T1: FFTAlgorithm<R::Ring>,
+    T2: FFTAlgorithm<R::Ring>,
 {
     /// Creates a new [`GeneralCooleyTukeyFFT`] over the given ring of length `n`, based on FFTs
     /// of length `n1` and `n2`, where `n = n1 * n2`.
@@ -234,11 +234,11 @@ where
         let root_of_unity_pows = |i: i64| {
             if i >= 0 {
                 hom.domain()
-                    .pow(hom.domain().clone_el(&root_of_unity), i.try_into().unwrap())
+                    .pow(root_of_unity.clone(), i.try_into().unwrap())
             } else {
                 let len_i64: i64 = len.try_into().unwrap();
                 hom.domain().pow(
-                    hom.domain().clone_el(&root_of_unity),
+                    root_of_unity.clone(),
                     (len_i64 + (i % len_i64)).try_into().unwrap(),
                 )
             }
@@ -307,7 +307,7 @@ where
 {
     fn len(&self) -> usize { self.left_table.len() * self.right_table.len() }
 
-    fn root_of_unity<S: RingStore<Type = R_main> + Copy>(&self, ring: S) -> &R_main::Element {
+    fn root_of_unity<S: RingStore<Ring = R_main> + Copy>(&self, ring: S) -> &R_main::Element {
         assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         &self.root_of_unity
     }
@@ -316,7 +316,7 @@ where
     fn unordered_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         if self.left_table.len() > 1 {
@@ -342,7 +342,7 @@ where
     fn unordered_inv_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         for i in 0..self.left_table.len() {
@@ -600,7 +600,7 @@ fn bench_factor_fft(bencher: &mut test::Bencher) {
     let mut copy = Vec::with_capacity(BENCH_N1 * BENCH_N2);
     bencher.iter(|| {
         copy.clear();
-        copy.extend(data.iter().map(|x| ring.clone_el(x)));
+        copy.extend(data.iter().map(|x| x.clone()));
         fft.unordered_fft(&mut copy[..], &ring);
         fft.unordered_inv_fft(&mut copy[..], &ring);
         assert_el_eq!(ring, copy[0], data[0]);

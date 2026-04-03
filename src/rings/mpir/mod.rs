@@ -49,7 +49,7 @@ impl MPZEl {
 }
 
 impl Clone for MPZEl {
-    fn clone(&self) -> Self { MPZ::RING.clone_el(self) }
+    fn clone(&self) -> Self { MPZ::self.clone() }
 }
 
 /// Except for random number generation (which we do in Rust), GMP/MPIR
@@ -352,7 +352,7 @@ impl RingBase for MPZBase {
         _env: EnvBindingStrength,
     ) -> std::fmt::Result {
         RustBigintRing::RING.get_ring().dbg(
-            &self.map_out(RustBigintRing::RING.get_ring(), self.clone_el(value), &()),
+            &self.map_out(RustBigintRing::RING.get_ring(), value.clone(), &()),
             out,
         )
     }
@@ -458,7 +458,7 @@ impl DivisibilityRing for MPZBase {
                 return None;
             }
         }
-        let (quo, rem) = self.euclidean_div_rem(self.clone_el(lhs), rhs);
+        let (quo, rem) = self.euclidean_div_rem(lhs.clone(), rhs);
         if self.is_zero(&rem) {
             return Some(quo);
         } else {
@@ -481,7 +481,7 @@ impl PrincipalIdealRing for MPZBase {
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), MPZ::RING)
+        algorithms::eea::eea(lhs.clone(), rhs.clone(), MPZ::RING)
     }
 
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -622,7 +622,7 @@ impl IntegerRing for MPZBase {
     }
 
     fn rounded_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut rhs_half = self.abs(self.clone_el(rhs));
+        let mut rhs_half = self.abs(rhs.clone());
         self.euclidean_div_pow_2(&mut rhs_half, 1);
         if self.is_neg(&lhs) {
             return self.euclidean_div(self.sub(lhs, rhs_half), rhs);
@@ -834,7 +834,7 @@ fn test_negate_inplace() {
     assert!(MPZ::RING.is_neg(&a));
 
     for a in edge_case_elements() {
-        let mut b = MPZ::RING.clone_el(&a);
+        let mut b = MPZ::a.clone();
         MPZ::RING.negate_inplace(&mut b);
         assert!(MPZ::RING.is_zero(&a) || (MPZ::RING.is_neg(&a) ^ MPZ::RING.is_neg(&b)));
     }
@@ -1082,7 +1082,7 @@ fn bench_div_300_bits(bencher: &mut test::Bencher) {
     );
     let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
     bencher.iter(|| {
-        let q = MPZ::RING.euclidean_div(MPZ::RING.clone_el(&z), &y);
+        let q = MPZ::RING.euclidean_div(MPZ::z.clone(), &y);
         assert_el_eq!(MPZ::RING, x, q);
     })
 }

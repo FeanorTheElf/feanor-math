@@ -43,7 +43,7 @@ impl<T> OwnedMatrix<T> {
     /// Creates the `row_count x col_count` zero matrix over the given ring.
     pub fn zero<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
     where
-        R::Type: RingBase<Element = T>,
+        R::Ring: RingBase<Element = T>,
     {
         Self::zero_in(row_count, col_count, ring, Global)
     }
@@ -51,7 +51,7 @@ impl<T> OwnedMatrix<T> {
     /// Creates the `row_count x col_count` identity matrix over the given ring.
     pub fn identity<R: RingStore>(row_count: usize, col_count: usize, ring: R) -> Self
     where
-        R::Type: RingBase<Element = T>,
+        R::Ring: RingBase<Element = T>,
     {
         Self::identity_in(row_count, col_count, ring, Global)
     }
@@ -133,7 +133,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     #[stability::unstable(feature = "enable")]
     pub fn zero_in<R: RingStore>(row_count: usize, col_count: usize, ring: R, allocator: A) -> Self
     where
-        R::Type: RingBase<Element = T>,
+        R::Ring: RingBase<Element = T>,
     {
         let mut result = Vec::with_capacity_in(row_count * col_count, allocator);
         for _ in 0..row_count {
@@ -148,7 +148,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     #[stability::unstable(feature = "enable")]
     pub fn identity_in<R: RingStore>(row_count: usize, col_count: usize, ring: R, allocator: A) -> Self
     where
-        R::Type: RingBase<Element = T>,
+        R::Ring: RingBase<Element = T>,
     {
         let mut result = Vec::with_capacity_in(row_count * col_count, allocator);
         for i in 0..row_count {
@@ -164,21 +164,6 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn clone_matrix<R: RingStore>(&self, ring: R) -> Self
-    where
-        R::Type: RingBase<Element = T>,
-        A: Clone,
-    {
-        let mut result = Vec::with_capacity_in(self.row_count() * self.col_count(), self.data.allocator().clone());
-        for i in 0..self.row_count() {
-            for j in 0..self.col_count() {
-                result.push(ring.clone_el(self.at(i, j)));
-            }
-        }
-        return Self::new_with_shape(result, self.row_count(), self.col_count());
-    }
-
-    #[stability::unstable(feature = "enable")]
     pub fn set_row_count<F>(&mut self, new_count: usize, new_entries: F)
     where
         F: FnMut() -> T,
@@ -189,6 +174,17 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
 
 impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.data().fmt(f) }
+}
+
+impl<T: Clone, A: Allocator + Clone> Clone for OwnedMatrix<T, A> {
+
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+            col_count: self.col_count,
+            row_count: self.row_count
+        }
+    }
 }
 
 #[cfg(test)]

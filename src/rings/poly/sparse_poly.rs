@@ -77,7 +77,7 @@ impl<R: RingStore + Clone> Clone for SparsePolyRingBase<R> {
 
 impl<R: RingStore> Debug for SparsePolyRingBase<R>
 where
-    R::Type: Debug,
+    R::Ring: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
@@ -123,7 +123,7 @@ impl<R: RingStore> SparsePolyRingBase<R> {
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
         let (quo, rem) = algorithms::poly_div::poly_div_rem(RingRef::from(self), lhs_val, rhs, |x| {
-            left_div_lc(self.base_ring().clone_el(x)).ok_or(())
+            left_div_lc(x.clone()).ok_or(())
         })
         .ok()?;
         *lhs = rem;
@@ -136,17 +136,8 @@ pub struct SparsePolyRingEl<R: RingStore> {
     data: SparseMapVector<Arc<R>>,
 }
 
-impl<R: RingStore> Debug for SparsePolyRingEl<R>
-where
-    El<R>: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.data.fmt(f) }
-}
-
 impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     type Element = SparsePolyRingEl<R>;
-
-    fn clone_el(&self, val: &Self::Element) -> Self::Element { SparsePolyRingEl { data: val.data.clone() } }
 
     #[instrument(skip_all, level = "trace")]
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -243,12 +234,28 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.base_ring().characteristic(ZZ)
     }
 
     fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
+}
+
+impl<R: RingStore> Debug for SparsePolyRingEl<R>
+where
+    El<R>: Debug,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.data.fmt(f) }
+}
+
+impl<R: RingStore> Clone for SparsePolyRingEl<R> {
+    
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone()
+        }
+    }
 }
 
 impl<R> PartialEq for SparsePolyRingBase<R>
@@ -279,14 +286,14 @@ impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R,
 where
     R: RingStore,
     A: Allocator + Clone + Send + Sync,
-    C: ConvolutionAlgorithm<R::Type>,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
 }
 
 impl<R, P> CanHomFrom<P> for SparsePolyRingBase<R>
 where
     R: RingStore,
-    R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>,
+    R::Ring: CanHomFrom<<P::BaseRing as RingStore>::Ring>,
     P: ImplGenericCanIsoFromToMarker,
 {
     type Homomorphism = super::generic_impls::Homomorphism<P, Self>;
@@ -304,9 +311,9 @@ impl<R1, R2> CanHomFrom<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
 where
     R1: RingStore,
     R2: RingStore,
-    R2::Type: CanHomFrom<R1::Type>,
+    R2::Ring: CanHomFrom<R1::Ring>,
 {
-    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
+    type Homomorphism = <R2::Ring as CanHomFrom<R1::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &SparsePolyRingBase<R1>) -> Option<Self::Homomorphism> {
         self.base_ring()
@@ -343,7 +350,7 @@ where
 impl<R, P> CanIsoFromTo<P> for SparsePolyRingBase<R>
 where
     R: RingStore,
-    R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>,
+    R::Ring: CanIsoFromTo<<P::BaseRing as RingStore>::Ring>,
     P: ImplGenericCanIsoFromToMarker,
 {
     type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
@@ -363,9 +370,9 @@ impl<R1, R2> CanIsoFromTo<SparsePolyRingBase<R1>> for SparsePolyRingBase<R2>
 where
     R1: RingStore,
     R2: RingStore,
-    R2::Type: CanIsoFromTo<R1::Type>,
+    R2::Ring: CanIsoFromTo<R1::Ring>,
 {
-    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
+    type Isomorphism = <R2::Ring as CanIsoFromTo<R1::Ring>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &SparsePolyRingBase<R1>) -> Option<Self::Isomorphism> {
         self.base_ring()
@@ -384,7 +391,7 @@ where
             *result.at_mut(j) =
                 self.base_ring()
                     .get_ring()
-                    .map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso);
+                    .map_out(from.base_ring().get_ring(), c.clone(), iso);
         }
         return SparsePolyRingEl { data: result };
     }
@@ -470,19 +477,19 @@ where
 impl<R> Domain for SparsePolyRingBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
 }
 
 impl<R> DivisibilityRing for SparsePolyRingBase<R>
 where
     R: RingStore,
-    R::Type: DivisibilityRing + Domain,
+    R::Ring: DivisibilityRing + Domain,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
             let lc = rhs.data.at(d);
-            let mut lhs_copy = self.clone_el(&lhs);
+            let mut lhs_copy = lhs.clone();
             let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
             if self.is_zero(&lhs_copy) { Some(quo) } else { None }
         } else if self.is_zero(lhs) {
@@ -498,7 +505,7 @@ where
 impl<R> PrincipalIdealRing for SparsePolyRingBase<R>
 where
     R: RingStore,
-    R::Type: Field + PolyTFracGCDRing,
+    R::Ring: Field + PolyTFracGCDRing,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         // base ring is a field, so everything is fine
@@ -507,7 +514,7 @@ where
         } else if self.is_zero(rhs) {
             return None;
         }
-        let (quo, rem) = self.euclidean_div_rem(self.clone_el(lhs), rhs);
+        let (quo, rem) = self.euclidean_div_rem(lhs.clone(), rhs);
         if self.is_zero(&rem) {
             return Some(quo);
         } else {
@@ -520,7 +527,7 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        eea(self.clone_el(lhs), self.clone_el(rhs), RingRef::from(self))
+        eea(lhs.clone(), rhs.clone(), RingRef::from(self))
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -531,7 +538,7 @@ where
 impl<R> EuclideanRing for SparsePolyRingBase<R>
 where
     R: RingStore,
-    R::Type: Field + PolyTFracGCDRing,
+    R::Ring: Field + PolyTFracGCDRing,
 {
     fn euclidean_div_rem(&self, mut lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         let lc_inv = self.base_ring.invert(rhs.data.at(self.degree(rhs).unwrap())).unwrap();
@@ -558,7 +565,7 @@ use crate::rings::zn::*;
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
 where
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
 {
     let base_ring = poly_ring.base_ring();
     vec![

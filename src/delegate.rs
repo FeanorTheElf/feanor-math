@@ -284,7 +284,7 @@ pub trait DelegateRing: PartialEq + Debug + Send + Sync {
 
     /// Type of elements of this ring. These should always wrap elements from the delegated-to ring,
     /// but may store additional data.
-    type Element: Send + Sync;
+    type Element: Sized + Send + Sync + Clone;
 
     /// Returns a reference to the delegated-to ring, which is used by all other default
     /// implementations to actually implement arithmetic operations.
@@ -310,7 +310,7 @@ pub trait DelegateRing: PartialEq + Debug + Send + Sync {
     /// This can be used to update additional data, that is stored for every element in
     /// addition to the delegated-to ring element. In many cases, this can be empty.
     fn postprocess_delegate_mut(&self, el: &mut Self::Element) {
-        *el = self.rev_delegate(self.get_delegate().clone_el(self.delegate_ref(el)));
+        *el = self.rev_delegate(self.delegate_ref(el).clone());
     }
 
     /// Necessary in some locations to satisfy the type system
@@ -328,10 +328,6 @@ pub trait DelegateRing: PartialEq + Debug + Send + Sync {
 
 impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
     type Element = <Self as DelegateRing>::Element;
-
-    default fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        self.rev_delegate(self.get_delegate().clone_el(self.delegate_ref(val)))
-    }
 
     default fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.get_delegate()
@@ -525,14 +521,14 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
 
     default fn pow_gen<S: IntegerRingStore>(&self, x: Self::Element, power: &El<S>, integers: S) -> Self::Element
     where
-        S::Type: IntegerRing,
+        S::Ring: IntegerRing,
     {
         self.rev_delegate(self.get_delegate().pow_gen(self.delegate(x), power, integers))
     }
 
     default fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.get_delegate().characteristic(ZZ)
     }
@@ -624,7 +620,7 @@ where
 
     default fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.get_delegate().size(ZZ)
     }
@@ -827,7 +823,7 @@ where
 pub struct WrapHom<R, S>
 where
     R: RingStore,
-    S::Type: DelegateRing<Base = R::Type>,
+    S::Ring: DelegateRing<Base = R::Ring>,
     S: RingStore,
 {
     from: R,
@@ -837,7 +833,7 @@ where
 impl<R, S> WrapHom<R, S>
 where
     R: RingStore,
-    S::Type: DelegateRing<Base = R::Type>,
+    S::Ring: DelegateRing<Base = R::Ring>,
     S: RingStore,
 {
     /// Creates a new [`WrapHom`] between the given rings.
@@ -856,10 +852,10 @@ where
     pub fn to_delegate_ring(to: &'a R) -> Self { Self::new(RingRef::from(to.get_delegate()), RingRef::from(to)) }
 }
 
-impl<R, S> Homomorphism<R::Type, S::Type> for WrapHom<R, S>
+impl<R, S> Homomorphism<R::Ring, S::Ring> for WrapHom<R, S>
 where
     R: RingStore,
-    S::Type: DelegateRing<Base = R::Type>,
+    S::Ring: DelegateRing<Base = R::Ring>,
     S: RingStore,
 {
     type DomainStore = R;
@@ -877,7 +873,7 @@ where
 pub struct UnwrapHom<R, S>
 where
     R: RingStore,
-    R::Type: DelegateRing<Base = S::Type>,
+    R::Ring: DelegateRing<Base = S::Ring>,
     S: RingStore,
 {
     from: R,
@@ -887,7 +883,7 @@ where
 impl<R, S> UnwrapHom<R, S>
 where
     R: RingStore,
-    R::Type: DelegateRing<Base = S::Type>,
+    R::Ring: DelegateRing<Base = S::Ring>,
     S: RingStore,
 {
     /// Creates a new [`UnwrapHom`] between the given rings.
@@ -907,10 +903,10 @@ where
     }
 }
 
-impl<R, S> Homomorphism<R::Type, S::Type> for UnwrapHom<R, S>
+impl<R, S> Homomorphism<R::Ring, S::Ring> for UnwrapHom<R, S>
 where
     R: RingStore,
-    R::Type: DelegateRing<Base = S::Type>,
+    R::Ring: DelegateRing<Base = S::Ring>,
     S: RingStore,
 {
     type DomainStore = R;

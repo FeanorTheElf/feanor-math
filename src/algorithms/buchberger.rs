@@ -50,8 +50,8 @@ fn term_xlcm<P>(
 )
 where
     P: RingStore,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
 {
     let xlcm_m = ring.monomial_lcm(ring.clone_monomial(l_m), r_m);
     let xlcm_c = ring.base_ring().ideal_intersect(l_c, r_c);
@@ -75,8 +75,8 @@ fn term_lcm<P>(
 ) -> (PolyCoeff<P>, PolyMonomial<P>)
 where
     P: RingStore,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
 {
     (
         ring.base_ring().ideal_intersect(l_c, r_c),
@@ -94,8 +94,9 @@ impl<C, M> SPoly<C, M> {
     pub fn cancelled_term<P, O>(&self, ring: P, basis: &[El<P>], order: O) -> (PolyCoeff<P>, PolyMonomial<P>)
     where
         P: RingStore + Copy,
-        P::Type: MultivariatePolyRing<Monomial = M>,
-        <BaseRing<P> as RingStore>::Type: PrincipalIdealRing<Element = C>,
+        P::Ring: MultivariatePolyRing<Monomial = M>,
+        C: Clone,
+        <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing<Element = C>,
         O: MonomialOrder + Copy,
     {
         match self {
@@ -109,8 +110,7 @@ impl<C, M> SPoly<C, M> {
                 annihilator: _,
                 annihilate_including,
             } => (
-                ring.base_ring()
-                    .clone_el(ring.coefficient_at(&basis[*i], annihilate_including)),
+                ring.coefficient_at(&basis[*i], annihilate_including).clone(),
                 ring.clone_monomial(annihilate_including),
             ),
         }
@@ -121,8 +121,8 @@ impl<C, M> SPoly<C, M> {
     pub fn poly<P, O>(&self, ring: P, basis: &[El<P>], order: O) -> El<P>
     where
         P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        <BaseRing<P> as RingStore>::Type: PrincipalIdealRing<Element = C>,
+        P::Ring: MultivariatePolyRing,
+        <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing<Element = C>,
         O: MonomialOrder + Copy,
     {
         match self {
@@ -132,10 +132,10 @@ impl<C, M> SPoly<C, M> {
                     ring.LT(&basis[*i], order).unwrap(),
                     ring.LT(&basis[*j], order).unwrap(),
                 );
-                let mut f1_scaled = ring.clone_el(&basis[*i]);
+                let mut f1_scaled = basis[*i].clone();
                 ring.mul_assign_monomial(&mut f1_scaled, f1_factor.1);
                 ring.inclusion().mul_assign_map(&mut f1_scaled, f1_factor.0);
-                let mut f2_scaled = ring.clone_el(&basis[*j]);
+                let mut f2_scaled = basis[*j].clone();
                 ring.mul_assign_monomial(&mut f2_scaled, f2_factor.1);
                 ring.inclusion().mul_assign_map(&mut f2_scaled, f2_factor.0);
                 return ring.sub(f1_scaled, f2_scaled);
@@ -145,7 +145,7 @@ impl<C, M> SPoly<C, M> {
                 annihilator,
                 annihilate_including: _,
             } => {
-                let mut result = ring.clone_el(&basis[*i]);
+                let mut result = basis[*i].clone();
                 ring.inclusion().mul_assign_ref_map(&mut result, annihilator);
                 return result;
             }
@@ -163,8 +163,8 @@ fn find_reducer<'a, 'b, P, O, I>(
 ) -> Option<(usize, &'a El<P>, PolyCoeff<P>, PolyMonomial<P>)>
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing,
     O: MonomialOrder + Copy,
     I: Iterator<Item = (&'a El<P>, &'b ExpandedMonomial)>,
 {
@@ -204,8 +204,8 @@ fn filter_spoly<P, O>(
 ) -> Option<usize>
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder + Copy,
 {
     match new_spoly {
@@ -259,16 +259,16 @@ where
 pub fn default_sort_fn<P, O>(ring: P, order: O) -> impl FnMut(&mut [SPoly<PolyCoeff<P>, PolyMonomial<P>>], &[El<P>])
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder + Copy,
 {
     #[instrument(skip_all, level = "trace")]
     fn default_sort<P, O>(ring: P, order: O, spolys: &mut [SPoly<PolyCoeff<P>, PolyMonomial<P>>], basis: &[El<P>])
     where
         P: RingStore + Copy,
-        P::Type: MultivariatePolyRing,
-        <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+        P::Ring: MultivariatePolyRing,
+        <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
         O: MonomialOrder + Copy,
     {
         spolys.sort_by_key(|spoly| -(ring.monomial_deg(&spoly.cancelled_term(ring, basis, order).1) as i64))
@@ -282,8 +282,8 @@ pub type ExpandedMonomial = Vec<usize>;
 fn expand_lm<P, O>(ring: P, f: El<P>, order: O) -> (El<P>, ExpandedMonomial)
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder,
 {
     let exponents = ring.expand_monomial(ring.LT(&f, order).unwrap().1);
@@ -303,8 +303,8 @@ fn update_basis<I, P, O, SortFn>(
     sort_spolys: &mut SortFn,
 ) where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder + Copy,
     SortFn: FnMut(&mut [SPoly<PolyCoeff<P>, PolyMonomial<P>>], &[El<P>]),
     I: Iterator<Item = El<P>>,
@@ -355,15 +355,15 @@ fn update_basis<I, P, O, SortFn>(
 fn reduce_poly<'a, 'b, F, I, P, O>(ring: P, to_reduce: &mut El<P>, mut reducers: F, order: O)
 where
     P: 'a + RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing,
     O: MonomialOrder + Copy,
     F: FnMut() -> I,
     I: Iterator<Item = (&'a El<P>, &'b ExpandedMonomial)>,
 {
     while let Some((_, reducer, quo_c, quo_m)) = find_reducer(ring, to_reduce, reducers(), order) {
         let prev_lm = ring.clone_monomial(&ring.LT(to_reduce, order).unwrap().1);
-        let mut scaled_reducer = ring.clone_el(reducer);
+        let mut scaled_reducer = reducer.clone();
         ring.mul_assign_monomial(&mut scaled_reducer, ring.clone_monomial(&quo_m));
         ring.inclusion().mul_assign_ref_map(&mut scaled_reducer, &quo_c);
         debug_assert!(
@@ -386,8 +386,8 @@ where
 pub fn multivariate_division<'a, P, O, I>(ring: P, mut f: El<P>, reducers: I, order: O) -> El<P>
 where
     P: 'a + RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing,
     O: MonomialOrder + Copy,
     I: Clone + Iterator<Item = &'a El<P>>,
 {
@@ -403,8 +403,8 @@ where
 fn inter_reduce<P, O>(ring: P, mut polys: Vec<(El<P>, ExpandedMonomial)>, order: O) -> Vec<(El<P>, ExpandedMonomial)>
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: DivisibilityRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: DivisibilityRing,
     O: MonomialOrder + Copy,
 {
     let mut changed = true;
@@ -468,8 +468,8 @@ pub fn buchberger_with_strategy<P, O, SortFn, AbortFn>(
 ) -> Vec<El<P>>
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
-    <BaseRing<P> as RingStore>::Type: PrincipalIdealRing,
+    P::Ring: MultivariatePolyRing,
+    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder + Copy + Send + Sync,
     SortFn: FnMut(&mut [SPoly<PolyCoeff<P>, PolyMonomial<P>>], &[El<P>]),
     AbortFn: FnMut(&[(El<P>, ExpandedMonomial)]) -> bool,
@@ -503,7 +503,7 @@ where
     // monomial, in order to simplify divisibility checks
     let mut reducers: Vec<(El<P>, ExpandedMonomial)> = input_basis
         .iter()
-        .map(|f| expand_lm(ring, ring.clone_el(f), order))
+        .map(|f| expand_lm(ring, f.clone(), order))
         .collect::<Vec<_>>();
     sort_reducers(&mut reducers);
 
@@ -544,7 +544,7 @@ where
         let spolys_to_reduce = &open[spolys_to_reduce_index..];
         let considered_spolys = spolys_to_reduce.len();
 
-        let new_polys: FrozenVec<Box<(<<P as RingStore>::Type as RingBase>::Element, Vec<usize>)>> = FrozenVec::new();
+        let new_polys: FrozenVec<Box<(<<P as RingStore>::Ring as RingBase>::Element, Vec<usize>)>> = FrozenVec::new();
         let reduced_to_zero = AtomicUsize::new(0);
 
         let outer_span = Span::current();
@@ -601,7 +601,7 @@ where
             current_deg = 0;
             update_basis(
                 ring,
-                new_polys.iter().map(|x| &**x).map(|(f, _)| ring.clone_el(f)),
+                new_polys.iter().map(|x| &**x).map(|(f, _)| f.clone()),
                 &mut basis,
                 &mut open,
                 order,
@@ -647,9 +647,9 @@ where
 pub fn buchberger<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
 where
     P: RingStore + Copy,
-    P::Type: MultivariatePolyRing,
+    P::Ring: MultivariatePolyRing,
     BaseRing<P>: Sync,
-    <BaseRing<P> as RingStore>::Type: Field,
+    <BaseRing<P> as RingStore>::Ring: Field,
     O: MonomialOrder + Copy + Send + Sync,
 {
     buchberger_with_strategy::<_, _, _, _>(ring, input_basis, order, default_sort_fn(ring, order), |_| false)
@@ -684,7 +684,7 @@ fn test_buchberger_small() {
 
     let actual = buchberger_with_strategy(
         &ring,
-        vec![ring.clone_el(&f1), ring.clone_el(&f2)],
+        vec![f1.clone(), f2.clone()],
         DegRevLex,
         default_sort_fn(&ring, DegRevLex),
         |_| false,
@@ -754,7 +754,7 @@ fn test_buchberger_larger() {
 
     let actual = buchberger_with_strategy(
         &ring,
-        vec![ring.clone_el(&f1), ring.clone_el(&f2), ring.clone_el(&f3)],
+        vec![f1.clone(), f2.clone(), f3.clone()],
         DegRevLex,
         default_sort_fn(&ring, DegRevLex),
         |_| false,
@@ -806,11 +806,11 @@ fn test_generic_computation() {
     );
     let X2 = poly_ring.mul(
         poly_ring.add(
-            poly_ring.clone_el(&X1),
+            X1.clone(),
             poly_ring.from_terms([(var_i(2), 0), (var_i(3), 1)].into_iter()),
         ),
         poly_ring.add(
-            poly_ring.clone_el(&X1),
+            X1.clone(),
             poly_ring.from_terms([(var_i(4), 0), (var_i(5), 1)].into_iter()),
         ),
     );
@@ -822,7 +822,7 @@ fn test_generic_computation() {
 
     let gb1 = buchberger_with_strategy(
         &ring,
-        basis.iter().map(|f| ring.clone_el(f)).collect(),
+        basis.iter().map(|f| f.clone()).collect(),
         DegRevLex,
         default_sort_fn(&ring, DegRevLex),
         |_| false,
@@ -927,14 +927,14 @@ fn test_expensive_gb_1() {
 
     let gb = buchberger_with_strategy(
         &ring,
-        system.iter().map(|f| ring.clone_el(f)).collect(),
+        system.iter().map(|f| f.clone()).collect(),
         DegRevLex,
         default_sort_fn(&ring, DegRevLex),
         |_| false,
     );
 
     for f in &part_of_result {
-        assert!(ring.is_zero(&multivariate_division(&ring, ring.clone_el(f), gb.iter(), DegRevLex)));
+        assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), DegRevLex)));
     }
     assert_eq!(108, gb.len());
 }

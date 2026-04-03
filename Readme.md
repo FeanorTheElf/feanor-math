@@ -15,6 +15,12 @@ Note that I will try to keep the interfaces stable, unless they are marked with 
 
 This library uses nightly Rust, ~~and even unstable features like const-generics and specialization~~ - this caused too much of a headache, so I removed those uses again.
 
+### Update notes
+
+The most important changes from version 3.x.y are the following:
+ - attempted to simplify the overall design; carefully introducing dynamic dispatch when it doesn't harm performance or type safety, make ring elements and [`RingStore`]s `Clone`
+ - performance improvements, in particular to polynomial gcd and factorization
+
 ## A short introduction
 
 The project started with the idea that algorithmic number theory usually focuses on the rings it works with.
@@ -200,7 +206,7 @@ fn fermat_is_prime(n: i64) -> bool {
     let mut rng = oorandom::Rand64::new(1);
     for _ in 0..6 {
         let a = Zn.random_element(|| rng.rand_u64());
-        let a_n = Zn.pow(Zn.clone_el(&a), n as usize);
+        let a_n = Zn.pow(a.clone(), n as usize);
         if !Zn.eq_el(&a, &a_n) {
             return false;
         }
@@ -235,7 +241,7 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
     // be used in practice. This is just a proof of concept.
 
     // ZZ is not guaranteed to be Copy anymore, so use reference instead
-    let Zn = ZnGB::new(&ZZ, ZZ.clone_el(&n)); // the ring Z/nZ
+    let Zn = ZnGB::new(&ZZ, n.clone()); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
     let mut rng = oorandom::Rand64::new(1);
@@ -243,7 +249,7 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
         let a = Zn.random_element(|| rng.rand_u64());
         // use a generic square-and-multiply powering function that works with any implementation
         // of integers
-        let a_n = Zn.pow_gen(Zn.clone_el(&a), &n, &ZZ);
+        let a_n = Zn.pow_gen(a.clone(), &n, &ZZ);
         if !Zn.eq_el(&a, &a_n) {
             return false;
         }
@@ -376,7 +382,7 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
     type Element = Vec<El<R>>;
 
     fn clone_el(&self, el: &Self::Element) -> Self::Element {
-        el.iter().map(|x| self.base_ring.clone_el(x)).collect()
+        el.iter().map(|x| self.x.clone()).collect()
     }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {

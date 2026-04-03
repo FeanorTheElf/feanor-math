@@ -386,8 +386,6 @@ impl<T> Clone for StaticRingBase<T> {
 impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     type Element = T;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
-
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
 
     fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
@@ -412,14 +410,14 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
 
     fn characteristic<I: RingStore>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         Some(ZZ.zero())
     }
 
     fn pow_gen<R: RingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
     where
-        R::Type: IntegerRing,
+        R::Ring: IntegerRing,
     {
         assert!(!integers.is_neg(power));
         algorithms::sqr_mul::generic_abs_square_and_multiply(
@@ -444,7 +442,7 @@ macro_rules! impl_default_convolution_ring {
             impl DefaultConvolutionRing for StaticRingBase<$prim_type> {
 
                 default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
-                    where S: RingStore<Type = Self> + 'conv
+                    where S: RingStore<Ring = Self> + 'conv
                 {
                     std::sync::Arc::new($crate::algorithms::convolution::TypeErasedConvolution::new(KaratsubaAlgorithm::new($threshold_log2, std::alloc::Global)))
                 }

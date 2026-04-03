@@ -97,7 +97,7 @@ pub trait QRDecompositionField: Field {
 fn gram_schmidt<R, V1, V2>(ring: R, mut matrix: SubmatrixMut<V1, El<R>>, mut q: SubmatrixMut<V2, El<R>>) -> Vec<El<R>>
 where
     R: RingStore,
-    R::Type: Field,
+    R::Ring: Field,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
 {
@@ -134,7 +134,7 @@ where
         }
         result.push(<_ as RingStore>::sum(
             &ring,
-            (0..m).map(|k| ring.pow(ring.clone_el(target.at(k, 0)), 2)),
+            (0..m).map(|k| ring.pow(target.at(k, 0).clone(), 2)),
         ));
         for (k, c) in mus.drain(..).enumerate() {
             *matrix.at_mut(k, i) = c;
@@ -152,7 +152,7 @@ where
 fn householder_qr<R, V1, V2>(ring: R, mut matrix: SubmatrixMut<V1, El<R>>, mut q: SubmatrixMut<V2, El<R>>)
 where
     R: RingStore,
-    R::Type: ApproxRealField + SqrtRing,
+    R::Ring: ApproxRealField + SqrtRing,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
 {
@@ -168,19 +168,19 @@ where
 
     let mut householder_vector = Vec::with_capacity(m);
     for i in 0..min(n, m) {
-        let norm_sqr = <_ as RingStore>::sum(&ring, (i..m).map(|k| ring.pow(ring.clone_el(matrix.at(k, i)), 2)));
-        let norm = ring.get_ring().sqrt(ring.clone_el(&norm_sqr));
+        let norm_sqr = <_ as RingStore>::sum(&ring, (i..m).map(|k| ring.pow(matrix.at(k, i).clone(), 2)));
+        let norm = ring.get_ring().sqrt(norm_sqr.clone());
         let alpha = if ring.is_neg(matrix.at(i, i)) {
-            ring.clone_el(&norm)
+            norm.clone()
         } else {
-            ring.negate(ring.clone_el(&norm))
+            ring.negate(norm.clone())
         };
         // | x - alpha * e1 | / sqrt(2)
         let scale = ring
             .get_ring()
             .sqrt(ring.sub(norm_sqr, ring.mul_ref(&alpha, matrix.at(i, i))));
         householder_vector.clear();
-        householder_vector.extend((i..m).map(|k| ring.clone_el(matrix.at(k, i))));
+        householder_vector.extend((i..m).map(|k| matrix.at(k, i).clone()));
         ring.sub_assign_ref(&mut householder_vector[0], &alpha);
         for x in &mut householder_vector {
             *x = ring.div(x, &scale);
@@ -222,7 +222,7 @@ where
 impl<I> QRDecompositionField for RationalFieldBase<I>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     fn scaled_qr_decomposition<V1, V2>(
         &self,
@@ -241,14 +241,14 @@ where
 fn ldl_decomposition_impl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Vec<El<R>>
 where
     R: RingStore,
-    R::Type: Field,
+    R::Ring: Field,
     V: AsPointerToSlice<El<R>>,
 {
     assert_eq!(matrix.row_count(), matrix.col_count());
     let n = matrix.row_count();
     let mut result = Vec::with_capacity(n);
     for i in 0..n {
-        let pivot = ring.clone_el(matrix.at(i, i));
+        let pivot = matrix.at(i, i).clone();
         if !ring.get_ring().is_approximate() && ring.is_zero(&pivot) {
             panic!("matrix is singular")
         }
@@ -288,7 +288,7 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
         self.qr_decomposition(matrix.reborrow(), q.reborrow());
         let mut result = Vec::with_capacity(matrix.row_count());
         for i in 0..matrix.row_count() {
-            let mut scale = self.clone_el(matrix.at(i, i));
+            let mut scale = matrix.at(i, i).clone();
             let scale_inv = self.div(&self.one(), &scale);
             for j in i..matrix.col_count() {
                 self.mul_assign_ref(matrix.at_mut(i, j), &scale_inv);
@@ -452,25 +452,25 @@ fn test_float_qr() {
     feanor_tracing::DelayedLogger::init_test();
     let RR = Real64::RING;
     let a = OwnedMatrix::new_with_shape(vec![0.0, 1.0, 1.0, 0.0], 2, 2);
-    let mut r = a.clone_matrix(RR);
+    let mut r = a.clone();
     let mut q = OwnedMatrix::zero(2, 2, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
     let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
-    let mut r = a.clone_matrix(RR);
+    let mut r = a.clone();
     let mut q = OwnedMatrix::zero(3, 3, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
     let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
-    let mut r = a.clone_matrix(RR);
+    let mut r = a.clone();
     let mut q = OwnedMatrix::zero(2, 2, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
     let a = OwnedMatrix::new_with_shape(vec![1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 0.0, 0.0, 1.0], 3, 3);
-    let mut r = a.clone_matrix(RR);
+    let mut r = a.clone();
     let mut q = OwnedMatrix::zero(3, 3, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
@@ -482,7 +482,7 @@ fn test_float_qr() {
         6,
         5,
     );
-    let mut r = a.clone_matrix(RR);
+    let mut r = a.clone();
     let mut q = OwnedMatrix::zero(6, 6, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
@@ -493,7 +493,7 @@ fn test_float_qdr() {
     feanor_tracing::DelayedLogger::init_test();
     let RR = Real64::RING;
     let a = OwnedMatrix::new_with_shape((1..10).map(|c| c as f64).collect(), 3, 3);
-    let mut r = a.clone_matrix(RR);
+    let mut r = a.clone();
     let mut q = OwnedMatrix::zero(3, 3, RR);
     let diags = RR.get_ring().scaled_qr_decomposition(r.data_mut(), q.data_mut());
     for i in 0..3 {
@@ -513,12 +513,12 @@ fn test_float_ldl() {
     feanor_tracing::DelayedLogger::init_test();
     let RR = Real64::RING;
     let a = OwnedMatrix::new_with_shape(vec![5.0, 1.0, 1.0, 5.0], 2, 2);
-    let mut l = a.clone_matrix(RR);
+    let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
     let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, 20.0], 3, 3);
-    let mut l = a.clone_matrix(RR);
+    let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
@@ -530,12 +530,12 @@ fn test_float_ldl() {
         TransposableSubmatrixMut::from(a.data_mut()),
         RR,
     );
-    let mut l = a.clone_matrix(RR);
+    let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
     let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, -20.0], 3, 3);
-    let mut l = a.clone_matrix(RR);
+    let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 }

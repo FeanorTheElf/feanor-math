@@ -32,7 +32,7 @@ pub trait ApproxRealField: Field + OrderedRing {
     fn round_to_integer<I>(&self, ZZ: I, x: Self::Element) -> Option<El<I>>
     where
         I: RingStore,
-        I::Type: IntegerRing;
+        I::Ring: IntegerRing;
 
     /// Returns the difference between one and the next larger
     /// representable number.

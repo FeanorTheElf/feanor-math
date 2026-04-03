@@ -41,7 +41,7 @@ where
                 .drain(..taken_elements)
                 .chain((taken_elements..ring.rank()).map(|_| ring.base_ring().zero()));
             let current = ring.from_canonical_basis(chunk);
-            let result = (current, ring.clone_el(&current_power));
+            let result = (current, current_power.clone());
             ring.mul_assign_ref(&mut current_power, &power_of_canonical_gen);
             return Some(result);
         }),
@@ -54,9 +54,9 @@ pub fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<
 where
     R: ?Sized + FreeAlgebra,
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: LinSolveRing,
-    H: Homomorphism<<R::BaseRing as RingStore>::Type, <BaseRing<P> as RingStore>::Type>,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: LinSolveRing,
+    H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRing<P> as RingStore>::Ring>,
 {
     let minpoly = minpoly(ring, el, &poly_ring, hom);
     let power = StaticRing::<i64>::RING
@@ -71,9 +71,9 @@ pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P
 where
     R: ?Sized + FreeAlgebra,
     P: RingStore,
-    P::Type: PolyRing,
-    <BaseRing<P> as RingStore>::Type: LinSolveRing,
-    H: Homomorphism<<R::BaseRing as RingStore>::Type, <BaseRing<P> as RingStore>::Type>,
+    P::Ring: PolyRing,
+    <BaseRing<P> as RingStore>::Ring: LinSolveRing,
+    H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRing<P> as RingStore>::Ring>,
 {
     assert!(!ring.is_zero(el));
     let base_ring = hom.codomain();
@@ -100,7 +100,7 @@ where
         let sol_poly = |sol: &OwnedMatrix<El<BaseRing<P>>>| {
             poly_ring.from_terms(
                 (0..d)
-                    .map(|i| (base_ring.clone_el(sol.at(i, 0)), i))
+                    .map(|i| (sol.at(i, 0).clone(), i))
                     .chain([(base_ring.one(), d)].into_iter()),
             )
         };
@@ -125,19 +125,19 @@ where
 pub fn discriminant<R>(ring: &R) -> El<R::BaseRing>
 where
     R: ?Sized + FreeAlgebra,
-    <R::BaseRing as RingStore>::Type: PrincipalIdealRing,
+    <R::BaseRing as RingStore>::Ring: PrincipalIdealRing,
 {
     let mut current = ring.one();
     let generator = ring.canonical_gen();
     let traces = (0..(2 * ring.rank()))
         .map(|_| {
-            let result = ring.trace(ring.clone_el(&current));
+            let result = ring.trace(current.clone());
             ring.mul_assign_ref(&mut current, &generator);
             return result;
         })
         .collect::<Vec<_>>();
     let mut matrix = OwnedMatrix::from_fn(ring.rank(), ring.rank(), |i, j| {
-        ring.base_ring().clone_el(&traces[i + j])
+        traces[i + j].clone()
     });
     let result = determinant_using_pre_smith(ring.base_ring(), matrix.data_mut(), Global);
     return result;
@@ -151,10 +151,10 @@ pub fn create_multiplication_matrix<R: RingStore, A: Allocator>(
     allocator: A,
 ) -> OwnedMatrix<El<BaseRing<R>>, A>
 where
-    R::Type: FreeAlgebra,
+    R::Ring: FreeAlgebra,
 {
     let mut result = OwnedMatrix::zero_in(ring.rank(), ring.rank(), ring.base_ring(), allocator);
-    let mut current = ring.clone_el(el);
+    let mut current = el.clone();
     let g = ring.canonical_gen();
     for i in 0..ring.rank() {
         {

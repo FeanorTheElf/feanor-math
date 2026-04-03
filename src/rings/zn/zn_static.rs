@@ -58,8 +58,6 @@ impl<const N: u64, const IS_FIELD: bool> Debug for ZnSBase<N, IS_FIELD> {
 impl<const N: u64, const IS_FIELD: bool> RingBase for ZnSBase<N, IS_FIELD> {
     type Element = u64;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
-
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs += rhs;
         if *lhs >= N {
@@ -98,7 +96,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnSBase<N, IS_FIELD> {
 
     fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.size(ZZ)
     }
@@ -207,7 +205,7 @@ impl<const N: u64, const IS_FIELD: bool> FiniteRing for ZnSBase<N, IS_FIELD> {
 
     fn size<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         if ZZ.get_ring().representable_bits().is_none()
             || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits()
@@ -233,7 +231,7 @@ impl<const N: u64> InterpolationBaseRing for ZnSBase<N, true> {
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
         let wrt_basis = ext_ring.wrt_canonical_basis(&el);
         if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
@@ -246,7 +244,7 @@ impl<const N: u64> InterpolationBaseRing for ZnSBase<N, true> {
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
         ext_ring.inclusion().map(el)
     }

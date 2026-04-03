@@ -76,8 +76,6 @@ impl Real64Base {
 impl RingBase for Real64Base {
     type Element = f64;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
-
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
 
     fn negate_inplace(&self, x: &mut Self::Element) { *x = -*x; }
@@ -92,12 +90,12 @@ impl RingBase for Real64Base {
 
     fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
     where
-        R::Type: IntegerRing,
+        R::Ring: IntegerRing,
     {
         if integers.get_ring().representable_bits().is_some()
             && integers.get_ring().representable_bits().unwrap() < i32::BITS as usize
         {
-            x.powi(int_cast(integers.clone_el(power), &StaticRing::<i32>::RING, integers))
+            x.powi(int_cast(power.clone(), &StaticRing::<i32>::RING, integers))
         } else {
             x.powf(integers.to_float_approx(power))
         }
@@ -120,7 +118,7 @@ impl RingBase for Real64Base {
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         Some(ZZ.zero())
     }
@@ -173,7 +171,7 @@ impl StrassenHint for Real64Base {
 impl DefaultConvolutionRing for Real64Base {
     default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
-        S: RingStore<Type = Self> + 'conv,
+        S: RingStore<Ring = Self> + 'conv,
     {
         // disable Karatsuba's algorithm, as it is very numerically unstable
         Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
@@ -212,7 +210,7 @@ where
 impl<I> CanHomFrom<RationalFieldBase<I>> for Real64Base
 where
     I: IntegerRingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     type Homomorphism = ();
 
@@ -240,7 +238,7 @@ impl ApproxRealField for Real64Base {
     fn round_to_integer<I>(&self, ZZ: I, x: Self::Element) -> Option<El<I>>
     where
         I: RingStore,
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         ZZ.from_float_approx(x.round())
     }

@@ -16,13 +16,13 @@ pub trait FiniteRing: RingBase + FiniteRingSpecializable {
     /// the given integer ring.
     fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing;
+        I::Ring: IntegerRing;
 }
 
 /// [`RingStore`] for [`FiniteRing`]
 pub trait FiniteRingStore: RingStore
 where
-    Self::Type: FiniteRing,
+    Self::Ring: FiniteRing,
 {
     /// See [`FiniteRing::random_element()`].
     fn random_element<G: FnMut() -> u64>(&self, rng: G) -> El<Self> { self.get_ring().random_element(rng) }
@@ -30,13 +30,13 @@ where
     /// See [`FiniteRing::size()`].
     fn size<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.get_ring().size(ZZ)
     }
 }
 
-impl<R: RingStore> FiniteRingStore for R where R::Type: FiniteRing {}
+impl<R: RingStore> FiniteRingStore for R where R::Ring: FiniteRing {}
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
@@ -50,7 +50,7 @@ pub mod generic_tests {
     pub fn test_finite_ring_axioms<R>(ring: &R)
     where
         R: RingStore,
-        R::Type: FiniteRing,
+        R::Ring: FiniteRing,
     {
         let ZZ = BigIntRing::RING;
         let size = ring.size(&ZZ).unwrap();

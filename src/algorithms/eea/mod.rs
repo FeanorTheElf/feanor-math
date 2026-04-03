@@ -26,7 +26,7 @@ use crate::rings::poly::{PolyRing, PolyRingStore};
 pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 where
     R: RingStore,
-    R::Type: EuclideanRing,
+    R::Ring: EuclideanRing,
 {
     let (mut a, mut b) = (a, b);
     let (mut sa, mut ta) = (ring.one(), ring.zero());
@@ -84,7 +84,7 @@ pub const fn const_eea(a: i128, b: i128) -> (i128, i128, i128) {
 pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
 where
     R: RingStore,
-    R::Type: EuclideanRing,
+    R::Ring: EuclideanRing,
 {
     let (mut a, mut b) = (a, b);
     let (mut s, mut t) = (ring.one(), ring.zero());
@@ -116,7 +116,7 @@ where
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 where
     R: RingStore,
-    R::Type: EuclideanRing,
+    R::Ring: EuclideanRing,
 {
     let (mut a, mut b) = (a, b);
 
@@ -154,12 +154,12 @@ where
 pub fn partial_eea_poly<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> ([El<P>; 4], [El<P>; 2])
 where
     P: RingStore + Copy,
-    P::Type: PolyRing + EuclideanRing,
+    P::Ring: PolyRing + EuclideanRing,
 {
     if ring.is_zero(&lhs) || ring.is_zero(&rhs) {
         return ([ring.one(), ring.zero(), ring.zero(), ring.one()], [lhs, rhs]);
     }
-    let (mut a, mut b) = (ring.clone_el(&lhs), ring.clone_el(&rhs));
+    let (mut a, mut b) = (lhs.clone(), rhs.clone());
     let (mut sa, mut ta) = (ring.one(), ring.zero());
     let (mut sb, mut tb) = (ring.zero(), ring.one());
 
@@ -233,10 +233,10 @@ where
 pub fn partial_eea_int<R>(ring: R, lhs: El<R>, rhs: El<R>, target_size: &El<R>) -> ([El<R>; 4], [El<R>; 2])
 where
     R: RingStore + Copy,
-    R::Type: IntegerRing,
+    R::Ring: IntegerRing,
 {
     assert!(!ring.is_neg(target_size));
-    let (mut a, mut b) = (ring.clone_el(&lhs), ring.clone_el(&rhs));
+    let (mut a, mut b) = (lhs.clone(), rhs.clone());
     let (mut sa, mut ta) = (ring.one(), ring.zero());
     let (mut sb, mut tb) = (ring.zero(), ring.one());
 
@@ -308,8 +308,8 @@ fn test_partial_eea_poly() {
     feanor_tracing::DelayedLogger::init_test();
     let field = Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
-    let test_on_input = |a, b, deg| {
-        let ([s, t, s_, t_], [x, x_]) = partial_eea_poly(&poly_ring, poly_ring.clone_el(a), poly_ring.clone_el(b), deg);
+    let test_on_input = |a: &El<DensePolyRing<_>>, b: &El<DensePolyRing<_>>, deg| {
+        let ([s, t, s_, t_], [x, x_]) = partial_eea_poly(&poly_ring, a.clone(), b.clone(), deg);
         assert_el_eq!(
             &poly_ring,
             poly_ring.add(poly_ring.mul_ref(&s, a), poly_ring.mul_ref(&t, b)),

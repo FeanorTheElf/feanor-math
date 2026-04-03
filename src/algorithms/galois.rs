@@ -91,7 +91,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
         let poly_ring = DensePolyRing::new(field.base_ring(), "X");
         assert!(field.is_zero(&poly_ring.evaluate(&field.generating_poly(&poly_ring, field.base_ring().identity()), &image_of_canonical_gen, field.inclusion())));
         return Self {
-            image_of_canonical_gen_powers: (0..field.rank()).map(|i| field.pow(field.clone_el(&image_of_canonical_gen), i)).collect(),
+            image_of_canonical_gen_powers: (0..field.rank()).map(|i| field.pow(image_of_canonical_gen.clone(), i)).collect(),
             field: field
         };
     }
@@ -122,7 +122,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
             StaticRing::<i64>::RING, 
             |x| Ok(poly_ring.evaluate(&field.poly_repr(&poly_ring, x, field.base_ring().identity()), x, field.inclusion())), 
             |x, y| Ok(poly_ring.evaluate(&field.poly_repr(&poly_ring, x, field.base_ring().identity()), y, field.inclusion())), 
-            |x| field.clone_el(x), 
+            |x| x.clone(), 
             field.canonical_gen()
         ).unwrap_or_else(no_error);
         return Self::new(field, new_image);
@@ -202,7 +202,7 @@ impl<K, Impl, I> Clone for GaloisAutomorphism<K, Impl, I>
     fn clone(&self) -> Self {
         Self {
             field: self.field.clone(),
-            image_of_canonical_gen_powers: self.image_of_canonical_gen_powers.iter().map(|x| self.field.clone_el(x)).collect()
+            image_of_canonical_gen_powers: self.image_of_canonical_gen_powers.iter().map(|x| self.x.clone()).collect()
         }
     }
 }

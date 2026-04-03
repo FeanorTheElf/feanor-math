@@ -77,7 +77,7 @@ pub trait LinSolveRing: DivisibilityRing {
 /// [`RingStore`] corresponding to [`LinSolveRing`].
 pub trait LinSolveRingStore: RingStore
 where
-    Self::Type: LinSolveRing,
+    Self::Ring: LinSolveRing,
 {
     /// Solves a linear system `lhs * X = rhs`.
     ///
@@ -120,7 +120,7 @@ where
 impl<R> LinSolveRingStore for R
 where
     R: RingStore,
-    R::Type: LinSolveRing,
+    R::Ring: LinSolveRing,
 {
 }
 
@@ -145,10 +145,10 @@ impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
 impl<R, V, A_ring, C_ring> LinSolveRing for FreeAlgebraImplBase<R, V, C_ring, A_ring>
 where
     R: RingStore,
-    R::Type: LinSolveRing,
+    R::Ring: LinSolveRing,
     V: VectorView<El<R>> + Send + Sync,
     A_ring: Allocator + Clone + Send + Sync,
-    C_ring: ConvolutionAlgorithm<R::Type>,
+    C_ring: ConvolutionAlgorithm<R::Ring>,
 {
     fn solve_right<V1, V2, V3, A>(
         &self,

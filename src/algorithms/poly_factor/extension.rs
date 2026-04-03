@@ -34,9 +34,9 @@ pub fn poly_factor_extfield_squarefree<P>(
 ) -> Result<Vec<El<P>>, ProbablyNotSquarefree>
 where
     P: RingStore,
-    P::Type: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Type: Field + FreeAlgebra + PolyTFracGCDRing,
-    <<<BaseRing<P> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type:
+    P::Ring: PolyRing + EuclideanRing,
+    <BaseRing<P> as RingStore>::Ring: Field + FreeAlgebra + PolyTFracGCDRing,
+    <<<BaseRing<P> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring:
         PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
 {
     let L = LX.base_ring();
@@ -102,7 +102,7 @@ where
             LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(k)), 0), (L.one(), 1)].into_iter());
         let f_transformed = LX.evaluate(f, &lin_transform, &LX.inclusion());
 
-        let norm_f_transformed = Norm(LX.clone_el(&f_transformed));
+        let norm_f_transformed = Norm(f_transformed.clone());
         let degree = KX.degree(&norm_f_transformed).unwrap();
         let squarefree_part = <_ as PolyTFracGCDRing>::squarefree_part(&KX, &norm_f_transformed);
 
@@ -135,13 +135,12 @@ where
 pub fn poly_factor_extfield<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
 where
     P: RingStore,
-    P::Type: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Type: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
-    <<<BaseRing<P> as RingStore>::Type as RingExtension>::BaseRing as RingStore>::Type:
+    P::Ring: PolyRing + EuclideanRing,
+    <BaseRing<P> as RingStore>::Ring: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
+    <<<BaseRing<P> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring:
         PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
 {
     let KX = &poly_ring;
-    let K = KX.base_ring();
 
     // We use the approach outlined in Cohen's "a course in computational algebraic number theory".
     //  - Use square-free reduction to assume wlog that `f` is square-free
@@ -172,5 +171,5 @@ where
             }
         }
     }
-    return (result, K.clone_el(KX.coefficient_at(f, 0)));
+    return (result, KX.coefficient_at(f, 0).clone());
 }

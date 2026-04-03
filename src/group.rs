@@ -25,10 +25,7 @@ use crate::serialization::{DeserializeWithRing, SerializableElementRing, Seriali
 #[stability::unstable(feature = "enable")]
 pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     /// Type used to represent elements of this group.
-    type Element: Sized + Send + Sync;
-
-    /// Clones an element of the group.
-    fn clone_el(&self, x: &Self::Element) -> Self::Element;
+    type Element: Sized + Send + Sync + Clone;
 
     /// Checks whether two group elements are equal.
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool;
@@ -40,13 +37,13 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     ///
     /// As opposed to [`AbelianGroupBase::op()`], this takes both arguments by reference.
     fn op_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.op(self.clone_el(lhs), self.clone_el(rhs))
+        self.op(lhs.clone(), rhs.clone())
     }
 
     /// Applies the group operation to two elements.
     ///
     /// As opposed to [`AbelianGroupBase::op()`], this takes the second argument by reference.
-    fn op_ref_snd(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { self.op(lhs, self.clone_el(rhs)) }
+    fn op_ref_snd(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element { self.op(lhs, rhs.clone()) }
 
     /// Computes the inverse of the give element, i.e. the unique group element `x^-1` such that
     /// `x * x^-1` is the identity element.
@@ -66,7 +63,7 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     /// in total `e` times.
     fn pow(&self, x: &Self::Element, e: &El<BigIntRing>) -> Self::Element {
         let res = generic_abs_square_and_multiply(
-            self.clone_el(x),
+            x.clone(),
             e,
             BigIntRing::RING,
             |a| self.op_ref(&a, &a),
@@ -120,7 +117,6 @@ pub trait AbelianGroupStore: Send + Sync {
 
     fn get_group(&self) -> &Self::Type;
 
-    delegate_group! { AbelianGroupBase, fn clone_el(&self, el: &GroupEl<Self>) -> GroupEl<Self> }
     delegate_group! { AbelianGroupBase, fn eq_el(&self, lhs: &GroupEl<Self>, rhs: &GroupEl<Self>) -> bool }
     delegate_group! { AbelianGroupBase, fn op(&self, lhs: GroupEl<Self>, rhs: GroupEl<Self>) -> GroupEl<Self> }
     delegate_group! { AbelianGroupBase, fn op_ref(&self, lhs: &GroupEl<Self>, rhs: &GroupEl<Self>) -> GroupEl<Self> }
@@ -220,28 +216,27 @@ pub struct MultGroupEl<R: RingStore>(El<R>);
 
 impl<R: RingStore> PartialEq for AddGroupBase<R>
 where
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     fn eq(&self, other: &Self) -> bool { self.0.get_ring() == other.0.get_ring() }
 }
 
 impl<R: RingStore> Debug for AddGroupBase<R>
 where
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.0.get_ring()) }
 }
 
 impl<R: RingStore> AbelianGroupBase for AddGroupBase<R>
 where
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     type Element = El<R>;
 
-    fn clone_el(&self, x: &Self::Element) -> Self::Element { self.0.clone_el(x) }
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.0.eq_el(lhs, rhs) }
     fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element { self.0.add(lhs, rhs) }
-    fn inv(&self, x: &Self::Element) -> Self::Element { self.0.negate(self.0.clone_el(x)) }
+    fn inv(&self, x: &Self::Element) -> Self::Element { self.0.negate(x.clone()) }
     fn identity(&self) -> Self::Element { self.0.zero() }
     fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(x, hasher) }
     fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
@@ -251,7 +246,7 @@ where
 
 impl<R: RingStore> AddGroup<R>
 where
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self { Self::from(AddGroupBase(ring)) }
@@ -259,32 +254,31 @@ where
 
 impl<R: RingStore + Clone> Clone for AddGroupBase<R>
 where
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     fn clone(&self) -> Self { Self(self.0.clone()) }
 }
 
 impl<R: RingStore> PartialEq for MultGroupBase<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
     fn eq(&self, other: &Self) -> bool { self.0.get_ring() == other.0.get_ring() }
 }
 
 impl<R: RingStore> Debug for MultGroupBase<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "({:?})*", self.0.get_ring()) }
 }
 
 impl<R: RingStore> AbelianGroupBase for MultGroupBase<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
     type Element = MultGroupEl<R>;
 
-    fn clone_el(&self, x: &Self::Element) -> Self::Element { MultGroupEl(self.0.clone_el(&x.0)) }
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.0.eq_el(&lhs.0, &rhs.0) }
     fn inv(&self, x: &Self::Element) -> Self::Element { MultGroupEl(self.0.invert(&x.0).unwrap()) }
     fn identity(&self) -> Self::Element { MultGroupEl(self.0.one()) }
@@ -297,7 +291,7 @@ where
 
 impl<R: RingStore> SerializableElementGroup for MultGroupBase<R>
 where
-    R::Type: HashableElRing + DivisibilityRing + SerializableElementRing,
+    R::Ring: HashableElRing + DivisibilityRing + SerializableElementRing,
 {
     fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -319,7 +313,7 @@ where
 impl<R: RingStore> Clone for MultGroupBase<R>
 where
     R: Clone,
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
     fn clone(&self) -> Self { Self(self.0.clone()) }
 }
@@ -327,13 +321,13 @@ where
 impl<R: RingStore> Copy for MultGroupBase<R>
 where
     R: Copy,
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
 }
 
 impl<R: RingStore> Clone for MultGroupEl<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
     El<R>: Clone,
 {
     fn clone(&self) -> Self { Self(self.0.clone()) }
@@ -341,7 +335,7 @@ where
 
 impl<R: RingStore> Debug for MultGroupEl<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
     El<R>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.0) }
@@ -349,7 +343,7 @@ where
 
 impl<R: RingStore> MultGroupBase<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self {
@@ -374,7 +368,7 @@ where
 
 impl<R: RingStore> MultGroup<R>
 where
-    R::Type: HashableElRing + DivisibilityRing,
+    R::Ring: HashableElRing + DivisibilityRing,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self { Self::from(MultGroupBase::new(ring)) }

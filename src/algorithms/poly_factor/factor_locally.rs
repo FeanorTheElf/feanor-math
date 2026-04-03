@@ -29,10 +29,10 @@ fn combine_local_factors_local<'ring, 'data, 'local, R, P1, P2>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore + Copy,
-    P1::Type: PolyRing + DivisibilityRing,
-    BaseRing<P1>: RingStore<Type = R>,
+    P1::Ring: PolyRing + DivisibilityRing,
+    BaseRing<P1>: RingStore<Ring = R>,
     P2: RingStore + Copy,
-    P2::Type: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
+    P2::Ring: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
     R::LocalRing<'ring>: 'local,
 {
     debug_assert!(poly_ring.base_ring().is_one(poly_ring.lc(poly).unwrap()));
@@ -60,7 +60,7 @@ where
     };
 
     let mut ungrouped_factors = (0..local_factors.len()).collect::<Vec<_>>();
-    let mut current = poly_ring.clone_el(poly);
+    let mut current = poly.clone();
     let mut result = Vec::new();
     while ungrouped_factors.len() > 0 {
         // Here we use the naive approach to group the factors such that the product of each group
@@ -74,7 +74,7 @@ where
                 indices
                     .iter()
                     .copied()
-                    .map(|i| local_poly_ring.clone_el(&local_factors[i])),
+                    .map(|i| local_factors[i].clone()),
             );
             let lifted_factor = reconstruct_poly(factor);
             if let Some(quo) = poly_ring.checked_div(&current, &lifted_factor) {
@@ -97,7 +97,7 @@ where
 pub enum FactorAndLiftModpeResult<P>
 where
     P: RingStore,
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
 {
     PartialFactorization(Vec<El<P>>),
     Irreducible,
@@ -122,8 +122,8 @@ pub fn factor_and_lift_mod_pe<'ring, R, P>(
 where
     R: ?Sized + PolyLiftFactorsDomain,
     P: RingStore + Copy,
-    P::Type: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Type = R>,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRing<P>: RingStore<Ring = R>,
 {
     event!(Level::TRACE, poly_deg = poly_ring.degree(poly).unwrap());
     let ring = poly_ring.base_ring().get_ring();
@@ -176,8 +176,8 @@ where
 fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: IntegerRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(!ZZX.is_zero(f));
     let ZZ = ZZX.base_ring();
@@ -193,8 +193,8 @@ where
 fn poly_factor_integer_squarefree_monic<'a, P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
 where
     P: 'a + RingStore + Copy,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: IntegerRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: IntegerRing,
 {
     let ZZ = ZZX.base_ring();
     assert!(ZZ.is_one(ZZX.lc(f).unwrap()));
@@ -207,10 +207,10 @@ where
         let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;
         match factor_and_lift_mod_pe(ZZX, &prime, e, f) {
-            FactorAndLiftModpeResult::Irreducible => return vec![ZZX.clone_el(f)],
+            FactorAndLiftModpeResult::Irreducible => return vec![f.clone()],
             FactorAndLiftModpeResult::PartialFactorization(result) => return result,
             // unknown means irreducible, since we chose `e` large enough
-            FactorAndLiftModpeResult::Unknown => return vec![ZZX.clone_el(f)],
+            FactorAndLiftModpeResult::Unknown => return vec![f.clone()],
             FactorAndLiftModpeResult::NotSquarefreeModpe => {}
         }
     }
@@ -226,15 +226,15 @@ where
 pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
 where
     P: PolyRingStore + Copy,
-    P::Type: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Type: IntegerRing,
+    P::Ring: PolyRing + DivisibilityRing,
+    <BaseRing<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(!ZZX.is_zero(&f));
 
-    let power_decomposition = poly_power_decomposition_local(ZZX, ZZX.clone_el(&f));
+    let power_decomposition = poly_power_decomposition_local(ZZX, f.clone());
 
     let mut result = Vec::new();
-    let mut current = ZZX.clone_el(&f);
+    let mut current = f.clone();
     for (factor, _k) in power_decomposition {
         let lc_factor = ZZX.lc(&factor).unwrap();
         let factor_monic = evaluate_aX(ZZX, &factor, lc_factor);
@@ -247,7 +247,7 @@ where
                 &ZZX.inclusion().mul_ref_map(
                     &current,
                     &ZZX.base_ring()
-                        .pow(ZZX.base_ring().clone_el(&irred_factor_lc), ZZX.degree(&f).unwrap()),
+                        .pow(irred_factor_lc.clone(), ZZX.degree(&f).unwrap()),
                 ),
                 &irred_factor,
             ) {

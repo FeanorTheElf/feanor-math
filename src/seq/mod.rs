@@ -7,8 +7,6 @@ pub use conversion::{CloneElFn, VectorFnIter, VectorViewFn};
 pub use map::{VectorFnMap, VectorViewMap, VectorViewMapMut};
 use step_by::{StepBy, StepByFn};
 
-use crate::ring::*;
-
 mod conversion;
 mod map;
 
@@ -98,27 +96,6 @@ pub trait VectorView<T: ?Sized> {
         T: Sized,
     {
         None
-    }
-
-    /// Moves this vector into a [`VectorFn`] that clones ring elements on access using
-    /// the given ring.
-    fn into_clone_ring_els<R: RingStore>(self, ring: R) -> CloneElFn<Self, T, CloneRingEl<R>>
-    where
-        Self: Sized,
-        T: Sized,
-        R::Type: RingBase<Element = T>,
-    {
-        self.into_clone_els_by(CloneRingEl(ring))
-    }
-
-    /// Converts this vector into a [`VectorFn`] that clones ring elements on access using
-    /// the given ring.
-    fn clone_ring_els<'a, R: RingStore>(&'a self, ring: R) -> CloneElFn<&'a Self, T, CloneRingEl<R>>
-    where
-        T: Sized,
-        R::Type: RingBase<Element = T>,
-    {
-        self.into_clone_ring_els(ring)
     }
 
     /// Moves this vector into a [`VectorFn`] that clones elements on access using
@@ -831,43 +808,6 @@ impl VectorFn<usize> for Range<usize> {
     fn len(&self) -> usize { self.end - self.start }
 }
 
-/// A wrapper around a [`RingStore`] that is callable with signature `(&El<R>) -> El<R>`,
-/// and will clone the given ring element when called.
-///
-/// In order to be compatible with [`crate::iters::multi_cartesian_product()`], it
-/// additionally is also callable with signature `(usize, &El<R>) -> El<R>`. In this
-/// case, the first parameter is ignored.
-#[derive(Copy, Clone)]
-pub struct CloneRingEl<R: RingStore>(pub R);
-
-impl<'a, R: RingStore> FnOnce<(&'a El<R>,)> for CloneRingEl<R> {
-    type Output = El<R>;
-
-    extern "rust-call" fn call_once(self, args: (&'a El<R>,)) -> Self::Output { self.call(args) }
-}
-
-impl<'a, R: RingStore> FnMut<(&'a El<R>,)> for CloneRingEl<R> {
-    extern "rust-call" fn call_mut(&mut self, args: (&'a El<R>,)) -> Self::Output { self.call(args) }
-}
-
-impl<'a, R: RingStore> Fn<(&'a El<R>,)> for CloneRingEl<R> {
-    extern "rust-call" fn call(&self, args: (&'a El<R>,)) -> Self::Output { self.0.clone_el(args.0) }
-}
-
-impl<'a, R: RingStore> FnOnce<(usize, &'a El<R>)> for CloneRingEl<R> {
-    type Output = El<R>;
-
-    extern "rust-call" fn call_once(self, args: (usize, &'a El<R>)) -> Self::Output { self.call(args) }
-}
-
-impl<'a, R: RingStore> FnMut<(usize, &'a El<R>)> for CloneRingEl<R> {
-    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a El<R>)) -> Self::Output { self.call(args) }
-}
-
-impl<'a, R: RingStore> Fn<(usize, &'a El<R>)> for CloneRingEl<R> {
-    extern "rust-call" fn call(&self, args: (usize, &'a El<R>)) -> Self::Output { self.0.clone_el(args.1) }
-}
-
 /// Callable struct that wraps [`Clone::clone()`].
 #[derive(Copy, Clone)]
 pub struct CloneValue;
@@ -884,6 +824,20 @@ impl<'a, T: Clone> FnMut<(&'a T,)> for CloneValue {
 
 impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
     extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output { args.0.clone() }
+}
+
+impl<'a, T: Clone> FnOnce<(usize, &'a T,)> for CloneValue {
+    type Output = T;
+
+    extern "rust-call" fn call_once(self, args: (usize, &'a T,)) -> Self::Output { self.call(args) }
+}
+
+impl<'a, T: Clone> FnMut<(usize, &'a T,)> for CloneValue {
+    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a T,)) -> Self::Output { self.call(args) }
+}
+
+impl<'a, T: Clone> Fn<(usize, &'a T,)> for CloneValue {
+    extern "rust-call" fn call(&self, args: (usize, &'a T,)) -> Self::Output { args.1.clone() }
 }
 
 #[test]

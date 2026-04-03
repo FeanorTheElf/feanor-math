@@ -118,8 +118,6 @@ impl Complex64 {
 impl RingBase for Complex64Base {
     type Element = Complex64El;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element { *val }
-
     fn add_assign(&self, Complex64El(lhs_re, lhs_im): &mut Self::Element, Complex64El(rhs_re, rhs_im): Self::Element) {
         *lhs_re += rhs_re;
         *lhs_im += rhs_im;
@@ -144,7 +142,7 @@ impl RingBase for Complex64Base {
 
     fn pow_gen<R: IntegerRingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
     where
-        R::Type: IntegerRing,
+        R::Ring: IntegerRing,
     {
         self.exp(self.mul(
             self.ln_main_branch(x),
@@ -177,7 +175,7 @@ impl RingBase for Complex64Base {
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         Some(ZZ.zero())
     }
@@ -257,9 +255,9 @@ impl<I: ?Sized + IntegerRing> CanHomFrom<I> for Complex64Base {
 impl<I> CanHomFrom<RationalFieldBase<I>> for Complex64Base
 where
     I: IntegerRingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
-    type Homomorphism = <Self as CanHomFrom<I::Type>>::Homomorphism;
+    type Homomorphism = <Self as CanHomFrom<I::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> {
         self.has_canonical_hom(from.base_ring().get_ring())

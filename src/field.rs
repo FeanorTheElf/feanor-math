@@ -21,7 +21,7 @@ pub trait Field: Domain + EuclideanRing {
 /// to provide a convenient interface to the `Field`-functions.
 pub trait FieldStore: RingStore + EuclideanRingStore
 where
-    Self::Type: Field,
+    Self::Ring: Field,
 {
     delegate! { Field, fn div(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
 }
@@ -29,7 +29,7 @@ where
 impl<R> FieldStore for R
 where
     R: RingStore,
-    R::Type: Field,
+    R::Ring: Field,
 {
 }
 
@@ -54,7 +54,7 @@ pub mod generic_tests {
     pub fn test_field_axioms<R, I>(R: R, edge_case_elements: I)
     where
         R: FieldStore,
-        R::Type: Field,
+        R::Ring: Field,
         I: Iterator<Item = El<R>>,
     {
         let edge_case_elements = edge_case_elements.collect::<Vec<_>>();

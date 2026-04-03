@@ -65,8 +65,8 @@ pub fn fincke_pohst<I, R, H, V, F>(
 
     linear_components[i] = RR.zero();
     norms_square[i] = RR.zero();
-    let center_int = RR.get_ring().round_to_integer(ZZ, RR.clone_el(&target[i])).unwrap();
-    current[i] = ZZ.clone_el(&center_int);
+    let center_int = RR.get_ring().round_to_integer(ZZ, target[i].clone()).unwrap();
+    current[i] = center_int.clone();
     centers[i] = center_int;
 
     'visit_enum_tree_node: loop {
@@ -105,7 +105,7 @@ pub fn fincke_pohst<I, R, H, V, F>(
                     );
                     let center = RR.sub_ref_fst(&target[i], RR.div(&linear_components[i], quadratic_form.at(i, i)));
                     let center_int = RR.get_ring().round_to_integer(ZZ, center).unwrap();
-                    current[i] = ZZ.clone_el(&center_int);
+                    current[i] = center_int.clone();
                     centers[i] = center_int;
                     norms_square[i] = norm_square;
                 }

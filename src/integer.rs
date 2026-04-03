@@ -182,7 +182,7 @@ pub trait IntegerRing:
     /// assert_eq!(4, StaticRing::<i32>::RING.rounded_div(-7, &-2));
     /// ```
     fn rounded_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
-        let mut rhs_half = self.abs(self.clone_el(rhs));
+        let mut rhs_half = self.abs(rhs.clone());
         self.euclidean_div_pow_2(&mut rhs_half, 1);
         if self.is_neg(&lhs) {
             return self.euclidean_div(self.sub(lhs, rhs_half), rhs);
@@ -279,7 +279,7 @@ where
     }
 
     default fn map_in_ref(&self, from: &I, el: &<I as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
-        <J as CanHomFrom<I>>::map_in(self, from, from.clone_el(el), hom)
+        <J as CanHomFrom<I>>::map_in(self, from, el.clone(), hom)
     }
 
     default fn fma_map_in(
@@ -379,10 +379,10 @@ impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 ///  ```
 pub fn int_cast<T: RingStore, F: RingStore>(value: El<F>, to: T, from: F) -> El<T>
 where
-    T::Type: IntegerRing,
-    F::Type: IntegerRing,
+    T::Ring: IntegerRing,
+    F::Ring: IntegerRing,
 {
-    <T::Type as IntCast<F::Type>>::cast(to.get_ring(), from.get_ring(), value)
+    <T::Ring as IntCast<F::Ring>>::cast(to.get_ring(), from.get_ring(), value)
 }
 
 /// Computes the binomial coefficient of `n` and `k`, defined as `n(n - 1)...(n - k + 1)/k!`.
@@ -407,7 +407,7 @@ where
 pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     if ring.is_neg(&n) {
         let mut result = binomial(ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k, ring);
@@ -439,14 +439,14 @@ where
 pub fn factorial<I>(n: &El<I>, ring: I) -> El<I>
 where
     I: RingStore + Copy,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
     let mut current = ring.zero();
     let one = ring.one();
     return ring.prod((0..).map_while(|_| {
         if ring.is_lt(&current, &n) {
             ring.add_assign_ref(&mut current, &one);
-            return Some(ring.clone_el(&current));
+            return Some(current.clone());
         } else {
             return None;
         }
@@ -457,7 +457,7 @@ where
 /// to provide a convenient interface to the `IntegerRing`-functions.
 pub trait IntegerRingStore: RingStore
 where
-    Self::Type: IntegerRing,
+    Self::Ring: IntegerRing,
 {
     delegate! { IntegerRing, fn to_float_approx(&self, value: &El<Self>) -> f64 }
     delegate! { IntegerRing, fn from_float_approx(&self, value: f64) -> Option<El<Self>> }
@@ -518,7 +518,7 @@ where
 impl<R> IntegerRingStore for R
 where
     R: RingStore,
-    R::Type: IntegerRing,
+    R::Ring: IntegerRing,
 {
 }
 
@@ -533,7 +533,7 @@ pub mod generic_impls {
     pub fn map_from_integer_ring<I, R>(from: I, to: R, mut x: El<I>) -> El<R>
     where
         I: RingStore,
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
         R: RingStore,
     {
         let basis = to.int_hom().map(1 << 16);
@@ -546,9 +546,9 @@ pub mod generic_impls {
         let mut current = to.zero();
         let mut current_pow = to.one();
         while !from.is_zero(&x) {
-            let mut quo = from.clone_el(&x);
+            let mut quo = x.clone();
             from.euclidean_div_pow_2(&mut quo, 16);
-            let mut rem = from.clone_el(&quo);
+            let mut rem = quo.clone();
             from.mul_pow_2(&mut rem, 16);
             from.sub_self_assign(&mut rem, x);
             let rem = int_cast(rem, StaticRing::<i32>::RING, &from);
@@ -567,7 +567,7 @@ pub mod generic_impls {
     pub fn parse<I>(ring: I, string: &str, base: u32) -> Result<El<I>, ()>
     where
         I: RingStore,
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         let (negative, rest) = if string.chars().next() == Some('-') {
             (true, string.split_at(1).1)
@@ -619,7 +619,7 @@ pub mod generic_tests {
 
     pub fn test_integer_get_uniformly_random<R: RingStore>(ring: R)
     where
-        R::Type: IntegerRing,
+        R::Ring: IntegerRing,
     {
         for b in [15, 16] {
             let bound = ring.int_hom().map(b);
@@ -638,7 +638,7 @@ pub mod generic_tests {
 
     pub fn test_integer_axioms<R: IntegerRingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where
-        R::Type: IntegerRing,
+        R::Ring: IntegerRing,
     {
         let elements = edge_case_elements.collect::<Vec<_>>();
 
@@ -652,18 +652,18 @@ pub mod generic_tests {
             let mut ceil_pow_2 = ring.int_hom().map(2);
             ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
             assert!(ring.is_lt(a, &ceil_pow_2));
-            assert!(ring.is_lt(&ring.negate(ring.clone_el(a)), &ceil_pow_2));
+            assert!(ring.is_lt(&ring.negate(a.clone()), &ceil_pow_2));
 
             for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
                 let mut pow_2 = ring.one();
                 ring.mul_pow_2(&mut pow_2, i);
-                let mut b = ring.clone_el(a);
+                let mut b = a.clone();
                 ring.mul_pow_2(&mut b, i);
-                assert_el_eq!(ring, b, ring.mul(ring.clone_el(a), ring.clone_el(&pow_2)));
+                assert_el_eq!(ring, b, ring.mul_ref(&a, &pow_2));
                 ring.euclidean_div_pow_2(&mut b, i);
                 assert_el_eq!(ring, b, a);
                 ring.euclidean_div_pow_2(&mut b, i);
-                assert_el_eq!(ring, b, ring.euclidean_div(ring.clone_el(a), &pow_2));
+                assert_el_eq!(ring, b, ring.euclidean_div(a.clone(), &pow_2));
             }
         }
 
@@ -674,7 +674,7 @@ pub mod generic_tests {
             assert_el_eq!(
                 ring,
                 ring.int_hom().map(k / 8),
-                ring.euclidean_div(ring.clone_el(&a), &d)
+                ring.euclidean_div(a.clone(), &d)
             );
             ring.euclidean_div_pow_2(&mut a, 3);
             assert_el_eq!(ring, ring.int_hom().map(k / 8), a);
@@ -685,7 +685,7 @@ pub mod generic_tests {
             assert_el_eq!(
                 ring,
                 ring.int_hom().map(k / -8),
-                ring.euclidean_div(ring.clone_el(&a), &d)
+                ring.euclidean_div(a.clone(), &d)
             );
         }
 

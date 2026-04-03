@@ -69,7 +69,7 @@ use crate::specialization::{FiniteRingOperation, FiniteRingSpecializable};
 /// ```
 pub struct DensePolyRingBase<
     R: RingStore,
-    C: ConvolutionAlgorithm<R::Type> = DynConvolution<'static, <R as RingStore>::Type>,
+    C: ConvolutionAlgorithm<R::Ring> = DynConvolution<'static, <R as RingStore>::Ring>,
     A: Allocator + Clone + Send + Sync = Global,
 > {
     base_ring: R,
@@ -86,10 +86,10 @@ pub struct DensePolyRingEl<R: RingStore, A: Allocator + Clone + Send + Sync = Gl
 
 /// The univariate polynomial ring `R[X]`, with polynomials being stored as dense vectors of
 /// coefficients. For details, see [`DensePolyRingBase`].
-pub type DensePolyRing<R, C = DynConvolution<'static, <R as RingStore>::Type>, A = Global> =
+pub type DensePolyRing<R, C = DynConvolution<'static, <R as RingStore>::Ring>, A = Global> =
     RingValue<DensePolyRingBase<R, C, A>>;
 
-impl<'conv, R: RingStore> DensePolyRing<R, DynConvolution<'conv, R::Type>, Global>
+impl<'conv, R: RingStore> DensePolyRing<R, DynConvolution<'conv, R::Ring>, Global>
 where
     R: 'conv,
 {
@@ -101,18 +101,18 @@ where
     }
 }
 
-impl<'conv, R: RingStore> DensePolyRingBase<R, DynConvolution<'conv, R::Type>, Global>
+impl<'conv, R: RingStore> DensePolyRingBase<R, DynConvolution<'conv, R::Ring>, Global>
 where
     R: 'conv,
 {
     /// Creates a new univariate polynomial ring over the given base ring.
     pub fn new(base_ring: R, unknown_name: &'static str) -> Self {
-        let convolution = <R::Type>::create_default_convolution(base_ring.clone(), None);
+        let convolution = <R::Ring>::create_default_convolution(base_ring.clone(), None);
         Self::new_with_convolution(base_ring, unknown_name, Global, convolution)
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, C, A> {
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> DensePolyRingBase<R, C, A> {
     /// Creates a new univariate polynomial ring over the given base ring.
     ///
     /// The given allocator will be used to allocate memory for ring elements and the
@@ -139,12 +139,12 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> DensePolyRingBase<R, C, A> {
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> DensePolyRingBase<R, C, A> {
     #[stability::unstable(feature = "enable")]
     pub fn into_base_ring(self) -> R { self.base_ring }
 }
 
-impl<R: RingStore + Clone, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type> + Clone> Clone
+impl<R: RingStore + Clone, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring> + Clone> Clone
     for DensePolyRingBase<R, C, A>
 {
     fn clone(&self) -> Self {
@@ -157,36 +157,10 @@ impl<R: RingStore + Clone, A: Allocator + Clone + Send + Sync, C: ConvolutionAlg
         }
     }
 }
-
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Debug
-    for DensePolyRingBase<R, C, A>
-where
-    R::Type: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
-    }
-}
-
-impl<R, A> Debug for DensePolyRingEl<R, A>
-where
-    R: RingStore,
-    A: Allocator + Clone + Send + Sync,
-    El<R>: Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
-}
-
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> RingBase
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> RingBase
     for DensePolyRingBase<R, C, A>
 {
     type Element = DensePolyRingEl<R, A>;
-
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        let mut data = Vec::with_capacity_in(val.data.len(), self.element_allocator.clone());
-        data.extend((0..val.data.len()).map(|i| self.base_ring.clone_el(&val.data.at(i))));
-        DensePolyRingEl { data }
-    }
 
     #[instrument(skip_all, level = "trace")]
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
@@ -194,7 +168,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
             self.base_ring.add_assign_ref(&mut lhs.data[i], &rhs.data[i]);
         }
         for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
-            lhs.data.push(self.base_ring().clone_el(&rhs.data[i]));
+            lhs.data.push(rhs.data[i].clone());
         }
     }
 
@@ -207,7 +181,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         }
         for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
             lhs.data
-                .push(self.base_ring().negate(self.base_ring().clone_el(&rhs.data[i])));
+                .push(self.base_ring().negate(rhs.data[i].clone()));
         }
     }
 
@@ -303,7 +277,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.base_ring().characteristic(ZZ)
     }
@@ -337,11 +311,43 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
     fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
 }
 
+
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> Debug
+    for DensePolyRingBase<R, C, A>
+where
+    R::Ring: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
+    }
+}
+
+impl<R, A> Debug for DensePolyRingEl<R, A>
+where
+    R: RingStore,
+    A: Allocator + Clone + Send + Sync,
+    El<R>: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
+}
+
+impl<R, A> Clone for DensePolyRingEl<R, A>
+where
+    R: RingStore,
+    A: Allocator + Clone + Send + Sync
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone()
+        }
+    }
+}
+
 impl<R, A, C> PartialEq for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
     A: Allocator + Clone + Send + Sync,
-    C: ConvolutionAlgorithm<R::Type>,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
     fn eq(&self, other: &Self) -> bool { self.base_ring.get_ring() == other.base_ring.get_ring() }
 }
@@ -360,10 +366,10 @@ impl<R> ImplGenericCanIsoFromToMarker for sparse_poly::SparsePolyRingBase<R> whe
 impl<R, P, A, C> CanHomFrom<P> for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>,
+    R::Ring: CanHomFrom<<P::BaseRing as RingStore>::Ring>,
     P: ImplGenericCanIsoFromToMarker,
     A: Allocator + Clone + Send + Sync,
-    C: ConvolutionAlgorithm<R::Type>,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
     type Homomorphism = super::generic_impls::Homomorphism<P, DensePolyRingBase<R, C, A>>;
 
@@ -380,13 +386,13 @@ impl<R1, A1, R2, A2, C1, C2> CanHomFrom<DensePolyRingBase<R1, C1, A1>> for Dense
 where
     R1: RingStore,
     A1: Allocator + Clone + Send + Sync,
-    C1: ConvolutionAlgorithm<R1::Type>,
+    C1: ConvolutionAlgorithm<R1::Ring>,
     R2: RingStore,
     A2: Allocator + Clone + Send + Sync,
-    C2: ConvolutionAlgorithm<R2::Type>,
-    R2::Type: CanHomFrom<R1::Type>,
+    C2: ConvolutionAlgorithm<R2::Ring>,
+    R2::Ring: CanHomFrom<R1::Ring>,
 {
-    type Homomorphism = <R2::Type as CanHomFrom<R1::Type>>::Homomorphism;
+    type Homomorphism = <R2::Ring as CanHomFrom<R1::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &DensePolyRingBase<R1, C1, A1>) -> Option<Self::Homomorphism> {
         self.base_ring()
@@ -424,13 +430,13 @@ impl<R1, A1, R2, A2, C1, C2> CanIsoFromTo<DensePolyRingBase<R1, C1, A1>> for Den
 where
     R1: RingStore,
     A1: Allocator + Clone + Send + Sync,
-    C1: ConvolutionAlgorithm<R1::Type>,
+    C1: ConvolutionAlgorithm<R1::Ring>,
     R2: RingStore,
     A2: Allocator + Clone + Send + Sync,
-    C2: ConvolutionAlgorithm<R2::Type>,
-    R2::Type: CanIsoFromTo<R1::Type>,
+    C2: ConvolutionAlgorithm<R2::Ring>,
+    R2::Ring: CanIsoFromTo<R1::Ring>,
 {
-    type Isomorphism = <R2::Type as CanIsoFromTo<R1::Type>>::Isomorphism;
+    type Isomorphism = <R2::Ring as CanIsoFromTo<R1::Ring>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &DensePolyRingBase<R1, C1, A1>) -> Option<Self::Isomorphism> {
         self.base_ring()
@@ -448,7 +454,7 @@ where
             (
                 self.base_ring().get_ring().map_out(
                     from.base_ring().get_ring(),
-                    self.base_ring().clone_el(&el.data[i]),
+                    el.data[i].clone(),
                     hom,
                 ),
                 i,
@@ -460,10 +466,10 @@ where
 impl<R, P, A, C> CanIsoFromTo<P> for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>,
+    R::Ring: CanIsoFromTo<<P::BaseRing as RingStore>::Ring>,
     P: ImplGenericCanIsoFromToMarker,
     A: Allocator + Clone + Send + Sync,
-    C: ConvolutionAlgorithm<R::Type>,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
     type Isomorphism = super::generic_impls::Isomorphism<P, Self>;
 
@@ -478,7 +484,7 @@ where
     }
 }
 
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> RingExtension
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> RingExtension
     for DensePolyRingBase<R, C, A>
 {
     type BaseRing = R;
@@ -552,11 +558,11 @@ where
     }
 }
 
-impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> HashableElRing
+impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> HashableElRing
     for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         let len = self.degree(el).map(|d| d + 1).unwrap_or(0);
@@ -567,11 +573,11 @@ where
     }
 }
 
-impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> SerializableElementRing
+impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> SerializableElementRing
     for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: SerializableElementRing,
+    R::Ring: SerializableElementRing,
 {
     #[instrument(skip_all, level = "trace")]
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
@@ -610,7 +616,7 @@ where
     }
 }
 
-impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> PolyRing for DensePolyRingBase<R, C, A>
+impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> PolyRing for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
 {
@@ -678,7 +684,7 @@ where
             self.base_ring()
                 .is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap()))
         );
-        let (quo, rem) = fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| Ok(self.base_ring().clone_el(x)))
+        let (quo, rem) = fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| Ok(x.clone()))
             .unwrap_or_else(no_error);
         return (quo, rem);
     }
@@ -687,7 +693,7 @@ where
     fn evaluate<S, H>(&self, f: &Self::Element, value: &S::Element, hom: H) -> S::Element
     where
         S: ?Sized + RingBase,
-        H: Homomorphism<R::Type, S>,
+        H: Homomorphism<R::Ring, S>,
     {
         let d = if self.base_ring().get_ring().is_approximate() {
             f.data.len().saturating_sub(1)
@@ -703,33 +709,33 @@ where
         return current;
     }
 }
-impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> FiniteRingSpecializable
+impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> FiniteRingSpecializable
     for DensePolyRingBase<R, C, A>
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
 }
 
 pub struct DensePolyRingBaseLocalComputationData<'ring, R>(
-    ToExtRingMap<'ring, R::Type>,
-    Vec<El<<R::Type as InterpolationBaseRing>::ExtendedRing<'ring>>>,
+    ToExtRingMap<'ring, R::Ring>,
+    Vec<El<<R::Ring as InterpolationBaseRing>::ExtendedRing<'ring>>>,
 )
 where
     R: RingStore,
-    R::Type: InterpolationBaseRing;
+    R::Ring: InterpolationBaseRing;
 
-impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> LiftPolyEvalRing
+impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> LiftPolyEvalRing
     for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: InterpolationBaseRing,
+    R::Ring: InterpolationBaseRing,
 {
     type LocalRing<'ring>
-        = <R::Type as InterpolationBaseRing>::ExtendedRing<'ring>
+        = <R::Ring as InterpolationBaseRing>::ExtendedRing<'ring>
     where
         Self: 'ring;
 
     type LocalRingBase<'ring>
-        = <R::Type as InterpolationBaseRing>::ExtendedRingBase<'ring>
+        = <R::Ring as InterpolationBaseRing>::ExtendedRingBase<'ring>
     where
         Self: 'ring;
 
@@ -790,31 +796,31 @@ where
         let new_ring = DensePolyRing::new(base_ring, self.unknown_name);
         let result_in_extension = interpolate(
             &new_ring,
-            (&data.1).into_clone_ring_els(data.0.codomain()),
-            els.into_clone_ring_els(data.0.codomain()),
+            (&data.1).into_clone_els(),
+            els.into_clone_els(),
             &self.element_allocator,
         )
         .unwrap();
         return RingRef::from(self).from_terms(
             new_ring
                 .terms(&result_in_extension)
-                .map(|(c, i)| (data.0.as_base_ring_el(base_ring.clone_el(c)), i)),
+                .map(|(c, i)| (data.0.as_base_ring_el(c.clone()), i)),
         );
     }
 }
 
-impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Type>> Domain for DensePolyRingBase<R, C, A>
+impl<R, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> Domain for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
 }
 
 impl<R, A: Allocator + Clone + Send + Sync, C> DivisibilityRing for DensePolyRingBase<R, C, A>
 where
     R: RingStore,
-    R::Type: DivisibilityRing + Domain,
-    C: ConvolutionAlgorithm<R::Type>,
+    R::Ring: DivisibilityRing + Domain,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
@@ -829,12 +835,12 @@ where
             } else {
                 let lc = &rhs.data[d];
                 let (quo, rem) = if let Some(lc_inv) = self.base_ring().invert(&lc) {
-                    fast_poly_div_rem::<_, _, !>(RingRef::from(self), self.clone_el(lhs), rhs, |x| {
+                    fast_poly_div_rem::<_, _, !>(RingRef::from(self), lhs.clone(), rhs, |x| {
                         Ok(self.base_ring().mul_ref(x, &lc_inv))
                     })
                     .ok()?
                 } else {
-                    fast_poly_div_rem(RingRef::from(self), self.clone_el(lhs), rhs, |x| {
+                    fast_poly_div_rem(RingRef::from(self), lhs.clone(), rhs, |x| {
                         self.base_ring().checked_left_div(x, lc).ok_or(())
                     })
                     .ok()?
@@ -854,7 +860,7 @@ where
                 true
             } else {
                 let lc = &rhs.data[d];
-                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::from(self), self.clone_el(lhs), rhs, |x| {
+                if let Ok((_, rem)) = fast_poly_div_rem(RingRef::from(self), lhs.clone(), rhs, |x| {
                     self.base_ring().checked_left_div(&x, lc).ok_or(())
                 }) {
                     if self.is_zero(&rem) { true } else { false }
@@ -887,8 +893,8 @@ impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, C, A>
 where
     A: Allocator + Clone + Send + Sync,
     R: RingStore,
-    R::Type: Field + PolyTFracGCDRing,
-    C: ConvolutionAlgorithm<R::Type>,
+    R::Ring: Field + PolyTFracGCDRing,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         // base ring is a field, so everything is fine
@@ -897,7 +903,7 @@ where
         } else if self.is_zero(rhs) {
             return None;
         }
-        let (quo, rem) = self.euclidean_div_rem(self.clone_el(lhs), rhs);
+        let (quo, rem) = self.euclidean_div_rem(lhs.clone(), rhs);
         if self.is_zero(&rem) {
             return Some(quo);
         } else {
@@ -910,7 +916,7 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), &RingRef::from(self))
+        algorithms::eea::eea(lhs.clone(), rhs.clone(), &RingRef::from(self))
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -922,8 +928,8 @@ impl<R, A, C> EuclideanRing for DensePolyRingBase<R, C, A>
 where
     A: Allocator + Clone + Send + Sync,
     R: RingStore,
-    R::Type: Field + PolyTFracGCDRing,
-    C: ConvolutionAlgorithm<R::Type>,
+    R::Ring: Field + PolyTFracGCDRing,
+    C: ConvolutionAlgorithm<R::Ring>,
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(&rhs));
@@ -993,7 +999,7 @@ use crate::rings::zn::*;
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
 where
-    P::Type: PolyRing,
+    P::Ring: PolyRing,
 {
     let base_ring = poly_ring.base_ring();
     vec![
@@ -1155,7 +1161,7 @@ fn test_expensive_prod() {
     let a = ring.random_element(|| rng.rand_u64());
 
     let start = Instant::now();
-    let product = poly_ring.prod((0..2048).scan(ring.clone_el(&a), |current, _| {
+    let product = poly_ring.prod((0..2048).scan(a.clone(), |current, _| {
         let result = poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map_ref(&current));
         *current = ring.pow(std::mem::replace(current, ring.zero()), 17);
         return Some(result);

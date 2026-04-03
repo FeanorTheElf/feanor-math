@@ -26,8 +26,8 @@ use crate::ring::*;
 /// println!(
 ///     "The result is: {}",
 ///     ring.formatted_el(&ring.add(
-///         ring.mul(ring.clone_el(&x), ring.clone_el(&x)),
-///         ring.clone_el(&x)
+///         ring.mul(x.clone(), x.clone()),
+///         x.clone()
 ///     ))
 /// );
 /// ```
@@ -44,8 +44,8 @@ use crate::ring::*;
 /// assert_el_eq!(
 ///     &ring,
 ///     ring.add(
-///         ring.mul(ring.clone_el(&x), ring.clone_el(&x)),
-///         ring.clone_el(&x)
+///         ring.mul(x.clone(), x.clone()),
+///         x.clone()
 ///     ),
 ///     (x.clone() + x.clone() * x).unwrap()
 /// );
@@ -79,7 +79,7 @@ impl<R: RingStore> RingElementWrapper<R> {
         R: Clone,
     {
         Self {
-            element: self.ring.pow(self.ring.clone_el(&self.element), power),
+            element: self.ring.pow(self.element.clone(), power),
             ring: self.ring.clone(),
         }
     }
@@ -188,7 +188,7 @@ impl_trait! { Sub, sub, sub_ref_fst, sub_ref_snd, sub_ref }
 
 impl<R: RingStore> Div<RingElementWrapper<R>> for RingElementWrapper<R>
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = Self;
 
@@ -202,7 +202,7 @@ where
 
 impl<'a, 'b, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for &'b RingElementWrapper<R>
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = RingElementWrapper<R>;
 
@@ -216,7 +216,7 @@ where
 
 impl<'a, R: RingStore + Clone> Div<RingElementWrapper<R>> for &'a RingElementWrapper<R>
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = RingElementWrapper<R>;
 
@@ -230,7 +230,7 @@ where
 
 impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for RingElementWrapper<R>
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = RingElementWrapper<R>;
 
@@ -284,7 +284,7 @@ macro_rules! impl_trait_int {
                 RingElementWrapper {
                     element: self
                         .ring
-                        .$fn_name(self.ring.clone_el(&self.element), self.ring.int_hom().map(rhs)),
+                        .$fn_name(self.element.clone(), self.ring.int_hom().map(rhs)),
                     ring: self.ring.clone(),
                 }
             }
@@ -297,7 +297,7 @@ macro_rules! impl_trait_int {
                 RingElementWrapper {
                     element: rhs
                         .ring
-                        .$fn_name(rhs.ring.int_hom().map(self), rhs.ring.clone_el(&rhs.element)),
+                        .$fn_name(rhs.ring.int_hom().map(self), rhs.element.clone()),
                     ring: rhs.ring.clone(),
                 }
             }
@@ -314,7 +314,7 @@ impl_trait_int! { Sub, sub }
 
 impl<R: RingStore> Div<i32> for RingElementWrapper<R>
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = Self;
 
@@ -328,7 +328,7 @@ where
 
 impl<R: RingStore> Div<RingElementWrapper<R>> for i32
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = RingElementWrapper<R>;
 
@@ -342,7 +342,7 @@ where
 
 impl<'a, R: RingStore + Clone> Div<i32> for &'a RingElementWrapper<R>
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = RingElementWrapper<R>;
 
@@ -356,7 +356,7 @@ where
 
 impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for i32
 where
-    R::Type: Field,
+    R::Ring: Field,
 {
     type Output = RingElementWrapper<R>;
 
@@ -374,7 +374,7 @@ impl<R: RingStore + Clone> Clone for RingElementWrapper<R> {
     fn clone(&self) -> Self {
         Self {
             ring: self.ring.clone(),
-            element: self.ring.clone_el(&self.element),
+            element: self.element.clone(),
         }
     }
 }
@@ -405,7 +405,7 @@ impl<R: RingStore> PartialEq<RingElementWrapper<R>> for i32 {
 
 impl<R: RingStore> Hash for RingElementWrapper<R>
 where
-    R::Type: HashableElRing,
+    R::Ring: HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) { self.ring.hash(&self.element, state) }
 }

@@ -27,9 +27,9 @@ pub fn erathostenes(B: u64) -> Vec<u64> {
 pub fn enumerate_primes<I>(ZZ: I, B: &El<I>) -> Vec<El<I>>
 where
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
 {
-    let bound = int_cast(ZZ.clone_el(B), StaticRing::<i128>::RING, &ZZ) as u64;
+    let bound = int_cast(B.clone(), StaticRing::<i128>::RING, &ZZ) as u64;
     erathostenes(bound)
         .into_iter()
         .map(|p| int_cast(p as i128, &ZZ, StaticRing::<i128>::RING))

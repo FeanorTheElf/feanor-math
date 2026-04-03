@@ -36,10 +36,10 @@ impl<C> LengthExtendedConvolution<C> {
     fn chunk_len(&self) -> usize { self.base_max_len / 2 }
 }
 
-impl<R> LengthExtendedConvolution<NTTConvolution<R::Type, R::Type, Identity<R>>>
+impl<R> LengthExtendedConvolution<NTTConvolution<R::Ring, R::Ring, Identity<R>>>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     /// Constructs a [`LengthExtendedConvolution`], which will use a suitable, NTT-based convolution
     /// over the given ring.
@@ -72,12 +72,12 @@ where
 
 impl<R>
     LengthExtendedConvolution<
-        NTTConvolution<R::Type, <<R::Type as RingExtension>::BaseRing as RingStore>::Type, Inclusion<R>>,
+        NTTConvolution<R::Ring, <<R::Ring as RingExtension>::BaseRing as RingStore>::Ring, Inclusion<R>>,
     >
 where
     R: RingStore,
-    R::Type: RingExtension,
-    <<R::Type as RingExtension>::BaseRing as RingStore>::Type: ZnRing,
+    R::Ring: RingExtension,
+    <<R::Ring as RingExtension>::BaseRing as RingStore>::Ring: ZnRing,
 {
     /// Constructs a [`LengthExtendedConvolution`], which will use a suitable, NTT-based convolution
     /// over the base ring of the given.

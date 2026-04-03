@@ -53,7 +53,7 @@ use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
 pub fn cyclotomic_polynomial<P>(P: P, n: usize) -> El<P>
 where
     P: RingStore,
-    P::Type: PolyRing + DivisibilityRing,
+    P::Ring: PolyRing + DivisibilityRing,
 {
     let mut current = P.sub(P.indeterminate(), P.one());
     let ZZ = StaticRing::<i128>::RING;
@@ -64,7 +64,7 @@ where
             .checked_div(
                 &P.from_terms(
                     P.terms(&current)
-                        .map(|(c, d)| (P.base_ring().clone_el(c), d * p as usize)),
+                        .map(|(c, d)| (c.clone(), d * p as usize)),
                 ),
                 &current,
             )
@@ -72,7 +72,7 @@ where
     }
     return P.from_terms(
         P.terms(&current)
-            .map(|(c, d)| (P.base_ring().clone_el(c), d * power_of_x)),
+            .map(|(c, d)| (c.clone(), d * power_of_x)),
     );
 }
 
@@ -119,7 +119,7 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
     if log2_n == 0 {
         return ring.is_one(el);
     }
-    ring.is_neg_one(&ring.pow(ring.clone_el(&el), 1 << (log2_n - 1)))
+    ring.is_neg_one(&ring.pow(el.clone(), 1 << (log2_n - 1)))
 }
 
 /// Checks if the given ring element is a primitive `n`-th root of unity.
@@ -136,14 +136,14 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
 pub fn is_prim_root_of_unity<R>(ring: R, el: &El<R>, n: &El<BigIntRing>) -> bool
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     let characteristic = ring.characteristic(BigIntRing::RING).unwrap();
     assert!(
         BigIntRing::RING.is_zero(&characteristic)
             || BigIntRing::RING.is_unit(&BigIntRing::RING.ideal_gen(n, &characteristic))
     );
-    is_prim_root_of_unity_with_factorization(ring, el, n, &factor(BigIntRing::RING, BigIntRing::RING.clone_el(n)))
+    is_prim_root_of_unity_with_factorization(ring, el, n, &factor(BigIntRing::RING, n.clone()))
 }
 
 /// Checks if the given ring element is a primitive `n`-th root of unity.
@@ -166,7 +166,7 @@ pub fn is_prim_root_of_unity_general<R: RingStore>(ring: R, el: &El<R>, n: usize
                 &characteristic
             ))
     );
-    if !ring.is_one(&ring.pow(ring.clone_el(el), n)) {
+    if !ring.is_one(&ring.pow(el.clone(), n)) {
         return false;
     }
     let (ZZX, Phi_n) = cyclotomic_polynomial_cache(n);
@@ -184,14 +184,14 @@ pub fn is_prim_root_of_unity_general<R: RingStore>(ring: R, el: &El<R>, n: usize
 pub fn get_prim_root_of_unity<R>(ring: R, n: &El<BigIntRing>) -> Option<El<R>>
 where
     R: RingStore,
-    R::Type: FiniteRing + Field,
+    R::Ring: FiniteRing + Field,
 {
     let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
     assert!(BigIntRing::RING.is_zero(&characteristic) || ZZbig.is_unit(&ZZbig.ideal_gen(n, &characteristic)));
     let order = ZZbig.sub(ring.size(&ZZbig).unwrap(), ZZbig.one());
     let power = ZZbig.checked_div(&order, n)?;
-    let n_factorization = factor(ZZbig, ZZbig.clone_el(n));
+    let n_factorization = factor(ZZbig, n.clone());
 
     let mut rng = oorandom::Rand64::new(1);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZbig);
@@ -216,7 +216,7 @@ where
 pub fn get_prim_root_of_unity_zn<R>(ring: R, n: usize) -> Option<El<R>>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
@@ -232,8 +232,8 @@ where
 
     let mut accumulator = ring.zero();
     let ZZ = ring.integer_ring();
-    'mod_pe: for (p, e) in factor(ZZ, ZZ.clone_el(ring.modulus())) {
-        let pe = ZZ.pow(ZZ.clone_el(&p), e);
+    'mod_pe: for (p, e) in factor(ZZ, ring.modulus().clone()) {
+        let pe = ZZ.pow(p.clone(), e);
         let order = ZZ.sub_ref_fst(&pe, ZZ.pow(p, e - 1));
         let n = int_cast(n.try_into().unwrap(), ZZ, StaticRing::<i64>::RING);
         let power = ZZ.checked_div(&order, &n)?;
@@ -242,13 +242,13 @@ where
         let mut rng = oorandom::Rand64::new(1);
         let base = ring.mul_ref_snd(ring.random_element(|| rng.rand_u64()), &scale);
         let mut current = ring.pow_gen(base, &power, ZZ);
-        let one_mod_p = ring.pow_gen(ring.clone_el(&current), &n, ZZ);
+        let one_mod_p = ring.pow_gen(current.clone(), &n, ZZ);
         for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
             if n_factorization.iter().all(|(factor_n, _)| {
                 !ring.eq_el(
                     &one_mod_p,
                     &ring.pow_gen(
-                        ring.clone_el(&current),
+                        current.clone(),
                         &ZZ.checked_div(&n, &int_cast(*factor_n, ZZ, StaticRing::<i64>::RING))
                             .unwrap(),
                         ZZ,
@@ -281,7 +281,7 @@ where
 pub fn get_prim_root_of_unity_pow2<R>(ring: R, log2_n: usize) -> Option<El<R>>
 where
     R: RingStore,
-    R::Type: FiniteRing + Field,
+    R::Ring: FiniteRing + Field,
 {
     let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
@@ -312,7 +312,7 @@ where
 pub fn get_prim_root_of_unity_pow2_zn<R>(ring: R, log2_n: usize) -> Option<El<R>>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     if log2_n == 0 {
         return Some(ring.one());
@@ -323,8 +323,8 @@ where
 
     let mut accumulator = ring.zero();
     let ZZ = ring.integer_ring();
-    'mod_pe: for (p, e) in factor(ZZ, ZZ.clone_el(ring.modulus())) {
-        let pe = ZZ.pow(ZZ.clone_el(&p), e);
+    'mod_pe: for (p, e) in factor(ZZ, ring.modulus().clone()) {
+        let pe = ZZ.pow(p.clone(), e);
         let order = ZZ.sub_ref_fst(&pe, ZZ.pow(p, e - 1));
         let power = ZZ.checked_div(&order, &ZZ.power_of_two(log2_n))?;
         let scale = ring.coerce(ZZ, ZZ.checked_div(ring.modulus(), &pe).unwrap());
@@ -335,11 +335,11 @@ where
             &power,
             ZZ,
         );
-        let one_mod_p = ring.pow_gen(ring.clone_el(&current), &ZZ.power_of_two(log2_n), ZZ);
+        let one_mod_p = ring.pow_gen(current.clone(), &ZZ.power_of_two(log2_n), ZZ);
         for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
             if !ring.eq_el(
                 &one_mod_p,
-                &ring.pow_gen(ring.clone_el(&current), &ZZ.power_of_two(log2_n - 1), ZZ),
+                &ring.pow_gen(current.clone(), &ZZ.power_of_two(log2_n - 1), ZZ),
             ) {
                 ring.add_assign(&mut accumulator, current);
                 continue 'mod_pe;
@@ -365,7 +365,7 @@ pub fn is_prim_root_of_unity_with_factorization<R>(
 ) -> bool
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     let characteristic = ring.characteristic(BigIntRing::RING).unwrap();
     debug_assert!(
@@ -375,13 +375,13 @@ where
     let ZZbig = BigIntRing::RING;
     debug_assert!(ZZbig.eq_el(
         n,
-        &ZZbig.prod(n_factorization.iter().map(|(p, e)| ZZbig.pow(ZZbig.clone_el(p), *e)))
+        &ZZbig.prod(n_factorization.iter().map(|(p, e)| ZZbig.pow(p.clone(), *e)))
     ));
-    if !ring.is_one(&ring.pow_gen(ring.clone_el(el), n, ZZbig)) {
+    if !ring.is_one(&ring.pow_gen(el.clone(), n, ZZbig)) {
         return false;
     }
     for (p, _) in n_factorization {
-        if ring.is_one(&ring.pow_gen(ring.clone_el(el), &ZZbig.checked_div(n, p).unwrap(), ZZbig)) {
+        if ring.is_one(&ring.pow_gen(el.clone(), &ZZbig.checked_div(n, p).unwrap(), ZZbig)) {
             return false;
         }
     }

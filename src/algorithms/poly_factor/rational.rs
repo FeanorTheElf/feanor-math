@@ -16,11 +16,11 @@ use crate::rings::zn::zn_64b::*;
 pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
 where
     P: RingStore,
-    P::Type: PolyRing + EuclideanRing,
-    BaseRing<P>: RingStore<Type = RationalFieldBase<I>>,
+    P::Ring: PolyRing + EuclideanRing,
+    BaseRing<P>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
-    I::Type: IntegerRing,
-    Zn64BBase: CanHomFrom<I::Type>,
+    I::Ring: IntegerRing,
+    Zn64BBase: CanHomFrom<I::Ring>,
 {
     assert!(!poly_ring.is_zero(poly));
 
@@ -52,6 +52,6 @@ where
             .into_iter()
             .map(|(f, e)| (QQX.normalize(ZZX_to_QQX.map(f)), e))
             .collect(),
-        QQ.clone_el(QQX.lc(poly).unwrap()),
+        QQX.lc(poly).unwrap().clone(),
     );
 }

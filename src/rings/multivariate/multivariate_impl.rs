@@ -41,15 +41,6 @@ where
     data: Vec<(El<R>, MonomialIdentifier), A>,
 }
 
-impl<R, A> Debug for MultivariatePolyRingEl<R, A>
-where
-    R: RingStore,
-    El<R>: Debug,
-    A: Allocator + Clone,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.data) }
-}
-
 /// Implementation of multivariate polynomial rings.
 pub struct MultivariatePolyRingImplBase<R, A = Global>
 where
@@ -403,7 +394,7 @@ where
                 }
                 Ordering::Less => {
                     let (l_c, l_m) = lhs_it.next().unwrap();
-                    (self.base_ring().clone_el(l_c), l_m.data.clone().wrap())
+                    (l_c.clone(), l_m.data.clone().wrap())
                 }
                 Ordering::Greater => {
                     let (r_c, r_m) = rhs_it.next().unwrap();
@@ -412,11 +403,32 @@ where
             };
             result.push(next_element);
         }
-        result.extend(lhs_it.map(|(c, m)| (self.base_ring().clone_el(c), m.data.clone().wrap())));
+        result.extend(lhs_it.map(|(c, m)| (c.clone(), m.data.clone().wrap())));
         result.extend(rhs_it);
         self.remove_zeros(&mut result);
         debug_assert!(self.is_valid(&result));
         return MultivariatePolyRingEl { data: result };
+    }
+}
+
+impl<R, A> Debug for MultivariatePolyRingEl<R, A>
+where
+    R: RingStore,
+    El<R>: Debug,
+    A: Allocator + Clone,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.data) }
+}
+
+impl<R, A> Clone for MultivariatePolyRingEl<R, A>
+where
+    R: RingStore,
+    A: Allocator + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone()
+        }
     }
 }
 
@@ -426,6 +438,15 @@ impl Debug for MonomialIdentifier {
             .field("deg", &self.data.deg)
             .field("idx", &self.data.order)
             .finish()
+    }
+}
+
+impl Clone for MonomialIdentifier {
+
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
     }
 }
 
@@ -453,7 +474,7 @@ impl PartialOrd for InternalMonomialIdentifier {
 impl<R, A> Debug for MultivariatePolyRingImplBase<R, A>
 where
     R: RingStore,
-    R::Type: Debug,
+    R::Ring: Debug,
     A: Allocator + Send + Sync + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -484,23 +505,13 @@ where
 {
     type Element = MultivariatePolyRingEl<R, A>;
 
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        let mut data = Vec::with_capacity_in(val.data.len(), self.allocator.clone());
-        data.extend(
-            val.data
-                .iter()
-                .map(|(c, m)| (self.base_ring().clone_el(c), self.clone_monomial(m))),
-        );
-        MultivariatePolyRingEl { data }
-    }
-
     fn add_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         debug_assert!(self.is_valid(&rhs.data));
         self.add_terms(
             lhs,
             rhs.data
                 .iter()
-                .map(|(c, m)| (self.base_ring().clone_el(c), m.data.clone().wrap())),
+                .map(|(c, m)| (c.clone(), m.data.clone().wrap())),
             Vec::new_in(self.allocator.clone()),
         )
     }
@@ -518,7 +529,7 @@ where
             &lhs,
             rhs.data.iter().map(|(c, m)| {
                 (
-                    self.base_ring().negate(self.base_ring.clone_el(c)),
+                    self.base_ring().negate(c.clone()),
                     m.data.clone().wrap(),
                 )
             }),
@@ -637,7 +648,7 @@ where
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.base_ring().characteristic(ZZ)
     }
@@ -970,7 +981,7 @@ where
     fn evaluate<S, V, H>(&self, f: &Self::Element, values: V, hom: H) -> S::Element
     where
         S: ?Sized + RingBase,
-        H: Homomorphism<<Self::BaseRing as RingStore>::Type, S>,
+        H: Homomorphism<<Self::BaseRing as RingStore>::Ring, S>,
         V: VectorFn<S::Element>,
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
@@ -1011,9 +1022,9 @@ where
     R: RingStore,
     A: Allocator + Send + Sync + Clone,
     P: MultivariatePolyRing,
-    R::Type: CanHomFrom<<P::BaseRing as RingStore>::Type>,
+    R::Ring: CanHomFrom<<P::BaseRing as RingStore>::Ring>,
 {
-    type Homomorphism = <R::Type as CanHomFrom<<P::BaseRing as RingStore>::Type>>::Homomorphism;
+    type Homomorphism = <R::Ring as CanHomFrom<<P::BaseRing as RingStore>::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &P) -> Option<Self::Homomorphism> {
         if self.indeterminate_count() >= from.indeterminate_count() {
@@ -1052,9 +1063,9 @@ where
     R: RingStore,
     A: Allocator + Send + Sync + Clone,
     P: MultivariatePolyRing,
-    R::Type: CanIsoFromTo<<P::BaseRing as RingStore>::Type>,
+    R::Ring: CanIsoFromTo<<P::BaseRing as RingStore>::Ring>,
 {
-    type Isomorphism = <R::Type as CanIsoFromTo<<P::BaseRing as RingStore>::Type>>::Isomorphism;
+    type Isomorphism = <R::Ring as CanIsoFromTo<<P::BaseRing as RingStore>::Ring>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &P) -> Option<Self::Isomorphism> {
         if self.indeterminate_count() == from.indeterminate_count() {
@@ -1071,7 +1082,7 @@ where
             (
                 self.base_ring()
                     .get_ring()
-                    .map_out(from.base_ring().get_ring(), self.base_ring().clone_el(c), iso),
+                    .map_out(from.base_ring().get_ring(), c.clone(), iso),
                 from.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(m, i))),
             )
         }))

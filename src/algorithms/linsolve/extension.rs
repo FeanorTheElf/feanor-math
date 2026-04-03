@@ -19,8 +19,8 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(
 ) -> SolveResult
 where
     R: RingStore,
-    R::Type: FreeAlgebra,
-    <BaseRing<R> as RingStore>::Type: LinSolveRing,
+    R::Ring: FreeAlgebra,
+    <BaseRing<R> as RingStore>::Ring: LinSolveRing,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
     V3: AsPointerToSlice<El<R>>,
@@ -40,7 +40,7 @@ where
     let g = ring.canonical_gen();
     for i in 0..lhs.row_count() {
         for j in 0..lhs.col_count() {
-            current = ring.clone_el(lhs.at(i, j));
+            current = lhs.at(i, j).clone();
             for l in 0..ring.rank() {
                 let current_wrt_basis = ring.wrt_canonical_basis(&current);
                 for k in 0..ring.rank() {
@@ -87,7 +87,7 @@ where
     for i in 0..lhs.col_count() {
         for j in 0..rhs.col_count() {
             let res_value = ring.from_canonical_basis(
-                (0..ring.rank()).map(|k| ring.base_ring().clone_el(solution.at(i * ring.rank() + k, j))),
+                (0..ring.rank()).map(|k| solution.at(i * ring.rank() + k, j).clone()),
             );
             *out.at_mut(i, j) = res_value;
         }
@@ -126,14 +126,14 @@ fn test_solve() {
         DerefArray::from([el([0, 0, 0])]),
         DerefArray::from([el([1, 0, 0])]),
     ];
-    let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| ring.clone_el(&data_A[i][j]), Global);
-    let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
+    let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
+    let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
 
     solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).assert_solved();
 
-    let A = OwnedMatrix::from_fn_in(3, 2, |i, j| ring.clone_el(&data_A[i][j]), Global);
-    let B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
+    let A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
+    let B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
     let mut prod: OwnedMatrix<_> = OwnedMatrix::zero(3, 1, &ring);
     STANDARD_MATMUL.matmul(
         TransposableSubmatrix::from(A.data()),
@@ -149,8 +149,8 @@ fn test_solve() {
         DerefArray::from([el([0, 0, 0])]),
         DerefArray::from([el([1, 0, 0])]),
     ];
-    let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| ring.clone_el(&data_A[i][j]), Global);
-    let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| ring.clone_el(&data_B[i][j]), Global);
+    let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
+    let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
     assert!(!solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).is_solved());
 }
@@ -172,7 +172,7 @@ fn test_invert() {
     let mut inverse = OwnedMatrix::zero(2, 2, &ring);
     solve_right_over_extension(
         &ring,
-        matrix.clone_matrix(&ring).data_mut(),
+        matrix.clone().data_mut(),
         OwnedMatrix::identity(2, 2, &ring).data_mut(),
         inverse.data_mut(),
         Global,

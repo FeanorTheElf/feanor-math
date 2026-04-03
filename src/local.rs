@@ -37,7 +37,7 @@ pub trait PrincipalLocalRing: EuclideanRing {
         return Some(int_bisect::find_root_floor(&StaticRing::<i64>::RING, 0, |e| {
             if *e < 0
                 || ring
-                    .checked_div(x, &ring.pow(ring.clone_el(ring.max_ideal_gen()), *e as usize))
+                    .checked_div(x, &ring.pow(ring.max_ideal_gen().clone(), *e as usize))
                     .is_some()
             {
                 -1

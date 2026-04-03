@@ -17,7 +17,7 @@ use crate::rings::rational::RationalFieldBase;
 pub struct FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     base_ring: R,
 }
@@ -29,7 +29,7 @@ pub type FractionFieldImpl<R> = RingValue<FractionFieldImplBase<R>>;
 pub struct FractionFieldEl<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     num: El<R>,
     den: El<R>,
@@ -38,7 +38,7 @@ where
 impl<R> FractionFieldImpl<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(base_ring: R) -> Self {
@@ -50,7 +50,7 @@ where
 impl<R> FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     /// Partially reduces the fraction; This should be considered only a performance
     /// optimization, and does not give any reducedness-guarantees (since it only uses
@@ -79,7 +79,7 @@ where
 impl<R> Debug for FractionFieldEl<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
     El<R>: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
@@ -93,7 +93,7 @@ where
 impl<R> PartialEq for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn eq(&self, other: &Self) -> bool { self.base_ring.get_ring() == other.base_ring.get_ring() }
 }
@@ -101,7 +101,7 @@ where
 impl<R> Debug for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "Frac({:?})", self.base_ring.get_ring()) }
 }
@@ -109,7 +109,7 @@ where
 impl<R> Clone for FractionFieldImplBase<R>
 where
     R: RingStore + Clone,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn clone(&self) -> Self {
         Self {
@@ -121,7 +121,7 @@ where
 impl<R> Copy for FractionFieldImplBase<R>
 where
     R: RingStore + Copy,
-    R::Type: Domain,
+    R::Ring: Domain,
     El<R>: Copy,
 {
 }
@@ -129,7 +129,7 @@ where
 impl<R> Clone for FractionFieldEl<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
     El<R>: Clone,
 {
     fn clone(&self) -> Self {
@@ -143,7 +143,7 @@ where
 impl<R> Copy for FractionFieldEl<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
     El<R>: Copy,
 {
 }
@@ -151,16 +151,9 @@ where
 impl<R> RingBase for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     type Element = FractionFieldEl<R>;
-
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        FractionFieldEl {
-            num: self.base_ring.clone_el(&val.num),
-            den: self.base_ring.clone_el(&val.den),
-        }
-    }
 
     fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
         self.base_ring.mul_assign_ref(&mut lhs.num, &rhs.den);
@@ -205,7 +198,7 @@ where
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
         self.base_ring
-            .eq_el(&self.base_ring.negate(self.base_ring.clone_el(&value.num)), &value.den)
+            .eq_el(&self.base_ring.negate(value.num.clone()), &value.den)
     }
 
     fn is_approximate(&self) -> bool { self.base_ring.get_ring().is_approximate() }
@@ -248,7 +241,7 @@ where
 
     fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
     where
-        I::Type: IntegerRing,
+        I::Ring: IntegerRing,
     {
         self.base_ring.characteristic(ZZ)
     }
@@ -257,7 +250,7 @@ where
 impl<R> RingExtension for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     type BaseRing = R;
 
@@ -279,7 +272,7 @@ where
 impl<R> DivisibilityRing for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -287,7 +280,7 @@ where
         } else if self.is_zero(rhs) {
             None
         } else {
-            let mut result = self.clone_el(lhs);
+            let mut result = lhs.clone();
             self.base_ring.mul_assign_ref(&mut result.num, &rhs.den);
             self.base_ring.mul_assign_ref(&mut result.den, &rhs.num);
             self.reduce(&mut result);
@@ -341,14 +334,14 @@ where
 impl<R> Domain for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
 }
 
 impl<R> PrincipalIdealRing for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -365,9 +358,9 @@ where
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return (self.zero(), self.zero(), self.zero());
         } else if self.is_zero(lhs) {
-            return (self.zero(), self.one(), self.clone_el(rhs));
+            return (self.zero(), self.one(), rhs.clone());
         } else {
-            return (self.one(), self.zero(), self.clone_el(lhs));
+            return (self.one(), self.zero(), lhs.clone());
         }
     }
 }
@@ -375,7 +368,7 @@ where
 impl<R> EuclideanRing for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
 
@@ -388,14 +381,14 @@ where
 impl<R> Field for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
 }
 
 impl<R> FractionField for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>) { (el.num, el.den) }
 }
@@ -405,7 +398,7 @@ where
 impl<R> HashableElRing for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain + IntegerRing + HashableElRing,
+    R::Ring: Domain + IntegerRing + HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
         let gcd = self.base_ring().ideal_gen(&el.den, &el.num);
@@ -421,7 +414,7 @@ where
 impl<R: RingStore> StrassenHint for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     default fn strassen_threshold(&self) -> usize { usize::MAX }
 }
@@ -429,11 +422,11 @@ where
 impl<R: RingStore> DefaultConvolutionRing for FractionFieldImplBase<R>
 where
     R: RingStore,
-    R::Type: Domain,
+    R::Ring: Domain,
 {
     fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
-        S: RingStore<Type = Self> + 'conv,
+        S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
         Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
@@ -444,10 +437,10 @@ impl<R: RingStore, S: RingStore> CanHomFrom<FractionFieldImplBase<S>> for Fracti
 where
     R: RingStore,
     S: RingStore,
-    R::Type: Domain + CanHomFrom<S::Type>,
-    S::Type: Domain,
+    R::Ring: Domain + CanHomFrom<S::Ring>,
+    S::Ring: Domain,
 {
-    type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
+    type Homomorphism = <R::Ring as CanHomFrom<S::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &FractionFieldImplBase<S>) -> Option<Self::Homomorphism> {
         self.base_ring()
@@ -476,10 +469,10 @@ impl<R: RingStore, S: RingStore> CanIsoFromTo<FractionFieldImplBase<S>> for Frac
 where
     R: RingStore,
     S: RingStore,
-    R::Type: Domain + CanIsoFromTo<S::Type>,
-    S::Type: Domain,
+    R::Ring: Domain + CanIsoFromTo<S::Ring>,
+    S::Ring: Domain,
 {
-    type Isomorphism = <R::Type as CanIsoFromTo<S::Type>>::Isomorphism;
+    type Isomorphism = <R::Ring as CanIsoFromTo<S::Ring>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &FractionFieldImplBase<S>) -> Option<Self::Isomorphism> {
         self.base_ring()
@@ -508,10 +501,10 @@ impl<R: RingStore, I: RingStore> CanHomFrom<RationalFieldBase<I>> for FractionFi
 where
     R: RingStore,
     I: RingStore,
-    R::Type: Domain + CanHomFrom<I::Type>,
-    I::Type: IntegerRing,
+    R::Ring: Domain + CanHomFrom<I::Ring>,
+    I::Ring: IntegerRing,
 {
-    type Homomorphism = <R::Type as CanHomFrom<I::Type>>::Homomorphism;
+    type Homomorphism = <R::Ring as CanHomFrom<I::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &RationalFieldBase<I>) -> Option<Self::Homomorphism> {
         self.base_ring()
@@ -541,10 +534,10 @@ impl<R: RingStore, I: RingStore> CanIsoFromTo<RationalFieldBase<I>> for Fraction
 where
     R: RingStore,
     I: RingStore,
-    R::Type: Domain + CanIsoFromTo<I::Type>,
-    I::Type: IntegerRing,
+    R::Ring: Domain + CanIsoFromTo<I::Ring>,
+    I::Ring: IntegerRing,
 {
-    type Isomorphism = <R::Type as CanIsoFromTo<I::Type>>::Isomorphism;
+    type Isomorphism = <R::Ring as CanIsoFromTo<I::Ring>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &RationalFieldBase<I>) -> Option<Self::Isomorphism> {
         self.base_ring()

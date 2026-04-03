@@ -90,7 +90,7 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     /// The [`RingStore`] corresponding to the local ring.
     ///
     /// This may reference data stored by [`PolyLiftFactorsDomain::SuitableIdeal`].
-    type LocalRing<'ring>: RingStore<Type = Self::LocalRingBase<'ring>>
+    type LocalRing<'ring>: RingStore<Ring = Self::LocalRingBase<'ring>>
     where
         Self: 'ring;
 
@@ -106,7 +106,7 @@ pub trait PolyLiftFactorsDomain: Domain + DivisibilityRing + FiniteRingSpecializ
     ///
     /// This may reference data stored by [`PolyLiftFactorsDomain::SuitableIdeal`].
     /// f
-    type LocalField<'ring>: RingStore<Type = Self::LocalFieldBase<'ring>>
+    type LocalField<'ring>: RingStore<Ring = Self::LocalFieldBase<'ring>>
     where
         Self: 'ring;
 
@@ -272,7 +272,7 @@ pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
     where
         Self: 'ring;
 
-    type LocalRingAsZn<'ring>: RingStore<Type = Self::LocalRingAsZnBase<'ring>> + Clone
+    type LocalRingAsZn<'ring>: RingStore<Ring = Self::LocalRingAsZnBase<'ring>> + Clone
     where
         Self: 'ring;
 
@@ -286,7 +286,7 @@ pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
     where
         Self: 'ring;
 
-    type LocalFieldAsZn<'ring>: RingStore<Type = Self::LocalFieldAsZnBase<'ring>> + Clone
+    type LocalFieldAsZn<'ring>: RingStore<Ring = Self::LocalFieldAsZnBase<'ring>> + Clone
     where
         Self: 'ring;
 
@@ -307,7 +307,7 @@ pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
         let Fp = self.quotient_ring_at(p, 1, 0);
         let Fp = self.local_ring_as_zn(&Fp);
         return int_cast(
-            Fp.integer_ring().clone_el(Fp.modulus()),
+            Fp.modulus().clone(),
             BigIntRing::RING,
             Fp.integer_ring(),
         );
@@ -828,7 +828,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 use $crate::seq::*;
                 assert_eq!(1, from.len());
                 assert_eq!(1, x.len());
-                int_cast(from.at(0).smallest_lift(from.at(0).clone_el(x.at(0))), RingRef::from(self), BigIntRing::RING)
+                int_cast(from.at(0).smallest_lift(x.at(0).clone()), RingRef::from(self), BigIntRing::RING)
             }
 
             fn maximal_ideal_factor_count<'ring>(&self, _p: &Self::SuitableIdeal<'ring>) -> usize
@@ -1432,7 +1432,7 @@ where
     where
         F: FnMut() -> u64,
     {
-        self.integers.clone_el(&self.prime)
+        self.prime.clone()
     }
 
     fn maximal_ideal_factor_count<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>) -> usize
@@ -1469,7 +1469,7 @@ where
         RingValue::from(
             R::from_modulus(|ZZ| {
                 Ok(RingRef::from(ZZ).pow(
-                    int_cast(self.integers.clone_el(&self.prime), RingRef::from(ZZ), &self.integers),
+                    int_cast(self.prime.clone(), RingRef::from(ZZ), &self.integers),
                     e,
                 ))
             })
@@ -1490,7 +1490,7 @@ where
         debug_assert_eq!(0, max_ideal_idx);
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
         debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.integers.clone_el(&self.prime), to.1),
+            &self.integers.pow(self.prime.clone(), to.1),
             to.0.modulus()
         ));
         RingRef::from(to.0).coerce(&self.integers, x)
@@ -1510,11 +1510,11 @@ where
         debug_assert_eq!(0, max_ideal_idx);
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
         debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.integers.clone_el(&self.prime), to.1),
+            &self.integers.pow(self.prime.clone(), to.1),
             to.0.modulus()
         ));
         debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.integers.clone_el(&self.prime), from.1),
+            &self.integers.pow(self.prime.clone(), from.1),
             from.0.modulus()
         ));
         RingRef::from(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
@@ -1534,11 +1534,11 @@ where
         debug_assert_eq!(0, max_ideal_idx);
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
         debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.integers.clone_el(&self.prime), to.1),
+            &self.integers.pow(self.prime.clone(), to.1),
             to.0.modulus()
         ));
         debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.integers.clone_el(&self.prime), from.1),
+            &self.integers.pow(self.prime.clone(), from.1),
             from.0.modulus()
         ));
         RingRef::from(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
@@ -1595,10 +1595,10 @@ where
         assert_eq!(1, from.len());
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
         debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.integers.clone_el(&self.prime), e),
+            &self.integers.pow(self.prime.clone(), e),
             from.at(0).modulus()
         ));
-        from.at(0).smallest_lift(from.at(0).clone_el(x.at(0)))
+        from.at(0).smallest_lift(x.at(0).clone())
     }
 
     fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result

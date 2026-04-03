@@ -55,7 +55,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// See also [`FFTAlgorithm::unordered_fft_permutation()`].
     fn root_of_unity<S>(&self, ring: S) -> &R::Element
     where
-        S: RingStore<Type = R> + Copy;
+        S: RingStore<Ring = R> + Copy;
 
     /// On input `i`, returns `j` such that `unordered_fft(values)[i]` contains the evaluation
     /// at `z^(-j)` of values (note the `-`, which is standard convention for Fourier transforms).
@@ -104,7 +104,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     fn fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         self.unordered_fft(&mut values, ring);
         permute::permute_inv(&mut values, |i| self.unordered_fft_permutation(i));
@@ -128,7 +128,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     fn inv_fft<V, S>(&self, mut values: V, ring: S)
     where
         V: SwappableVectorViewMut<R::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         permute::permute(&mut values, |i| self.unordered_fft_permutation(i));
         self.unordered_inv_fft(&mut values, ring);
@@ -150,7 +150,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     fn unordered_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<R::Element>,
-        S: RingStore<Type = R> + Copy;
+        S: RingStore<Ring = R> + Copy;
 
     /// Inverse to [`FFTAlgorithm::unordered_fft()`], with basically the same contract.
     ///
@@ -164,7 +164,7 @@ pub trait FFTAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<R::Element>,
-        S: RingStore<Type = R> + Copy;
+        S: RingStore<Ring = R> + Copy;
 }
 
 impl<T, R> FFTAlgorithm<R> for T
@@ -177,7 +177,7 @@ where
 
     fn root_of_unity<S>(&self, ring: S) -> &R::Element
     where
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         self.deref().root_of_unity(ring)
     }
@@ -189,7 +189,7 @@ where
     fn fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R as RingBase>::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         self.deref().fft(values, ring)
     }
@@ -197,7 +197,7 @@ where
     fn inv_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R as RingBase>::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         self.deref().inv_fft(values, ring)
     }
@@ -205,7 +205,7 @@ where
     fn unordered_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R as RingBase>::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         self.deref().unordered_fft(values, ring)
     }
@@ -213,7 +213,7 @@ where
     fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R as RingBase>::Element>,
-        S: RingStore<Type = R> + Copy,
+        S: RingStore<Ring = R> + Copy,
     {
         self.deref().unordered_inv_fft(values, ring)
     }

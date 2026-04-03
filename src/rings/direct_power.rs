@@ -123,7 +123,7 @@ impl<R: RingStore, const N: usize> RingBase for DirectPowerRingBase<R, N> {
 
     fn from_int(&self, value: i32) -> Self::Element {
         let val = self.base.get_ring().from_int(value);
-        from_fn(|_| self.base.clone_el(&val))
+        from_fn(|_| self.val.clone())
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -227,7 +227,7 @@ impl<R: RingStore, const N: usize> RingExtension for DirectPowerRingBase<R, N> {
     }
 
     fn from_ref(&self, x: &El<Self::BaseRing>) -> Self::Element {
-        from_fn(|_| self.base.clone_el(x))
+        from_fn(|_| self.x.clone())
     }
 
     fn mul_assign_base(&self, lhs: &mut Self::Element, rhs: &El<Self::BaseRing>) {

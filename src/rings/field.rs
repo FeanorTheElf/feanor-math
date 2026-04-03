@@ -71,7 +71,7 @@ use crate::specialization::FiniteRingSpecializable;
 /// The alternative is to explicitly use [`WrapHom`] and [`UnwrapHom`].
 pub struct AsFieldBase<R: RingStore>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     base: R,
 }
@@ -79,14 +79,14 @@ where
 impl<R> PerfectField for AsFieldBase<R>
 where
     R: RingStore,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
 }
 
 impl<R> Clone for AsFieldBase<R>
 where
     R: RingStore + Clone,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn clone(&self) -> Self {
         Self {
@@ -98,7 +98,7 @@ where
 impl<R> Copy for AsFieldBase<R>
 where
     R: RingStore + Copy,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
     El<R>: Copy,
 {
 }
@@ -106,7 +106,7 @@ where
 impl<R> Debug for AsFieldBase<R>
 where
     R: RingStore,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "AsField({:?})", self.get_delegate())
@@ -116,7 +116,7 @@ where
 impl<R> PartialEq for AsFieldBase<R>
 where
     R: RingStore,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
 }
@@ -128,12 +128,12 @@ pub type AsField<R: RingStore> = RingValue<AsFieldBase<R>>;
 /// An element of [`AsField`].
 pub struct FieldEl<R: RingStore>(El<R>)
 where
-    R::Type: DivisibilityRing;
+    R::Ring: DivisibilityRing;
 
 impl<R: RingStore> Debug for FieldEl<R>
 where
     El<R>: Debug,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("FieldEl").field(&self.0).finish()
@@ -143,7 +143,7 @@ where
 impl<R: RingStore> Clone for FieldEl<R>
 where
     El<R>: Clone,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn clone(&self) -> Self { FieldEl(self.0.clone()) }
 }
@@ -151,13 +151,13 @@ where
 impl<R: RingStore> Copy for FieldEl<R>
 where
     El<R>: Copy,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
 }
 
 impl<R: RingStore> AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     /// Assumes that the given ring is a perfect field, and wraps it in [`AsFieldBase`].
     ///
@@ -180,12 +180,12 @@ where
     #[stability::unstable(feature = "enable")]
     pub fn promise_is_field(base: R) -> Result<Self, R>
     where
-        R::Type: FiniteRingSpecializable,
+        R::Ring: FiniteRingSpecializable,
     {
         let characteristic = base.characteristic(&StaticRing::<i64>::RING);
         if characteristic.is_some() && characteristic.unwrap() == 0 {
             return Ok(Self::promise_is_perfect_field(base));
-        } else if <R::Type as FiniteRingSpecializable>::is_finite_ring() {
+        } else if <R::Ring as FiniteRingSpecializable>::is_finite_ring() {
             return Ok(Self::promise_is_perfect_field(base));
         } else {
             return Err(base);
@@ -200,7 +200,7 @@ where
 
 impl<R: RingStore> AsFieldBase<R>
 where
-    R::Type: PerfectField,
+    R::Ring: PerfectField,
 {
     /// Creates a new [`AsFieldBase`] from a ring that is already known to be a
     /// perfect field.
@@ -209,10 +209,10 @@ where
 
 impl<R: RingStore> DelegateRing for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     type Element = FieldEl<R>;
-    type Base = R::Type;
+    type Base = R::Ring;
 
     fn get_delegate(&self) -> &Self::Base { self.base.get_ring() }
 
@@ -225,21 +225,21 @@ where
     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { FieldEl(el) }
 }
 
-impl<R: RingStore> DelegateRingImplFiniteRing for AsFieldBase<R> where R::Type: DivisibilityRing {}
+impl<R: RingStore> DelegateRingImplFiniteRing for AsFieldBase<R> where R::Ring: DivisibilityRing {}
 
 impl<R: RingStore, S: RingStore> CanHomFrom<AsFieldBase<S>> for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing + CanHomFrom<S::Type>,
-    S::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing + CanHomFrom<S::Ring>,
+    S::Ring: DivisibilityRing,
 {
-    type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
+    type Homomorphism = <R::Ring as CanHomFrom<S::Ring>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &AsFieldBase<S>) -> Option<Self::Homomorphism> {
-        <R::Type as CanHomFrom<S::Type>>::has_canonical_hom(self.get_delegate(), from.get_delegate())
+        <R::Ring as CanHomFrom<S::Ring>>::has_canonical_hom(self.get_delegate(), from.get_delegate())
     }
 
     fn map_in(&self, from: &AsFieldBase<S>, el: FieldEl<S>, hom: &Self::Homomorphism) -> Self::Element {
-        FieldEl(<R::Type as CanHomFrom<S::Type>>::map_in(
+        FieldEl(<R::Ring as CanHomFrom<S::Ring>>::map_in(
             self.get_delegate(),
             from.get_delegate(),
             el.0,
@@ -250,17 +250,17 @@ where
 
 impl<R: RingStore, S: RingStore> CanIsoFromTo<AsFieldBase<S>> for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing + CanIsoFromTo<S::Type>,
-    S::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing + CanIsoFromTo<S::Ring>,
+    S::Ring: DivisibilityRing,
 {
-    type Isomorphism = <R::Type as CanIsoFromTo<S::Type>>::Isomorphism;
+    type Isomorphism = <R::Ring as CanIsoFromTo<S::Ring>>::Isomorphism;
 
     fn has_canonical_iso(&self, from: &AsFieldBase<S>) -> Option<Self::Isomorphism> {
-        <R::Type as CanIsoFromTo<S::Type>>::has_canonical_iso(self.get_delegate(), from.get_delegate())
+        <R::Ring as CanIsoFromTo<S::Ring>>::has_canonical_iso(self.get_delegate(), from.get_delegate())
     }
 
     fn map_out(&self, from: &AsFieldBase<S>, el: Self::Element, iso: &Self::Isomorphism) -> FieldEl<S> {
-        FieldEl(<R::Type as CanIsoFromTo<S::Type>>::map_out(
+        FieldEl(<R::Ring as CanIsoFromTo<S::Ring>>::map_out(
             self.get_delegate(),
             from.get_delegate(),
             el.0,
@@ -272,20 +272,20 @@ where
 /// Necessary to potentially implement [`crate::rings::zn::ZnRing`].
 impl<R: RingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing + CanHomFrom<S>,
+    R::Ring: DivisibilityRing + CanHomFrom<S>,
 {
-    type Homomorphism = <R::Type as CanHomFrom<S>>::Homomorphism;
+    type Homomorphism = <R::Ring as CanHomFrom<S>>::Homomorphism;
 
     fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> { self.get_delegate().has_canonical_hom(from) }
 
     fn map_in(&self, from: &S, el: S::Element, hom: &Self::Homomorphism) -> Self::Element {
-        FieldEl(<R::Type as CanHomFrom<S>>::map_in(self.get_delegate(), from, el, hom))
+        FieldEl(<R::Ring as CanHomFrom<S>>::map_in(self.get_delegate(), from, el, hom))
     }
 }
 
 impl<R: RingStore> PrincipalIdealRing for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
@@ -301,9 +301,9 @@ where
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
         if self.is_zero(lhs) {
-            (self.zero(), self.one(), self.clone_el(rhs))
+            (self.zero(), self.one(), rhs.clone())
         } else {
-            (self.one(), self.zero(), self.clone_el(lhs))
+            (self.one(), self.zero(), lhs.clone())
         }
     }
 }
@@ -311,22 +311,22 @@ where
 impl<R> InterpolationBaseRing for AsFieldBase<R>
 where
     R: InterpolationBaseRingStore,
-    R::Type: InterpolationBaseRing,
+    R::Ring: InterpolationBaseRing,
 {
     type ExtendedRingBase<'a>
-        = <R::Type as InterpolationBaseRing>::ExtendedRingBase<'a>
+        = <R::Ring as InterpolationBaseRing>::ExtendedRingBase<'a>
     where
         Self: 'a;
 
     type ExtendedRing<'a>
-        = <R::Type as InterpolationBaseRing>::ExtendedRing<'a>
+        = <R::Ring as InterpolationBaseRing>::ExtendedRing<'a>
     where
         Self: 'a;
 
     fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
         self.get_delegate().in_base(ext_ring, el).map(|x| self.rev_delegate(x))
     }
@@ -334,7 +334,7 @@ where
     fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
     where
         Self: 'a,
-        S: RingStore<Type = Self::ExtendedRingBase<'a>>,
+        S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
         self.get_delegate().in_extension(ext_ring, self.delegate(el))
     }
@@ -346,7 +346,7 @@ where
 
 impl<R: RingStore> EuclideanRing for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
@@ -361,11 +361,11 @@ where
     }
 }
 
-impl<R: RingStore> Domain for AsFieldBase<R> where R::Type: DivisibilityRing {}
+impl<R: RingStore> Domain for AsFieldBase<R> where R::Ring: DivisibilityRing {}
 
 impl<R: RingStore> Field for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
         FieldEl(self.get_delegate().checked_left_div(&lhs.0, &rhs.0).unwrap())
@@ -374,7 +374,7 @@ where
 
 impl<R: RingStore> ComputeInnerProduct for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn inner_product<I: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
         self.rev_delegate(
@@ -416,7 +416,7 @@ where
 
 impl<R: RingStore> StrassenHint for AsFieldBase<R>
 where
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn strassen_threshold(&self) -> usize { self.get_delegate().strassen_threshold() }
 }
@@ -437,7 +437,7 @@ where
 impl<R> Serialize for AsFieldBase<R>
 where
     R: RingStore + Serialize,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -450,7 +450,7 @@ where
 impl<'de, R> Deserialize<'de> for AsFieldBase<R>
 where
     R: RingStore + Deserialize<'de>,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
 {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
@@ -524,7 +524,7 @@ macro_rules! impl_field_wrap_unwrap_homs {
     (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
 
         impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$self_type_from> for $crate::rings::field::AsFieldBase<AsFieldRingStore>
-            where AsFieldRingStore: RingStore<Type = $self_type_to>, $($constraints)*
+            where AsFieldRingStore: RingStore<Ring = $self_type_to>, $($constraints)*
         {
             type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
 
@@ -540,7 +540,7 @@ macro_rules! impl_field_wrap_unwrap_homs {
         }
 
         impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$crate::rings::field::AsFieldBase<AsFieldRingStore>> for $self_type_to
-            where AsFieldRingStore: RingStore<Type = $self_type_from>, $($constraints)*
+            where AsFieldRingStore: RingStore<Ring = $self_type_from>, $($constraints)*
         {
             type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
 
@@ -570,7 +570,7 @@ macro_rules! impl_field_wrap_unwrap_isos {
     (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
 
         impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$self_type_from> for $crate::rings::field::AsFieldBase<AsFieldRingStore>
-            where AsFieldRingStore: RingStore<Type = $self_type_to>, $($constraints)*
+            where AsFieldRingStore: RingStore<Ring = $self_type_to>, $($constraints)*
         {
             type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
 
@@ -586,7 +586,7 @@ macro_rules! impl_field_wrap_unwrap_isos {
         }
 
         impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$crate::rings::field::AsFieldBase<AsFieldRingStore>> for $self_type_to
-            where AsFieldRingStore: RingStore<Type = $self_type_from>, $($constraints)*
+            where AsFieldRingStore: RingStore<Ring = $self_type_from>, $($constraints)*
         {
             type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
 

@@ -75,7 +75,7 @@ where
 
 impl<R, A> BluesteinFFT<Complex64Base, Complex64Base, Identity<R>, A>
 where
-    R: RingStore<Type = Complex64Base> + Clone,
+    R: RingStore<Ring = Complex64Base> + Clone,
     A: Allocator + Sync + Send,
 {
     /// Creates an [`BluesteinFFT`] for the complex field.
@@ -84,10 +84,10 @@ where
     }
 }
 
-impl<R, A> BluesteinFFT<R::Type, R::Type, Identity<R>, A>
+impl<R, A> BluesteinFFT<R::Ring, R::Ring, Identity<R>, A>
 where
     R: RingStore + Clone,
-    R::Type: DivisibilityRing,
+    R::Ring: DivisibilityRing,
     A: Allocator + Sync + Send,
 {
     /// Creates an [`BluesteinFFT`] for the given ring, using the given roots of unity.
@@ -150,7 +150,7 @@ where
     /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `>= 2n`.
     pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
     where
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         Self::for_zn_with_hom(ring.into_identity(), n, tmp_mem_allocator)
     }
@@ -189,19 +189,19 @@ where
             hom,
             |i: i64| {
                 if i >= 0 {
-                    twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_2n), i as usize % (2 * n))
+                    twiddle_ring.pow(root_of_unity_2n.clone(), i as usize % (2 * n))
                 } else {
                     twiddle_ring
-                        .invert(&twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_2n), (-i) as usize % (2 * n)))
+                        .invert(&twiddle_ring.pow(root_of_unity_2n.clone(), (-i) as usize % (2 * n)))
                         .unwrap()
                 }
             },
             |i: i64| {
                 if i >= 0 {
-                    twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_m), i as usize)
+                    twiddle_ring.pow(root_of_unity_m.clone(), i as usize)
                 } else {
                     twiddle_ring
-                        .invert(&twiddle_ring.pow(twiddle_ring.clone_el(&root_of_unity_m), (-i) as usize))
+                        .invert(&twiddle_ring.pow(root_of_unity_m.clone(), (-i) as usize))
                         .unwrap()
                 }
             },
@@ -432,7 +432,7 @@ where
 {
     fn len(&self) -> usize { self.n }
 
-    fn root_of_unity<S: RingStore<Type = R_main> + Copy>(&self, ring: S) -> &R_main::Element {
+    fn root_of_unity<S: RingStore<Ring = R_main> + Copy>(&self, ring: S) -> &R_main::Element {
         assert!(self.ring().get_ring() == ring.get_ring(), "unsupported ring");
         &self.root_of_unity_n
     }
@@ -444,7 +444,7 @@ where
     fn unordered_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator());
@@ -455,7 +455,7 @@ where
     fn unordered_inv_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         assert!(ring.get_ring() == self.ring().get_ring(), "unsupported ring");
         let mut buffer = Vec::with_capacity_in(self.m_fft_table.len(), self.allocator());
@@ -466,7 +466,7 @@ where
     fn fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         self.unordered_fft(values, ring);
     }
@@ -474,7 +474,7 @@ where
     fn inv_fft<V, S>(&self, values: V, ring: S)
     where
         V: SwappableVectorViewMut<<R_main as RingBase>::Element>,
-        S: RingStore<Type = R_main> + Copy,
+        S: RingStore<Ring = R_main> + Copy,
     {
         self.unordered_inv_fft(values, ring);
     }
@@ -598,7 +598,7 @@ fn bench_bluestein(bencher: &mut test::Bencher) {
     let mut copy = Vec::with_capacity(BENCH_SIZE);
     bencher.iter(|| {
         copy.clear();
-        copy.extend(data.iter().map(|x| ring.clone_el(x)));
+        copy.extend(data.iter().map(|x| x.clone()));
         fft.unordered_fft(std::hint::black_box(&mut copy[..]), &ring);
         fft.unordered_inv_fft(std::hint::black_box(&mut copy[..]), &ring);
         assert_el_eq!(ring, copy[0], data[0]);

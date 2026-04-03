@@ -24,18 +24,18 @@ fn size_reduce<R, I, V, T>(
     gso_part: Submatrix<V, El<R>>,
     col_ops: &mut T,
 ) where
-    R: RingStore<Type = RationalFieldBase<I>> + Copy,
+    R: RingStore<Ring = RationalFieldBase<I>> + Copy,
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     V: AsPointerToSlice<El<RationalField<I>>>,
-    T: TransformTarget<R::Type>,
+    T: TransformTarget<R::Ring>,
 {
     assert!(!ring.get_ring().is_approximate());
     for j in (0..gso_part.col_count()).rev() {
         let target_const = target.as_const();
         let mu = target_const.at(j, 0);
         let factor = ring.base_ring().rounded_div(
-            ring.base_ring().clone_el(ring.get_ring().num(mu)),
+            ring.get_ring().num(mu).clone(),
             ring.get_ring().den(mu),
         );
         let factor = ring.inclusion().map(factor);
@@ -66,7 +66,7 @@ fn size_reduce<R, I, V, T>(
 fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: usize)
 where
     R: RingStore,
-    R::Type: OrderedRing + Field,
+    R::Ring: OrderedRing + Field,
     V: AsPointerToSlice<El<R>>,
 {
     // numerically very unstable
@@ -84,12 +84,12 @@ where
     // re-orthogonalize the triangle `i..(i + 2) x i..(i + 2)`
 
     // | b_i* |^2
-    let bi_star_norm_sqr = ring.clone_el(gso.at(i, i));
+    let bi_star_norm_sqr = gso.at(i, i).clone();
     // | b_(i + 1)* |^2
-    let bi1_star_norm_sqr = ring.clone_el(gso.at(i + 1, i + 1));
+    let bi1_star_norm_sqr = gso.at(i + 1, i + 1).clone();
     // mu_(i + 1)i = <b_(i + 1), bi*> / <bi*, bi*>
-    let mu = ring.clone_el(gso.at(i, i + 1));
-    let mu_sqr = ring.pow(ring.clone_el(&mu), 2);
+    let mu = gso.at(i, i + 1).clone();
+    let mu_sqr = ring.pow(mu.clone(), 2);
 
     let new_bi_star_norm_sqr = ring.add_ref_fst(&bi1_star_norm_sqr, ring.mul_ref(&mu_sqr, &bi_star_norm_sqr));
     // `gamma := |b_(i + 1)*|^2 / |bnew_i*|^2`
@@ -142,14 +142,14 @@ where
 fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
 where
     R: RingStore,
-    R::Type: Field,
+    R::Ring: Field,
     V: AsPointerToSlice<El<R>>,
 {
     // only the upper triangle part of matrix is used
     assert_eq!(matrix.row_count(), matrix.col_count());
     let n = matrix.row_count();
     for i in 0..n {
-        let pivot = ring.clone_el(matrix.at(i, i));
+        let pivot = matrix.at(i, i).clone();
         if ring.is_zero(&pivot) {
             return Err(i);
         }
@@ -198,9 +198,9 @@ pub fn lll<R, I, V1, V2, A>(
     allocator: A,
     disable_float_lll: bool,
 ) where
-    R: RingStore<Type = RationalFieldBase<I>> + Copy,
+    R: RingStore<Ring = RationalFieldBase<I>> + Copy,
     I: RingStore,
-    I::Type: IntegerRing,
+    I::Ring: IntegerRing,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
     A: Allocator,

@@ -44,7 +44,7 @@ where
     V2: AsPointerToSlice<R::Element>,
     V3: AsPointerToSlice<R::Element>,
 {
-    fn transform<S: Copy + RingStore<Type = I>>(
+    fn transform<S: Copy + RingStore<Ring = I>>(
         &mut self,
         ring: S,
         i: usize,
@@ -55,12 +55,12 @@ where
         TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
     }
 
-    fn swap<S: Copy + RingStore<Type = I>>(&mut self, ring: S, i: usize, j: usize) {
+    fn swap<S: Copy + RingStore<Ring = I>>(&mut self, ring: S, i: usize, j: usize) {
         TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).swap(ring, i, j);
         TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).swap(ring, i, j);
     }
 
-    fn subtract<S: Copy + RingStore<Type = I>>(
+    fn subtract<S: Copy + RingStore<Ring = I>>(
         &mut self,
         ring: S,
         src: usize,
@@ -94,7 +94,7 @@ where
     assert!(!RR.is_neg(&pivot_inv_error));
     let result_err = RR.sum([
         RR.mul_ref_fst(num_err, RR.div(&RR.one(), &den)),
-        RR.mul(RR.abs(RR.clone_el(num)), pivot_inv_error),
+        RR.mul(RR.abs(num.clone()), pivot_inv_error),
     ]);
     return (result, result_err);
 }
@@ -123,8 +123,8 @@ where
             RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(k, i)))),
             RR.sum((0..k).map(|l| {
                 RR.add(
-                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, k)),
-                    RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, k))), &gso.error_bound.at(l, i)),
+                    RR.mul_ref_snd(RR.abs(gso.cholesky.at(l, i).clone()), &gso.error_bound.at(l, k)),
+                    RR.mul_ref_snd(RR.abs(gso.cholesky.at(l, k).clone()), &gso.error_bound.at(l, i)),
                 )
             })),
         ]);
@@ -160,13 +160,13 @@ where
     let eps = RR.get_ring().epsilon();
     let sum = RR.sub(
         h.map_ref(gso.quadratic_form.at(i, i)),
-        RR.sum((0..i).map(|l| RR.pow(RR.clone_el(gso.cholesky.at(l, i)), 2))),
+        RR.sum((0..i).map(|l| RR.pow(gso.cholesky.at(l, i).clone(), 2))),
     );
     let sum_error = RR.sum([
         RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(i, i)))),
         RR.int_hom().mul_map(
             RR.sum(
-                (0..i).map(|l| RR.mul_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(l, i))), &gso.error_bound.at(l, i))),
+                (0..i).map(|l| RR.mul_ref_snd(RR.abs(gso.cholesky.at(l, i).clone()), &gso.error_bound.at(l, i))),
             ),
             2,
         ),
@@ -225,7 +225,7 @@ where
         let new_largest_max_mu = (0..i)
             .map(|k| {
                 RR.div(
-                    &RR.add_ref_snd(RR.abs(RR.clone_el(gso.cholesky.at(k, i))), gso.error_bound.at(k, i)),
+                    &RR.add_ref_snd(RR.abs(gso.cholesky.at(k, i).clone()), gso.error_bound.at(k, i)),
                     gso.cholesky.at(k, k),
                 )
             })
@@ -241,7 +241,7 @@ where
 
         for k in (0..i).rev() {
             let min_entry = RR.sub(
-                RR.abs(RR.clone_el(gso.cholesky.at(k, i))),
+                RR.abs(gso.cholesky.at(k, i).clone()),
                 // add epsilon here, to avoid `NotEnoughPrecision` error in the case that `mu = +/- 1/2` and `error =
                 // 0`
                 RR.add_ref(gso.error_bound.at(k, i), RR.get_ring().epsilon()),
@@ -309,8 +309,8 @@ where
     let RR = h.codomain();
     compute_cholesky_pivot(gso, i, h);
 
-    let prev_norm_squared = RR.pow(RR.clone_el(gso.cholesky.at(i - 1, i - 1)), 2);
-    let current_norm_squared = RR.pow(RR.clone_el(gso.cholesky.at(i, i)), 2);
+    let prev_norm_squared = RR.pow(gso.cholesky.at(i - 1, i - 1).clone(), 2);
+    let current_norm_squared = RR.pow(gso.cholesky.at(i, i).clone(), 2);
     let mu = RR.div(gso.cholesky.at(i - 1, i), gso.cholesky.at(i - 1, i - 1));
     let factor = RR.sub_ref_fst(delta, RR.pow(mu, 2));
     assert!(!RR.is_neg(&factor));

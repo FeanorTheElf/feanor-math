@@ -23,8 +23,8 @@ use crate::rings::zn::*;
 pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
 where
     S: RingStore,
-    S::Type: FreeAlgebra,
-    <<S::Type as RingExtension>::BaseRing as RingStore>::Type:
+    S::Ring: FreeAlgebra,
+    <<S::Ring as RingExtension>::BaseRing as RingStore>::Ring:
         LinSolveRing + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
 {
     let base_ring = ring.base_ring();
@@ -34,7 +34,7 @@ where
 
     let (inverse, _) = local_zn_ring_bezout_identity(&poly_ring, &poly_ring.add_ref_fst(&modulus, poly), &modulus)?;
     return Some(ring.from_canonical_basis_extended(
-        (0..=poly_ring.degree(&inverse).unwrap()).map(|i| base_ring.clone_el(poly_ring.coefficient_at(&inverse, i))),
+        (0..=poly_ring.degree(&inverse).unwrap()).map(|i| poly_ring.coefficient_at(&inverse, i).clone()),
     ));
 }
 

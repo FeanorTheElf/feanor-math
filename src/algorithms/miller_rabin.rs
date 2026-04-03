@@ -24,7 +24,7 @@ impl ZnOperation for CheckIsFieldMillerRabin {
     fn call<'a, R>(self, ring: R) -> bool
     where
         R: 'a + ZnRingStore,
-        R::Type: ZnRing,
+        R::Ring: ZnRing,
     {
         is_prime_base(ring, self.probability_param)
     }
@@ -41,13 +41,13 @@ impl ZnOperation for CheckIsFieldMillerRabin {
 pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
 where
     I: IntegerRingStore + HashableElRingStore,
-    I::Type: IntegerRing + CanIsoFromTo<StaticRingBase<i128>>,
+    I::Ring: IntegerRing + CanIsoFromTo<StaticRingBase<i128>>,
 {
     assert!(ZZ.is_pos(n));
     if ZZ.is_zero(n) || ZZ.is_one(n) {
         false
     } else {
-        let n_copy = ZZ.clone_el(n);
+        let n_copy = n.clone();
         choose_zn_impl(ZZ, n_copy, CheckIsFieldMillerRabin { probability_param: k })
     }
 }
@@ -60,14 +60,14 @@ const SMALL_IS_COPRIME_TABLE: [bool; 30] = [
 #[instrument(skip_all, level = "trace")]
 fn search_prime<I: IntegerRingStore>(ZZ: I, mut n: El<I>, delta: i64) -> Option<El<I>>
 where
-    I::Type: IntegerRing,
-    zn_64b::Zn64BBase: CanHomFrom<I::Type>,
+    I::Ring: IntegerRing,
+    zn_64b::Zn64BBase: CanHomFrom<I::Ring>,
 {
     assert!(!ZZ.is_neg(&n));
 
     let m = SMALL_IS_COPRIME_TABLE.len();
     let Zm = zn_64b::Zn64B::new(m as u64);
-    let mut n_mod_m = Zm.coerce(&ZZ, ZZ.clone_el(&n));
+    let mut n_mod_m = Zm.coerce(&ZZ, n.clone());
     let mut diff_to_n = 0;
     let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
     let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
@@ -126,8 +126,8 @@ where
 #[stability::unstable(feature = "enable")]
 pub fn prev_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> Option<El<I>>
 where
-    I::Type: IntegerRing,
-    zn_64b::Zn64BBase: CanHomFrom<I::Type>,
+    I::Ring: IntegerRing,
+    zn_64b::Zn64BBase: CanHomFrom<I::Ring>,
 {
     assert!(!ZZ.is_neg(&n));
     if ZZ.is_zero(&n) || ZZ.is_one(&n) {
@@ -141,8 +141,8 @@ where
 #[stability::unstable(feature = "enable")]
 pub fn next_prime<I: IntegerRingStore>(ZZ: I, n: El<I>) -> El<I>
 where
-    I::Type: IntegerRing,
-    zn_64b::Zn64BBase: CanHomFrom<I::Type>,
+    I::Ring: IntegerRing,
+    zn_64b::Zn64BBase: CanHomFrom<I::Ring>,
 {
     assert!(!ZZ.is_neg(&n));
     let n_plus_one = ZZ.add(n, ZZ.one());
@@ -170,7 +170,7 @@ where
 pub fn is_prime_base<R>(Zn: R, k: usize) -> bool
 where
     R: ZnRingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let ZZ = Zn.integer_ring();
     let n = Zn.modulus();

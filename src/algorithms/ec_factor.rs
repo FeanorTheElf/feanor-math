@@ -22,7 +22,7 @@ fn square<R>(Zn: &R, x: &El<R>) -> El<R>
 where
     R: RingStore,
 {
-    let mut result: <<R as RingStore>::Type as RingBase>::Element = Zn.clone_el(&x);
+    let mut result: <<R as RingStore>::Ring as RingBase>::Element = x.clone();
     Zn.square(&mut result);
     return result;
 }
@@ -31,7 +31,7 @@ where
 fn point_eq<R>(Zn: &R, P: &Point<R>, Q: &Point<R>) -> bool
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let factor_quo = if !Zn.is_zero(&Q.0) {
         if Zn.is_zero(&P.0) {
@@ -53,7 +53,7 @@ where
     if !Zn.is_unit(&factor_quo.1) {
         let factor_of_n = Zn
             .integer_ring()
-            .ideal_gen(Zn.modulus(), &Zn.smallest_positive_lift(Zn.clone_el(&factor_quo.1)));
+            .ideal_gen(Zn.modulus(), &Zn.smallest_positive_lift(factor_quo.1.clone()));
         let Zn_new = zn_big::ZnGB::new(
             BigIntRing::RING,
             int_cast(
@@ -131,7 +131,7 @@ where
 fn edcurve_add<R>(Zn: &R, d: &El<R>, P: Point<R>, Q: &Point<R>) -> Point<R>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let (Px, Py, Pz) = P;
     let (Qx, Qy, Qz) = Q;
@@ -163,7 +163,7 @@ where
 fn edcurve_double<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> Point<R>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let (Px, Py, Pz) = P;
 
@@ -190,9 +190,9 @@ where
 fn ec_pow<R>(base: &Point<R>, d: &El<R>, power: &El<BigIntRing>, Zn: &R) -> Point<R>
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
-    let copy_point = |(x, y, z): &Point<R>| (Zn.clone_el(x), Zn.clone_el(y), Zn.clone_el(z));
+    let copy_point = |(x, y, z): &Point<R>| (x.clone(), y.clone(), z.clone());
     let ZZ = BigIntRing::RING;
 
     sqr_mul::generic_pow_shortest_chain_table(
@@ -211,7 +211,7 @@ where
 fn is_on_curve<R>(Zn: &R, d: &El<R>, P: &Point<R>) -> bool
 where
     R: RingStore,
-    R::Type: ZnRing,
+    R::Ring: ZnRing,
 {
     let (x, y, z) = &P;
     let x_sqr = square(Zn, x);
@@ -252,10 +252,10 @@ fn optimize_parameters(ln_p: f64, ln_n: f64) -> (f64, f64) {
 
 /// Optimizes the parameters to find a factor of size roughly `p`; `p` should be at most sqrt(n)
 #[instrument(skip_all, level = "trace")]
-fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+fn lenstra_ec_factor_base<R, F>(Zn: R, log2_p: usize, mut rng: F) -> Option<El<<R::Ring as ZnRing>::IntegerRing>>
 where
     R: RingStore + Copy,
-    R::Type: ZnRing + DivisibilityRing,
+    R::Ring: ZnRing + DivisibilityRing,
     F: FnMut() -> u64 + Send,
 {
     event!(
@@ -355,10 +355,10 @@ pub fn lenstra_ec_factor_small<R>(
     Zn: R,
     min_factor_bound_log2: usize,
     repetitions: usize,
-) -> Option<El<<R::Type as ZnRing>::IntegerRing>>
+) -> Option<El<<R::Ring as ZnRing>::IntegerRing>>
 where
     R: ZnRingStore + DivisibilityRingStore + Copy,
-    R::Type: ZnRing + DivisibilityRing,
+    R::Ring: ZnRing + DivisibilityRing,
 {
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
     assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
@@ -379,10 +379,10 @@ where
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Type as ZnRing>::IntegerRing>
+pub fn lenstra_ec_factor<R>(Zn: R) -> El<<R::Ring as ZnRing>::IntegerRing>
 where
     R: ZnRingStore + DivisibilityRingStore + Copy,
-    R::Type: ZnRing + DivisibilityRing,
+    R::Ring: ZnRing + DivisibilityRing,
 {
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
     assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
@@ -475,7 +475,7 @@ fn test_compute_partial_factorization() {
         RustBigintRing::RING
     );
 
-    let Zn = zn_big::ZnGB::new(ZZbig, ZZbig.clone_el(&n));
+    let Zn = zn_big::ZnGB::new(ZZbig, n.clone());
     let factor = lenstra_ec_factor_small(&Zn, 50, 1).unwrap();
     ZZbig.println(&factor);
     assert!(!ZZbig.is_one(&factor));
