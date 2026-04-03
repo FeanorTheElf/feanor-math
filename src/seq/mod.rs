@@ -826,18 +826,18 @@ impl<'a, T: Clone> Fn<(&'a T,)> for CloneValue {
     extern "rust-call" fn call(&self, args: (&'a T,)) -> Self::Output { args.0.clone() }
 }
 
-impl<'a, T: Clone> FnOnce<(usize, &'a T,)> for CloneValue {
+impl<'a, T: Clone> FnOnce<(usize, &'a T)> for CloneValue {
     type Output = T;
 
-    extern "rust-call" fn call_once(self, args: (usize, &'a T,)) -> Self::Output { self.call(args) }
+    extern "rust-call" fn call_once(self, args: (usize, &'a T)) -> Self::Output { self.call(args) }
 }
 
-impl<'a, T: Clone> FnMut<(usize, &'a T,)> for CloneValue {
-    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a T,)) -> Self::Output { self.call(args) }
+impl<'a, T: Clone> FnMut<(usize, &'a T)> for CloneValue {
+    extern "rust-call" fn call_mut(&mut self, args: (usize, &'a T)) -> Self::Output { self.call(args) }
 }
 
-impl<'a, T: Clone> Fn<(usize, &'a T,)> for CloneValue {
-    extern "rust-call" fn call(&self, args: (usize, &'a T,)) -> Self::Output { args.1.clone() }
+impl<'a, T: Clone> Fn<(usize, &'a T)> for CloneValue {
+    extern "rust-call" fn call(&self, args: (usize, &'a T)) -> Self::Output { args.1.clone() }
 }
 
 #[test]

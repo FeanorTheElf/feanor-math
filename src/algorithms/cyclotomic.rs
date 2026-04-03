@@ -62,18 +62,12 @@ where
         power_of_x *= ZZ.pow(p, e - 1) as usize;
         current = P
             .checked_div(
-                &P.from_terms(
-                    P.terms(&current)
-                        .map(|(c, d)| (c.clone(), d * p as usize)),
-                ),
+                &P.from_terms(P.terms(&current).map(|(c, d)| (c.clone(), d * p as usize))),
                 &current,
             )
             .unwrap();
     }
-    return P.from_terms(
-        P.terms(&current)
-            .map(|(c, d)| (c.clone(), d * power_of_x)),
-    );
+    return P.from_terms(P.terms(&current).map(|(c, d)| (c.clone(), d * power_of_x)));
 }
 
 /// Computes the `n`-th cyclotomic polynomial.

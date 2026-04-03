@@ -19,9 +19,6 @@ use crate::specialization::FiniteRingOperation;
 pub mod finite;
 /// Contains algorithms for computing the gcd of polynomials.
 pub mod gcd_locally;
-/// Contains an implementation of Hensel lifting, to lift a factorization modulo
-/// a maximal ideal to a factorization modulo a power of this ideal.
-pub mod hensel;
 /// Contains algorithms for computing power decompositions and the square-free
 /// part of polynomials.
 pub mod squarefree_part;
@@ -89,7 +86,7 @@ pub trait PolyTFracGCDRing {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         poly_ring.prod(Self::power_decomposition(poly_ring, poly).into_iter().map(|(f, _)| f))
     }
@@ -104,7 +101,7 @@ pub trait PolyTFracGCDRing {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>;
+        BaseRingStore<P>: RingStore<Ring = Self>;
 
     /// Computes the greatest common divisor of two polynomials `f, g` over the fraction field,
     /// which is the largest-degree polynomial `d` such that `d | a f, a g` for some
@@ -134,7 +131,7 @@ pub trait PolyTFracGCDRing {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>;
+        BaseRingStore<P>: RingStore<Ring = Self>;
 }
 
 /// Computes the map
@@ -144,11 +141,11 @@ pub trait PolyTFracGCDRing {
 /// that can be used to make polynomials over a domain monic (when setting `a = lc(f)`).
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<BaseRing<P>>) -> El<P>
+pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<BaseRingStore<P>>) -> El<P>
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
+    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
     if poly_ring.is_zero(f) {
         return poly_ring.zero();
@@ -168,11 +165,11 @@ where
 /// Computes the inverse to [`evaluate_aX()`].
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<BaseRing<P>>) -> El<P>
+pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<BaseRingStore<P>>) -> El<P>
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
+    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
     if poly_ring.is_zero(g) {
         return poly_ring.zero();
@@ -193,11 +190,11 @@ where
 /// is the content of `f`, i.e. the gcd of all coefficients of `f`.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<BaseRing<P>>)
+pub fn make_primitive<P>(poly_ring: P, f: &El<P>) -> (El<P>, El<BaseRingStore<P>>)
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: PrincipalIdealRing + Domain,
+    <BaseRingStore<P> as RingStore>::Ring: PrincipalIdealRing + Domain,
 {
     if poly_ring.is_zero(f) {
         return (poly_ring.zero(), poly_ring.base_ring().one());
@@ -236,7 +233,7 @@ pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: DivisibilityRing + Domain,
+    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
     assert!(poly_ring.degree(&f).unwrap() % k == 0);
     let d = poly_ring.degree(&f).unwrap() / k;
@@ -246,10 +243,7 @@ where
     let mut result_reversed = Vec::new();
     result_reversed.push(ring.one());
     for i in 1..=d {
-        let g = poly_ring.pow(
-            poly_ring.from_terms((0..i).map(|j| (result_reversed[j].clone(), j))),
-            k,
-        );
+        let g = poly_ring.pow(poly_ring.from_terms((0..i).map(|j| (result_reversed[j].clone(), j))), k);
         let partition_sum = poly_ring.coefficient_at(&g, i);
         let next_coeff = ring.checked_div(
             &ring.sub_ref(poly_ring.coefficient_at(&f, k * d - i), partition_sum),
@@ -274,52 +268,44 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         struct PowerDecompositionOperation<'a, P>(P, &'a El<P>)
         where
             P: RingStore + Copy,
             P::Ring: PolyRing,
-            <BaseRing<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
+            <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
 
-        impl<'a, P> FiniteRingOperation<<BaseRing<P> as RingStore>::Ring> for PowerDecompositionOperation<'a, P>
+        impl<'a, P> FiniteRingOperation<<BaseRingStore<P> as RingStore>::Ring> for PowerDecompositionOperation<'a, P>
         where
             P: RingStore + Copy,
             P::Ring: PolyRing + DivisibilityRing,
-            <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
+            <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
         {
             type Output = Vec<(El<P>, usize)>;
 
             fn execute(self) -> Vec<(El<P>, usize)>
             where
-                <BaseRing<P> as RingStore>::Ring: FiniteRing,
+                <BaseRingStore<P> as RingStore>::Ring: FiniteRing,
             {
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
                     "X",
                 );
-                let new_poly = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| {
-                    (
-                        new_poly_ring
-                            .base_ring()
-                            .get_ring()
-                            .rev_delegate(c.clone()),
-                        i,
-                    )
-                }));
+                let new_poly = new_poly_ring.from_terms(
+                    self.0
+                        .terms(&self.1)
+                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(c.clone()), i)),
+                );
                 poly_power_decomposition_finite_field(&new_poly_ring, &new_poly)
                     .into_iter()
                     .map(|(f, k)| {
                         (
-                            self.0.from_terms(new_poly_ring.terms(&f).map(|(c, i)| {
-                                (
-                                    new_poly_ring
-                                        .base_ring()
-                                        .get_ring()
-                                        .unwrap_element(c.clone()),
-                                    i,
-                                )
-                            })),
+                            self.0.from_terms(
+                                new_poly_ring
+                                    .terms(&f)
+                                    .map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(c.clone()), i)),
+                            ),
                             k,
                         )
                     })
@@ -339,58 +325,46 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         struct PolyGCDOperation<'a, P>(P, &'a El<P>, &'a El<P>)
         where
             P: RingStore + Copy,
             P::Ring: PolyRing,
-            <BaseRing<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
+            <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
 
-        impl<'a, P> FiniteRingOperation<<BaseRing<P> as RingStore>::Ring> for PolyGCDOperation<'a, P>
+        impl<'a, P> FiniteRingOperation<<BaseRingStore<P> as RingStore>::Ring> for PolyGCDOperation<'a, P>
         where
             P: RingStore + Copy,
             P::Ring: PolyRing + DivisibilityRing,
-            <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
+            <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
         {
             type Output = El<P>;
 
             fn execute(self) -> El<P>
             where
-                <BaseRing<P> as RingStore>::Ring: FiniteRing,
+                <BaseRingStore<P> as RingStore>::Ring: FiniteRing,
             {
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
                     "X",
                 );
-                let new_lhs = new_poly_ring.from_terms(self.0.terms(&self.1).map(|(c, i)| {
-                    (
-                        new_poly_ring
-                            .base_ring()
-                            .get_ring()
-                            .rev_delegate(c.clone()),
-                        i,
-                    )
-                }));
-                let new_rhs = new_poly_ring.from_terms(self.0.terms(&self.2).map(|(c, i)| {
-                    (
-                        new_poly_ring
-                            .base_ring()
-                            .get_ring()
-                            .rev_delegate(c.clone()),
-                        i,
-                    )
-                }));
+                let new_lhs = new_poly_ring.from_terms(
+                    self.0
+                        .terms(&self.1)
+                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(c.clone()), i)),
+                );
+                let new_rhs = new_poly_ring.from_terms(
+                    self.0
+                        .terms(&self.2)
+                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(c.clone()), i)),
+                );
                 let result = new_poly_ring.normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs).2);
-                return self.0.from_terms(new_poly_ring.terms(&result).map(|(c, i)| {
-                    (
-                        new_poly_ring
-                            .base_ring()
-                            .get_ring()
-                            .unwrap_element(c.clone()),
-                        i,
-                    )
-                }));
+                return self.0.from_terms(
+                    new_poly_ring
+                        .terms(&result)
+                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(c.clone()), i)),
+                );
             }
 
             fn fallback(self) -> Self::Output {

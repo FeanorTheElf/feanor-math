@@ -298,11 +298,11 @@ impl<C, A> Clone for ZnRNSEl<C, A>
 where
     C: RingStore,
     C::Ring: ZnRing,
-    A: Allocator + Send + Sync + Clone
+    A: Allocator + Send + Sync + Clone,
 {
     fn clone(&self) -> Self {
         Self {
-            data: self.data.clone()
+            data: self.data.clone(),
         }
     }
 }
@@ -755,11 +755,7 @@ where
         if ZZ.get_ring().representable_bits().is_none()
             || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits()
         {
-            Some(int_cast(
-                self.modulus().clone(),
-                ZZ,
-                self.integer_ring(),
-            ))
+            Some(int_cast(self.modulus().clone(), ZZ, self.integer_ring()))
         } else {
             None
         }

@@ -34,7 +34,7 @@ fn pow_geometric_series_characteristic<R>(ring: R, a: El<R>, e: usize) -> El<R>
 where
     R: RingStore,
     R::Ring: FreeAlgebra,
-    <BaseRing<R> as RingStore>::Ring: FiniteRing,
+    <BaseRingStore<R> as RingStore>::Ring: FiniteRing,
 {
     let q = ring.base_ring().size(BigIntRing::RING).unwrap();
     let log2_q = BigIntRing::RING.abs_log2_ceil(&q).unwrap();
@@ -86,8 +86,8 @@ where
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
     R::Ring: FreeAlgebra,
-    BaseRing<R>: RingStore<Ring = <BaseRing<P> as RingStore>::Ring>,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     if mod_f_ring.rank() == 1 {
         return true;
@@ -131,8 +131,8 @@ where
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
     R::Ring: FreeAlgebra,
-    BaseRing<R>: RingStore<Ring = <BaseRing<P> as RingStore>::Ring>,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -232,18 +232,14 @@ pub fn distinct_degree_factorization<P>(poly_ring: P, mut f: El<P>) -> Vec<El<P>
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRing<P>: FieldStore + RingStore,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    BaseRingStore<P>: FieldStore + RingStore,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     let lc = poly_ring.lc(&f).unwrap().clone();
     f = poly_ring.normalize(f);
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
-        .map(|i| {
-            poly_ring
-                .base_ring()
-                .negate(poly_ring.coefficient_at(&f, i).clone())
-        })
+        .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
 
@@ -262,8 +258,8 @@ where
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
     R::Ring: FreeAlgebra,
-    BaseRing<R>: RingStore<Ring = <BaseRing<P> as RingStore>::Ring>,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -332,16 +328,12 @@ pub fn cantor_zassenhaus<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRing<P>: RingStore + FieldStore,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    BaseRingStore<P>: RingStore + FieldStore,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     f = poly_ring.normalize(f);
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
-        .map(|i| {
-            poly_ring
-                .base_ring()
-                .negate(poly_ring.coefficient_at(&f, i).clone())
-        })
+        .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
     let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
@@ -361,8 +353,8 @@ where
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
     R::Ring: FreeAlgebra,
-    BaseRing<R>: RingStore<Ring = <BaseRing<P> as RingStore>::Ring>,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     let ZZ = BigIntRing::RING;
@@ -419,8 +411,8 @@ where
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
     R::Ring: FreeAlgebra,
-    BaseRing<R>: RingStore<Ring = <BaseRing<P> as RingStore>::Ring>,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
+    BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     assert!(mod_f_ring.rank() % d == 0);
@@ -508,16 +500,12 @@ pub fn cantor_zassenhaus_even<P>(poly_ring: P, mut f: El<P>, d: usize) -> El<P>
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRing<P>: RingStore + FieldStore,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
+    BaseRingStore<P>: RingStore + FieldStore,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
 {
     f = poly_ring.normalize(f);
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
-        .map(|i| {
-            poly_ring
-                .base_ring()
-                .negate(poly_ring.coefficient_at(&f, i).clone())
-        })
+        .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
     let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);

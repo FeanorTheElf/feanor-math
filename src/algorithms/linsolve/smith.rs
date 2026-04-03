@@ -392,12 +392,7 @@ fn test_solve_zn() {
     );
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 4, ring);
     ring.get_ring()
-        .solve_right(
-            A.clone().data_mut(),
-            B.clone().data_mut(),
-            solution.data_mut(),
-            Global,
-        )
+        .solve_right(A.clone().data_mut(), B.clone().data_mut(), solution.data_mut(), Global)
         .assert_solved();
 
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
@@ -411,12 +406,8 @@ fn test_unique_solution_correct() {
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
     assert_eq!(
         SolveResult::FoundUniqueSolution,
-        ring.get_ring().solve_right(
-            A.clone().data_mut(),
-            B.clone().data_mut(),
-            solution.data_mut(),
-            Global
-        )
+        ring.get_ring()
+            .solve_right(A.clone().data_mut(), B.clone().data_mut(), solution.data_mut(), Global)
     );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 
@@ -425,12 +416,8 @@ fn test_unique_solution_correct() {
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
     assert_eq!(
         SolveResult::FoundSomeSolution,
-        ring.get_ring().solve_right(
-            A.clone().data_mut(),
-            B.clone().data_mut(),
-            solution.data_mut(),
-            Global
-        )
+        ring.get_ring()
+            .solve_right(A.clone().data_mut(), B.clone().data_mut(), solution.data_mut(), Global)
     );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 
@@ -439,12 +426,8 @@ fn test_unique_solution_correct() {
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
     assert_eq!(
         SolveResult::FoundSomeSolution,
-        ring.get_ring().solve_right(
-            A.clone().data_mut(),
-            B.clone().data_mut(),
-            solution.data_mut(),
-            Global
-        )
+        ring.get_ring()
+            .solve_right(A.clone().data_mut(), B.clone().data_mut(), solution.data_mut(), Global)
     );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 }
@@ -457,12 +440,7 @@ fn test_solve_int() {
     let B: OwnedMatrix<i64> = OwnedMatrix::identity(2, 2, ring);
     let mut solution: OwnedMatrix<i64> = OwnedMatrix::zero(6, 2, ring);
     ring.get_ring()
-        .solve_right(
-            A.clone().data_mut(),
-            B.clone().data_mut(),
-            solution.data_mut(),
-            Global,
-        )
+        .solve_right(A.clone().data_mut(), B.clone().data_mut(), solution.data_mut(), Global)
         .assert_solved();
 
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], &ring), &B);
@@ -489,12 +467,7 @@ fn test_large() {
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(11, 11, ring);
     assert!(
         ring.get_ring()
-            .solve_right(
-                A.clone().data_mut(),
-                A.data_mut(),
-                solution.data_mut(),
-                Global
-            )
+            .solve_right(A.clone().data_mut(), A.data_mut(), solution.data_mut(), Global)
             .is_solved()
     );
 }

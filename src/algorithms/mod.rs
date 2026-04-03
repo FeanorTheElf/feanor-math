@@ -27,6 +27,9 @@ pub mod extension_ops;
 pub mod fft;
 /// Contains an implementation of the Fincke-Pohst lattice point enumeration algorithm.
 pub mod fincke_pohst;
+/// Contains an implementation of Hensel lifting, to lift a factorization modulo
+/// a maximal ideal to a factorization modulo a power of this ideal.
+pub mod hensel;
 /// Contains an implementation of the bisection method for computing roots, but
 /// working with integers only.
 pub mod int_bisect;

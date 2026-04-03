@@ -83,7 +83,7 @@ where
 impl<'conv, R, V> FreeAlgebraImpl<R, V, DynConvolution<'conv, R::Ring>, Global>
 where
     R: RingStore + 'conv,
-    V: VectorView<El<R>> + Send + Sync + Clone
+    V: VectorView<El<R>> + Send + Sync + Clone,
 {
     /// Creates a new [`FreeAlgebraImpl`] ring as extension of the given base ring.
     ///
@@ -290,11 +290,11 @@ where
 impl<R, A> Clone for FreeAlgebraImplEl<R, A>
 where
     R: RingStore,
-    A: Allocator + Clone + Send + Sync
+    A: Allocator + Clone + Send + Sync,
 {
     fn clone(&self) -> Self {
         Self {
-            values: self.values.clone()
+            values: self.values.clone(),
         }
     }
 }
@@ -572,9 +572,7 @@ where
             Global,
         );
         if has_sol.is_solved() {
-            return Some(
-                self.from_canonical_basis((0..self.rank()).map(|i| solution.at(i, 0).clone())),
-            );
+            return Some(self.from_canonical_basis((0..self.rank()).map(|i| solution.at(i, 0).clone())));
         } else {
             return None;
         }
@@ -711,11 +709,7 @@ where
         assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
         let rank = poly_ring.degree(&poly).unwrap();
         let x_pow_rank = (0..rank)
-            .map(|i| {
-                poly_ring
-                    .base_ring()
-                    .negate(poly_ring.coefficient_at(&poly, i).clone())
-            })
+            .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&poly, i).clone()))
             .collect::<Vec<_>>();
         let base_ring = poly_ring.into().into_base_ring();
         let log2_padded_len = StaticRing::<i64>::RING

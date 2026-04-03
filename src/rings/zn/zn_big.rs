@@ -402,8 +402,7 @@ where
     I::Ring: IntegerRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        self.integer_ring()
-            .hash(&self.smallest_positive_lift(el.clone()), h)
+        self.integer_ring().hash(&self.smallest_positive_lift(el.clone()), h)
     }
 }
 
@@ -692,11 +691,7 @@ where
         if ZZ.get_ring().representable_bits().is_none()
             || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits()
         {
-            Some(int_cast(
-                self.modulus().clone(),
-                ZZ,
-                self.integer_ring(),
-            ))
+            Some(int_cast(self.modulus().clone(), ZZ, self.integer_ring()))
         } else {
             None
         }

@@ -34,7 +34,7 @@ pub fn absolute_error_of_poly_eval<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Ring = Complex64Base>,
+    BaseRingStore<P>: RingStore<Ring = Complex64Base>,
 {
     let CC = Complex64::RING;
     let mut current = point;
@@ -60,7 +60,7 @@ fn bound_distance_to_root<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Ring = Complex64Base>,
+    BaseRingStore<P>: RingStore<Ring = Complex64Base>,
 {
     let CC = Complex64::RING;
     let f = poly;
@@ -113,7 +113,7 @@ fn newton_with_initial<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Ring = Complex64Base>,
+    BaseRingStore<P>: RingStore<Ring = Complex64Base>,
 {
     let CC = Complex64::RING;
     let f_prime = derive_poly(&poly_ring, f);
@@ -139,7 +139,7 @@ fn find_approximate_complex_root_squarefree<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Ring = Complex64Base>,
+    BaseRingStore<P>: RingStore<Ring = Complex64Base>,
 {
     let mut rng = Rand64::new(1);
     let CC = Complex64::RING;
@@ -210,7 +210,7 @@ pub fn find_approximate_complex_root<P>(ZZX: P, f: &El<P>) -> Result<(El<Complex
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: IntegerRing,
+    <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(ZZX.degree(f).unwrap_or(0) > 0);
     let CC = Complex64::RING;
@@ -243,7 +243,7 @@ pub fn find_all_approximate_complex_roots<P>(ZZX: P, poly: &El<P>) -> Result<Vec
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: IntegerRing,
+    <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(ZZX.degree(poly).unwrap_or(0) > 0);
     let CC = Complex64::RING;

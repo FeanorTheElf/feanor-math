@@ -24,11 +24,11 @@ use crate::specialization::FiniteRingOperation;
 /// are implementing said method for a custom ring.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<BaseRing<P>>
+pub fn resultant_finite_field<P>(ring: P, mut f: El<P>, mut g: El<P>) -> El<BaseRingStore<P>>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Ring: Domain + FiniteRing,
+    <BaseRingStore<P> as RingStore>::Ring: Domain + FiniteRing,
 {
     let base_ring = ring.base_ring();
     if ring.is_zero(&g) || ring.is_zero(&f) {
@@ -49,10 +49,7 @@ where
         g = r;
         base_ring.mul_assign(
             &mut scale,
-            base_ring.pow(
-                ring.lc(&f).unwrap().clone(),
-                deg_g - ring.degree(&g).unwrap_or(0),
-            ),
+            base_ring.pow(ring.lc(&f).unwrap().clone(), deg_g - ring.degree(&g).unwrap_or(0)),
         );
 
         swap(&mut f, &mut g);
@@ -72,11 +69,11 @@ where
 }
 
 #[instrument(skip_all, level = "trace")]
-fn resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<BaseRing<P>>
+fn resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<BaseRingStore<P>>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: LiftPolyEvalRing + Domain + SelfIso,
+    <BaseRingStore<P> as RingStore>::Ring: LiftPolyEvalRing + Domain + SelfIso,
 {
     let base_ring = poly_ring.base_ring();
     if poly_ring.is_zero(f) || poly_ring.is_zero(g) {
@@ -155,37 +152,37 @@ pub trait ComputeResultantRing: RingBase {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = Self>;
+        BaseRingStore<P>: RingStore<Ring = Self>;
 }
 
 impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R {
-    default fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<BaseRing<P>>
+    default fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<BaseRingStore<P>>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = R>,
+        BaseRingStore<P>: RingStore<Ring = R>,
     {
         struct ComputeResultant<P>
         where
             P: RingStore + Copy,
             P::Ring: PolyRing,
-            <BaseRing<P> as RingStore>::Ring: LiftPolyEvalRing + Domain + SelfIso,
+            <BaseRingStore<P> as RingStore>::Ring: LiftPolyEvalRing + Domain + SelfIso,
         {
             ring: P,
             f: El<P>,
             g: El<P>,
         }
-        impl<P> FiniteRingOperation<<BaseRing<P> as RingStore>::Ring> for ComputeResultant<P>
+        impl<P> FiniteRingOperation<<BaseRingStore<P> as RingStore>::Ring> for ComputeResultant<P>
         where
             P: RingStore + Copy,
             P::Ring: PolyRing,
-            <BaseRing<P> as RingStore>::Ring: LiftPolyEvalRing + Domain + SelfIso,
+            <BaseRingStore<P> as RingStore>::Ring: LiftPolyEvalRing + Domain + SelfIso,
         {
-            type Output = El<BaseRing<P>>;
+            type Output = El<BaseRingStore<P>>;
 
             fn execute(self) -> Self::Output
             where
-                <BaseRing<P> as RingStore>::Ring: FiniteRing,
+                <BaseRingStore<P> as RingStore>::Ring: FiniteRing,
             {
                 let new_poly_ring = DensePolyRing::new(
                     AsField::from(AsFieldBase::promise_is_perfect_field(self.ring.base_ring())),
@@ -210,11 +207,11 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<BaseRing<P>>
+    fn resultant<P>(ring: P, f: El<P>, g: El<P>) -> El<BaseRingStore<P>>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         if ring.is_zero(&g) || ring.is_zero(&f) {
             return ring.base_ring().zero();

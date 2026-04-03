@@ -671,22 +671,14 @@ pub mod generic_tests {
         let d = ring.int_hom().map(8);
         for k in -10..=10 {
             let mut a = ring.int_hom().map(k);
-            assert_el_eq!(
-                ring,
-                ring.int_hom().map(k / 8),
-                ring.euclidean_div(a.clone(), &d)
-            );
+            assert_el_eq!(ring, ring.int_hom().map(k / 8), ring.euclidean_div(a.clone(), &d));
             ring.euclidean_div_pow_2(&mut a, 3);
             assert_el_eq!(ring, ring.int_hom().map(k / 8), a);
         }
         let d = ring.int_hom().map(-8);
         for k in -10..=10 {
             let a = ring.int_hom().map(k);
-            assert_el_eq!(
-                ring,
-                ring.int_hom().map(k / -8),
-                ring.euclidean_div(a.clone(), &d)
-            );
+            assert_el_eq!(ring, ring.int_hom().map(k / -8), ring.euclidean_div(a.clone(), &d));
         }
 
         // test rounded_div

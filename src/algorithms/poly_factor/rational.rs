@@ -13,11 +13,11 @@ use crate::rings::zn::zn_64b::*;
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
+pub fn poly_factor_rational<'a, P, I>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRingStore<P>>)
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRing<P>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<P>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
     Zn64BBase: CanHomFrom<I::Ring>,

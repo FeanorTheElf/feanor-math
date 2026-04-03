@@ -3,8 +3,8 @@ use std::convert::identity;
 use tracing::{Level, event, instrument};
 
 use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::algorithms::hensel::*;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::algorithms::poly_gcd::hensel::*;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::*;
 use crate::divisibility::*;
@@ -30,7 +30,7 @@ where
     R: ?Sized + PolyLiftFactorsDomain,
     P1: RingStore + Copy,
     P1::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P1>: RingStore<Ring = R>,
+    BaseRingStore<P1>: RingStore<Ring = R>,
     P2: RingStore + Copy,
     P2::Ring: PolyRing<BaseRing = &'local R::LocalRing<'ring>>,
     R::LocalRing<'ring>: 'local,
@@ -70,12 +70,7 @@ where
             if indices.len() == 0 {
                 return None;
             }
-            let factor = local_poly_ring.prod(
-                indices
-                    .iter()
-                    .copied()
-                    .map(|i| local_factors[i].clone()),
-            );
+            let factor = local_poly_ring.prod(indices.iter().copied().map(|i| local_factors[i].clone()));
             let lifted_factor = reconstruct_poly(factor);
             if let Some(quo) = poly_ring.checked_div(&current, &lifted_factor) {
                 return Some((lifted_factor, quo, clone_slice(indices)));
@@ -123,7 +118,7 @@ where
     R: ?Sized + PolyLiftFactorsDomain,
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Ring = R>,
+    BaseRingStore<P>: RingStore<Ring = R>,
 {
     event!(Level::TRACE, poly_deg = poly_ring.degree(poly).unwrap());
     let ring = poly_ring.base_ring().get_ring();
@@ -177,7 +172,7 @@ fn ln_factor_max_coeff<P>(ZZX: P, f: &El<P>) -> f64
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: IntegerRing,
+    <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(!ZZX.is_zero(f));
     let ZZ = ZZX.base_ring();
@@ -194,7 +189,7 @@ fn poly_factor_integer_squarefree_monic<'a, P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
 where
     P: 'a + RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: IntegerRing,
+    <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
     let ZZ = ZZX.base_ring();
     assert!(ZZ.is_one(ZZX.lc(f).unwrap()));
@@ -227,7 +222,7 @@ pub fn poly_factor_integer<P>(ZZX: P, f: El<P>) -> Vec<(El<P>, usize)>
 where
     P: PolyRingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: IntegerRing,
+    <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
     assert!(!ZZX.is_zero(&f));
 
@@ -246,8 +241,7 @@ where
             while let Some(quo) = ZZX.checked_div(
                 &ZZX.inclusion().mul_ref_map(
                     &current,
-                    &ZZX.base_ring()
-                        .pow(irred_factor_lc.clone(), ZZX.degree(&f).unwrap()),
+                    &ZZX.base_ring().pow(irred_factor_lc.clone(), ZZX.degree(&f).unwrap()),
                 ),
                 &irred_factor,
             ) {

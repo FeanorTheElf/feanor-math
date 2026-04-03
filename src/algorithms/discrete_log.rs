@@ -209,9 +209,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             }
             *main_relation_matrix.at_mut(n, n) = -ZZ.pow(p, e);
             for k in 0..e {
-                if let Some(dlog) =
-                    self.padic_dlog(p_idx, e, &group.pow(&new_gen, &ZZbig.pow(p_bigint.clone(), k)))
-                {
+                if let Some(dlog) = self.padic_dlog(p_idx, e, &group.pow(&new_gen, &ZZbig.pow(p_bigint.clone(), k))) {
                     *main_relation_matrix.at_mut(n, n) = -ZZ.pow(p, k);
                     for j in 0..n {
                         *main_relation_matrix.at_mut(n, j) = dlog[j];
@@ -725,11 +723,7 @@ where
             scaled_generating_sets: self
                 .scaled_generating_sets
                 .iter()
-                .map(|sets| {
-                    sets.iter()
-                        .map(|set| set.iter().map(|g| g.clone()).collect())
-                        .collect()
-                })
+                .map(|sets| sets.iter().map(|set| set.iter().map(|g| g.clone()).collect()).collect())
                 .collect(),
             scaled_relation_lattices: self
                 .scaled_relation_lattices
@@ -768,11 +762,7 @@ where
                 }
             });
             order_factorization.retain(|(_, e)| *e > 0);
-            let order = ZZbig.prod(
-                order_factorization
-                    .iter()
-                    .map(|(p, e)| ZZbig.pow(p.clone(), *e)),
-            );
+            let order = ZZbig.prod(order_factorization.iter().map(|(p, e)| ZZbig.pow(p.clone(), *e)));
             let order_factorization = order_factorization
                 .into_iter()
                 .map(|(p, e)| (int_cast(p, ZZ, ZZbig), e))
@@ -920,9 +910,7 @@ where
         let mut current_els = (0..n).map(|_| start_el.clone()).collect::<Vec<_>>();
         let mut current_idxs = (0..n).map(|_| 1).collect::<Vec<_>>();
         for idx in 0..count {
-            if let Some(bs_idx) =
-                baby_step_table.get(&HashableGroupEl::new(&group, current_els[n - 1].clone()))
-            {
+            if let Some(bs_idx) = baby_step_table.get(&HashableGroupEl::new(&group, current_els[n - 1].clone())) {
                 let mut bs_idx = *bs_idx;
                 let mut result = current_idxs.clone();
                 for j in (0..n).rev() {

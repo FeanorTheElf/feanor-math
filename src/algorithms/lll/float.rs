@@ -165,9 +165,7 @@ where
     let sum_error = RR.sum([
         RR.mul_ref_fst(eps, RR.abs(h.map_ref(gso.quadratic_form.at(i, i)))),
         RR.int_hom().mul_map(
-            RR.sum(
-                (0..i).map(|l| RR.mul_ref_snd(RR.abs(gso.cholesky.at(l, i).clone()), &gso.error_bound.at(l, i))),
-            ),
+            RR.sum((0..i).map(|l| RR.mul_ref_snd(RR.abs(gso.cholesky.at(l, i).clone()), &gso.error_bound.at(l, i)))),
             2,
         ),
     ]);

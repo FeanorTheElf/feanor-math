@@ -23,7 +23,7 @@ pub fn poly_power_decomposition_finite_field<P>(poly_ring: P, poly: &El<P>) -> V
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(!poly_ring.is_zero(&poly));
     let squarefree_part = poly_squarefree_part_finite_field(poly_ring, poly);
@@ -62,7 +62,7 @@ pub fn poly_squarefree_part_finite_field<P>(poly_ring: P, poly: &El<P>) -> El<P>
 where
     P: RingStore,
     P::Ring: PolyRing + PrincipalIdealRing,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(!poly_ring.is_zero(&poly));
     if poly_ring.degree(poly).unwrap() == 0 {
@@ -75,11 +75,8 @@ where
         let p_usize = int_cast(p.clone(), StaticRing::<i64>::RING, BigIntRing::RING) as usize;
         assert!(p_usize > 0);
         let power = BigIntRing::RING.pow(p, e - 1);
-        let undo_frobenius = |x: &El<BaseRing<P>>| {
-            poly_ring
-                .base_ring()
-                .pow_gen(x.clone(), &power, BigIntRing::RING)
-        };
+        let undo_frobenius =
+            |x: &El<BaseRingStore<P>>| poly_ring.base_ring().pow_gen(x.clone(), &power, BigIntRing::RING);
         let base_poly = poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| {
             debug_assert!(i % p_usize == 0);
             (undo_frobenius(c), i / p_usize)
@@ -110,7 +107,7 @@ pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, 
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Ring: Field,
+    <BaseRingStore<P> as RingStore>::Ring: Field,
 {
     fn fast_poly_eea_impl<P>(
         poly_ring: P,
@@ -122,7 +119,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
-        <BaseRing<P> as RingStore>::Ring: Field,
+        <BaseRingStore<P> as RingStore>::Ring: Field,
     {
         if poly_ring.is_zero(&lhs) || poly_ring.is_zero(&rhs) {
             return (

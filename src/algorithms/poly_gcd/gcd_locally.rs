@@ -4,7 +4,7 @@ use tracing::{Level, event, instrument};
 
 use super::{evaluate_aX, unevaluate_aX};
 use crate::MAX_PROBABILISTIC_REPETITIONS;
-use crate::algorithms::poly_gcd::hensel::*;
+use crate::algorithms::hensel::*;
 use crate::algorithms::poly_gcd::*;
 use crate::seq::*;
 
@@ -40,7 +40,7 @@ fn poly_gcd_monic_coprime_local<P, F>(
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain,
+    <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain,
     F: FnMut() -> u64,
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
@@ -147,7 +147,7 @@ fn poly_gcd_coprime_local<P, F>(poly_ring: P, mut f: El<P>, mut g: El<P>, rng: F
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain,
+    <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain,
     F: FnMut() -> u64,
 {
     if poly_ring.is_zero(&f) {
@@ -185,7 +185,7 @@ pub fn poly_gcd_monic_local<'a, P>(poly_ring: P, mut f: &'a El<P>, mut g: &'a El
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain,
+    <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain,
 {
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
     assert!(poly_ring.base_ring().is_one(poly_ring.lc(g).unwrap()));
@@ -251,7 +251,7 @@ pub fn poly_gcd_local<P>(poly_ring: P, mut f: El<P>, mut g: El<P>) -> El<P>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    <BaseRing<P> as RingStore>::Ring: PolyLiftFactorsDomain,
+    <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain,
 {
     if poly_ring.is_zero(&f) {
         return g.clone();
@@ -348,11 +348,7 @@ fn random_test_poly_gcd_local() {
         let h = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let lhs = poly_ring.mul_ref(&f, &h);
         let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(
-            &poly_ring,
-            &poly_gcd_local(&poly_ring, lhs.clone(), rhs.clone()),
-        )
-        .0;
+        let gcd = make_primitive(&poly_ring, &poly_gcd_local(&poly_ring, lhs.clone(), rhs.clone())).0;
 
         assert!(poly_ring.divides(&lhs, &gcd));
         assert!(poly_ring.divides(&rhs, &gcd));

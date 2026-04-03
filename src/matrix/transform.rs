@@ -278,11 +278,8 @@ where
     ) {
         debug_assert!(i < self.row_count);
         debug_assert!(j < self.row_count);
-        self.transforms.push(Transform::General(
-            i,
-            j,
-            std::array::from_fn(|k| transform[k].clone()),
-        ))
+        self.transforms
+            .push(Transform::General(i, j, std::array::from_fn(|k| transform[k].clone())))
     }
 
     fn subtract<S: Copy + RingStore<Ring = R>>(
@@ -294,8 +291,7 @@ where
     ) {
         debug_assert!(src < self.row_count);
         debug_assert!(dst < self.row_count);
-        self.transforms
-            .push(Transform::Subtract(src, dst, factor.clone()))
+        self.transforms.push(Transform::Subtract(src, dst, factor.clone()))
     }
 
     fn swap<S: Copy + RingStore<Ring = R>>(&mut self, _ring: S, i: usize, j: usize) {

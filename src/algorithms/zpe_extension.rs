@@ -1,7 +1,7 @@
 use tracing::instrument;
 
+use crate::algorithms::hensel::local_zn_ring_bezout_identity;
 use crate::algorithms::linsolve::LinSolveRing;
-use crate::algorithms::poly_gcd::hensel::local_zn_ring_bezout_identity;
 use crate::homomorphism::*;
 use crate::ring::*;
 use crate::rings::extension::*;
@@ -24,8 +24,7 @@ pub fn invert_over_local_zn<S>(ring: S, el: &El<S>) -> Option<El<S>>
 where
     S: RingStore,
     S::Ring: FreeAlgebra,
-    <<S::Ring as RingExtension>::BaseRing as RingStore>::Ring:
-        LinSolveRing + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
+    BaseRingBase<S>: LinSolveRing + SelfIso + ZnRing + FromModulusCreateableZnRing + Clone,
 {
     let base_ring = ring.base_ring();
     let poly_ring = DensePolyRing::new(base_ring, "X");

@@ -570,8 +570,7 @@ pub mod generic_tests {
 
                 let mut actual = Vec::new();
                 actual.extend(
-                    (0..(lhs_len + rhs_len))
-                        .map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(scale.clone(), 2))),
+                    (0..(lhs_len + rhs_len)).map(|i| ring.mul(ring.int_hom().map(i * i), ring.pow(scale.clone(), 2))),
                 );
                 convolution.compute_convolution(&lhs, None, &rhs, None, &mut actual, ring.get_ring());
                 for i in 0..(lhs_len + rhs_len) {

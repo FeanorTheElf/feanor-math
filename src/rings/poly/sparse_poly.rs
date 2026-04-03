@@ -122,10 +122,9 @@ impl<R: RingStore> SparsePolyRingBase<R> {
         F: FnMut(El<R>) -> Option<El<R>>,
     {
         let lhs_val = std::mem::replace(lhs, self.zero());
-        let (quo, rem) = algorithms::poly_div::poly_div_rem(RingRef::from(self), lhs_val, rhs, |x| {
-            left_div_lc(x.clone()).ok_or(())
-        })
-        .ok()?;
+        let (quo, rem) =
+            algorithms::poly_div::poly_div_rem(RingRef::from(self), lhs_val, rhs, |x| left_div_lc(x.clone()).ok_or(()))
+                .ok()?;
         *lhs = rem;
         return Some(quo);
     }
@@ -250,10 +249,9 @@ where
 }
 
 impl<R: RingStore> Clone for SparsePolyRingEl<R> {
-    
     fn clone(&self) -> Self {
         Self {
-            data: self.data.clone()
+            data: self.data.clone(),
         }
     }
 }
@@ -388,10 +386,10 @@ where
     ) -> SparsePolyRingEl<R1> {
         let mut result = SparseMapVector::new(el.data.len(), from.base_ring.clone());
         for (j, c) in el.data.nontrivial_entries() {
-            *result.at_mut(j) =
-                self.base_ring()
-                    .get_ring()
-                    .map_out(from.base_ring().get_ring(), c.clone(), iso);
+            *result.at_mut(j) = self
+                .base_ring()
+                .get_ring()
+                .map_out(from.base_ring().get_ring(), c.clone(), iso);
         }
         return SparsePolyRingEl { data: result };
     }

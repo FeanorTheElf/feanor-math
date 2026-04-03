@@ -70,14 +70,11 @@ where
     }
 }
 
-impl<R>
-    LengthExtendedConvolution<
-        NTTConvolution<R::Ring, <<R::Ring as RingExtension>::BaseRing as RingStore>::Ring, Inclusion<R>>,
-    >
+impl<R> LengthExtendedConvolution<NTTConvolution<R::Ring, BaseRingBase<R>, Inclusion<R>>>
 where
     R: RingStore,
     R::Ring: RingExtension,
-    <<R::Ring as RingExtension>::BaseRing as RingStore>::Ring: ZnRing,
+    BaseRingBase<R>: ZnRing,
 {
     /// Constructs a [`LengthExtendedConvolution`], which will use a suitable, NTT-based convolution
     /// over the base ring of the given.

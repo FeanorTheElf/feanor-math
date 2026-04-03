@@ -215,9 +215,7 @@ where
         let mut current_num = self.integers.zero();
         for (lhs, rhs) in els {
             let new_den = self.integers.mul_ref(&lhs.1, &rhs.1);
-            let (quo, rem) = self
-                .integers
-                .euclidean_div_rem(current_den.clone(), &new_den);
+            let (quo, rem) = self.integers.euclidean_div_rem(current_den.clone(), &new_den);
             if self.integers.is_zero(&rem) {
                 current_num = self
                     .integers
@@ -340,8 +338,7 @@ where
     fn is_one(&self, value: &Self::Element) -> bool { self.integers.eq_el(&value.0, &value.1) }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.integers
-            .eq_el(&value.0, &self.integers.negate(value.1.clone()))
+        self.integers.eq_el(&value.0, &self.integers.negate(value.1.clone()))
     }
 
     fn is_approximate(&self) -> bool { false }
@@ -764,7 +761,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         assert!(!poly_ring.is_zero(poly));
         let QQX = &poly_ring;
@@ -799,7 +796,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         if poly_ring.is_zero(lhs) {
             return rhs.clone();

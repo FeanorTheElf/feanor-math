@@ -14,11 +14,11 @@ use crate::rings::poly::*;
 /// Factors a polynomial with coefficients in a finite field.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
+pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRingStore<P>>)
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
 {
     assert!(!poly_ring.is_zero(&f));
     let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());

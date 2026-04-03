@@ -120,8 +120,7 @@ where
         let ring = hom.domain();
         let pow_zeta = |i: i64| {
             if i < 0 {
-                ring.invert(&ring.pow(zeta.clone(), (-i).try_into().unwrap()))
-                    .unwrap()
+                ring.invert(&ring.pow(zeta.clone(), (-i).try_into().unwrap())).unwrap()
             } else {
                 ring.pow(zeta.clone(), i.try_into().unwrap())
             }
@@ -190,10 +189,7 @@ where
         let root_of_unity = if self.log3_n == 0 {
             new_hom.codomain().one()
         } else if self.log3_n == 1 {
-            let root_of_unity = self
-                .hom
-                .domain()
-                .pow(self.third_root_of_unity.clone(), 2);
+            let root_of_unity = self.hom.domain().pow(self.third_root_of_unity.clone(), 2);
             debug_assert!(self.ring().eq_el(
                 &self.hom.map_ref(&root_of_unity),
                 self.root_of_unity(self.hom.codomain())
@@ -690,11 +686,7 @@ pub mod generic_tests {
         R::Ring: CanHomFrom<S::Ring>,
         S::Ring: DivisibilityRing,
     {
-        assert!(base.is_zero(&base.sum([
-            base.one(),
-            test_zeta.clone(),
-            base.pow(test_zeta.clone(), 2)
-        ])));
+        assert!(base.is_zero(&base.sum([base.one(), test_zeta.clone(), base.pow(test_zeta.clone(), 2)])));
         let test_inv_twiddle = base.invert(&test_twiddle).unwrap();
         let elements = edge_case_elements.collect::<Vec<_>>();
         let hom = ring.can_hom(&base).unwrap();

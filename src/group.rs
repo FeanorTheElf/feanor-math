@@ -36,9 +36,7 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     /// Applies the group operation to two elements.
     ///
     /// As opposed to [`AbelianGroupBase::op()`], this takes both arguments by reference.
-    fn op_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.op(lhs.clone(), rhs.clone())
-    }
+    fn op_ref(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element { self.op(lhs.clone(), rhs.clone()) }
 
     /// Applies the group operation to two elements.
     ///

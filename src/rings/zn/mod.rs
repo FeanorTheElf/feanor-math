@@ -496,11 +496,7 @@ where
                 };
             Some(Self {
                 map_forward_requirement,
-                to_modulus: int_cast(
-                    to.modulus().clone(),
-                    from.integer_ring(),
-                    to.integer_ring(),
-                ),
+                to_modulus: int_cast(to.modulus().clone(), from.integer_ring(), to.integer_ring()),
                 to_from_int: to.get_ring().has_canonical_hom(to.integer_ring().get_ring()).unwrap(),
                 from_from_int: from
                     .get_ring()

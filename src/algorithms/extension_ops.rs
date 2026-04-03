@@ -55,8 +55,8 @@ where
     R: ?Sized + FreeAlgebra,
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: LinSolveRing,
-    H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRing<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: LinSolveRing,
+    H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRingStore<P> as RingStore>::Ring>,
 {
     let minpoly = minpoly(ring, el, &poly_ring, hom);
     let power = StaticRing::<i64>::RING
@@ -72,8 +72,8 @@ where
     R: ?Sized + FreeAlgebra,
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRing<P> as RingStore>::Ring: LinSolveRing,
-    H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRing<P> as RingStore>::Ring>,
+    <BaseRingStore<P> as RingStore>::Ring: LinSolveRing,
+    H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRingStore<P> as RingStore>::Ring>,
 {
     assert!(!ring.is_zero(el));
     let base_ring = hom.codomain();
@@ -97,7 +97,7 @@ where
             *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
         }
         let mut sol = OwnedMatrix::zero(d, 1, &base_ring);
-        let sol_poly = |sol: &OwnedMatrix<El<BaseRing<P>>>| {
+        let sol_poly = |sol: &OwnedMatrix<El<BaseRingStore<P>>>| {
             poly_ring.from_terms(
                 (0..d)
                     .map(|i| (sol.at(i, 0).clone(), i))
@@ -136,9 +136,7 @@ where
             return result;
         })
         .collect::<Vec<_>>();
-    let mut matrix = OwnedMatrix::from_fn(ring.rank(), ring.rank(), |i, j| {
-        traces[i + j].clone()
-    });
+    let mut matrix = OwnedMatrix::from_fn(ring.rank(), ring.rank(), |i, j| traces[i + j].clone());
     let result = determinant_using_pre_smith(ring.base_ring(), matrix.data_mut(), Global);
     return result;
 }
@@ -149,7 +147,7 @@ pub fn create_multiplication_matrix<R: RingStore, A: Allocator>(
     ring: R,
     el: &El<R>,
     allocator: A,
-) -> OwnedMatrix<El<BaseRing<R>>, A>
+) -> OwnedMatrix<El<BaseRingStore<R>>, A>
 where
     R::Ring: FreeAlgebra,
 {

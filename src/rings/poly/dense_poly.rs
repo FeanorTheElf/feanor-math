@@ -180,8 +180,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
             self.base_ring.sub_assign_ref(&mut lhs.data[i], &rhs.data[i]);
         }
         for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
-            lhs.data
-                .push(self.base_ring().negate(rhs.data[i].clone()));
+            lhs.data.push(self.base_ring().negate(rhs.data[i].clone()));
         }
     }
 
@@ -311,7 +310,6 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
     fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
 }
 
-
 impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R::Ring>> Debug
     for DensePolyRingBase<R, C, A>
 where
@@ -334,11 +332,11 @@ where
 impl<R, A> Clone for DensePolyRingEl<R, A>
 where
     R: RingStore,
-    A: Allocator + Clone + Send + Sync
+    A: Allocator + Clone + Send + Sync,
 {
     fn clone(&self) -> Self {
         Self {
-            data: self.data.clone()
+            data: self.data.clone(),
         }
     }
 }
@@ -452,11 +450,9 @@ where
     ) -> DensePolyRingEl<R1, A1> {
         RingRef::from(from).from_terms((0..el.data.len()).map(|i| {
             (
-                self.base_ring().get_ring().map_out(
-                    from.base_ring().get_ring(),
-                    el.data[i].clone(),
-                    hom,
-                ),
+                self.base_ring()
+                    .get_ring()
+                    .map_out(from.base_ring().get_ring(), el.data[i].clone(), hom),
                 i,
             )
         }))
@@ -684,8 +680,7 @@ where
             self.base_ring()
                 .is_one(self.coefficient_at(rhs, self.degree(rhs).unwrap()))
         );
-        let (quo, rem) = fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| Ok(x.clone()))
-            .unwrap_or_else(no_error);
+        let (quo, rem) = fast_poly_div_rem(RingRef::from(self), lhs, rhs, |x| Ok(x.clone())).unwrap_or_else(no_error);
         return (quo, rem);
     }
 

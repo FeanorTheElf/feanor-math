@@ -35,8 +35,8 @@ pub fn poly_factor_extfield_squarefree<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Ring: Field + FreeAlgebra + PolyTFracGCDRing,
-    <<<BaseRing<P> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring:
+    BaseRingBase<P>: Field + FreeAlgebra + PolyTFracGCDRing,
+    BaseRingBase<BaseRingStore<P>>:
         PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
 {
     let L = LX.base_ring();
@@ -132,12 +132,12 @@ where
 /// field extension of a base field that supports polynomial factorization.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factor_extfield<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRing<P>>)
+pub fn poly_factor_extfield<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>, El<BaseRingStore<P>>)
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRing<P> as RingStore>::Ring: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
-    <<<BaseRing<P> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring:
+    BaseRingBase<P>: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
+    BaseRingBase<BaseRingStore<P>>:
         PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
 {
     let KX = &poly_ring;

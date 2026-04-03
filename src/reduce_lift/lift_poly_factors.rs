@@ -306,11 +306,7 @@ pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
         assert_eq!(1, self.maximal_ideal_factor_count(p));
         let Fp = self.quotient_ring_at(p, 1, 0);
         let Fp = self.local_ring_as_zn(&Fp);
-        return int_cast(
-            Fp.modulus().clone(),
-            BigIntRing::RING,
-            Fp.integer_ring(),
-        );
+        return int_cast(Fp.modulus().clone(), BigIntRing::RING, Fp.integer_ring());
     }
 }
 
@@ -1468,10 +1464,7 @@ where
         assert!(self.integers.eq_el(ideal, &self.prime));
         RingValue::from(
             R::from_modulus(|ZZ| {
-                Ok(RingRef::from(ZZ).pow(
-                    int_cast(self.prime.clone(), RingRef::from(ZZ), &self.integers),
-                    e,
-                ))
+                Ok(RingRef::from(ZZ).pow(int_cast(self.prime.clone(), RingRef::from(ZZ), &self.integers), e))
             })
             .unwrap_or_else(no_error),
         )
@@ -1489,10 +1482,10 @@ where
     {
         debug_assert_eq!(0, max_ideal_idx);
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
-        debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.prime.clone(), to.1),
-            to.0.modulus()
-        ));
+        debug_assert!(
+            self.integers
+                .eq_el(&self.integers.pow(self.prime.clone(), to.1), to.0.modulus())
+        );
         RingRef::from(to.0).coerce(&self.integers, x)
     }
 
@@ -1509,14 +1502,14 @@ where
     {
         debug_assert_eq!(0, max_ideal_idx);
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
-        debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.prime.clone(), to.1),
-            to.0.modulus()
-        ));
-        debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.prime.clone(), from.1),
-            from.0.modulus()
-        ));
+        debug_assert!(
+            self.integers
+                .eq_el(&self.integers.pow(self.prime.clone(), to.1), to.0.modulus())
+        );
+        debug_assert!(
+            self.integers
+                .eq_el(&self.integers.pow(self.prime.clone(), from.1), from.0.modulus())
+        );
         RingRef::from(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
     }
 
@@ -1533,14 +1526,14 @@ where
     {
         debug_assert_eq!(0, max_ideal_idx);
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
-        debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.prime.clone(), to.1),
-            to.0.modulus()
-        ));
-        debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.prime.clone(), from.1),
-            from.0.modulus()
-        ));
+        debug_assert!(
+            self.integers
+                .eq_el(&self.integers.pow(self.prime.clone(), to.1), to.0.modulus())
+        );
+        debug_assert!(
+            self.integers
+                .eq_el(&self.integers.pow(self.prime.clone(), from.1), from.0.modulus())
+        );
         RingRef::from(to.0).coerce(&self.integers, from.0.smallest_positive_lift(x))
     }
 
@@ -1594,10 +1587,10 @@ where
         assert_eq!(1, x.len());
         assert_eq!(1, from.len());
         debug_assert!(self.integers.eq_el(ideal, &self.prime));
-        debug_assert!(self.integers.eq_el(
-            &self.integers.pow(self.prime.clone(), e),
-            from.at(0).modulus()
-        ));
+        debug_assert!(
+            self.integers
+                .eq_el(&self.integers.pow(self.prime.clone(), e), from.at(0).modulus())
+        );
         from.at(0).smallest_lift(x.at(0).clone())
     }
 

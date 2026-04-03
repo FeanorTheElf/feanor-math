@@ -11,7 +11,7 @@ use std::any::Any;
 use std::cmp::{Ordering, max};
 
 /// Type of coefficients of multivariate polynomials of the given ring.
-pub type PolyCoeff<P> = El<<<P as RingStore>::Ring as RingExtension>::BaseRing>;
+pub type PolyCoeff<P> = El<BaseRingStore<P>>;
 
 /// Type of monomials of multivariate polynomials of the given ring.
 pub type PolyMonomial<P> = <<P as RingStore>::Ring as MultivariatePolyRing>::Monomial;
@@ -361,7 +361,7 @@ where
     fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<BaseRing<Self> as RingStore>::Ring, R>,
+        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, R>,
         V: VectorFn<R::Element>,
     {
         self.get_ring().evaluate(f, value, hom)
@@ -373,7 +373,7 @@ where
     where
         P: RingStore,
         P::Ring: MultivariatePolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
     {
         CoefficientHom { from, to: self, hom }
     }
@@ -387,7 +387,7 @@ where
     where
         P: RingStore,
         P::Ring: MultivariatePolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
     {
         self.into_lifted_hom(from, hom)
     }
@@ -660,10 +660,7 @@ where
     PTo: RingStore,
     PFrom::Ring: MultivariatePolyRing,
     PTo::Ring: MultivariatePolyRing,
-    H: Homomorphism<
-            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-        >,
+    H: Homomorphism<BaseRingBase<PFrom>, BaseRingBase<PTo>>,
 {
     from: PFrom,
     to: PTo,
@@ -676,10 +673,7 @@ where
     PTo: RingStore,
     PFrom::Ring: MultivariatePolyRing,
     PTo::Ring: MultivariatePolyRing,
-    H: Homomorphism<
-            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-        >,
+    H: Homomorphism<BaseRingBase<PFrom>, BaseRingBase<PTo>>,
 {
     type DomainStore = PFrom;
     type CodomainStore = PTo;
@@ -764,9 +758,8 @@ pub mod generic_impls {
 
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
-    use crate::seq::VectorView;
-
     use super::*;
+    use crate::seq::VectorView;
 
     #[stability::unstable(feature = "enable")]
     pub fn test_poly_ring_axioms<P: RingStore, I: Iterator<Item = PolyCoeff<P>>>(

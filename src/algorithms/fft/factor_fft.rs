@@ -233,14 +233,11 @@ where
         let len = left_table.len() * right_table.len();
         let root_of_unity_pows = |i: i64| {
             if i >= 0 {
-                hom.domain()
-                    .pow(root_of_unity.clone(), i.try_into().unwrap())
+                hom.domain().pow(root_of_unity.clone(), i.try_into().unwrap())
             } else {
                 let len_i64: i64 = len.try_into().unwrap();
-                hom.domain().pow(
-                    root_of_unity.clone(),
-                    (len_i64 + (i % len_i64)).try_into().unwrap(),
-                )
+                hom.domain()
+                    .pow(root_of_unity.clone(), (len_i64 + (i % len_i64)).try_into().unwrap())
             }
         };
         let result = GeneralCooleyTukeyFFT::create(&hom, root_of_unity_pows, left_table, right_table);

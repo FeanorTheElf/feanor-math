@@ -599,7 +599,7 @@ where
 ///     fn resultant_with_controller<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, _: Controller) -> Self::Element
 ///         where P: RingStore + Copy,
 ///             P::Ring: PolyRing,
-///             BaseRing<P>: RingStore<Ring = Self>,
+///             BaseRingStore<P>: RingStore<Ring = Self>,
 ///             Controller: ComputationController
 ///     {
 ///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");

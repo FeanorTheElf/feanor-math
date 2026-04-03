@@ -177,12 +177,11 @@ impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
 }
 
 impl<T: Clone, A: Allocator + Clone> Clone for OwnedMatrix<T, A> {
-
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
             col_count: self.col_count,
-            row_count: self.row_count
+            row_count: self.row_count,
         }
     }
 }

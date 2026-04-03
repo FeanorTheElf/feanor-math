@@ -911,7 +911,7 @@ pub trait RingExtensionStore: RingStore
 where
     Self::Ring: RingExtension,
 {
-    delegate! { RingExtension, fn base_ring(&self) -> &BaseRing<Self> }
+    delegate! { RingExtension, fn base_ring(&self) -> &BaseRingStore<Self> }
 
     /// Returns the inclusion map of the base ring `R -> self`.
     fn into_inclusion(self) -> Inclusion<Self> { Inclusion::new(self) }
@@ -950,10 +950,23 @@ impl<'a, R: RingBase + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a,
 /// # use feanor_math::ring::*;
 /// # use feanor_math::rings::galois_field::*;
 /// let ring = GaloisField::new(3, 1);
-/// fn foo(base_ring: &BaseRing<GaloisField>) {}
+/// fn foo(base_ring: &BaseRingStore<GaloisField>) {}
 /// foo(ring.base_ring());
 /// ```
-pub type BaseRing<R> = <<R as RingStore>::Ring as RingExtension>::BaseRing;
+pub type BaseRingStore<R> = <<R as RingStore>::Ring as RingExtension>::BaseRing;
+
+/// Type alias for the base ring [`RingBase`] of a [`RingExtensionStore`].
+///
+/// # Example
+///
+/// ```
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::galois_field::*;
+/// let ring = GaloisField::new(3, 1);
+/// fn foo(base_ring: &BaseRingBase<GaloisField>) {}
+/// foo(ring.base_ring().get_ring());
+/// ```
+pub type BaseRingBase<R> = <<<R as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring;
 
 /// Trait for rings that are an extension ring of a base ring.
 /// This does not have to be a proper extension in the mathematical
@@ -1429,11 +1442,7 @@ pub mod generic_tests {
 
         for a in &elements {
             assert_el_eq!(ring, a, ring.get_ring().map_in_ref(ring.get_ring(), a, &hom));
-            assert_el_eq!(
-                ring,
-                a,
-                ring.get_ring().map_out(ring.get_ring(), a.clone(), &iso)
-            );
+            assert_el_eq!(ring, a, ring.get_ring().map_out(ring.get_ring(), a.clone(), &iso));
         }
     }
 

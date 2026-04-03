@@ -351,10 +351,9 @@ impl RingBase for MPZBase {
         out: &mut std::fmt::Formatter<'a>,
         _env: EnvBindingStrength,
     ) -> std::fmt::Result {
-        RustBigintRing::RING.get_ring().dbg(
-            &self.map_out(RustBigintRing::RING.get_ring(), value.clone(), &()),
-            out,
-        )
+        RustBigintRing::RING
+            .get_ring()
+            .dbg(&self.map_out(RustBigintRing::RING.get_ring(), value.clone(), &()), out)
     }
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>

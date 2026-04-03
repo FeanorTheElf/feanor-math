@@ -20,7 +20,7 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(
 where
     R: RingStore,
     R::Ring: FreeAlgebra,
-    <BaseRing<R> as RingStore>::Ring: LinSolveRing,
+    <BaseRingStore<R> as RingStore>::Ring: LinSolveRing,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
     V3: AsPointerToSlice<El<R>>,
@@ -86,9 +86,8 @@ where
 
     for i in 0..lhs.col_count() {
         for j in 0..rhs.col_count() {
-            let res_value = ring.from_canonical_basis(
-                (0..ring.rank()).map(|k| solution.at(i * ring.rank() + k, j).clone()),
-            );
+            let res_value =
+                ring.from_canonical_basis((0..ring.rank()).map(|k| solution.at(i * ring.rank() + k, j).clone()));
             *out.at_mut(i, j) = res_value;
         }
     }

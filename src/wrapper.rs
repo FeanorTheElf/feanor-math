@@ -25,10 +25,7 @@ use crate::ring::*;
 /// let x = ring.indeterminate();
 /// println!(
 ///     "The result is: {}",
-///     ring.formatted_el(&ring.add(
-///         ring.mul(x.clone(), x.clone()),
-///         x.clone()
-///     ))
+///     ring.formatted_el(&ring.add(ring.mul(x.clone(), x.clone()), x.clone()))
 /// );
 /// ```
 /// You can also retrieve the wrapped element
@@ -43,10 +40,7 @@ use crate::ring::*;
 /// let x = RingElementWrapper::new(&ring, ring.indeterminate());
 /// assert_el_eq!(
 ///     &ring,
-///     ring.add(
-///         ring.mul(x.clone(), x.clone()),
-///         x.clone()
-///     ),
+///     ring.add(ring.mul(x.clone(), x.clone()), x.clone()),
 ///     (x.clone() + x.clone() * x).unwrap()
 /// );
 /// ```

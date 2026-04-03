@@ -239,8 +239,7 @@ where
             if i >= 0 {
                 ring.pow(root_of_unity.clone(), i as usize)
             } else {
-                ring.invert(&ring.pow(root_of_unity.clone(), (-i) as usize))
-                    .unwrap()
+                ring.invert(&ring.pow(root_of_unity.clone(), (-i) as usize)).unwrap()
             }
         };
         let result = CooleyTuckeyFFT::create(&hom, root_of_unity_pow, log2_n, Global);

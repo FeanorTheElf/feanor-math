@@ -24,7 +24,7 @@ pub fn poly_div_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left
 where
     P: RingStore,
     P::Ring: PolyRing,
-    F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
+    F: FnMut(&El<BaseRingStore<P>>) -> Result<El<BaseRingStore<P>>, E>,
 {
     assert!(poly_ring.degree(rhs).is_some());
 
@@ -74,7 +74,7 @@ pub fn poly_rem<P, F, E>(poly_ring: P, mut lhs: El<P>, rhs: &El<P>, mut left_div
 where
     P: RingStore,
     P::Ring: PolyRing,
-    F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
+    F: FnMut(&El<BaseRingStore<P>>) -> Result<El<BaseRingStore<P>>, E>,
 {
     assert!(poly_ring.degree(rhs).is_some());
 
@@ -115,13 +115,13 @@ pub fn fast_poly_div_rem<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, mut left_di
 where
     P: RingStore + Copy,
     P::Ring: PolyRing,
-    F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
+    F: FnMut(&El<BaseRingStore<P>>) -> Result<El<BaseRingStore<P>>, E>,
 {
     fn fast_poly_div_impl<P, F, E>(poly_ring: P, f: El<P>, g: &El<P>, left_div_lc: &mut F) -> Result<(El<P>, El<P>), E>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        F: FnMut(&El<BaseRing<P>>) -> Result<El<BaseRing<P>>, E>,
+        F: FnMut(&El<BaseRingStore<P>>) -> Result<El<BaseRingStore<P>>, E>,
     {
         let deg_g = poly_ring.degree(g).unwrap();
         if poly_ring.degree(&f).is_none() || poly_ring.degree(&f).unwrap() < deg_g {
@@ -169,9 +169,7 @@ where
 
         poly_ring.get_ring().add_assign_from_terms(
             &mut f_lower,
-            poly_ring
-                .terms(&r)
-                .map(|(c, i)| (c.clone(), i + split_degree_f)),
+            poly_ring.terms(&r).map(|(c, i)| (c.clone(), i + split_degree_f)),
         );
         debug_assert!(
             poly_ring.degree(&f_lower).is_none()

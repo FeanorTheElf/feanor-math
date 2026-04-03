@@ -34,10 +34,9 @@ fn size_reduce<R, I, V, T>(
     for j in (0..gso_part.col_count()).rev() {
         let target_const = target.as_const();
         let mu = target_const.at(j, 0);
-        let factor = ring.base_ring().rounded_div(
-            ring.get_ring().num(mu).clone(),
-            ring.get_ring().den(mu),
-        );
+        let factor = ring
+            .base_ring()
+            .rounded_div(ring.get_ring().num(mu).clone(), ring.get_ring().den(mu));
         let factor = ring.inclusion().map(factor);
         col_ops.subtract(ring, j, target_j, &factor);
         ring.sub_assign_ref(target.at_mut(j, 0), &factor);

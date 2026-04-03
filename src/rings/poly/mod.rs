@@ -155,7 +155,7 @@ where
     delegate! { PolyRing, fn truncate_monomials(&self, lhs: &mut El<Self>, truncated_at_degree: usize) -> () }
 
     /// See [`PolyRing::coefficient_at()`].
-    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<BaseRing<Self>> {
+    fn coefficient_at<'a>(&'a self, f: &'a El<Self>, i: usize) -> &'a El<BaseRingStore<Self>> {
         self.get_ring().coefficient_at(f, i)
     }
 
@@ -168,7 +168,7 @@ where
     /// the corresponding coefficients will be summed up.
     fn from_terms<I>(&self, iter: I) -> El<Self>
     where
-        I: IntoIterator<Item = (El<BaseRing<Self>>, usize)>,
+        I: IntoIterator<Item = (El<BaseRingStore<Self>>, usize)>,
     {
         let mut result = self.zero();
         self.get_ring().add_assign_from_terms(&mut result, iter);
@@ -181,7 +181,7 @@ where
     /// in which case the computation is aborted and the first error is returned.
     fn try_from_terms<E, I>(&self, iter: I) -> Result<El<Self>, E>
     where
-        I: IntoIterator<Item = Result<(El<BaseRing<Self>>, usize), E>>,
+        I: IntoIterator<Item = Result<(El<BaseRingStore<Self>>, usize), E>>,
     {
         let mut result = self.zero();
         let mut error = None;
@@ -207,7 +207,7 @@ where
 
     /// Returns a reference to the leading coefficient of the given polynomial, or `None` if the
     /// polynomial is zero.
-    fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<BaseRing<Self>>> {
+    fn lc<'a>(&'a self, f: &'a El<Self>) -> Option<&'a El<BaseRingStore<Self>>> {
         Some(self.coefficient_at(f, self.degree(f)?))
     }
 
@@ -233,7 +233,7 @@ where
     /// ```
     fn normalize(&self, mut f: El<Self>) -> El<Self>
     where
-        <BaseRing<Self> as RingStore>::Ring: DivisibilityRing + Domain,
+        <BaseRingStore<Self> as RingStore>::Ring: DivisibilityRing + Domain,
     {
         if self.is_zero(&f) {
             return f;
@@ -253,7 +253,7 @@ where
     fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<BaseRing<Self> as RingStore>::Ring, R>,
+        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, R>,
     {
         self.get_ring().evaluate(f, value, hom)
     }
@@ -267,7 +267,7 @@ where
     where
         P: RingStore,
         P::Ring: PolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
     {
         CoefficientHom { from, to: self, hom }
     }
@@ -278,7 +278,7 @@ where
     where
         P: RingStore,
         P::Ring: PolyRing,
-        H: Homomorphism<<BaseRing<P> as RingStore>::Ring, <BaseRing<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
     {
         self.into_lifted_hom(from, hom)
     }
@@ -366,9 +366,9 @@ where
 
     /// See [`PolyRing::balance_poly()`].
     #[stability::unstable(feature = "enable")]
-    fn balance_poly(&self, f: &mut El<Self>) -> Option<El<BaseRing<Self>>>
+    fn balance_poly(&self, f: &mut El<Self>) -> Option<El<BaseRingStore<Self>>>
     where
-        <BaseRing<Self> as RingStore>::Ring: DivisibilityRing,
+        <BaseRingStore<Self> as RingStore>::Ring: DivisibilityRing,
     {
         self.get_ring().balance_poly(f)
     }
@@ -385,10 +385,7 @@ where
     PTo: RingStore,
     PFrom::Ring: PolyRing,
     PTo::Ring: PolyRing,
-    H: Homomorphism<
-            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-        >,
+    H: Homomorphism<BaseRingBase<PFrom>, BaseRingBase<PTo>>,
 {
     from: PFrom,
     to: PTo,
@@ -401,10 +398,7 @@ where
     PTo: RingStore,
     PFrom::Ring: PolyRing,
     PTo::Ring: PolyRing,
-    H: Homomorphism<
-            <<PFrom::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-            <<PTo::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-        >,
+    H: Homomorphism<BaseRingBase<PFrom>, BaseRingBase<PTo>>,
 {
     type DomainStore = PFrom;
     type CodomainStore = PTo;
@@ -600,12 +594,9 @@ where
     P1::Ring: PolyRing,
     P2: RingStore,
     P2::Ring: PolyRing,
-    <BaseRing<P1> as RingStore>::Ring: PolyRing,
-    <BaseRing<P2> as RingStore>::Ring: PolyRing,
-    H: Homomorphism<
-            <<<BaseRing<P1> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-            <<<BaseRing<P2> as RingStore>::Ring as RingExtension>::BaseRing as RingStore>::Ring,
-        >,
+    BaseRingBase<P1>: PolyRing,
+    BaseRingBase<P2>: PolyRing,
+    H: Homomorphism<BaseRingBase<BaseRingStore<P1>>, BaseRingBase<BaseRingStore<P2>>>,
 {
     LambdaHom::new(from, to, move |from, to, x| {
         let mut result_terms: HashMap<usize, Vec<(_, usize)>> = HashMap::new();
@@ -633,7 +624,7 @@ where
 pub mod generic_tests {
     use super::*;
 
-    pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<BaseRing<R>>>>(
+    pub fn test_poly_ring_axioms<R: PolyRingStore, I: Iterator<Item = El<BaseRingStore<R>>>>(
         ring: R,
         interesting_base_ring_elements: I,
     ) where
@@ -716,20 +707,9 @@ pub mod generic_tests {
                         ]
                         .into_iter(),
                     );
-                    let actual = ring.from_terms(
-                        [
-                            (a.clone(), 0),
-                            (c.clone(), 3),
-                            (b.clone(), 1),
-                        ]
-                        .into_iter(),
-                    );
+                    let actual = ring.from_terms([(a.clone(), 0), (c.clone(), 3), (b.clone(), 1)].into_iter());
                     assert_el_eq!(ring, f, actual);
-                    assert_el_eq!(
-                        ring,
-                        f,
-                        ring.from_terms(ring.terms(&f).map(|(c, i)| (c.clone(), i)))
-                    );
+                    assert_el_eq!(ring, f, ring.from_terms(ring.terms(&f).map(|(c, i)| (c.clone(), i))));
                 }
             }
         }
@@ -738,15 +718,9 @@ pub mod generic_tests {
         for a in &elements {
             for b in &elements {
                 for c in &elements {
-                    let f = ring
-                        .from_terms([(a.clone(), 0), (b.clone(), 3)].into_iter());
-                    let g = ring.from_terms(
-                        [
-                            (ring.base_ring().negate(c.clone()), 0),
-                            (ring.base_ring().one(), 1),
-                        ]
-                        .into_iter(),
-                    );
+                    let f = ring.from_terms([(a.clone(), 0), (b.clone(), 3)].into_iter());
+                    let g = ring
+                        .from_terms([(ring.base_ring().negate(c.clone()), 0), (ring.base_ring().one(), 1)].into_iter());
 
                     let (quo, rem) = ring.div_rem_monic(f.clone(), &g);
                     assert_el_eq!(
@@ -755,8 +729,7 @@ pub mod generic_tests {
                             [(
                                 ring.base_ring().add_ref_fst(
                                     a,
-                                    ring.base_ring()
-                                        .mul_ref_fst(b, ring.base_ring().pow(c.clone(), 3))
+                                    ring.base_ring().mul_ref_fst(b, ring.base_ring().pow(c.clone(), 3))
                                 ),
                                 0
                             )]

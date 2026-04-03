@@ -97,7 +97,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Ring = Self>;
+        BaseRingStore<P>: RingStore<Ring = Self>;
 
     /// Returns whether the given polynomial is irreducible over the base field.
     ///
@@ -107,7 +107,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let factorization = Self::factor_poly(poly_ring, poly).0;
         return factorization.len() == 1 && factorization[0].1 == 1;
@@ -122,7 +122,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         poly_factor_finite_field(poly_ring, poly)
     }
@@ -138,7 +138,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         poly_factor_rational(poly_ring, poly)
     }
@@ -197,15 +197,7 @@ fn test_factor_nonmonic_poly() {
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
     let (actual, unit) = <_ as FactorPolyField>::factor_poly(
         &poly_ring,
-        &poly_ring.prod(
-            [
-                f.clone(),
-                f.clone(),
-                g.clone(),
-                poly_ring.int_hom().map(100),
-            ]
-            .into_iter(),
-        ),
+        &poly_ring.prod([f.clone(), f.clone(), g.clone(), poly_ring.int_hom().map(100)].into_iter()),
     );
     assert_eq!(2, actual.len());
 

@@ -427,7 +427,7 @@ where
 {
     fn clone(&self) -> Self {
         Self {
-            data: self.data.clone()
+            data: self.data.clone(),
         }
     }
 }
@@ -442,7 +442,6 @@ impl Debug for MonomialIdentifier {
 }
 
 impl Clone for MonomialIdentifier {
-
     fn clone(&self) -> Self {
         Self {
             data: self.data.clone(),
@@ -509,9 +508,7 @@ where
         debug_assert!(self.is_valid(&rhs.data));
         self.add_terms(
             lhs,
-            rhs.data
-                .iter()
-                .map(|(c, m)| (c.clone(), m.data.clone().wrap())),
+            rhs.data.iter().map(|(c, m)| (c.clone(), m.data.clone().wrap())),
             Vec::new_in(self.allocator.clone()),
         )
     }
@@ -527,12 +524,9 @@ where
         debug_assert!(self.is_valid(&rhs.data));
         *lhs = self.add_terms(
             &lhs,
-            rhs.data.iter().map(|(c, m)| {
-                (
-                    self.base_ring().negate(c.clone()),
-                    m.data.clone().wrap(),
-                )
-            }),
+            rhs.data
+                .iter()
+                .map(|(c, m)| (self.base_ring().negate(c.clone()), m.data.clone().wrap())),
             Vec::new_in(self.allocator.clone()),
         );
     }

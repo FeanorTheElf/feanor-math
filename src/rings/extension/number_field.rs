@@ -12,6 +12,7 @@ use super::extension_impl::FreeAlgebraImpl;
 use super::{Field, FreeAlgebra};
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::convolution::*;
+use crate::algorithms::hensel;
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
 use crate::algorithms::poly_factor::extension::poly_factor_extfield;
@@ -160,7 +161,7 @@ pub struct NumberFieldBase<Impl = DefaultNumberFieldImpl, I = BigIntRing>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -175,7 +176,7 @@ where
     K: RingStore<Ring = NumberFieldBase<Impl, I>>,
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -206,7 +207,7 @@ impl NumberField {
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = BigIntRingBase>,
+        BaseRingStore<P>: RingStore<Ring = BigIntRingBase>,
     {
         RingValue::from(NumberFieldBase::new(poly_ring, generating_poly))
     }
@@ -220,7 +221,7 @@ impl NumberField {
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = RationalFieldBase<BigIntRing>>,
+        BaseRingStore<P>: RingStore<Ring = RationalFieldBase<BigIntRing>>,
     {
         let (res, root) = NumberFieldBase::adjoin_root(poly_ring, generating_poly);
         (RingValue::from(res), root)
@@ -238,7 +239,7 @@ impl NumberFieldBase {
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = BigIntRingBase>,
+        BaseRingStore<P>: RingStore<Ring = BigIntRingBase>,
     {
         assert!(poly_ring.base_ring().is_one(poly_ring.lc(generating_poly).unwrap()));
         let QQ = RationalField::new(BigIntRing::RING);
@@ -274,7 +275,7 @@ impl NumberFieldBase {
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = BigIntRingBase>,
+        BaseRingStore<P>: RingStore<Ring = BigIntRingBase>,
     {
         Self::try_new(poly_ring, generating_poly).unwrap()
     }
@@ -286,7 +287,7 @@ impl NumberFieldBase {
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = RationalFieldBase<BigIntRing>>,
+        BaseRingStore<P>: RingStore<Ring = RationalFieldBase<BigIntRing>>,
     {
         let QQ = poly_ring.base_ring();
         let ZZ = QQ.base_ring();
@@ -334,7 +335,7 @@ impl NumberFieldBase {
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = RationalFieldBase<BigIntRing>>,
+        BaseRingStore<P>: RingStore<Ring = RationalFieldBase<BigIntRing>>,
     {
         Self::try_adjoin_root(poly_ring, generating_poly).unwrap()
     }
@@ -345,7 +346,7 @@ where
     K: RingStore<Ring = NumberFieldBase<Impl, I>>,
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -372,7 +373,7 @@ where
     K: RingStore<Ring = NumberFieldBase<Impl, I>>,
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -402,7 +403,7 @@ impl<Impl, I> NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -448,7 +449,7 @@ impl<Impl, I> NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -456,7 +457,7 @@ where
     where
         P: RingStore,
         P::Ring: PolyRing,
-        BaseRing<P>: RingStore<Ring = I::Ring>,
+        BaseRingStore<P>: RingStore<Ring = I::Ring>,
     {
         let ZZ = ZZX.base_ring();
         assert!(ZZ.get_ring() == self.base_ring().base_ring().get_ring());
@@ -475,7 +476,7 @@ impl<Impl, I> Clone for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Clone,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -490,7 +491,7 @@ impl<Impl, I> Copy for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Copy,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
     El<Impl>: Copy,
@@ -502,7 +503,7 @@ impl<Impl, I> PartialEq for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -513,7 +514,7 @@ impl<Impl, I> DelegateRing for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -532,7 +533,7 @@ impl<Impl, I> DelegateRingImplEuclideanRing for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -542,7 +543,7 @@ impl<Impl, I> Debug for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -553,7 +554,7 @@ impl<Impl, I> FiniteRingSpecializable for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -564,7 +565,7 @@ impl<Impl, I> Field for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -574,7 +575,7 @@ impl<Impl, I> PerfectField for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -584,7 +585,7 @@ impl<Impl, I> Domain for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -594,7 +595,7 @@ impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -602,18 +603,14 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let self_ = poly_ring.base_ring().get_ring().by_order();
         let order_poly_ring = DensePolyRing::new(self_, "X");
         let lhs_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
         let rhs_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
 
-        let result = poly_gcd_local(
-            &order_poly_ring,
-            lhs_order.clone(),
-            rhs_order.clone(),
-        );
+        let result = poly_gcd_local(&order_poly_ring, lhs_order.clone(), rhs_order.clone());
 
         return self_
             .get_ring()
@@ -624,7 +621,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let self_ = poly_ring.base_ring().get_ring().by_order();
         let order_poly_ring = DensePolyRing::new(self_, "X");
@@ -671,12 +668,12 @@ fn poly_factor_numberfield_heuristic<'a, P, Impl, I>(poly_ring: P, poly: &El<P>)
 where
     Impl: 'a + RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: 'a + RingStore,
     I::Ring: IntegerRing,
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRing<P>: RingStore<Ring = NumberFieldByOrder<Impl, I>>,
+    BaseRingStore<P>: RingStore<Ring = NumberFieldByOrder<Impl, I>>,
 {
     event!(
         Level::TRACE,
@@ -717,9 +714,7 @@ where
                         .collect();
                     debug_assert!(poly_ring.eq_el(
                         &poly_ring.normalize(poly.clone()),
-                        &poly_ring.normalize(
-                            poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(f.clone(), *e)))
-                        )
+                        &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(f.clone(), *e))))
                     ));
                     return HeuristicFactorPolyInOrderResult::PartialFactorization(result);
                 }
@@ -749,7 +744,7 @@ impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing + ComputeResultantRing,
 {
@@ -758,7 +753,7 @@ where
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
-        BaseRing<P>: RingStore<Ring = Self>,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let self_ = poly_ring.base_ring().get_ring().by_order();
         let order_poly_ring = DensePolyRing::new(self_, "X");
@@ -811,7 +806,7 @@ struct NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -822,7 +817,7 @@ impl<Impl, I> NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -833,10 +828,10 @@ where
     where
         P1: RingStore,
         P1::Ring: PolyRing,
-        BaseRing<P1>: RingStore<Ring = NumberFieldBase<Impl, I>>,
+        BaseRingStore<P1>: RingStore<Ring = NumberFieldBase<Impl, I>>,
         P2: RingStore,
         P2::Ring: PolyRing,
-        BaseRing<P2>: RingStore<Ring = Self>,
+        BaseRingStore<P2>: RingStore<Ring = Self>,
         Self: 'ring,
     {
         debug_assert!(self.get_delegate() == from.base_ring().get_ring());
@@ -870,10 +865,10 @@ where
     where
         P1: RingStore,
         P1::Ring: PolyRing,
-        BaseRing<P1>: RingStore<Ring = Self>,
+        BaseRingStore<P1>: RingStore<Ring = Self>,
         P2: RingStore,
         P2::Ring: PolyRing,
-        BaseRing<P2>: RingStore<Ring = NumberFieldBase<Impl, I>>,
+        BaseRingStore<P2>: RingStore<Ring = NumberFieldBase<Impl, I>>,
         Self: 'ring,
     {
         debug_assert!(self.get_delegate() == to.base_ring().get_ring());
@@ -887,7 +882,7 @@ impl<Impl, I> PartialEq for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -898,7 +893,7 @@ impl<Impl, I> Clone for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -913,7 +908,7 @@ impl<Impl, I> Debug for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -924,7 +919,7 @@ impl<Impl, I> FiniteRingSpecializable for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -935,7 +930,7 @@ impl<Impl, I> DelegateRing for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -954,7 +949,7 @@ impl<Impl, I> Domain for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -1060,7 +1055,7 @@ impl<Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<Impl, I>
 where
     Impl: RingStore,
     Impl::Ring: Field + FreeAlgebra,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -1495,7 +1490,7 @@ impl<Impl, I> Serialize for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Serialize,
     Impl::Ring: Field + FreeAlgebra + SerializableElementRing,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
@@ -1511,7 +1506,7 @@ impl<'de, Impl, I> Deserialize<'de> for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Deserialize<'de>,
     Impl::Ring: Field + FreeAlgebra + SerializableElementRing,
-    BaseRing<Impl>: RingStore<Ring = RationalFieldBase<I>>,
+    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
 {
