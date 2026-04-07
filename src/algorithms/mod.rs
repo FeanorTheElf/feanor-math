@@ -51,6 +51,7 @@ pub mod lll;
 pub mod matmul;
 /// Contains an implementation of the Miller-Rabin probabilistic primality test.
 pub mod miller_rabin;
+pub mod multipointeval;
 /// Contains an implementation of the Newton-Raphson method for approximating roots of
 /// polynomials (and more generally, "well-behaved" functions).
 pub mod newton;

@@ -296,7 +296,8 @@ where
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::extension::galois_field::*;
 /// let base_ring = Zn::new(5).as_field().ok().unwrap();
-/// let raw_F25: FreeAlgebraImpl<_, _> = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]); 
+/// let raw_F25: FreeAlgebraImpl<_, _> =
+///     FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]);
 /// let asfield_F25 = raw_F25.clone().as_field().ok().unwrap();
 /// // alternatively, you can ensure yourself that the ring is a field and use `promise_is_field` to
 /// // avoid the check at runtime; be careful when doing this!
@@ -304,7 +305,7 @@ where
 /// let F25 = GaloisField::create(asfield_F25);
 /// assert!(F25.can_iso(&raw_F25).is_some());
 /// ```
-/// 
+///
 /// # Choice of blanket implementations of [`CanHomFrom`]
 ///
 /// As opposed to the more generic [`DelegateRing`]s, here I chose a "ping-pong" way
