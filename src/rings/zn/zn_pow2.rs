@@ -1,0 +1,489 @@
+use smallvec::SmallVec;
+
+use crate::delegate::DelegateRing;
+use crate::divisibility::DivisibilityRing;
+use crate::homomorphism::*;
+use crate::integer::*;
+use crate::pid::*;
+use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::ring::*;
+use crate::rings::rust_bigint::{RustBigintRing, RustBigintRingBase};
+use crate::rings::zn::*;
+use crate::specialization::*;
+use crate::{
+    impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos, impl_localpir_wrap_unwrap_homs,
+    impl_localpir_wrap_unwrap_isos,
+};
+
+/// Ring `Z/2^k Z`.
+// TODO(Ohad): doc.
+#[derive(Clone)]
+pub struct Z2kBase {
+    k: usize,
+    n_limbs: usize,
+    last_limb_mask: u64,
+    modulus: El<RustBigintRing>,
+}
+impl Z2kBase {
+    pub fn new(k: usize) -> Self {
+        assert!(k >= 1);
+        let modulus = RustBigintRing::RING.power_of_two(k);
+        let n_limbs = k.div_ceil(64);
+        let last_limb_mask = if k % 64 == 0 {
+            0xFFFFFFFFFFFFFFFF
+        } else {
+            0xFFFFFFFFFFFFFFFF >> (64 - (k % 64))
+        };
+        Self {
+            k,
+            n_limbs,
+            last_limb_mask,
+            modulus,
+        }
+    }
+
+    fn mask_el(&self, el: &mut Z2kEl) {
+        el.0[self.n_limbs - 1] &= self.last_limb_mask;
+        el.0.truncate(self.n_limbs);
+    }
+
+    fn bigint_to_el(&self, ZZ: &RustBigintRing, x: &El<RustBigintRing>) -> Z2kEl {
+        let mut rem = ZZ.euclidean_rem(ZZ.clone_el(x), self.modulus());
+
+        // normalize to `[0, 2^k)`.
+        let n = &self.modulus;
+        while ZZ.is_neg(&rem) {
+            ZZ.add_assign_ref(&mut rem, n);
+        }
+        while ZZ.is_geq(&rem, n) {
+            ZZ.sub_assign_ref(&mut rem, n);
+        }
+        let mut limbs = SmallVec::from_elem(0, self.n_limbs);
+        for (i, d) in ZZ.get_ring().abs_base_u64_repr(&rem).take(self.n_limbs).enumerate() {
+            limbs[i] = d;
+        }
+        Z2kEl(limbs)
+    }
+
+    fn el_to_bigint(&self, ZZ: &RustBigintRing, el: &Z2kEl) -> El<RustBigintRing> {
+        let mut acc = ZZ.zero();
+        let i128_ring = StaticRing::<i128>::RING;
+        for i in 0..self.n_limbs {
+            let limb = int_cast(el.0[i] as i128, ZZ, &i128_ring);
+            if !ZZ.is_zero(&limb) {
+                let shifted = ZZ.mul(limb, ZZ.power_of_two(64 * i));
+                ZZ.add_assign(&mut acc, shifted);
+            }
+        }
+        acc
+    }
+
+    /// Returns an iterator over the digits of the `2^64`-adic digit
+    /// representation of the absolute value of the given element.
+    pub fn abs_base_u64_repr(&self, el: &Z2kEl) -> impl Iterator<Item = u64> {
+        el.0.iter().take(self.n_limbs).enumerate().map(|(i, &x)| {
+            if i == self.n_limbs - 1 {
+                x & self.last_limb_mask
+            } else {
+                x
+            }
+        })
+    }
+
+    /// Interprets the elements of the iterator as digits in a `2^64`-adic
+    /// digit representation, and returns the big integer represented by it.
+    pub fn from_base_u64_repr<I>(&self, data: I) -> Z2kEl
+    where
+        I: Iterator<Item = u64>,
+    {
+        let data = data.take(self.n_limbs).enumerate().map(|(i, x)| {
+            if i == self.n_limbs - 1 {
+                x & self.last_limb_mask
+            } else {
+                x
+            }
+        });
+        Z2kEl(SmallVec::from_iter(data))
+    }
+}
+
+impl PartialEq for Z2kBase {
+    fn eq(&self, other: &Self) -> bool { self.k == other.k }
+}
+
+impl Eq for Z2kBase {}
+
+pub type Z2k = RingValue<Z2kBase>;
+impl Z2k {
+    pub fn new(log_modulus: usize) -> Self { RingValue::from(Z2kBase::new(log_modulus)) }
+}
+
+#[derive(Clone)]
+pub struct Z2kEl(SmallVec<[u64; 4]>);
+
+impl RingBase for Z2kBase {
+    type Element = Z2kEl;
+
+    fn clone_el(&self, val: &Self::Element) -> Self::Element { val.clone() }
+
+    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        let mut carry = 0u64;
+        for i in 0..self.n_limbs {
+            let (sum, o0) = lhs.0[i].overflowing_add(rhs.0[i]);
+            let (sum, o1) = sum.overflowing_add(carry);
+            lhs.0[i] = sum;
+            carry = (o0 || o1) as u64;
+        }
+        self.mask_el(lhs);
+    }
+
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.add_assign_ref(lhs, &rhs); }
+
+    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        let mut borrow = 0u64;
+        for i in 0..self.n_limbs {
+            let (diff, o0) = lhs.0[i].overflowing_sub(rhs.0[i]);
+            let (diff, o1) = diff.overflowing_sub(borrow);
+            lhs.0[i] = diff;
+            borrow = (o0 || o1) as u64;
+        }
+        self.mask_el(lhs);
+    }
+
+    fn negate_inplace(&self, lhs: &mut Self::Element) {
+        let mut z = self.zero();
+        self.sub_assign_ref(&mut z, lhs);
+        *lhs = z;
+    }
+
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { self.mul_assign_ref(lhs, &rhs); }
+
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        let mut a = lhs.clone();
+        let mut b = rhs.clone();
+        self.mask_el(&mut a);
+        self.mask_el(&mut b);
+        let wide = mul_z2k(&a, &b, self.n_limbs);
+        *lhs = wide;
+    }
+
+    fn from_int(&self, value: i32) -> Self::Element {
+        let ZZ = RustBigintRing::RING;
+        let x = ZZ.int_hom().map(value);
+        self.map_in(ZZ.get_ring(), x, &())
+    }
+
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        let mut a = lhs.clone();
+        let mut b = rhs.clone();
+        self.mask_el(&mut a);
+        self.mask_el(&mut b);
+        a.0 == b.0
+    }
+
+    fn is_zero(&self, value: &Self::Element) -> bool {
+        let mut v = value.clone();
+        self.mask_el(&mut v);
+        v.0.iter().all(|x| *x == 0)
+    }
+
+    fn is_one(&self, value: &Self::Element) -> bool { self.eq_el(value, &self.one()) }
+
+    fn is_commutative(&self) -> bool { true }
+    fn is_noetherian(&self) -> bool { true }
+
+    fn dbg_within<'a>(
+        &self,
+        value: &Self::Element,
+        out: &mut std::fmt::Formatter<'a>,
+        _: EnvBindingStrength,
+    ) -> std::fmt::Result {
+        let ZZ = RustBigintRing::RING;
+        write!(out, "{}", ZZ.format(&self.el_to_bigint(&ZZ, value)))
+    }
+
+    fn characteristic<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
+    where
+        J::Type: IntegerRing,
+    {
+        self.size(ZZ)
+    }
+
+    fn is_approximate(&self) -> bool { false }
+}
+
+// Schoolbook multiplication, only keeps the first `n_limbs` limbs.
+fn mul_z2k(Z2kEl(a): &Z2kEl, Z2kEl(b): &Z2kEl, n_limbs: usize) -> Z2kEl {
+    let mut res = SmallVec::from_elem(0, n_limbs);
+    for i in 0..n_limbs {
+        let mut carry = 0u128;
+        for j in 0..n_limbs - i {
+            let idx = i + j;
+            let sum = a[i] as u128 * b[j] as u128 + res[idx] as u128 + carry;
+            res[idx] = sum as u64;
+            carry = sum >> 64;
+        }
+    }
+    Z2kEl(res)
+}
+
+impl DivisibilityRing for Z2kBase {
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        super::generic_impls::checked_left_div(RingRef::new(self), lhs, rhs)
+    }
+}
+
+impl CanHomFrom<Z2kBase> for Z2kBase {
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, from: &Z2kBase) -> Option<Self::Homomorphism> {
+        // Canonical homomorphism is expected to be unital. As such, characteristics must match.
+        (from.k == self.k).then_some(())
+    }
+
+    fn map_in(&self, _from: &Z2kBase, el: <Z2kBase as RingBase>::Element, _: &Self::Homomorphism) -> Self::Element {
+        el
+    }
+}
+
+impl CanIsoFromTo<Z2kBase> for Z2kBase {
+    type Isomorphism = ();
+
+    fn has_canonical_iso(&self, from: &Z2kBase) -> Option<Self::Isomorphism> { (self.k == from.k).then_some(()) }
+
+    fn map_out(&self, _from: &Z2kBase, el: Self::Element, _: &Self::Isomorphism) -> <Z2kBase as RingBase>::Element {
+        el
+    }
+}
+
+#[derive(Clone)]
+pub struct Z2KBaseElementsIter<'a> {
+    ring: &'a Z2kBase,
+    next_index: Z2kEl,
+    wrap_around: bool,
+}
+
+impl<'a> Iterator for Z2KBaseElementsIter<'a> {
+    type Item = Z2kEl;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.wrap_around {
+            return None;
+        }
+
+        let out = self.next_index.clone();
+        self.ring.add_assign(&mut self.next_index, self.ring.one());
+        if self.ring.is_zero(&self.next_index) {
+            self.wrap_around = true;
+        }
+        Some(out)
+    }
+}
+
+impl FiniteRingSpecializable for Z2kBase {
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.execute() }
+}
+
+impl FiniteRing for Z2kBase {
+    type ElementsIter<'a>
+        = Z2KBaseElementsIter<'a>
+    where
+        Self: 'a;
+
+    fn elements<'a>(&'a self) -> Self::ElementsIter<'a> {
+        Z2KBaseElementsIter {
+            ring: self,
+            next_index: self.zero(),
+            wrap_around: false,
+        }
+    }
+
+    fn random_element<G: FnMut() -> u64>(&self, rng: G) -> <Self as RingBase>::Element {
+        super::generic_impls::random_element(self, rng)
+    }
+
+    fn size<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
+    where
+        I::Type: IntegerRing,
+    {
+        {
+            if other_ZZ.get_ring().representable_bits().is_none()
+                || self.k < other_ZZ.get_ring().representable_bits().unwrap()
+            {
+                Some(int_cast(
+                    RustBigintRing::RING.clone_el(&self.modulus),
+                    other_ZZ,
+                    &RustBigintRing::RING,
+                ))
+            } else {
+                None
+            }
+        }
+    }
+}
+
+impl PrincipalIdealRing for Z2kBase {
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        super::generic_impls::checked_div_min(RingRef::new(self), lhs, rhs)
+    }
+
+    fn extended_ideal_gen(
+        &self,
+        lhs: &Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element, Self::Element) {
+        let ZZ = RustBigintRing::RING;
+        let l = self.el_to_bigint(&ZZ, lhs);
+        let r = self.el_to_bigint(&ZZ, rhs);
+        let (s, t, d) = ZZ.extended_ideal_gen(&l, &r);
+        let [s, t, d] = [s, t, d].map(|x| self.bigint_to_el(&ZZ, &x));
+        (s, t, d)
+    }
+}
+
+impl CanHomFrom<RustBigintRingBase> for Z2kBase {
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<Self::Homomorphism> { Some(()) }
+
+    fn map_in(
+        &self,
+        _from: &RustBigintRingBase,
+        el: <RustBigintRingBase as RingBase>::Element,
+        _: &Self::Homomorphism,
+    ) -> Self::Element {
+        self.bigint_to_el(&RustBigintRing::RING, &el)
+    }
+}
+
+impl CanHomFrom<StaticRingBase<i64>> for Z2kBase {
+    type Homomorphism = ();
+
+    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<Self::Homomorphism> { Some(()) }
+
+    fn map_in(&self, _from: &StaticRingBase<i64>, el: i64, _: &Self::Homomorphism) -> Self::Element {
+        let ZZ = RustBigintRing::RING;
+        let x = int_cast(el, &ZZ, &StaticRing::<i64>::RING);
+        <Z2kBase as CanHomFrom<RustBigintRingBase>>::map_in(self, ZZ.get_ring(), x, &())
+    }
+}
+
+impl ZnRing for Z2kBase {
+    type IntegerRingBase = RustBigintRingBase;
+    type IntegerRing = RustBigintRing;
+
+    fn integer_ring(&self) -> &Self::IntegerRing { &RustBigintRing::RING }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
+        let ZZ = RustBigintRing::RING;
+        self.el_to_bigint(&ZZ, &el)
+    }
+
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
+        let result = self.smallest_positive_lift(el);
+        let mut mod_half = self.integer_ring().clone_el(self.modulus());
+        self.integer_ring().euclidean_div_pow_2(&mut mod_half, 1);
+        if self.integer_ring().is_gt(&result, &mod_half) {
+            self.integer_ring().sub_ref_snd(result, self.modulus())
+        } else {
+            result
+        }
+    }
+
+    fn modulus(&self) -> &El<Self::IntegerRing> { &self.modulus }
+
+    fn any_lift(&self, el: Self::Element) -> El<Self::IntegerRing> { self.smallest_positive_lift(el) }
+
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
+        debug_assert!({
+            let ZZ = RustBigintRing::RING;
+            !ZZ.is_neg(&x) && ZZ.is_lt(&x, &self.modulus)
+        });
+        self.bigint_to_el(&RustBigintRing::RING, &x)
+    }
+}
+
+impl_field_wrap_unwrap_homs! { Z2kBase, Z2kBase }
+impl_field_wrap_unwrap_isos! { Z2kBase, Z2kBase }
+impl_localpir_wrap_unwrap_homs! { Z2kBase, Z2kBase }
+impl_localpir_wrap_unwrap_isos! { Z2kBase, Z2kBase }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    const SMALL_Ks: [usize; 2] = [3, 8];
+    const ZZ: BigIntRing = BigIntRing::RING;
+
+    #[test]
+    fn test_z2k_pow2_64_add_mul_edge_cases() {
+        let r = Z2k::new(64);
+
+        let almost_mod = ZZ.sub(ZZ.power_of_two(64), ZZ.int_hom().map(5));
+        let a = r.coerce(&ZZ, almost_mod);
+        let b = r.int_hom().map(5);
+        assert_el_eq!(r, r.zero(), r.add_ref(&a, &b));
+
+        // `2^32 * 2^32` = 0 mod `2^64`.
+        let pow32 = ZZ.power_of_two(32);
+        let u = r.coerce(&ZZ, pow32);
+        assert_el_eq!(r, r.zero(), r.mul_ref(&u, &u));
+    }
+
+    #[test]
+    fn test_z2k_pow2_130_add_mul_edge_cases() {
+        let r = Z2k::new(130);
+
+        // `k` is not a multiple of 64, so the last limb is partially masked.
+        let almost_mod = ZZ.sub(ZZ.power_of_two(130), ZZ.int_hom().map(11));
+        let a = r.coerce(&ZZ, almost_mod);
+        let b = r.int_hom().map(11);
+        assert_el_eq!(r, r.zero(), r.add_ref(&a, &b));
+
+        // `2^100 + 2^129` = 0 mod `2^130`.
+        let hi = ZZ.add(ZZ.power_of_two(100), ZZ.power_of_two(129));
+        let expected = ZZ.euclidean_rem(ZZ.mul_ref(&hi, &hi), &r.modulus());
+        let x = r.coerce(&ZZ, hi);
+        let y = r.mul_ref(&x, &x);
+        assert!(ZZ.eq_el(&expected, &r.smallest_positive_lift(y)));
+    }
+
+    #[test]
+    fn test_ring_axioms_z2kbase() {
+        for k in SMALL_Ks {
+            let ring = Z2k::new(k);
+            crate::ring::generic_tests::test_ring_axioms(&ring, ring.elements())
+        }
+    }
+
+    #[test]
+    fn test_zn_ring_axioms_znbase() {
+        for k in SMALL_Ks {
+            crate::rings::zn::generic_tests::test_zn_axioms(Z2k::new(k));
+        }
+    }
+
+    #[test]
+    fn test_divisibility_axioms() {
+        for k in SMALL_Ks {
+            let R = Z2k::new(k);
+            crate::divisibility::generic_tests::test_divisibility_axioms(&R, R.elements());
+        }
+    }
+
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        for k in SMALL_Ks {
+            let R = Z2k::new(k);
+            crate::pid::generic_tests::test_principal_ideal_ring_axioms(&R, R.elements());
+        }
+    }
+
+    #[test]
+    fn test_finite_field_axioms() {
+        for k in SMALL_Ks {
+            let R = Z2k::new(k);
+            crate::rings::finite::generic_tests::test_finite_ring_axioms(&R);
+        }
+    }
+}

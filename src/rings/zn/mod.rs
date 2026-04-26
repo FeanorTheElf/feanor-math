@@ -13,13 +13,19 @@ use crate::rings::finite::FiniteRingStore;
 /// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
 /// for moduli `n` of size slightly smaller than 64 bits.
 pub mod zn_64;
+
 /// This module contains [`zn_big::Zn`], a general-purpose implementation of
 /// Barett reduction. It is relatively slow when instantiated with small fixed-size
 /// integer type.
 pub mod zn_big;
+
+/// This module contains [`zn_pow2::Zn`], an implementation of `Z/nZ` for moduli of the form `2^k`.
+pub mod zn_pow2;
+
 /// This module contains [`zn_rns::Zn`], a residue number system (RNS) implementation of
 /// `Z/nZ` for highly composite `n`.
 pub mod zn_rns;
+
 /// This module contains [`zn_static::Zn`], an implementation of `Z/nZ` for a small `n`
 /// that is known at compile-time.
 pub mod zn_static;
