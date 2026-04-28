@@ -201,9 +201,9 @@ where
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { *lhs = mul_z2k(lhs, rhs, self.n_limbs); }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        let ZZ = RustBigintRing::RING;
+        let ZZ = &RustBigintRing::RING;
         let x = ZZ.int_hom().map(value);
-        self.map_in(ZZ.get_ring(), x, &())
+        self.bigint_to_el(ZZ, &x)
     }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
@@ -411,14 +411,34 @@ where
     }
 }
 
+impl<const N: usize, I: ?Sized + IntegerRing> CanHomFrom<I> for Z2kBase<N>
+where
+    [u64; N]: smallvec::Array<Item = u64>,
+{
+    type Homomorphism = super::generic_impls::BigIntToZnHom<I, RustBigintRingBase, Self>;
+
+    fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
+        super::generic_impls::has_canonical_hom_from_bigint(from, self, RustBigintRing::RING.get_ring(), None)
+    }
+
+    default fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
+        let ZZ = &RustBigintRing::RING;
+        super::generic_impls::map_in_from_bigint(
+            from,
+            self,
+            ZZ.get_ring(),
+            el,
+            hom,
+            |n| self.bigint_to_el(ZZ, &n),
+            |n| self.bigint_to_el(ZZ, &n),
+        )
+    }
+}
+
 impl<const N: usize> CanHomFrom<RustBigintRingBase> for Z2kBase<N>
 where
     [u64; N]: smallvec::Array<Item = u64>,
 {
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &RustBigintRingBase) -> Option<Self::Homomorphism> { Some(()) }
-
     fn map_in(
         &self,
         _from: &RustBigintRingBase,
@@ -429,20 +449,29 @@ where
     }
 }
 
-impl<const N: usize> CanHomFrom<StaticRingBase<i64>> for Z2kBase<N>
-where
-    [u64; N]: smallvec::Array<Item = u64>,
-{
-    type Homomorphism = ();
-
-    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<Self::Homomorphism> { Some(()) }
-
-    fn map_in(&self, _from: &StaticRingBase<i64>, el: i64, _: &Self::Homomorphism) -> Self::Element {
-        let ZZ = RustBigintRing::RING;
-        let x = int_cast(el, &ZZ, &StaticRing::<i64>::RING);
-        <Z2kBase<N> as CanHomFrom<RustBigintRingBase>>::map_in(self, ZZ.get_ring(), x, &())
-    }
+macro_rules! impl_static_int_to_z2k {
+    ($($int:ident),*) => {
+        $(
+            impl<const N: usize> CanHomFrom<StaticRingBase<$int>> for Z2kBase<N>
+            where
+                [u64; N]: smallvec::Array<Item = u64>,
+            {
+                fn map_in(
+                    &self,
+                    from: &StaticRingBase<$int>,
+                    el: $int,
+                    _: &Self::Homomorphism,
+                ) -> Self::Element {
+                    let ZZ = &RustBigintRing::RING;
+                    let x = int_cast(el, ZZ, RingRef::new(from));
+                    self.bigint_to_el(ZZ, &x)
+                }
+            }
+        )*
+    };
 }
+
+impl_static_int_to_z2k! { i8, i16, i32, i64, i128 }
 
 impl<const N: usize> ZnRing for Z2kBase<N>
 where
@@ -490,9 +519,38 @@ impl_localpir_wrap_unwrap_isos! { Z2kBase, Z2kBase }
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::primitive_int::StaticRing;
+    use crate::ring::generic_tests as ring_generic_tests;
+    use crate::rings::zn::generic_tests as zn_generic_tests;
 
     const SMALL_Ks: [usize; 2] = [3, 8];
     const ZZ: BigIntRing = BigIntRing::RING;
+
+    #[test]
+    fn test_z2k_can_hom_map_in_large_power() {
+        let r: Z2k = Z2k::new(256);
+        zn_generic_tests::test_map_in_large_int(r);
+    }
+
+    #[test]
+    fn test_z2k_can_hom_axioms_static_i32() {
+        let to: Z2k = Z2k::new(14);
+        ring_generic_tests::test_hom_axioms(StaticRing::<i32>::RING, to, -12i32..=12);
+    }
+
+    #[test]
+    fn test_z2k_can_hom_axioms_bigint_ring() {
+        let to: Z2k = Z2k::new(20);
+        let edge = [
+            ZZ.zero(),
+            ZZ.one(),
+            ZZ.negate(ZZ.one()),
+            ZZ.int_hom().map(17),
+            ZZ.int_hom().map(-42),
+            ZZ.pow(ZZ.int_hom().map(2), 200),
+        ];
+        ring_generic_tests::test_hom_axioms(&ZZ, to, edge.into_iter());
+    }
 
     #[test]
     fn test_z2k_pow2_64_add_mul_edge_cases() {
