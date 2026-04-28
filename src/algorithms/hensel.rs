@@ -26,6 +26,7 @@ where
     /// the i-th element contains the product of factors [(i + 1)..]; of length n - 1, thus we
     /// always lift current_factors[i] and current_partial_prods[i] with each other
     current_partial_prods: Vec<HenselLiftableBarrettReducer<P_current::Ring>>,
+    single_factor: Option<El<P_current>>,
     current_factor_bezout: Vec<El<P_current>>,
     current_partial_prods_bezout: Vec<El<P_current>>,
 }
@@ -40,6 +41,17 @@ where
         assert!(factors.len() >= 1);
         for f in &factors {
             assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
+        }
+        if factors.len() == 1 {
+            return Self {
+                current_e: 1,
+                current_factor_bezout: Vec::new(),
+                current_partial_prods_bezout: Vec::new(),
+                current_factors: Vec::new(),
+                current_partial_prods: Vec::new(),
+                single_factor: Some(factors.into_iter().next().unwrap()),
+                current_poly_ring: poly_ring
+            };
         }
         let n = factors.len();
         let last = factors.pop().unwrap();
@@ -70,8 +82,9 @@ where
                 partial_prods_bezout.push(poly_ring.mul_ref_snd(t, &d_inv));
                 let deg_g = poly_ring.degree(&g).unwrap();
                 let deg_h = poly_ring.degree(&h).unwrap();
-                factor_reducers.push(HenselLiftableBarrettReducer::new(&poly_ring, g, deg_h, 1));
-                partial_prod_reducers.push(HenselLiftableBarrettReducer::new(&poly_ring, h, deg_g, 1));
+                let deg_delta_bound = deg_g + deg_h;
+                factor_reducers.push(HenselLiftableBarrettReducer::new(&poly_ring, g, deg_delta_bound, 1));
+                partial_prod_reducers.push(HenselLiftableBarrettReducer::new(&poly_ring, h, deg_delta_bound, 1));
             } else {
                 panic!("given polynomials are not pairwise coprime")
             }
@@ -82,7 +95,8 @@ where
             current_partial_prods_bezout: partial_prods_bezout,
             current_factors: factor_reducers,
             current_partial_prods: partial_prod_reducers,
-            current_poly_ring: poly_ring,
+            single_factor: None,
+            current_poly_ring: poly_ring
         };
     }
 }
@@ -113,6 +127,18 @@ where
     {
         let P = new_ring;
         let n = self.current_factors.len() + 1;
+        
+        if n == 1 {
+            return HenselLift {
+                current_e: new_e,
+                current_factor_bezout: Vec::new(),
+                current_factors: Vec::new(),
+                current_partial_prods: Vec::new(),
+                current_partial_prods_bezout: Vec::new(),
+                single_factor: Some(target.clone()),
+                current_poly_ring: P
+            };
+        }
         
         let mut factor_bezout: Vec<El<P_new>> = Vec::with_capacity(n - 1);
         let mut partial_prods_bezout: Vec<El<P_new>> = Vec::with_capacity(n - 1);
@@ -180,6 +206,7 @@ where
             current_factors: factor_reducers,
             current_partial_prods: partial_prod_reducers,
             current_partial_prods_bezout: partial_prods_bezout,
+            single_factor: None,
             current_poly_ring: P,
         };
     }
@@ -189,7 +216,7 @@ where
     }
 
     pub fn factorization<'a>(&'a self) -> impl Iterator<Item = &'a El<P_current>> {
-        self.current_factors.iter().chain([self.current_partial_prods.last().unwrap()]).map(|r| &r.poly)
+        self.current_factors.iter().map(|r| &r.poly).chain([self.current_partial_prods.last().map(|r| &r.poly).or(self.single_factor.as_ref()).unwrap()])
     }
 
     pub fn current_e(&self) -> usize {
