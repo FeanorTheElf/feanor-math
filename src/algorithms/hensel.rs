@@ -50,7 +50,7 @@ where
                 current_factors: Vec::new(),
                 current_partial_prods: Vec::new(),
                 single_factor: Some(factors.into_iter().next().unwrap()),
-                current_poly_ring: poly_ring
+                current_poly_ring: poly_ring,
             };
         }
         let n = factors.len();
@@ -96,7 +96,7 @@ where
             current_factors: factor_reducers,
             current_partial_prods: partial_prod_reducers,
             single_factor: None,
-            current_poly_ring: poly_ring
+            current_poly_ring: poly_ring,
         };
     }
 }
@@ -106,20 +106,12 @@ where
     P_current: RingStore,
     P_current::Ring: PolyRing,
 {
-    ///
     /// Lifts the current factorization to a factorization of `target` in `new_ring`.
-    /// 
+    ///
     /// This function requires that `target` is congruent to the product of the current
     /// factors modulo `m^prev_e`, and unfortunately cannot check this with the current information.
-    /// 
     #[instrument(skip_all, level = "trace")]
-    pub fn lift_to<P_new, L>(
-        self,
-        new_e: usize,
-        new_ring: P_new,
-        target: &El<P_new>,
-        mut lift: L,
-    ) -> HenselLift<P_new>
+    pub fn lift_to<P_new, L>(self, new_e: usize, new_ring: P_new, target: &El<P_new>, mut lift: L) -> HenselLift<P_new>
     where
         P_new: RingStore,
         P_new::Ring: PolyRing,
@@ -127,7 +119,7 @@ where
     {
         let P = new_ring;
         let n = self.current_factors.len() + 1;
-        
+
         if n == 1 {
             return HenselLift {
                 current_e: new_e,
@@ -136,10 +128,10 @@ where
                 current_partial_prods: Vec::new(),
                 current_partial_prods_bezout: Vec::new(),
                 single_factor: Some(target.clone()),
-                current_poly_ring: P
+                current_poly_ring: P,
             };
         }
-        
+
         let mut factor_bezout: Vec<El<P_new>> = Vec::with_capacity(n - 1);
         let mut partial_prods_bezout: Vec<El<P_new>> = Vec::with_capacity(n - 1);
         let mut factor_reducers: Vec<HenselLiftableBarrettReducer<P_new::Ring>> = Vec::with_capacity(n - 1);
@@ -153,14 +145,23 @@ where
                 self.current_factor_bezout
                     .into_iter()
                     .zip(self.current_partial_prods_bezout.into_iter()),
-            ).enumerate()
+            )
+            .enumerate()
         {
-            let f = if i == 0 { target } else { &partial_prod_reducers.last().unwrap().poly };
+            let f = if i == 0 {
+                target
+            } else {
+                &partial_prod_reducers.last().unwrap().poly
+            };
             let deg_g = self.current_poly_ring.degree(&g.poly).unwrap();
             let deg_h = self.current_poly_ring.degree(&h.poly).unwrap();
             let deg_delta_bound = deg_g + deg_h;
-            let mut g = g.change_ring(&P, |poly| P.from_terms(self.current_poly_ring.terms(&poly).map(|(c, i)| (lift(c), i))));
-            let mut h = h.change_ring(&P, |poly| P.from_terms(self.current_poly_ring.terms(&poly).map(|(c, i)| (lift(c), i))));
+            let mut g = g.change_ring(&P, |poly| {
+                P.from_terms(self.current_poly_ring.terms(&poly).map(|(c, i)| (lift(c), i)))
+            });
+            let mut h = h.change_ring(&P, |poly| {
+                P.from_terms(self.current_poly_ring.terms(&poly).map(|(c, i)| (lift(c), i)))
+            });
             let mut s = P.from_terms(self.current_poly_ring.terms(&s).map(|(c, i)| (lift(c), i)));
             let mut t = P.from_terms(self.current_poly_ring.terms(&t).map(|(c, i)| (lift(c), i)));
             let mut current_e = self.current_e;
@@ -211,17 +212,18 @@ where
         };
     }
 
-    pub fn poly_ring(&self) -> &P_current {
-        &self.current_poly_ring
-    }
+    pub fn poly_ring(&self) -> &P_current { &self.current_poly_ring }
 
     pub fn factorization<'a>(&'a self) -> impl Iterator<Item = &'a El<P_current>> {
-        self.current_factors.iter().map(|r| &r.poly).chain([self.current_partial_prods.last().map(|r| &r.poly).or(self.single_factor.as_ref()).unwrap()])
+        self.current_factors.iter().map(|r| &r.poly).chain([self
+            .current_partial_prods
+            .last()
+            .map(|r| &r.poly)
+            .or(self.single_factor.as_ref())
+            .unwrap()])
     }
 
-    pub fn current_e(&self) -> usize {
-        self.current_e
-    }
+    pub fn current_e(&self) -> usize { self.current_e }
 }
 
 struct HenselLiftableBarrettReducer<P: ?Sized + PolyRing> {
@@ -317,7 +319,6 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
 }
 
 impl<P: ?Sized + PolyRing> Clone for HenselLiftableBarrettReducer<P> {
-
     fn clone(&self) -> Self {
         Self {
             e: self.e,
@@ -325,7 +326,7 @@ impl<P: ?Sized + PolyRing> Clone for HenselLiftableBarrettReducer<P> {
             neg_Xn_div_poly: self.neg_Xn_div_poly.clone(),
             poly: self.poly.clone(),
             poly_deg: self.poly_deg,
-            ring: self.ring
+            ring: self.ring,
         }
     }
 }
@@ -530,16 +531,24 @@ where
         prime_field.get_ring(),
         reduction_map.max_ideal_idx(),
     );
-    assert_el_eq!(&base_poly_ring, base_poly_ring.lifted_hom(target_poly_ring, (&prime_ring_iso).compose(&reduction_map)).map_ref(f), base_poly_ring.prod(factors.iter().cloned()));
+    assert_el_eq!(
+        &base_poly_ring,
+        base_poly_ring
+            .lifted_hom(target_poly_ring, (&prime_ring_iso).compose(&reduction_map))
+            .map_ref(f),
+        base_poly_ring.prod(factors.iter().cloned())
+    );
 
     let lifter = HenselLift::new(base_poly_ring, factors.to_owned());
-    let lifted = lifter.lift_to(reduction_map.from_e(), target_poly_ring, f, |x| reduction_map.parent_ring().get_ring().lift_partial(
-        reduction_map.ideal(),
-        (reduction_map.codomain().get_ring(), 1),
-        (reduction_map.domain().get_ring(), reduction_map.from_e()),
-        reduction_map.max_ideal_idx(),
-        prime_ring_iso.inv().map_ref(x)
-    ));
+    let lifted = lifter.lift_to(reduction_map.from_e(), target_poly_ring, f, |x| {
+        reduction_map.parent_ring().get_ring().lift_partial(
+            reduction_map.ideal(),
+            (reduction_map.codomain().get_ring(), 1),
+            (reduction_map.domain().get_ring(), reduction_map.from_e()),
+            reduction_map.max_ideal_idx(),
+            prime_ring_iso.inv().map_ref(x),
+        )
+    });
     return lifted.factorization().cloned().collect();
 }
 

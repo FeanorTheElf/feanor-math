@@ -101,8 +101,8 @@ pub trait PrincipalIdealRing: DivisibilityRing {
         // localized at (p), we have either that R_(p) is integral, or p^e = 0 for some e.
         // if R_(p) is integral, this is the standard formula for LCM which works over PIDs.
         // hence assume p^e = 0. write lhs = unit * p^l, rhs = unit * p^r;
-        // Now div(lhs, gcd) = div(lhs, unit * p^min(l, r)) = unit * p^(l - min(l, r)) + R * p^(e - min(l, r))
-        // and thus the result is unit * p^r * p^(l - min(l, r)) + R * rhs * p^(e - min(l, r)) =
+        // Now div(lhs, gcd) = div(lhs, unit * p^min(l, r)) = unit * p^(l - min(l, r)) + R * p^(e - min(l,
+        // r)) and thus the result is unit * p^r * p^(l - min(l, r)) + R * rhs * p^(e - min(l, r)) =
         // unit * p^(l + r - min(l, r)) = unit * p^max(l, r)
         let gcd = self.ideal_gen(lhs, rhs);
         self.mul_ref_snd(self.checked_div(lhs, &gcd).unwrap(), rhs)
