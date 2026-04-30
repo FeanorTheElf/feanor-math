@@ -17,7 +17,7 @@ pub mod ec_factor;
 pub mod eea;
 /// Contains an implementation of the Sieve of Erathostenes, for enumerating
 /// prime number up to a certain bound.
-pub mod erathostenes;
+pub mod eratosthenes;
 /// Contains basic algorithms for implementing operations on ring extensions. Unless
 /// you are implementing your own extension ring type, you should use the operations
 /// through [`crate::rings::extension::FreeAlgebra`] instead.

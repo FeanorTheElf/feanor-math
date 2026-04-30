@@ -104,7 +104,7 @@ where
     }
 
     // then we remove small factors
-    for p in algorithms::erathostenes::enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND) {
+    for p in algorithms::eratosthenes::enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND) {
         let ZZ_p = ZZ.int_hom().map(p);
         let mut count = 0;
         while let Some(quo) = ZZ.checked_div(&n, &ZZ_p) {

@@ -277,7 +277,7 @@ where
     let log2_B = ln_B / 2.0f64.ln();
     assert!(log2_B <= i128::MAX as f64);
 
-    let primes = algorithms::erathostenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
+    let primes = algorithms::eratosthenes::enumerate_primes(&StaticRing::<i128>::RING, &(1i128 << (log2_B as u64)));
     let power_factorization = primes
         .iter()
         .map(|p| {

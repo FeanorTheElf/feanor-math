@@ -500,7 +500,7 @@ where
 
     // invariant: `(reducers) = (basis)` and there exists a reduction to zero for every `f` in `basis`
     // modulo `reducers`; reducers are always stored with an expanded version of their leading
-    // monomial, in order to simplify divisibility checks
+    // monomial, in order to speed up divisibility checks
     let mut reducers: Vec<(El<P>, ExpandedMonomial)> = input_basis
         .iter()
         .map(|f| expand_lm(ring, f.clone(), order))
