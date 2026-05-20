@@ -9,9 +9,8 @@ use crate::ring_impls::poly::sparse_poly::SparsePolyRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::primitive_int::StaticRing;
 use crate::ring_impls::zn::{ZnRing, ZnRingStore};
-use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain, *};
+use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::ring_properties::field::Field;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::{PROBABILISTIC_REPETITIONS, algorithms};
 

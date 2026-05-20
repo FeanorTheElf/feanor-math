@@ -68,11 +68,6 @@ pub mod iters;
 /// particular, we use [`matrix::Submatrix`] and [`matrix::SubmatrixMut`] for matrices that don't
 /// own their data.
 pub mod matrix;
-/// Contains the two traits [`reduce_lift::poly_eval::LiftPolyEvalRing`] and
-/// [`reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`] that formalize the assumptions required
-/// to perform certain computations over a ring modulo prime ideals, and then reconstruct the
-/// element from the resulting congruences.
-pub mod reduce_lift;
 /// Contains different traits for sequences of elements, namely [`seq::VectorView`] and
 /// [`seq::VectorFn`]. They all have some functional overlap with [`ExactSizeIterator`], but differ
 /// in how they allow access to the elements of the sequence.

@@ -5,8 +5,6 @@ use crate::homomorphism::Homomorphism;
 use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring_impls::approx_real::ApproxRealField;
-use crate::ring_properties::field::*;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 
 /// Uses the Fincke-Pohst algorithm to find integer points close to `target`, where

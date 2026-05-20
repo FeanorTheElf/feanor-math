@@ -230,20 +230,24 @@ where
     ///     P.normalize(f)
     /// );
     /// ```
-    fn normalize(&self, mut f: El<Self>) -> El<Self>
+    fn normalize(&self, mut f: El<Self>) -> (El<Self>, El<BaseRingStore<Self>>)
     where
-        <BaseRingStore<Self> as RingStore>::Ring: DivisibilityRing + Domain,
+        BaseRingBase<Self>: DivisibilityRing + Domain,
     {
         if self.is_zero(&f) {
-            return f;
+            return (f, self.base_ring().zero());
         } else if let Some(inv_lc) = self.base_ring().invert(self.lc(&f).unwrap()) {
+            let lc = self.lc(&f).unwrap().clone();
             self.inclusion().mul_assign_ref_map(&mut f, &inv_lc);
-            return f;
+            return (f, lc);
         } else {
-            let lc = self.lc(&f).unwrap();
-            return self.from_terms(
-                self.terms(&f)
-                    .map(|(c, i)| (self.base_ring().checked_div(c, &lc).unwrap(), i)),
+            let lc = self.lc(&f).unwrap().clone();
+            return (
+                self.from_terms(
+                    self.terms(&f)
+                        .map(|(c, i)| (self.base_ring().checked_div(c, &lc).unwrap(), i)),
+                ),
+                lc,
             );
         }
     }
@@ -252,7 +256,7 @@ where
     fn evaluate<R, H>(&self, f: &El<Self>, value: &R::Element, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, R>,
+        H: Homomorphism<BaseRingBase<Self>, R>,
     {
         self.get_ring().evaluate(f, value, hom)
     }
@@ -266,7 +270,7 @@ where
     where
         P: RingStore,
         P::Ring: PolyRing,
-        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, BaseRingBase<Self>>,
     {
         CoefficientHom { from, to: self, hom }
     }
@@ -277,7 +281,7 @@ where
     where
         P: RingStore,
         P::Ring: PolyRing,
-        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, BaseRingBase<Self>>,
     {
         self.into_lifted_hom(from, hom)
     }
@@ -367,7 +371,7 @@ where
     #[stability::unstable(feature = "enable")]
     fn balance_poly(&self, f: &mut El<Self>) -> Option<El<BaseRingStore<Self>>>
     where
-        <BaseRingStore<Self> as RingStore>::Ring: DivisibilityRing,
+        BaseRingBase<Self>: DivisibilityRing,
     {
         self.get_ring().balance_poly(f)
     }

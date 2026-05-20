@@ -1,28 +1,22 @@
-use finite::{fast_poly_eea, poly_power_decomposition_finite_field};
-use gcd_locally::poly_gcd_local;
-use squarefree_part::poly_power_decomposition_local;
 use tracing::instrument;
 
-use crate::delegate::DelegateRing;
-use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::reduce_lift::lift_poly_factors::*;
-use crate::ring_impls::as_field::*;
-use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
-use crate::ring_properties::specialization::FiniteRingOperation;
 
-/// Contains an implementation of factoring polynomials over finite fields.
+/// Contains an implementation of polynomial gcd and squarefree decomposition over finite fields.
 pub mod finite;
-/// Contains algorithms for computing the gcd of polynomials.
-pub mod gcd_locally;
-/// Contains algorithms for computing power decompositions and the square-free
-/// part of polynomials.
-pub mod squarefree_part;
+/// Contains an implementation of polynomial gcd and squarefree decomposition over the integers.
+pub mod integer;
+/// Contains an implementation of polynomial gcd and squarefree decomposition over a number field.
+pub mod numberfield;
 
-/// Trait for domain `R` for which there is an efficient way of computing the gcd
-/// of univariate polynomials over `TFrac(R)`, where `TFrac(R)` is the total ring
+/// Trait for rings R, whose total ring of fractions `TFrac(R)` gives rise to a well-defined and
+/// efficiently computable notion of the gcd of univariate polynomials over `TFrac(R)`.
 /// of fractions.
+///
+/// Reminder: The total ring of fractions is the ring extension in which every non-zero
+/// divisor is a unity, or equivalently the localization of R at all non-zero divisors
+/// of R.
 ///
 /// However, computations in `TFrac(R)` are avoided by most implementations due to
 /// performance reasons, and both inputs and outputs are polynomials over `R`. Despite
@@ -87,6 +81,15 @@ pub trait PolyTFracGCDRing {
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
         poly_ring.prod(Self::power_decomposition(poly_ring, poly).into_iter().map(|(f, _)| f))
+    }
+
+    fn is_squarefree<P>(poly_ring: P, poly: &El<P>) -> bool
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        poly_ring.degree(poly) == poly_ring.degree(&Self::squarefree_part(poly_ring, poly))
     }
 
     /// Compute square-free polynomials `f1, f2, ...` such that `a f = f1 f2^2 f3^3 ...`
@@ -210,168 +213,28 @@ where
     return (result, content);
 }
 
-/// Checks whether there exists a polynomial `g` such that `g^k = f`, and if yes,
-/// returns `g`.
-///
-/// # Example
-/// ```rust
-/// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::algorithms::poly_gcd::*;
-/// let poly_ring = DensePolyRing::new(ZZi64, "X");
-/// let [f, f_sqrt] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 2 * X + 1, X + 1]);
-/// assert_el_eq!(&poly_ring, f_sqrt, poly_root(&poly_ring, &f, 2).unwrap());
-/// ```
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
-where
-    P: RingStore,
-    P::Ring: PolyRing,
-    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
-{
-    assert!(poly_ring.degree(&f).unwrap() % k == 0);
-    let d = poly_ring.degree(&f).unwrap() / k;
-    let ring = poly_ring.base_ring();
-    let k_in_ring = ring.int_hom().map(k.try_into().unwrap());
-
-    let mut result_reversed = Vec::new();
-    result_reversed.push(ring.one());
-    for i in 1..=d {
-        let g = poly_ring.pow(poly_ring.from_terms((0..i).map(|j| (result_reversed[j].clone(), j))), k);
-        let partition_sum = poly_ring.coefficient_at(&g, i);
-        let next_coeff = ring.checked_div(
-            &ring.sub_ref(poly_ring.coefficient_at(&f, k * d - i), partition_sum),
-            &k_in_ring,
-        )?;
-        result_reversed.push(next_coeff);
-    }
-
-    let result = poly_ring.from_terms(result_reversed.into_iter().enumerate().map(|(i, c)| (c, d - i)));
-    if poly_ring.eq_el(&f, &poly_ring.pow(result.clone(), k)) {
-        return Some(result);
-    } else {
-        return None;
-    }
-}
-
 impl<R> PolyTFracGCDRing for R
 where
-    R: ?Sized + PolyLiftFactorsDomain + SelfIso,
+    R: ?Sized + FiniteRing + Field,
 {
-    default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
+    default fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        struct PowerDecompositionOperation<'a, P>(P, &'a El<P>)
-        where
-            P: RingStore + Copy,
-            P::Ring: PolyRing,
-            <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
-
-        impl<'a, P> FiniteRingOperation<<BaseRingStore<P> as RingStore>::Ring> for PowerDecompositionOperation<'a, P>
-        where
-            P: RingStore + Copy,
-            P::Ring: PolyRing + DivisibilityRing,
-            <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
-        {
-            type Output = Vec<(El<P>, usize)>;
-
-            fn execute(self) -> Vec<(El<P>, usize)>
-            where
-                <BaseRingStore<P> as RingStore>::Ring: FiniteRing,
-            {
-                let new_poly_ring = DensePolyRing::new(
-                    AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
-                    "X",
-                );
-                let new_poly = new_poly_ring.from_terms(
-                    self.0
-                        .terms(&self.1)
-                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(c.clone()), i)),
-                );
-                poly_power_decomposition_finite_field(&new_poly_ring, &new_poly)
-                    .into_iter()
-                    .map(|(f, k)| {
-                        (
-                            self.0.from_terms(
-                                new_poly_ring
-                                    .terms(&f)
-                                    .map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(c.clone()), i)),
-                            ),
-                            k,
-                        )
-                    })
-                    .collect()
-            }
-
-            fn fallback(self) -> Self::Output {
-                let poly_ring = self.0;
-                poly_power_decomposition_local(poly_ring, self.1.clone())
-            }
-        }
-
-        R::specialize(PowerDecompositionOperation(poly_ring, poly))
+        unimplemented!()
+        // poly_power_decomposition_finite_field(poly_ring, poly)
     }
 
-    default fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+    default fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        struct PolyGCDOperation<'a, P>(P, &'a El<P>, &'a El<P>)
-        where
-            P: RingStore + Copy,
-            P::Ring: PolyRing,
-            <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + SelfIso;
-
-        impl<'a, P> FiniteRingOperation<<BaseRingStore<P> as RingStore>::Ring> for PolyGCDOperation<'a, P>
-        where
-            P: RingStore + Copy,
-            P::Ring: PolyRing + DivisibilityRing,
-            <BaseRingStore<P> as RingStore>::Ring: PolyLiftFactorsDomain + DivisibilityRing + SelfIso,
-        {
-            type Output = El<P>;
-
-            fn execute(self) -> El<P>
-            where
-                <BaseRingStore<P> as RingStore>::Ring: FiniteRing,
-            {
-                let new_poly_ring = DensePolyRing::new(
-                    AsField::from(AsFieldBase::promise_is_perfect_field(self.0.base_ring())),
-                    "X",
-                );
-                let new_lhs = new_poly_ring.from_terms(
-                    self.0
-                        .terms(&self.1)
-                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(c.clone()), i)),
-                );
-                let new_rhs = new_poly_ring.from_terms(
-                    self.0
-                        .terms(&self.2)
-                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().rev_delegate(c.clone()), i)),
-                );
-                let result = new_poly_ring.normalize(fast_poly_eea(&new_poly_ring, new_lhs, new_rhs).2);
-                return self.0.from_terms(
-                    new_poly_ring
-                        .terms(&result)
-                        .map(|(c, i)| (new_poly_ring.base_ring().get_ring().unwrap_element(c.clone()), i)),
-                );
-            }
-
-            fn fallback(self) -> Self::Output {
-                let poly_ring = self.0;
-                poly_gcd_local(poly_ring, self.1.clone(), self.2.clone())
-            }
-        }
-
-        R::specialize(PolyGCDOperation(poly_ring, lhs, rhs))
+        unimplemented!()
+        // poly_ring.normalize(fast_poly_eea(poly_ring, lhs.clone(), rhs.clone()).2).0
     }
 }
 
@@ -381,34 +244,6 @@ use crate::ring_impls::extension::galois_field::GaloisField;
 use crate::ring_impls::zn::ZnRingStore;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_64b;
-
-#[test]
-fn test_poly_root() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZbig;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]
-    });
-    for k in 1..5 {
-        assert_el_eq!(
-            &poly_ring,
-            &f,
-            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
-        );
-    }
-
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [X.pow_ref(5) + 2 * X.pow_ref(4) + 3 * X.pow_ref(3) + 4 * X.pow_ref(2) + 5 * X + 6]
-    });
-    for k in 1..5 {
-        assert_el_eq!(
-            &poly_ring,
-            &f,
-            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
-        );
-    }
-}
 
 #[test]
 fn test_poly_gcd_galois_field() {

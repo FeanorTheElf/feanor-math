@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::ring_impls::primitive_int::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`

@@ -1,44 +1,27 @@
 use std::alloc::Global;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::mem::transmute;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
-use tracing::{Level, event, instrument};
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::{Field, FreeAlgebra};
-use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::convolution::*;
-use crate::algorithms::hensel;
-use crate::algorithms::interpolate::product_except_one;
-use crate::algorithms::newton::{self, absolute_error_of_poly_eval};
-use crate::algorithms::poly_factor::extension::poly_factor_extfield;
-use crate::algorithms::poly_factor::factor_locally::{FactorAndLiftModpeResult, factor_and_lift_mod_pe};
-use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
-use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
+use crate::algorithms::newton;
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
-use crate::algorithms::resultant::ComputeResultantRing;
 use crate::delegate::*;
 use crate::prelude::*;
-use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring_impls::as_field::AsField;
+use crate::ring_impls::extension::complex_embedding::ComplexEmbedding;
 use crate::ring_impls::extension::extension_impl::*;
 use crate::ring_impls::extension::number_field::newton::find_approximate_complex_root;
-use crate::ring_impls::extension::sparse::SparseMapVector;
 use crate::ring_impls::extension::*;
-use crate::ring_impls::float_complex::{Complex64, Complex64Base};
 use crate::ring_impls::rational::*;
-use crate::ring_impls::zn::ZnRingStore;
 use crate::ring_properties::field::PerfectField;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
-
-const TRY_FIND_INERT_PRIME_ATTEMPTS: usize = 10;
-const TRY_FACTOR_DIRECTLY_ATTEMPTS: usize = 0;
 
 /// An algebraic number field, i.e. a finite rank field extension of the rationals.
 ///
@@ -163,23 +146,6 @@ where
     I::Ring: IntegerRing,
 {
     base: Impl,
-}
-
-/// An embedding of a number field `K` into the complex numbers `CC`, represented
-/// approximately via floating point numbers.
-#[stability::unstable(feature = "enable")]
-pub struct ComplexEmbedding<K, Impl, I>
-where
-    K: RingStore<Ring = NumberFieldBase<Impl, I>>,
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    from: K,
-    image_of_generator: El<Complex64>,
-    absolute_error_image_of_generator: f64,
 }
 
 #[stability::unstable(feature = "enable")]
@@ -335,65 +301,6 @@ impl NumberFieldBase {
         Self::try_adjoin_root(poly_ring, generating_poly).unwrap()
     }
 }
-
-impl<K, Impl, I> ComplexEmbedding<K, Impl, I>
-where
-    K: RingStore<Ring = NumberFieldBase<Impl, I>>,
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    /// Returns `epsilon > 0` such that when evaluating this homomorphism
-    /// at point `x`, the given result is at most `epsilon` from the actual
-    /// result (i.e. the result when computed with infinite precision).
-    #[stability::unstable(feature = "enable")]
-    pub fn absolute_error_bound_at(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> f64 {
-        let CC = Complex64::RING;
-        let CCX = DensePolyRing::new(CC, "X");
-        let f = self.from.poly_repr(&CCX, x, CC.can_hom(self.from.base_ring()).unwrap());
-        return absolute_error_of_poly_eval(
-            &CCX,
-            &f,
-            self.from.rank(),
-            self.image_of_generator,
-            self.absolute_error_image_of_generator / CC.abs(self.image_of_generator),
-        );
-    }
-}
-
-impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, Complex64Base> for ComplexEmbedding<K, Impl, I>
-where
-    K: RingStore<Ring = NumberFieldBase<Impl, I>>,
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    type DomainStore = K;
-    type CodomainStore = Complex64;
-
-    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &Complex64::RING }
-
-    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
-
-    fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
-        let poly_ring = DensePolyRing::new(*self.codomain(), "X");
-        let hom = self.codomain().can_hom(self.from.base_ring()).unwrap();
-        return poly_ring.evaluate(
-            &self.from.poly_repr(&poly_ring, &x, &hom),
-            &self.image_of_generator,
-            self.codomain().identity(),
-        );
-    }
-
-    fn map(&self, x: <NumberFieldBase<Impl, I> as RingBase>::Element) -> <Complex64Base as RingBase>::Element {
-        self.map_ref(&x)
-    }
-}
-
 impl<Impl, I> NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
@@ -419,51 +326,35 @@ where
         NumberFieldBase { base: implementation }
     }
 
+    fn generating_poly_as_int<P>(&self, poly_ring: P) -> El<P>
+    where
+        P: RingStore,
+        P::Ring: PolyRing,
+        BaseRingStore<P>: RingStore<Ring = I::Ring>,
+    {
+        assert!(poly_ring.base_ring().get_ring() == self.base_ring().base_ring().get_ring());
+        RingRef::from(self).generating_poly(
+            &poly_ring,
+            LambdaHom::new(self.base_ring(), poly_ring.base_ring(), |QQ, ZZ, x| {
+                ZZ.checked_div(QQ.get_ring().num(x), QQ.get_ring().den(x)).unwrap()
+            }),
+        )
+    }
+
     #[stability::unstable(feature = "enable")]
-    pub fn into_choose_complex_embedding<S: RingStore<Ring = Self>>(self_: S) -> ComplexEmbedding<S, Impl, I> {
+    pub fn into_choose_complex_embedding<S: RingStore<Ring = Self>>(self_: S) -> ComplexEmbedding<S, I> {
         let ZZ = self_.base_ring().base_ring();
         let poly_ring = DensePolyRing::new(ZZ, "X");
         let poly = self_.get_ring().generating_poly_as_int(&poly_ring);
         let (root, error) = find_approximate_complex_root(&poly_ring, &poly).unwrap();
         drop(poly);
         drop(poly_ring);
-        return ComplexEmbedding {
-            from: self_,
-            image_of_generator: root,
-            absolute_error_image_of_generator: error,
-        };
+        return ComplexEmbedding::create(self_, root, error);
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn choose_complex_embedding<'a>(&'a self) -> ComplexEmbedding<RingRef<'a, Self>, Impl, I> {
+    pub fn choose_complex_embedding<'a>(&'a self) -> ComplexEmbedding<RingRef<'a, Self>, I> {
         Self::into_choose_complex_embedding(RingRef::from(self))
-    }
-}
-
-impl<Impl, I> NumberFieldBase<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    fn generating_poly_as_int<P>(&self, ZZX: P) -> El<P>
-    where
-        P: RingStore,
-        P::Ring: PolyRing,
-        BaseRingStore<P>: RingStore<Ring = I::Ring>,
-    {
-        let ZZ = ZZX.base_ring();
-        assert!(ZZ.get_ring() == self.base_ring().base_ring().get_ring());
-        let assume_in_ZZ = LambdaHom::new(self.base_ring(), ZZ, |from, to, x| {
-            to.checked_div(from.get_ring().num(x), from.get_ring().den(x)).unwrap()
-        });
-        return self.base.generating_poly(&ZZX, &assume_in_ZZ);
-    }
-
-    fn by_order(&self) -> &RingValue<NumberFieldByOrder<Impl, I>> {
-        unsafe { transmute::<&NumberFieldBase<_, _>, &RingValue<NumberFieldByOrder<_, _>>>(self) }
     }
 }
 
@@ -594,145 +485,41 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+    fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        let self_ = poly_ring.base_ring().get_ring().by_order();
-        let order_poly_ring = DensePolyRing::new(self_, "X");
-        let lhs_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, lhs);
-        let rhs_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, rhs);
-
-        let result = poly_gcd_local(&order_poly_ring, lhs_order.clone(), rhs_order.clone());
-
-        return self_
-            .get_ring()
-            .normalize_map_back_from_order(&order_poly_ring, poly_ring, &result);
+        unimplemented!()
     }
 
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
+    fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        let self_ = poly_ring.base_ring().get_ring().by_order();
-        let order_poly_ring = DensePolyRing::new(self_, "X");
-        let poly_order = self_.get_ring().scale_poly_to_order(poly_ring, &order_poly_ring, poly);
-
-        let result = poly_power_decomposition_local(&order_poly_ring, poly_order);
-
-        return result
-            .into_iter()
-            .map(|(f, k)| {
-                (
-                    self_
-                        .get_ring()
-                        .normalize_map_back_from_order(&order_poly_ring, poly_ring, &f),
-                    k,
-                )
-            })
-            .collect();
+        unimplemented!()
     }
-}
 
-enum HeuristicFactorPolyInOrderResult<P>
-where
-    P: RingStore,
-    P::Ring: PolyRing,
-{
-    PartialFactorization(Vec<(El<P>, usize)>),
-    Irreducible,
-    Unknown,
-}
-
-/// Tries to factor the polynomial directly, by first finding an inert prime `p`, so that
-/// the number ring modulo `p` becomes a finite field. Then we factor the polynomial over
-/// the finite field, and hensel-lift it to a factorization in the order. This can fail
-/// if we don't find an inert prime - note that they don't have to exist. Note also that the
-/// returned factorization may be only a partial factorization.
-///
-/// # Inert primes don't have to exist
-///
-/// E.g. `X^4 - 10 X^2 + 1` is reducible modulo every prime. In fact, it is a theorem that
-/// there exists inert primes if and only if the Galois group of the extension is cyclic.
-#[instrument(skip_all, level = "trace")]
-fn poly_factor_numberfield_heuristic<'a, P, Impl, I>(poly_ring: P, poly: &El<P>) -> HeuristicFactorPolyInOrderResult<P>
-where
-    Impl: 'a + RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: 'a + RingStore,
-    I::Ring: IntegerRing,
-    P: RingStore + Copy,
-    P::Ring: PolyRing + DivisibilityRing,
-    BaseRingStore<P>: RingStore<Ring = NumberFieldByOrder<Impl, I>>,
-{
-    event!(
-        Level::TRACE,
-        poly_deg = poly_ring.degree(poly).unwrap_or(0),
-        numberfield_deg = poly_ring.base_ring().rank()
-    );
-    let mut rng = oorandom::Rand64::new(1);
-    let self_ = poly_ring.base_ring();
-
-    // first, we try to find an inert prime `p` and lift a factorization modulo `p` to the ring
-    'try_factor_directly: for attempt in 0..TRY_FACTOR_DIRECTLY_ATTEMPTS {
-        let mut inert_prime = None;
-        for _ in 0..(TRY_FIND_INERT_PRIME_ATTEMPTS * self_.rank()) {
-            let p = self_.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
-            if p.minpoly_factors_mod_p.len() == 1 {
-                inert_prime = Some(p);
-                break;
-            }
-        }
-        if let Some(p) = inert_prime {
-            event!(Level::TRACE, prime = %IdealDisplayWrapper::new(self_.base_ring().base_ring().get_ring(), &p.prime));
-            let lc_poly = poly_ring.lc(poly).unwrap().clone();
-            let monic_poly = evaluate_aX(poly_ring, poly, &lc_poly);
-            let e = 2 * self_.get_ring().heuristic_exponent(
-                &p,
-                poly_ring.degree(&monic_poly).unwrap(),
-                poly_ring.terms(&monic_poly).map(|(c, _)| c),
-            );
-            match factor_and_lift_mod_pe(poly_ring, &p, e, &monic_poly) {
-                FactorAndLiftModpeResult::PartialFactorization(factorization) => {
-                    debug_assert!(poly_ring.eq_el(
-                        &monic_poly,
-                        &poly_ring.normalize(poly_ring.prod(factorization.iter().map(|f| f.clone())))
-                    ));
-                    let result: Vec<_> = factorization
-                        .into_iter()
-                        .map(|f| (unevaluate_aX(poly_ring, &f, &lc_poly), 1))
-                        .collect();
-                    debug_assert!(poly_ring.eq_el(
-                        &poly_ring.normalize(poly.clone()),
-                        &poly_ring.normalize(poly_ring.prod(result.iter().map(|(f, e)| poly_ring.pow(f.clone(), *e))))
-                    ));
-                    return HeuristicFactorPolyInOrderResult::PartialFactorization(result);
-                }
-                FactorAndLiftModpeResult::Irreducible => {
-                    event!(Level::TRACE, "irreducible");
-                    return HeuristicFactorPolyInOrderResult::Irreducible;
-                }
-                FactorAndLiftModpeResult::NotSquarefreeModpe => {
-                    // probably not square-free
-                    let power_decomposition = poly_power_decomposition_local(poly_ring, poly.clone());
-                    if power_decomposition.len() > 1 {
-                        event!(Level::TRACE, "nontrivial_factorization");
-                        return HeuristicFactorPolyInOrderResult::PartialFactorization(power_decomposition);
-                    }
-                }
-                FactorAndLiftModpeResult::Unknown => {}
-            }
-        } else {
-            break 'try_factor_directly;
-        }
+    fn is_squarefree<P>(_poly_ring: P, _poly: &El<P>) -> bool
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
     }
-    event!(Level::TRACE, "no_inert_prime");
-    return HeuristicFactorPolyInOrderResult::Unknown;
+
+    fn squarefree_part<P>(_poly_ring: P, _poly: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
 }
 
 impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
@@ -741,743 +528,24 @@ where
     Impl::Ring: Field + FreeAlgebra,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
-    I::Ring: IntegerRing + ComputeResultantRing,
+    I::Ring: IntegerRing,
 {
-    #[instrument(skip_all, level = "trace")]
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+    fn factor_poly<P>(_poly_ring: P, _poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        let self_ = poly_ring.base_ring().get_ring().by_order();
-        let order_poly_ring = DensePolyRing::new(self_, "X");
-
-        let mut to_factor = vec![(poly.clone(), 1)];
-        let mut result = Vec::new();
-        while let Some((current, e_base)) = to_factor.pop() {
-            if poly_ring.degree(&current).unwrap() == 1 {
-                result.push((poly_ring.normalize(current), 1));
-            } else {
-                let poly_order = self_
-                    .get_ring()
-                    .scale_poly_to_order(poly_ring, &order_poly_ring, &current);
-                // try the direct factorization
-                match poly_factor_numberfield_heuristic(&order_poly_ring, &poly_order) {
-                    HeuristicFactorPolyInOrderResult::PartialFactorization(partial_factorization) => {
-                        to_factor.extend(partial_factorization.into_iter().map(|(f, e)| {
-                            (
-                                self_
-                                    .get_ring()
-                                    .normalize_map_back_from_order(&order_poly_ring, poly_ring, &f),
-                                e * e_base,
-                            )
-                        }))
-                    }
-                    HeuristicFactorPolyInOrderResult::Irreducible => result.push((current, e_base)),
-                    HeuristicFactorPolyInOrderResult::Unknown => result.extend(
-                        poly_factor_extfield(&poly_ring, &current)
-                            .0
-                            .into_iter()
-                            .map(|(f, e)| (f, e * e_base)),
-                    ),
-                }
-            }
-        }
-        return (result, poly_ring.lc(poly).unwrap().clone());
+        unimplemented!()
     }
-}
 
-/// Implements [`PolyLiftFactorsDomain`] for [`NumberField`].
-///
-/// We don't want to expose the interface of [`PolyLiftFactorsDomain`] for number
-/// fields generally, thus use a private newtype.
-///
-/// Note that this does not actually represent the order, since during
-/// `reconstruct_ring_el()` we might reconstruct an element outside of the
-/// order. Hence, it should remain private.
-#[repr(transparent)]
-struct NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    base: NumberFieldBase<Impl, I>,
-}
-
-impl<Impl, I> NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    /// Multiplies the given polynomial with the lcm of the denominators of all coefficients,
-    /// and returns the polynomial as element of the current order.
-    #[instrument(skip_all, level = "trace")]
-    fn scale_poly_to_order<'ring, P1, P2>(&self, from: P1, to: P2, poly: &El<P1>) -> El<P2>
+    fn is_irred<P>(_poly_ring: P, _poly: &El<P>) -> bool
     where
-        P1: RingStore,
-        P1::Ring: PolyRing,
-        BaseRingStore<P1>: RingStore<Ring = NumberFieldBase<Impl, I>>,
-        P2: RingStore,
-        P2::Ring: PolyRing,
-        BaseRingStore<P2>: RingStore<Ring = Self>,
-        Self: 'ring,
+        P: RingStore + Copy,
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        debug_assert!(self.get_delegate() == from.base_ring().get_ring());
-        debug_assert!(self.get_delegate() == to.base_ring().get_ring().get_delegate());
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        let denominator = QQ.inclusion().map(
-            from.terms(poly)
-                .map(|(c, _)| {
-                    self.base
-                        .wrt_canonical_basis(c)
-                        .iter()
-                        .map(|c| QQ.get_ring().den(&c).clone())
-                        .fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b))
-                })
-                .fold(ZZ.one(), |a, b| ZZ.ideal_intersect(&a, &b)),
-        );
-        debug_assert!(!QQ.is_zero(&denominator));
-        return to.from_terms(from.terms(poly).map(|(c, i)| {
-            (
-                RingValue::from_ref(&self.base)
-                    .into_inclusion()
-                    .mul_ref_map(c, &denominator),
-                i,
-            )
-        }));
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    fn normalize_map_back_from_order<'ring, P1, P2>(&self, from: P1, to: P2, poly: &El<P1>) -> El<P2>
-    where
-        P1: RingStore,
-        P1::Ring: PolyRing,
-        BaseRingStore<P1>: RingStore<Ring = Self>,
-        P2: RingStore,
-        P2::Ring: PolyRing,
-        BaseRingStore<P2>: RingStore<Ring = NumberFieldBase<Impl, I>>,
-        Self: 'ring,
-    {
-        debug_assert!(self.get_delegate() == to.base_ring().get_ring());
-        debug_assert!(self.get_delegate() == from.base_ring().get_ring().get_delegate());
-        let result = to.from_terms(from.terms(poly).map(|(c, i)| (c.clone(), i)));
-        return to.normalize(result);
-    }
-}
-
-impl<Impl, I> PartialEq for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    fn eq(&self, other: &Self) -> bool { self.base == other.base }
-}
-
-impl<Impl, I> Clone for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    fn clone(&self) -> Self {
-        Self {
-            base: self.base.clone(),
-        }
-    }
-}
-
-impl<Impl, I> Debug for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "NumberFieldByOrder({:?})", &self.base) }
-}
-
-impl<Impl, I> FiniteRingSpecializable for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
-}
-
-impl<Impl, I> DelegateRing for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    type Base = NumberFieldBase<Impl, I>;
-    type Element = El<NumberField<Impl, I>>;
-
-    fn get_delegate(&self) -> &Self::Base { &self.base }
-
-    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
-    fn delegate_mut<'b>(&self, el: &'b mut Self::Element) -> &'b mut <Self::Base as RingBase>::Element { el }
-    fn delegate_ref<'b>(&self, el: &'b Self::Element) -> &'b <Self::Base as RingBase>::Element { el }
-    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
-}
-
-impl<Impl, I> Domain for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-}
-
-type LocalRing<'ring, I> = <<I as RingStore>::Ring as PolyLiftFactorsDomain>::LocalRing<'ring>;
-
-type LocalRingPolyRing<'ring, I> =
-    DensePolyRing<LocalRing<'ring, I>, DynConvolution<'ring, <LocalRing<'ring, I> as RingStore>::Ring>>;
-
-type LocalField<'ring, I> = <<I as RingStore>::Ring as PolyLiftFactorsDomain>::LocalField<'ring>;
-
-type LocalFieldPolyRing<'ring, I> =
-    DensePolyRing<LocalField<'ring, I>, DynConvolution<'ring, <LocalField<'ring, I> as RingStore>::Ring>>;
-
-type NumberFieldQuotientField<'ring, I> = AsFieldBase<
-    FreeAlgebraImpl<
-        <<I as RingStore>::Ring as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>,
-        Vec<El<<<I as RingStore>::Ring as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>>>,
-        DynConvolution<
-            'ring,
-            <<<I as RingStore>::Ring as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring> as RingStore>::Ring,
-        >,
-    >,
->;
-
-type NumberFieldQuotientRing<'ring, I> = FreeAlgebraImplBase<
-    LocalRing<'ring, I>,
-    SparseMapVector<LocalRing<'ring, I>>,
-    DynConvolution<'ring, <LocalRing<'ring, I> as RingStore>::Ring>,
->;
-
-/// A prime ideal of a [`NumberField`].
-///
-/// Used for various implementations that work on the ring modulus prime ideals,
-/// and lift the result back to the ring.
-pub struct NumberRingIdeal<'ring, I>
-where
-    I: RingStore,
-    I::Ring: IntegerRing,
-    I: 'ring,
-{
-    prime: <I::Ring as PolyLiftFactorsDomain>::SuitableIdeal<'ring>,
-    ZZX: DensePolyRing<&'ring I, DynConvolution<'ring, I::Ring>>,
-    number_field_poly: El<DensePolyRing<&'ring I, DynConvolution<'ring, I::Ring>>>,
-    FpX: LocalFieldPolyRing<'ring, I>,
-    Fp_as_ring: <I::Ring as PolyLiftFactorsDomain>::LocalRing<'ring>,
-    Fp_as_zn: <I::Ring as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring>,
-    minpoly_factors_mod_p: Vec<El<LocalFieldPolyRing<'ring, I>>>,
-}
-
-impl<'ring, I> NumberRingIdeal<'ring, I>
-where
-    I: RingStore,
-    I::Ring: IntegerRing,
-    I: 'ring,
-{
-    fn lifted_factorization<'a>(
-        &'a self,
-        e: usize,
-    ) -> (LocalRingPolyRing<'ring, I>, Vec<El<LocalRingPolyRing<'ring, I>>>) {
-        let ZZX = &self.ZZX;
-        let ZZ = ZZX.base_ring();
-        let ZpeX = DensePolyRing::new(ZZ.get_ring().quotient_ring_at(&self.prime, e, 0), "X");
-        let Zpe = ZpeX.base_ring();
-        let FpX = &self.FpX;
-        let Zpe_to_Fp = PolyLiftFactorsDomainIntermediateReductionMap::new(
-            ZZ.get_ring(),
-            &self.prime,
-            Zpe,
-            e,
-            &self.Fp_as_ring,
-            1,
-            0,
-        );
-        let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &self.prime, &Zpe, e, 0);
-
-        let factors = hensel::hensel_lift_factorization(
-            &Zpe_to_Fp,
-            &ZpeX,
-            FpX,
-            &ZpeX.lifted_hom(ZZX, ZZ_to_Zpe).map_ref(&self.number_field_poly),
-            &self.minpoly_factors_mod_p[..],
-        );
-
-        return (ZpeX, factors);
-    }
-}
-
-impl<'ring, I> Debug for NumberRingIdeal<'ring, I>
-where
-    I: RingStore,
-    I::Ring: IntegerRing,
-    I: 'ring,
-    <I::Ring as PolyLiftFactorsDomain>::SuitableIdeal<'ring>: Debug,
-{
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("NumberRingIdeal").field("prime", &self.prime).finish()
-    }
-}
-
-impl<Impl, I> PolyLiftFactorsDomain for NumberFieldByOrder<Impl, I>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra,
-    BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    type LocalRingBase<'ring>
-        = NumberFieldQuotientRing<'ring, I>
-    where
-        Self: 'ring;
-
-    type LocalRing<'ring>
-        = RingValue<Self::LocalRingBase<'ring>>
-    where
-        Self: 'ring;
-
-    type LocalFieldBase<'ring>
-        = NumberFieldQuotientField<'ring, I>
-    where
-        Self: 'ring;
-
-    type LocalField<'ring>
-        = RingValue<Self::LocalFieldBase<'ring>>
-    where
-        Self: 'ring;
-
-    type SuitableIdeal<'ring>
-        = NumberRingIdeal<'ring, I>
-    where
-        Self: 'ring;
-
-    fn maximal_ideal_factor_count<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>) -> usize
-    where
-        Self: 'ring,
-    {
-        ideal.minpoly_factors_mod_p.len()
-    }
-
-    fn heuristic_exponent<'ring, 'b, J>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        poly_deg: usize,
-        coefficients: J,
-    ) -> usize
-    where
-        J: Iterator<Item = &'b Self::Element>,
-        Self: 'b,
-        Self: 'ring,
-    {
-        const HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR: f64 = 0.25;
-
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        // to give any mathematically justifiable value, we would probably have to consider the canonical
-        // norm; I don't want to deal with this here, so let's just use the coefficient norm
-        // instead...
-        let log2_max_coeff = coefficients
-            .map(|c| {
-                self.base
-                    .wrt_canonical_basis(c)
-                    .iter()
-                    .map(|c| ZZ.abs_log2_ceil(QQ.get_ring().num(&c)).unwrap_or(0))
-                    .max()
-                    .unwrap()
-            })
-            .max()
-            .unwrap_or(0);
-        let log2_p = ZZbig
-            .to_float_approx(&ZZ.get_ring().principal_ideal_generator(&ideal.prime))
-            .log2();
-        return ((log2_max_coeff as f64 + poly_deg as f64 + (self.rank() as f64).log2()) / log2_p
-            * HEURISTIC_FACTOR_SIZE_OVER_POLY_SIZE_FACTOR)
-            .ceil() as usize
-            + 1;
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    fn random_suitable_ideal<'ring, F>(&'ring self, mut rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
-    where
-        F: FnMut() -> u64,
-    {
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let gen_poly = RingValue::from_ref(&self.base).generating_poly(
-            &ZZX,
-            LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
-                assert!(ZZ.is_one(QQ.get_ring().den(&x)));
-                QQ.get_ring().num(&x).clone()
-            }),
-        );
-
-        // search for a prime `p` such that the minimal polynomial is unramified modulo `p`
-        for _ in 0..PROBABILISTIC_REPETITIONS {
-            let p = ZZ.get_ring().random_suitable_ideal(&mut rng, attempt);
-            assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&p));
-
-            let Fp_as_ring = ZZ.get_ring().quotient_ring_at(&p, 1, 0);
-            let FpX = DensePolyRing::new(ZZ.get_ring().quotient_field_at(&p, 0), "X");
-            let Fp = FpX.base_ring();
-            let ZZ_to_Fp = LambdaHom::new(ZZ, Fp, |ZZ, Fp, x| {
-                ZZ.get_ring().base_ring_to_field(
-                    &p,
-                    Fp_as_ring.get_ring(),
-                    Fp.get_ring(),
-                    0,
-                    ZZ.get_ring()
-                        .reduce_ring_el(&p, (Fp_as_ring.get_ring(), 1), 0, x.clone()),
-                )
-            });
-
-            let gen_poly_mod_p = FpX.from_terms(ZZX.terms(&gen_poly).map(|(c, i)| (ZZ_to_Fp.map_ref(c), i)));
-            let (factorization, _) = <_ as FactorPolyField>::factor_poly(&FpX, &gen_poly_mod_p);
-            if factorization.iter().all(|(_, e)| *e == 1) {
-                return NumberRingIdeal {
-                    minpoly_factors_mod_p: factorization.into_iter().map(|(f, _)| f).collect(),
-                    number_field_poly: gen_poly,
-                    Fp_as_zn: ZZ
-                        .get_ring()
-                        .local_field_into_zn(ZZ.get_ring().quotient_field_at(&p, 0)),
-                    FpX,
-                    ZZX,
-                    Fp_as_ring,
-                    prime: p,
-                };
-            }
-        }
-        unreachable!()
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    fn quotient_field_at<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        idx: usize,
-    ) -> RingValue<NumberFieldQuotientField<'ring, I>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&ideal.prime));
-        let FpX = &ideal.FpX;
-        let Fp_to_Fp_zn = ideal.Fp_as_zn.can_hom(ideal.FpX.base_ring()).unwrap();
-
-        let irred_poly = &ideal.minpoly_factors_mod_p[idx];
-        let mut x_pow_rank = (0..FpX.degree(irred_poly).unwrap())
-            .map(|_| Fp_to_Fp_zn.codomain().zero())
-            .collect::<Vec<_>>();
-        for (c, i) in FpX.terms(irred_poly) {
-            if i < x_pow_rank.len() {
-                *x_pow_rank.at_mut(i) = Fp_to_Fp_zn.codomain().negate(Fp_to_Fp_zn.map_ref(c));
-            }
-        }
-        let trailing_zeros = x_pow_rank
-            .iter()
-            .rev()
-            .take_while(|x| Fp_to_Fp_zn.codomain().is_zero(x))
-            .count();
-        x_pow_rank.truncate(x_pow_rank.len() - trailing_zeros);
-        let Fp: <<I as RingStore>::Ring as IntegerPolyLiftFactorsDomain>::LocalFieldAsZn<'ring> =
-            ideal.Fp_as_zn.clone();
-        return AsField::from(AsFieldBase::promise_is_perfect_field(FreeAlgebraImpl::new(
-            Fp,
-            FpX.degree(irred_poly).unwrap(),
-            x_pow_rank,
-        )));
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    fn quotient_ring_at<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        e: usize,
-        idx: usize,
-    ) -> RingValue<NumberFieldQuotientRing<'ring, I>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        let (ZpeX, factors) = ideal.lifted_factorization(e);
-        let Zpe = ZZ.get_ring().quotient_ring_at(&ideal.prime, e, 0);
-        assert!(Zpe.get_ring() == ZpeX.base_ring().get_ring());
-
-        let irred_poly = &factors[idx];
-        let degree = ZpeX.degree(irred_poly).unwrap();
-        let mut x_pow_rank = SparseMapVector::new(degree, ZZ.get_ring().quotient_ring_at(&ideal.prime, e, 0));
-        for (c, i) in ZpeX.terms(irred_poly) {
-            if i < x_pow_rank.len() {
-                *x_pow_rank.at_mut(i) = Zpe.negate(c.clone());
-            }
-        }
-        _ = x_pow_rank.at_mut(0);
-        return FreeAlgebraImpl::new(Zpe, degree, x_pow_rank);
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    fn reduce_ring_el<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        to: (&Self::LocalRingBase<'ring>, usize),
-        idx: usize,
-        x: Self::Element,
-    ) -> El<Self::LocalRing<'ring>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        let ZZX = &ideal.ZZX;
-        let partial_QQ_to_ZZ = LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
-            assert!(ZZ.is_one(QQ.get_ring().den(&x)));
-            QQ.get_ring().num(&x).clone()
-        });
-        let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &ideal.prime, to.0.base_ring(), to.1, 0);
-
-        ZZX.evaluate(
-            &RingValue::from_ref(&self.base).poly_repr(ZZX, &x, partial_QQ_to_ZZ),
-            &to.0.canonical_gen(),
-            RingRef::from(to.0).into_inclusion().compose(ZZ_to_Zpe),
-        )
-    }
-
-    fn base_ring_to_field<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        from: &Self::LocalRingBase<'ring>,
-        to: &Self::LocalFieldBase<'ring>,
-        idx: usize,
-        x: El<Self::LocalRing<'ring>>,
-    ) -> El<Self::LocalField<'ring>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let ZZ = self.base.base_ring().base_ring();
-        let hom = to.base_ring().can_hom(ideal.FpX.base_ring()).unwrap().compose(
-            PolyLiftFactorsDomainBaseRingToFieldIso::new(
-                ZZ.get_ring(),
-                &ideal.prime,
-                from.base_ring().get_ring(),
-                ideal.FpX.base_ring().get_ring(),
-                0,
-            ),
-        );
-        to.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
-    }
-
-    fn field_to_base_ring<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        from: &Self::LocalFieldBase<'ring>,
-        to: &Self::LocalRingBase<'ring>,
-        idx: usize,
-        x: El<Self::LocalField<'ring>>,
-    ) -> El<Self::LocalRing<'ring>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let ZZ = self.base.base_ring().base_ring();
-        let hom = PolyLiftFactorsDomainBaseRingToFieldIso::new(
-            ZZ.get_ring(),
-            &ideal.prime,
-            to.base_ring().get_ring(),
-            ideal.FpX.base_ring().get_ring(),
-            0,
-        )
-        .inv()
-        .compose(from.base_ring().can_iso(ideal.FpX.base_ring()).unwrap());
-        to.from_canonical_basis(from.wrt_canonical_basis(&x).iter().map(|c| hom.map(c)))
-    }
-
-    fn reduce_partial<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        from: (&Self::LocalRingBase<'ring>, usize),
-        to: (&Self::LocalRingBase<'ring>, usize),
-        idx: usize,
-        x: El<Self::LocalRing<'ring>>,
-    ) -> El<Self::LocalRing<'ring>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| {
-            ZZ.get_ring().reduce_partial(
-                &ideal.prime,
-                (from.0.base_ring().get_ring(), from.1),
-                (to.0.base_ring().get_ring(), to.1),
-                0,
-                c,
-            )
-        }))
-    }
-
-    fn lift_partial<'ring>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        from: (&Self::LocalRingBase<'ring>, usize),
-        to: (&Self::LocalRingBase<'ring>, usize),
-        idx: usize,
-        x: El<Self::LocalRing<'ring>>,
-    ) -> El<Self::LocalRing<'ring>>
-    where
-        Self: 'ring,
-    {
-        assert!(idx < self.maximal_ideal_factor_count(ideal));
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        to.0.from_canonical_basis(from.0.wrt_canonical_basis(&x).iter().map(|c| {
-            ZZ.get_ring().lift_partial(
-                &ideal.prime,
-                (from.0.base_ring().get_ring(), from.1),
-                (to.0.base_ring().get_ring(), to.1),
-                0,
-                c,
-            )
-        }))
-    }
-
-    #[instrument(skip_all, level = "trace")]
-    fn reconstruct_ring_el<'local, 'element, 'ring, V1, V2>(
-        &self,
-        ideal: &Self::SuitableIdeal<'ring>,
-        from: V1,
-        e: usize,
-        x: V2,
-    ) -> Self::Element
-    where
-        Self: 'ring,
-        V1: VectorFn<&'local Self::LocalRing<'ring>>,
-        V2: VectorFn<&'element El<Self::LocalRing<'ring>>>,
-        Self::LocalRing<'ring>: 'local,
-        El<Self::LocalRing<'ring>>: 'element,
-        'ring: 'local + 'element,
-    {
-        assert_eq!(self.maximal_ideal_factor_count(ideal), from.len());
-        assert_eq!(self.maximal_ideal_factor_count(ideal), x.len());
-        let QQ = self.base.base_ring();
-        let ZZ = QQ.base_ring();
-        let Zpe = from.at(0).base_ring();
-        assert!(from.iter().all(|ring| ring.base_ring().get_ring() == Zpe.get_ring()));
-        let ZpeX = DensePolyRing::new(Zpe, "X");
-        let ZZ_to_Zpe = PolyLiftFactorsDomainReductionMap::new(ZZ.get_ring(), &ideal.prime, Zpe, e, 0);
-
-        // compute data necessary for inverse CRT
-        let mut unit_vectors = (0..self.maximal_ideal_factor_count(ideal))
-            .map(|_| ZpeX.zero())
-            .collect::<Vec<_>>();
-        product_except_one(
-            &ZpeX,
-            (&from).map_fn(|galois_ring| galois_ring.generating_poly(&ZpeX, Zpe.identity())),
-            &mut unit_vectors,
-        );
-        let complete_product = ZpeX.mul_ref_fst(&unit_vectors[0], from.at(0).generating_poly(&ZpeX, Zpe.identity()));
-        assert_el_eq!(
-            &ZpeX,
-            &complete_product,
-            &RingValue::from_ref(&self.base).generating_poly(
-                &ZpeX,
-                ZZ_to_Zpe.compose(LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
-                    assert!(ZZ.is_one(QQ.get_ring().den(&x)));
-                    QQ.get_ring().num(&x).clone()
-                }))
-            )
-        );
-
-        for i in 0..self.maximal_ideal_factor_count(ideal) {
-            let galois_ring = from.at(i);
-            let inv_normalization_factor = ZpeX.evaluate(
-                unit_vectors.at(i),
-                &galois_ring.canonical_gen(),
-                galois_ring.inclusion(),
-            );
-            let normalization_factor = galois_ring.invert(&inv_normalization_factor).unwrap();
-            let lifted_normalization_factor = galois_ring.poly_repr(&ZpeX, &normalization_factor, Zpe.identity());
-            let unreduced_new_unit_vector = ZpeX.mul(
-                std::mem::replace(&mut unit_vectors[i], ZpeX.zero()),
-                lifted_normalization_factor,
-            );
-            unit_vectors[i] = ZpeX.div_rem_monic(unreduced_new_unit_vector, &complete_product).1;
-        }
-
-        // now apply inverse CRT to get the value over ZpeX
-        let combined = <_ as RingStore>::sum(
-            &ZpeX,
-            (0..self.maximal_ideal_factor_count(ideal)).map(|i| {
-                let galois_ring = from.at(i);
-                let unreduced_result =
-                    ZpeX.mul_ref_snd(galois_ring.poly_repr(&ZpeX, x.at(i), Zpe.identity()), &unit_vectors[i]);
-                ZpeX.div_rem_monic(unreduced_result, &complete_product).1
-            }),
-        );
-
-        for i in 0..self.maximal_ideal_factor_count(ideal) {
-            let galois_ring = from.at(i);
-            debug_assert!(galois_ring.eq_el(
-                x.at(i),
-                &ZpeX.evaluate(&combined, &galois_ring.canonical_gen(), galois_ring.inclusion())
-            ));
-        }
-
-        // now lift the polynomial modulo `p^e` to the rationals
-        let Zpe_as_zn = ZZ.get_ring().local_ring_as_zn(&Zpe);
-        let Zpe_to_as_zn = Zpe_as_zn.can_hom(Zpe).unwrap();
-        let result = self.from_canonical_basis((0..self.rank()).map(|i| {
-            let (num, den) =
-                balanced_rational_reconstruction(Zpe_as_zn, Zpe_to_as_zn.map_ref(ZpeX.coefficient_at(&combined, i)));
-            return QQ.div(
-                &QQ.inclusion().map(int_cast(num, ZZ, Zpe_as_zn.integer_ring())),
-                &QQ.inclusion().map(int_cast(den, ZZ, Zpe_as_zn.integer_ring())),
-            );
-        }));
-        return result;
-    }
-
-    fn dbg_ideal<'ring>(&self, ideal: &Self::SuitableIdeal<'ring>, out: &mut std::fmt::Formatter) -> std::fmt::Result
-    where
-        Self: 'ring,
-    {
-        let QQ = self.base.base_ring();
-        QQ.base_ring().get_ring().dbg_ideal(&ideal.prime, out)
+        unimplemented!()
     }
 }
 

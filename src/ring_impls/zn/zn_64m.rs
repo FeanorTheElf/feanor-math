@@ -14,10 +14,10 @@ use crate::algorithms::convolution::{
 use crate::algorithms::eea::const_eea;
 use crate::algorithms::matmul::StrassenHint;
 use crate::iters::multi_cartesian_product;
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::primitive_int::*;
+use crate::ring_properties::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
@@ -242,7 +242,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64M> {
     where
         Self: 'a;
 
-    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<<Self as RingBase>::Element>
     where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
@@ -255,7 +255,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64M> {
         }
     }
 
-    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+    fn in_extension<'a, S>(&self, ext_ring: S, el: <Self as RingBase>::Element) -> El<S>
     where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,

@@ -361,7 +361,7 @@ where
     fn evaluate<R, V, H>(&self, f: &El<Self>, value: V, hom: H) -> R::Element
     where
         R: ?Sized + RingBase,
-        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, R>,
+        H: Homomorphism<BaseRingBase<Self>, R>,
         V: VectorFn<R::Element>,
     {
         self.get_ring().evaluate(f, value, hom)
@@ -373,7 +373,7 @@ where
     where
         P: RingStore,
         P::Ring: MultivariatePolyRing,
-        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, BaseRingBase<Self>>,
     {
         CoefficientHom { from, to: self, hom }
     }
@@ -387,7 +387,7 @@ where
     where
         P: RingStore,
         P::Ring: MultivariatePolyRing,
-        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, <BaseRingStore<Self> as RingStore>::Ring>,
+        H: Homomorphism<<BaseRingStore<P> as RingStore>::Ring, BaseRingBase<Self>>,
     {
         self.into_lifted_hom(from, hom)
     }

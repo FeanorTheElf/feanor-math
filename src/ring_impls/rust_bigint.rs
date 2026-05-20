@@ -12,15 +12,15 @@ use tracing::instrument;
 
 use crate::algorithms::bigint_ops::*;
 use crate::algorithms::eea::{eea, gcd, partial_eea_int};
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
-use crate::ring_impls::primitive_int::*;
 use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
 use crate::ring_properties::integer::IntCast;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
-use crate::{impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ};
+use crate::{impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero};
 
 /// An element of the integer ring implementation [`RustBigintRing`].
 ///
@@ -656,8 +656,6 @@ impl<A: Allocator + Send + Sync + Clone> SerializableElementRing for RustBigintR
 
 impl_interpolation_base_ring_char_zero! { <{A}> InterpolationBaseRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
-impl_poly_gcd_locally_for_ZZ! { <{A}> IntegerPolyLiftFactorsDomain for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
-
 impl_eval_poly_locally_for_ZZ! { <{A}> LiftPolyEvalRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
 impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
@@ -698,6 +696,44 @@ impl<A: Allocator + Send + Sync + Clone> CanHomFrom<StaticRingBase<i64>> for Rus
     ) {
         core_fma_small_ref_snd(&mut lhs.1, rhs.unsigned_abs() as u64, &[], 0);
         lhs.0 ^= *rhs < 0;
+    }
+}
+
+impl<A: Allocator + Send + Sync + Clone> PolyTFracGCDRing for RustBigintRingBase<A> {
+    fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn is_squarefree<P>(_poly_ring: P, _poly: &El<P>) -> bool
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn squarefree_part<P>(_poly_ring: P, _poly: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
     }
 }
 

@@ -1,9 +1,9 @@
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::homomorphism::*;
-use crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing;
-use crate::reduce_lift::lift_poly_factors::IntegerPolyLiftFactorsDomain;
 use crate::ring::*;
 use crate::ring_impls::primitive_int::*;
 use crate::ring_properties::divisibility::*;
+use crate::ring_properties::lift_poly_eval::LiftPolyEvalRing;
 use crate::ring_properties::ordered::*;
 use crate::ring_properties::pid::*;
 
@@ -53,7 +53,7 @@ pub const ZZi64: StaticRing<i64> = StaticRing::RING;
 /// [`LiftPolyEvalRing`] so it is at the moment impossible to implement [`IntegerRing`] for a
 /// custom ring type without enabling unstable features. Sorry.
 pub trait IntegerRing:
-    Domain + EuclideanRing + OrderedRing + HashableElRing + IntegerPolyLiftFactorsDomain + LiftPolyEvalRing
+    Domain + EuclideanRing + OrderedRing + HashableElRing + LiftPolyEvalRing + PolyTFracGCDRing
 {
     /// Computes a float value that is "close" to the given integer.
     ///

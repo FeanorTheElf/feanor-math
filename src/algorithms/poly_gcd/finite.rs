@@ -39,7 +39,7 @@ where
                     &poly_ring.prod(result.iter().map(|(g, e)| poly_ring.pow(g.clone(), *e))),
                 )
                 .unwrap();
-            result.insert(0, (poly_ring.normalize(remaining_part), 1));
+            result.insert(0, (poly_ring.normalize(remaining_part).0, 1));
         }
         return result;
     }
@@ -78,7 +78,7 @@ where
     } else {
         let square_part = poly_ring.ideal_gen(poly, &derivate);
         let result = poly_ring.checked_div(poly, &square_part).unwrap();
-        return poly_ring.normalize(result);
+        return poly_ring.normalize(result).0;
     }
 }
 
@@ -246,7 +246,7 @@ fn test_fast_poly_eea() {
     assert_el_eq!(
         &poly_ring,
         poly_ring.pow(poly_ring.indeterminate(), 54),
-        poly_ring.normalize(d)
+        poly_ring.normalize(d).0
     );
 
     let field = zn_64b::Zn64B::new(65537).as_field().ok().unwrap();

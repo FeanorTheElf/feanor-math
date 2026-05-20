@@ -20,7 +20,6 @@ use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::ring_impls::poly::PolyRingStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
-use crate::ring_properties::integer::{IntegerRingStore, *};
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
 use crate::seq::sparse::SparseMapVector;

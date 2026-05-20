@@ -13,13 +13,13 @@ use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::iters::multi_cartesian_product;
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::primitive_int::*;
 use crate::ring_impls::zn::{zn_big, *};
 use crate::ring_properties::divisibility::PreparedDivisor;
+use crate::ring_properties::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
@@ -382,7 +382,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
     where
         Self: 'a;
 
-    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<<Self as RingBase>::Element>
     where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
@@ -395,7 +395,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
         }
     }
 
-    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+    fn in_extension<'a, S>(&self, ext_ring: S, el: <Self as RingBase>::Element) -> El<S>
     where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
@@ -403,7 +403,13 @@ impl InterpolationBaseRing for AsFieldBase<Zn64B> {
         ext_ring.inclusion().map(el)
     }
 
-    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(
+        &'a self,
+        count: usize,
+    ) -> (
+        <Self as InterpolationBaseRing>::ExtendedRing<'a>,
+        Vec<El<<Self as InterpolationBaseRing>::ExtendedRing<'a>>>,
+    ) {
         let ring = super::generic_impls::interpolation_ring(RingRef::from(self), count);
         let points = multi_cartesian_product(
             (0..ring.rank()).map(|_| (0..*self.modulus()).map(|x| self.from_int_promise_reduced(x))),

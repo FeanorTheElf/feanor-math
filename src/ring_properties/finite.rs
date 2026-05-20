@@ -1,5 +1,4 @@
 use crate::prelude::*;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 /// Trait for rings that are finite.

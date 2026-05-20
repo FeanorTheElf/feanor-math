@@ -15,10 +15,10 @@ use crate::algorithms::poly_div::{FAST_POLY_DIV_THRESHOLD, fast_poly_div_rem, po
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::function::no_error;
 use crate::prelude::*;
-use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, LiftPolyEvalRing, ToExtRingMap};
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::poly::*;
 use crate::ring_properties::field::Field;
+use crate::ring_properties::lift_poly_eval::{InterpolationBaseRing, LiftPolyEvalRing, ToExtRingMap};
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::{FiniteRingOperation, FiniteRingSpecializable};
 use crate::seq::*;
@@ -733,7 +733,7 @@ where
     where
         Self: 'ring;
 
-    fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
+    fn ln_pseudo_norm(&self, el: &<Self as RingBase>::Element) -> f64 {
         if let Some(d) = self.degree(el) {
             return d as f64;
         } else {
@@ -741,20 +741,27 @@ where
         }
     }
 
-    fn init_reduce_lift<'ring>(&'ring self, ln_pseudo_norm: f64) -> Self::LocalComputationData<'ring> {
+    fn init_reduce_lift<'ring>(
+        &'ring self,
+        ln_pseudo_norm: f64,
+    ) -> <Self as LiftPolyEvalRing>::LocalComputationData<'ring> {
         let required_points = ln_pseudo_norm.ceil() as usize + 1;
         let (map, points) = ToExtRingMap::for_interpolation(self.base_ring().get_ring(), required_points);
         DensePolyRingBaseLocalComputationData(map, points)
     }
 
-    fn prime_ideal_count<'ring>(&self, data: &Self::LocalComputationData<'ring>) -> usize
+    fn prime_ideal_count<'ring>(&self, data: &<Self as LiftPolyEvalRing>::LocalComputationData<'ring>) -> usize
     where
         Self: 'ring,
     {
         data.1.len()
     }
 
-    fn quotient_ring_at<'ring>(&self, data: &Self::LocalComputationData<'ring>, i: usize) -> Self::LocalRing<'ring>
+    fn quotient_ring_at<'ring>(
+        &self,
+        data: &<Self as LiftPolyEvalRing>::LocalComputationData<'ring>,
+        i: usize,
+    ) -> <Self as LiftPolyEvalRing>::LocalRing<'ring>
     where
         Self: 'ring,
     {
@@ -764,9 +771,9 @@ where
 
     fn reduce<'ring>(
         &self,
-        data: &Self::LocalComputationData<'ring>,
-        el: &Self::Element,
-    ) -> Vec<<Self::LocalRingBase<'ring> as RingBase>::Element>
+        data: &<Self as LiftPolyEvalRing>::LocalComputationData<'ring>,
+        el: &<Self as RingBase>::Element,
+    ) -> Vec<<<Self as LiftPolyEvalRing>::LocalRingBase<'ring> as RingBase>::Element>
     where
         Self: 'ring,
     {
@@ -775,9 +782,9 @@ where
 
     fn lift_combine<'ring>(
         &self,
-        data: &Self::LocalComputationData<'ring>,
-        els: &[<Self::LocalRingBase<'ring> as RingBase>::Element],
-    ) -> Self::Element
+        data: &<Self as LiftPolyEvalRing>::LocalComputationData<'ring>,
+        els: &[<<Self as LiftPolyEvalRing>::LocalRingBase<'ring> as RingBase>::Element],
+    ) -> <Self as RingBase>::Element
     where
         Self: 'ring,
     {

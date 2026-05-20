@@ -14,8 +14,6 @@ use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_properties::divisibility::DivisibilityRingStore;
 use crate::ring_properties::field::{Field, FieldStore};
 use crate::ring_properties::finite::{FiniteRing, FiniteRingStore};
-use crate::ring_properties::integer::*;
-use crate::ring_properties::pid::*;
 use crate::seq::VectorFn;
 
 /// Let `a` be the given ring element and `q` the size of the finite base field.
@@ -163,7 +161,9 @@ where
             mod_f_ring.poly_repr(&poly_ring, &current, &poly_ring.base_ring().identity()),
             poly_ring.indeterminate(),
         );
-        let deg_i_factor = poly_ring.normalize(poly_ring.get_ring().ideal_gen(&f, &fq_defining_poly_mod_f));
+        let deg_i_factor = poly_ring
+            .normalize(poly_ring.get_ring().ideal_gen(&f, &fq_defining_poly_mod_f))
+            .0;
         f = poly_ring.checked_div(&f, &deg_i_factor).unwrap();
         result.push(deg_i_factor);
 
@@ -235,7 +235,7 @@ where
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     let lc = poly_ring.lc(&f).unwrap().clone();
-    f = poly_ring.normalize(f);
+    f = poly_ring.normalize(f).0;
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
@@ -330,7 +330,7 @@ where
     BaseRingStore<P>: RingStore + FieldStore,
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
-    f = poly_ring.normalize(f);
+    f = poly_ring.normalize(f).0;
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
@@ -411,7 +411,7 @@ where
     R: RingStore,
     R::Ring: FreeAlgebra,
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
-    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
     assert!(mod_f_ring.rank() % d == 0);
@@ -444,12 +444,14 @@ where
         // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that
         // factor only induces a trivial factor over the base ring; in this case repeat
         for seed in 0..u64::MAX {
-            let factor = new_poly_ring.normalize(cantor_zassenhaus_even_base_with_root_of_unity(
-                &new_poly_ring,
-                &new_mod_f_ring,
-                d,
-                seed,
-            ));
+            let factor = new_poly_ring
+                .normalize(cantor_zassenhaus_even_base_with_root_of_unity(
+                    &new_poly_ring,
+                    &new_mod_f_ring,
+                    d,
+                    seed,
+                ))
+                .0;
 
             if new_poly_ring
                 .terms(&factor)
@@ -500,9 +502,9 @@ where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
     BaseRingStore<P>: RingStore + FieldStore,
-    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
-    f = poly_ring.normalize(f);
+    f = poly_ring.normalize(f).0;
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
@@ -530,7 +532,7 @@ fn test_distinct_degree_factorization() {
     let actual = distinct_degree_factorization(&ring, a);
     assert_eq!(expected.len(), actual.len());
     for (f, e) in actual.into_iter().zip(expected.into_iter()) {
-        assert_el_eq!(ring, e, ring.normalize(f));
+        assert_el_eq!(ring, e, ring.normalize(f).0);
     }
 
     // two degree 3 factors
@@ -546,7 +548,7 @@ fn test_distinct_degree_factorization() {
     let actual = distinct_degree_factorization(&ring, a);
     assert_eq!(expected.len(), actual.len());
     for (f, e) in actual.into_iter().zip(expected.into_iter()) {
-        assert_el_eq!(ring, e, ring.normalize(f));
+        assert_el_eq!(ring, e, ring.normalize(f).0);
     }
 }
 
@@ -586,7 +588,7 @@ fn test_cantor_zassenhaus() {
     let f = ring.from_terms([(1, 0), (1, 2)].into_iter());
     let g = ring.from_terms([(3, 0), (1, 1), (1, 2)].into_iter());
     let p = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus(&ring, p, 2));
+    let factor = ring.normalize(cantor_zassenhaus(&ring, p, 2)).0;
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 }
 
@@ -598,14 +600,14 @@ fn test_cantor_zassenhaus_even() {
     let f = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
     let g = ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3)).0;
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 
     // (X^4 + X + 1) (X^4 + X^3 + 1)
     let f = ring.from_terms([(1, 0), (1, 1), (1, 4)].into_iter());
     let g = ring.from_terms([(1, 0), (1, 3), (1, 4)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4)).0;
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 }
 
@@ -623,7 +625,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 3)].into_iter());
     let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 2), (Fq.one(), 3)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3)).0;
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 
     // (X^4 + X + 1) = (X + a) (X + a + 1) (X + a^2) (X + a^2 + 1)
@@ -632,7 +634,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let f3 = ring.from_terms([(Fq.pow(Fq.canonical_gen(), 2), 0), (Fq.one(), 1)].into_iter());
     let f4 = ring.from_terms([(Fq.add(Fq.pow(Fq.canonical_gen(), 2), Fq.one()), 0), (Fq.one(), 1)].into_iter());
     let h = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1)).0;
     assert!(
         ring.eq_el(&factor, &f1) || ring.eq_el(&factor, &f2) || ring.eq_el(&factor, &f3) || ring.eq_el(&factor, &f4)
     );
@@ -647,7 +649,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
     let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 3), (Fq.one(), 4)].into_iter());
     let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4));
+    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4)).0;
     assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 }
 

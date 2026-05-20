@@ -1,12 +1,7 @@
-use finite::*;
-use rational::*;
-
-use super::poly_gcd::PolyTFracGCDRing;
-use crate::homomorphism::*;
+use crate::algorithms::poly_factor::finite::poly_factor_finite_field;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::prelude::*;
 use crate::ring_impls::poly::*;
-use crate::ring_impls::rational::*;
-use crate::ring_impls::zn::zn_64b::*;
 use crate::ring_properties::finite::FiniteRing;
 
 /// Contains an implementation of the Cantor-Zassenhaus algorithm for
@@ -15,20 +10,12 @@ use crate::ring_properties::finite::FiniteRing;
 /// Additionally, a distinct-degree factorization and variants of Cantor-
 /// Zassenhaus are also implemented.
 pub mod cantor_zassenhaus;
-/// Contains algorithms for computing the factorization of polynomials.
-pub mod factor_locally;
-
-/// Contains an an algorithm to factor univariate polynomials over
-/// field extensions.
+/// Contains an implementation of polynomial factorization over extension fields.
 pub mod extension;
-
-/// Contains an algorithm to factor univariate polynomials over the integers
-/// and the rational numbers.
-pub mod rational;
-
-/// Contains an algorithm to factor univariate polynomials over finite fields,
-/// based on the more basic functionality of [`cantor_zassenhaus`].
+/// Contains an implementation of polynomial factorization over finite fields.
 pub mod finite;
+/// Contains an implementation of polynomial factorization over the integers.
+pub mod integer;
 
 /// Trait for fields over which we can efficiently factor polynomials.
 /// For details, see the only associated function [`FactorPolyField::factor_poly()`].
@@ -111,9 +98,9 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     }
 }
 
-impl<R: ?Sized> FactorPolyField for R
+impl<R> FactorPolyField for R
 where
-    R: FiniteRing + Field + SelfIso,
+    R: ?Sized + FiniteRing + Field,
 {
     fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
@@ -125,85 +112,10 @@ where
     }
 }
 
-impl<I> FactorPolyField for RationalFieldBase<I>
-where
-    I: RingStore,
-    I::Ring: IntegerRing,
-    Zn64BBase: CanHomFrom<I::Ring>,
-{
-    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
-    where
-        P: RingStore + Copy,
-        P::Ring: PolyRing + EuclideanRing,
-        BaseRingStore<P>: RingStore<Ring = Self>,
-    {
-        poly_factor_rational(poly_ring, poly)
-    }
-}
-
 #[cfg(test)]
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::ring_impls::zn::*;
-
-#[test]
-fn test_factor_rational_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZbig);
-    let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(&QQ, "X");
-    let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
-    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(
-        &poly_ring,
-        &poly_ring.prod([f.clone(), f.clone(), g.clone()].into_iter()),
-    );
-    assert_eq!(2, actual.len());
-    assert_el_eq!(poly_ring, f, actual[0].0);
-    assert_eq!(2, actual[0].1);
-    assert_el_eq!(poly_ring, g, actual[1].0);
-    assert_eq!(1, actual[1].1);
-    assert_el_eq!(QQ, QQ.one(), unit);
-
-    let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-    assert_eq!(1, actual.len());
-    assert_eq!(1, actual[0].1);
-    assert_el_eq!(&poly_ring, f, &actual[0].0);
-    assert_el_eq!(QQ, QQ.one(), unit);
-
-    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]
-    });
-    poly_ring
-        .inclusion()
-        .mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-    assert_eq!(1, actual.len());
-    assert_eq!(2, actual[0].1);
-    assert_el_eq!(QQ, QQ.one(), unit);
-}
-
-#[test]
-fn test_factor_nonmonic_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZbig);
-    let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(&QQ, "X");
-    let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
-    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(
-        &poly_ring,
-        &poly_ring.prod([f.clone(), f.clone(), g.clone(), poly_ring.int_hom().map(100)].into_iter()),
-    );
-    assert_eq!(2, actual.len());
-
-    assert_el_eq!(poly_ring, g, actual[0].0);
-    assert_eq!(1, actual[0].1);
-    assert_el_eq!(poly_ring, f, actual[1].0);
-    assert_eq!(2, actual[1].1);
-    assert_el_eq!(QQ, incl.map(100), unit);
-}
 
 #[test]
 fn test_factor_fp() {

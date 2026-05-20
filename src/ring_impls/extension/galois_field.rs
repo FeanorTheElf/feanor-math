@@ -31,8 +31,6 @@ use crate::ring_impls::zn::zn_64b::Zn64BBase;
 use crate::ring_impls::zn::*;
 use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::ring_properties::field::*;
-use crate::ring_properties::integer::*;
-use crate::ring_properties::pid::*;
 use crate::ring_properties::serialization::*;
 
 /// Implementation of a galois field `GF(p^e)`; Also known as galois field, and sometimes denoted by

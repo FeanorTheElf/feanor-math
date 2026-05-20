@@ -2,9 +2,6 @@ use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
-use crate::ring_properties::field::*;
-use crate::ring_properties::finite::FiniteRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 /// Trait for rings that can be temporarily replaced by an extension when we need more points,
@@ -611,7 +608,7 @@ where
 #[macro_export]
 macro_rules! impl_interpolation_base_ring_char_zero {
     (<{$($gen_args:tt)*}> InterpolationBaseRing for $self_type:ty where $($constraints:tt)*) => {
-        impl<$($gen_args)*> $crate::reduce_lift::lift_poly_eval::InterpolationBaseRing for $self_type where $($constraints)* {
+        impl<$($gen_args)*> $crate::ring_properties::lift_poly_eval::InterpolationBaseRing for $self_type where $($constraints)* {
 
             type ExtendedRing<'a> = RingRef<'a, Self>
                 where Self: 'a;
@@ -660,7 +657,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
     };
     (<{$($gen_args:tt)*}> LiftPolyEvalRing for $int_ring_type:ty where $($constraints:tt)*) => {
 
-        impl<$($gen_args)*> $crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for $int_ring_type
+        impl<$($gen_args)*> $crate::ring_properties::lift_poly_eval::LiftPolyEvalRing for $int_ring_type
             where $($constraints)*
         {
             type LocalComputationData<'ring> = $crate::ring_impls::zn::zn_rns::ZnRNS<$crate::ring_impls::as_field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>, RingRef<'ring, Self>>
@@ -679,7 +676,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut prime_it = $crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::ring_impls::zn::zn_64b::Zn64B::new(p as u64));
+                let mut prime_it = $crate::algorithms::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::ring_impls::zn::zn_64b::Zn64B::new(p as u64));
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::ring_impls::zn::ZnRingStore::modulus(&Fp) as f64).ln();

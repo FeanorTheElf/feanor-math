@@ -6,14 +6,13 @@ use tracing::{Level, Span, instrument, span};
 use crate::delegate::{UnwrapHom, WrapHom};
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::fraction::FractionFieldStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::rational::*;
 use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
-use crate::ring_properties::pid::{EuclideanRingStore, *};
+use crate::ring_properties::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::ring_properties::specialization::FiniteRingOperation;
 
 /// Computes the resultant of two polynomials `f` and `g` over a finite field.
@@ -306,12 +305,14 @@ fn test_resultant_local_polynomial() {
         .filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1)
         .collect::<Vec<_>>();
     assert!(expected.len() == 1);
-    let expected = QQX.normalize(
-        QQX.from_terms(
-            QQYX.terms(&expected[0])
-                .map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))),
-        ),
-    );
+    let expected = QQX
+        .normalize(
+            QQX.from_terms(
+                QQYX.terms(&expected[0])
+                    .map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))),
+            ),
+        )
+        .0;
 
     assert_el_eq!(QQX, expected, actual);
 }

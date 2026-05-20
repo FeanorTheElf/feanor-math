@@ -7,6 +7,7 @@ pub mod field;
 pub mod finite;
 /// Contains the trait [`integer::IntegerRing`] for rings that represent the ring of integers `Z`.
 pub mod integer;
+pub mod lift_poly_eval;
 /// Contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
 /// with the ring operations.
 pub mod ordered;

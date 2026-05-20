@@ -69,6 +69,8 @@ pub mod poly_factor;
 /// Contains [`poly_gcd::PolyTFracGCDRing`] for rings over which we can compute polynomial gcds and
 /// related operations, modulo multiplication by non-zero divisors.
 pub mod poly_gcd;
+pub mod poly_root;
+pub mod primelist;
 pub mod qr;
 /// Contains algorithms for rational reconstruction, i.e. find a small rational number `x`
 /// from its reduction modulo some `n` (coprime to the denominator of `x`).
@@ -78,9 +80,3 @@ pub mod resultant;
 /// Contains [`sqr_mul::generic_abs_square_and_multiply()`] and other functions
 /// for computing a power of an element in a generic monoid.
 pub mod sqr_mul;
-/// Contains implementations to extend [`crate::rings::extension::number_field::NumberField`]s by
-/// adjoining additional roots of polynomials.
-// pub mod splitting_field;
-/// Contains algorithms for computing divisions in ring extensions for which standard methods
-/// are not sufficient.
-pub mod zpe_extension;

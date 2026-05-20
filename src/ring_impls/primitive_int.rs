@@ -9,15 +9,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
 use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring_properties::serialization::SerializableElementRing;
 use crate::ring_properties::specialization::*;
-use crate::{
-    algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
-};
+use crate::{algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero};
 
 /// Trait for `i8` to `i128`.
 pub trait PrimitiveInt:
@@ -253,8 +252,6 @@ impl<T: PrimitiveInt> OrderedRing for StaticRingBase<T> {
 
 impl_interpolation_base_ring_char_zero! { <{T}> InterpolationBaseRing for StaticRingBase<T> where T: PrimitiveInt }
 
-impl_poly_gcd_locally_for_ZZ! { <{T}> IntegerPolyLiftFactorsDomain for StaticRingBase<T> where T: PrimitiveInt }
-
 impl_eval_poly_locally_for_ZZ! { <{T}> LiftPolyEvalRing for StaticRingBase<T> where T: PrimitiveInt }
 
 impl<T> FiniteRingSpecializable for StaticRingBase<T>
@@ -262,6 +259,44 @@ where
     T: PrimitiveInt,
 {
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
+}
+
+impl<T: PrimitiveInt> PolyTFracGCDRing for StaticRingBase<T> {
+    fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn is_squarefree<P>(_poly_ring: P, _poly: &El<P>) -> bool
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn squarefree_part<P>(_poly_ring: P, _poly: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: super::poly::PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
 }
 
 impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {

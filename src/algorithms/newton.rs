@@ -4,14 +4,12 @@ use oorandom::Rand64;
 use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
-use crate::algorithms::poly_gcd::squarefree_part::poly_squarefree_part_local;
+use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::{Complex64, Complex64Base, Complex64El};
 use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::ring_properties::field::FieldStore;
 
 const NEWTON_MAX_SCALE: u32 = 10;
 const NEWTON_ITERATIONS: usize = 16;
@@ -213,11 +211,7 @@ where
 {
     assert!(ZZX.degree(f).unwrap_or(0) > 0);
     let CC = Complex64::RING;
-    assert!(
-        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, f.clone()), f)
-            .is_some(),
-        "polynomial must be square-free"
-    );
+    assert!(PolyTFracGCDRing::is_squarefree(&ZZX, f));
     let CCX = DensePolyRing::new(CC, "X");
     return find_approximate_complex_root_squarefree(
         &CCX,
@@ -247,11 +241,7 @@ where
     assert!(ZZX.degree(poly).unwrap_or(0) > 0);
     let CC = Complex64::RING;
     let ZZ_to_CC = CC.can_hom(ZZX.base_ring()).unwrap();
-    assert!(
-        ZZX.checked_div(&poly_squarefree_part_local(&ZZX, poly.clone()), poly)
-            .is_some(),
-        "polynomial must be square-free"
-    );
+    assert!(PolyTFracGCDRing::is_squarefree(&ZZX, poly));
     let CCX = DensePolyRing::new(CC, "X");
     let ZZX_to_CCX = CCX.lifted_hom(&ZZX, ZZ_to_CC);
 

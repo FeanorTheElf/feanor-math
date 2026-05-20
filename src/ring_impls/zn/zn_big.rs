@@ -13,11 +13,11 @@ use crate::algorithms::convolution::DynConvolution;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
 use crate::prelude::*;
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::zn::*;
 use crate::ring_properties::divisibility::DivisibilityRing;
+use crate::ring_properties::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
@@ -342,7 +342,7 @@ where
     where
         Self: 'a;
 
-    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<Self::Element>
+    fn in_base<'a, S>(&self, ext_ring: S, el: El<S>) -> Option<<Self as RingBase>::Element>
     where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
@@ -355,7 +355,7 @@ where
         }
     }
 
-    fn in_extension<'a, S>(&self, ext_ring: S, el: Self::Element) -> El<S>
+    fn in_extension<'a, S>(&self, ext_ring: S, el: <Self as RingBase>::Element) -> El<S>
     where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
@@ -363,7 +363,13 @@ where
         ext_ring.inclusion().map(el)
     }
 
-    fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
+    fn interpolation_points<'a>(
+        &'a self,
+        count: usize,
+    ) -> (
+        <Self as InterpolationBaseRing>::ExtendedRing<'a>,
+        Vec<El<<Self as InterpolationBaseRing>::ExtendedRing<'a>>>,
+    ) {
         let ring = super::generic_impls::interpolation_ring(RingRef::from(self), count);
         let ZZ = self.integer_ring();
         let modulus = if ZZ.abs_log2_ceil(self.modulus()).unwrap_or(0) <= 63 {

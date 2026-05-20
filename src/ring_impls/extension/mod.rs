@@ -21,6 +21,8 @@ pub mod galois_field;
 /// Contains [`number_field::NumberField`], an implementation of number fields.
 pub mod number_field;
 
+pub mod complex_embedding;
+
 /// A table of Conway polynomials, for standardized creation of finite fields.
 pub mod conway;
 
@@ -243,7 +245,7 @@ where
     where
         P: PolyRingStore,
         P::Ring: PolyRing,
-        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, <BaseRingStore<P> as RingStore>::Ring>,
+        H: Homomorphism<BaseRingBase<Self>, <BaseRingStore<P> as RingStore>::Ring>,
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
         poly_ring.sub(
@@ -259,7 +261,7 @@ where
     fn as_field(self) -> Result<AsField<Self>, Self>
     where
         Self::Ring: DivisibilityRing,
-        <BaseRingStore<Self> as RingStore>::Ring: Field + FactorPolyField,
+        BaseRingBase<Self>: Field + FactorPolyField,
     {
         let poly_ring = DensePolyRing::new(self.base_ring(), "X");
         if <_ as FactorPolyField>::factor_poly(
@@ -285,7 +287,7 @@ where
     where
         P: PolyRingStore,
         P::Ring: PolyRing,
-        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, <BaseRingStore<P> as RingStore>::Ring>,
+        H: Homomorphism<BaseRingBase<Self>, <BaseRingStore<P> as RingStore>::Ring>,
     {
         let coeff_vec = self.wrt_canonical_basis(el);
         to.from_terms(
@@ -304,7 +306,7 @@ where
     /// See also [`FreeAlgebra::discriminant()`].
     fn discriminant(&self) -> El<BaseRingStore<Self>>
     where
-        <BaseRingStore<Self> as RingStore>::Ring: PrincipalIdealRing,
+        BaseRingBase<Self>: PrincipalIdealRing,
     {
         self.get_ring().discriminant()
     }
@@ -315,7 +317,7 @@ where
         P: RingStore,
         P::Ring: PolyRing,
         <BaseRingStore<P> as RingStore>::Ring: LinSolveRing,
-        H: Homomorphism<<BaseRingStore<Self> as RingStore>::Ring, <BaseRingStore<P> as RingStore>::Ring>,
+        H: Homomorphism<BaseRingBase<Self>, <BaseRingStore<P> as RingStore>::Ring>,
     {
         self.get_ring().charpoly(el, poly_ring, hom)
     }

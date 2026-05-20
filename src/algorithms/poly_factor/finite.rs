@@ -1,8 +1,9 @@
 use tracing::{Level, event, instrument};
 
-use super::cantor_zassenhaus;
+use crate::algorithms::poly_factor::cantor_zassenhaus::{
+    cantor_zassenhaus, cantor_zassenhaus_even, distinct_degree_factorization,
+};
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
-use crate::homomorphism::SelfIso;
 use crate::prelude::*;
 use crate::ring_impls::poly::*;
 
@@ -13,7 +14,7 @@ pub fn poly_factor_finite_field<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usiz
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
+    <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(!poly_ring.is_zero(&f));
     let even_char = ZZbig.is_even(&poly_ring.base_ring().characteristic(&ZZbig).unwrap());
@@ -36,15 +37,14 @@ where
         assert!(!poly_ring.is_unit(&sqrfree_part));
 
         // factor the square-free part into distinct-degree factors
-        let distinct_degree_factors =
-            cantor_zassenhaus::distinct_degree_factorization(&poly_ring, sqrfree_part.clone());
+        let distinct_degree_factors = distinct_degree_factorization(&poly_ring, sqrfree_part.clone());
         for (d, factor_d) in distinct_degree_factors.into_iter().enumerate() {
             let mut stack = Vec::new();
             stack.push(factor_d);
 
             // and finally extract each individual factor
             while let Some(mut current) = stack.pop() {
-                current = poly_ring.normalize(current);
+                current = poly_ring.normalize(current).0;
 
                 if poly_ring.is_one(&current) {
                     continue;
@@ -62,11 +62,11 @@ where
                         result.push((current, 1));
                     }
                 } else if even_char {
-                    let factor = cantor_zassenhaus::cantor_zassenhaus_even(&poly_ring, current.clone(), d);
+                    let factor = cantor_zassenhaus_even(&poly_ring, current.clone(), d);
                     stack.push(poly_ring.checked_div(&current, &factor).unwrap());
                     stack.push(factor);
                 } else {
-                    let factor = cantor_zassenhaus::cantor_zassenhaus(&poly_ring, current.clone(), d);
+                    let factor = cantor_zassenhaus(&poly_ring, current.clone(), d);
                     stack.push(poly_ring.checked_div(&current, &factor).unwrap());
                     stack.push(factor);
                 }

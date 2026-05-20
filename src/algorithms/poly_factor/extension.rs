@@ -6,13 +6,12 @@ use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_impls::primitive_int::StaticRing;
 use crate::ring_properties::field::*;
-use crate::ring_properties::integer::*;
+use crate::ring_properties::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::EuclideanRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
@@ -60,7 +59,7 @@ where
         );
         let gen_poly = L.generating_poly(&KXY, KX.inclusion());
 
-        return <_ as ComputeResultantRing>::resultant(&KXY, f_over_KY, gen_poly);
+        return ComputeResultantRing::resultant(&KXY, f_over_KY, gen_poly);
     };
 
     // we want to find `k` such that `N(f(X + k theta))` remains square-free, where `theta` generates
@@ -105,17 +104,19 @@ where
         if KX.degree(&squarefree_part).unwrap() == degree {
             let lin_transform_rev =
                 LX.from_terms([(L.mul(L.canonical_gen(), L.int_hom().map(-k)), 0), (L.one(), 1)].into_iter());
-            let (factorization, _unit) = <_ as FactorPolyField>::factor_poly(&KX, &squarefree_part);
+            let (factorization, _unit) = FactorPolyField::factor_poly(&KX, &squarefree_part);
 
             return Ok(factorization
                 .into_iter()
                 .map(|(factor, e)| {
                     assert!(e == 1);
-                    let f_factor = LX.normalize(<_ as PolyTFracGCDRing>::gcd(
-                        &LX,
-                        &f_transformed,
-                        &LX.lifted_hom(&KX, L.inclusion()).map(factor),
-                    ));
+                    let f_factor = LX
+                        .normalize(PolyTFracGCDRing::gcd(
+                            &LX,
+                            &f_transformed,
+                            &LX.lifted_hom(&KX, L.inclusion()).map(factor),
+                        ))
+                        .0;
                     return LX.evaluate(&f_factor, &lin_transform_rev, &LX.inclusion());
                 })
                 .collect());
@@ -134,7 +135,7 @@ where
     P::Ring: PolyRing + EuclideanRing,
     BaseRingBase<P>: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
     BaseRingBase<BaseRingStore<P>>:
-        PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
+        PerfectField + PolyTFracGCDRing + FactorPolyField + FiniteRingSpecializable + InterpolationBaseRing + SelfIso,
 {
     let KX = &poly_ring;
 

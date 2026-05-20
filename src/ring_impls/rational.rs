@@ -13,20 +13,15 @@ use crate::algorithms::convolution::{
     DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
 };
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
+use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::algorithms::poly_gcd::gcd_locally::poly_gcd_local;
-use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::impl_interpolation_base_ring_char_zero;
 use crate::prelude::*;
 use crate::ring_impls::fraction::*;
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-use crate::ring_impls::poly::{PolyRing, *};
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
+use crate::ring_impls::poly::PolyRing;
 use crate::ring_properties::field::PerfectField;
-use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
-use crate::ring_properties::pid::{EuclideanRing, EuclideanRingStore, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
 
@@ -756,93 +751,73 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
+    fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        assert!(!poly_ring.is_zero(poly));
-        let QQX = &poly_ring;
-        let QQ = QQX.base_ring();
-        let ZZ = QQ.base_ring();
-
-        let den_lcm = QQX
-            .terms(poly)
-            .map(|(c, _)| QQ.get_ring().den(c))
-            .fold(ZZ.one(), |a, b| {
-                ZZ.checked_div(&ZZ.mul_ref(&a, b), &ZZ.ideal_gen(&a, b)).unwrap()
-            });
-
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| {
-            (
-                ZZ.checked_div(&ZZ.mul_ref(&den_lcm, QQ.get_ring().num(c)), QQ.get_ring().den(c))
-                    .unwrap(),
-                i,
-            )
-        }));
-        let power_decomp = poly_power_decomposition_local(&ZZX, f);
-        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
-
-        return power_decomp
-            .into_iter()
-            .map(|(f, k)| (QQX.normalize(ZZX_to_QQX.map(f)), k))
-            .collect();
+        unimplemented!()
     }
 
-    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+    fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        if poly_ring.is_zero(lhs) {
-            return rhs.clone();
-        } else if poly_ring.is_zero(rhs) {
-            return lhs.clone();
-        }
-        let QQX = &poly_ring;
-        let QQ = QQX.base_ring();
-        let ZZ = QQ.base_ring();
+        unimplemented!()
+    }
 
-        let den_lcm_lhs = QQX
-            .terms(lhs)
-            .map(|(c, _)| QQ.get_ring().den(c))
-            .fold(ZZ.one(), |a, b| {
-                ZZ.checked_div(&ZZ.mul_ref(&a, b), &ZZ.ideal_gen(&a, b)).unwrap()
-            });
-        let den_lcm_rhs = QQX
-            .terms(rhs)
-            .map(|(c, _)| QQ.get_ring().den(c))
-            .fold(ZZ.one(), |a, b| {
-                ZZ.checked_div(&ZZ.mul_ref(&a, b), &ZZ.ideal_gen(&a, b)).unwrap()
-            });
+    fn is_squarefree<P>(_poly_ring: P, _poly: &El<P>) -> bool
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
 
-        let ZZX = DensePolyRing::new(ZZ, "X");
-        let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| {
-            (
-                ZZ.checked_div(&ZZ.mul_ref(&den_lcm_lhs, QQ.get_ring().num(c)), QQ.get_ring().den(c))
-                    .unwrap(),
-                i,
-            )
-        }));
-        let rhs = ZZX.from_terms(QQX.terms(rhs).map(|(c, i)| {
-            (
-                ZZ.checked_div(&ZZ.mul_ref(&den_lcm_rhs, QQ.get_ring().num(c)), QQ.get_ring().den(c))
-                    .unwrap(),
-                i,
-            )
-        }));
-        let result = poly_gcd_local(&ZZX, lhs, rhs);
-        let ZZX_to_QQX = QQX.lifted_hom(&ZZX, QQ.inclusion());
+    fn squarefree_part<P>(_poly_ring: P, _poly: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+}
 
-        return QQX.normalize(ZZX_to_QQX.map(result));
+impl<I> FactorPolyField for RationalFieldBase<I>
+where
+    I: RingStore,
+    I::Ring: IntegerRing,
+{
+    fn factor_poly<P>(_poly_ring: P, _poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
+    }
+
+    fn is_irred<P>(_poly_ring: P, _poly: &El<P>) -> bool
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + EuclideanRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        unimplemented!()
     }
 }
 
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
+#[cfg(test)]
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+use crate::ring_impls::poly::*;
 #[cfg(test)]
 use crate::ring_impls::primitive_int::StaticRing;
 
@@ -952,4 +927,63 @@ fn test_serialize_postcard() {
         .unwrap();
 
     assert_el_eq!(&ring, ring.int_hom().map(42), result);
+}
+
+#[test]
+fn test_factor_rational_poly() {
+    feanor_tracing::DelayedLogger::init_test();
+    let QQ = RationalField::new(ZZbig);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(&QQ, "X");
+    let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(
+        &poly_ring,
+        &poly_ring.prod([f.clone(), f.clone(), g.clone()].into_iter()),
+    );
+    assert_eq!(2, actual.len());
+    assert_el_eq!(poly_ring, f, actual[0].0);
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(poly_ring, g, actual[1].0);
+    assert_eq!(1, actual[1].1);
+    assert_el_eq!(QQ, QQ.one(), unit);
+
+    let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+    assert_eq!(1, actual.len());
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(&poly_ring, f, &actual[0].0);
+    assert_el_eq!(QQ, QQ.one(), unit);
+
+    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| {
+        [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]
+    });
+    poly_ring
+        .inclusion()
+        .mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+    assert_eq!(1, actual.len());
+    assert_eq!(2, actual[0].1);
+    assert_el_eq!(QQ, QQ.one(), unit);
+}
+
+#[test]
+fn test_factor_nonmonic_poly() {
+    feanor_tracing::DelayedLogger::init_test();
+    let QQ = RationalField::new(ZZbig);
+    let incl = QQ.int_hom();
+    let poly_ring = DensePolyRing::new(&QQ, "X");
+    let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
+    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+    let (actual, unit) = <_ as FactorPolyField>::factor_poly(
+        &poly_ring,
+        &poly_ring.prod([f.clone(), f.clone(), g.clone(), poly_ring.int_hom().map(100)].into_iter()),
+    );
+    assert_eq!(2, actual.len());
+
+    assert_el_eq!(poly_ring, g, actual[0].0);
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(poly_ring, f, actual[1].0);
+    assert_eq!(2, actual[1].1);
+    assert_el_eq!(QQ, incl.map(100), unit);
 }
