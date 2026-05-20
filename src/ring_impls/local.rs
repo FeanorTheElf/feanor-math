@@ -8,7 +8,6 @@ use crate::ring_properties::field::Field;
 use crate::homomorphism::*;
 use crate::ring_properties::integer::IntegerRing;
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
-use crate::ring_properties::pid::*;
 use crate::reduce_lift::poly_eval::InterpolationBaseRing;
 use crate::prelude::*;
 use crate::rings::zn::*;
@@ -564,7 +563,7 @@ use crate::matrix::{OwnedMatrix, TransposableSubmatrix, TransposableSubmatrixMut
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
-use crate::rings::finite::FiniteRingStore;
+use crate::ring_properties::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::rings::zn::zn_big::Zn;
 

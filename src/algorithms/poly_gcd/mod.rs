@@ -4,13 +4,10 @@ use squarefree_part::poly_power_decomposition_local;
 use tracing::instrument;
 
 use crate::delegate::DelegateRing;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::ring_properties::pid::*;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::prelude::*;
-use crate::ring_impls::field::*;
-use crate::ring_impls::finite::*;
+use crate::ring_impls::as_field::*;
 use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
 use crate::ring_properties::specialization::FiniteRingOperation;

@@ -9,7 +9,6 @@ use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::ring_properties::divisibility::DivisibilityRingStore;
-use crate::ring_properties::integer::*;
 use crate::primitive_int::*;
 use crate::ring_impls::zn::*;
 use crate::seq::VectorView;
@@ -998,19 +997,19 @@ fn test_principal_ideal_ring_axioms() {
 #[test]
 fn test_finite_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
         vec![3, 5, 7, 11],
         ZZi64,
     ));
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
         vec![3, 5],
         ZZi64,
     ));
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
         vec![3],
         ZZi64,
     ));
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
         vec![2],
         ZZi64,
     ));

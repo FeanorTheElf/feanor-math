@@ -10,7 +10,7 @@ use crate::ring_properties::integer::*;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::primitive_int::StaticRing;
 use crate::prelude::*;
-use crate::ring_impls::finite::*;
+use crate::ring_properties::finite::*;
 use crate::ring_impls::poly::sparse_poly::SparsePolyRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::zn::{ZnRing, ZnRingStore};

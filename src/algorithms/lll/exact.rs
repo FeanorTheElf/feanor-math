@@ -2,9 +2,7 @@ use std::alloc::Allocator;
 
 use crate::algorithms::lll::float::lll_quadratic_form;
 use crate::algorithms::matmul::*;
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::matrix::transform::{TransformCols, TransformTarget};
 use crate::matrix::*;
 use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};

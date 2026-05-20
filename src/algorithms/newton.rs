@@ -8,7 +8,6 @@ use crate::algorithms::poly_gcd::squarefree_part::poly_squarefree_part_local;
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::ring_properties::field::FieldStore;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::{Complex64, Complex64Base, Complex64El};
 use crate::ring_impls::poly::dense_poly::*;

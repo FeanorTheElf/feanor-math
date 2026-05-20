@@ -9,7 +9,6 @@ use crate::algorithms;
 use crate::homomorphism::*;
 use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
-use crate::primitive_int::StaticRing;
 
 /// Describes the context in which to print an algebraic expression.
 /// It is usually used to determine when to use parenthesis during printing.
@@ -1238,7 +1237,7 @@ use crate::impl_eq_based_self_iso;
 #[test]
 fn test_ring_rc_lifetimes() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = Rc::new(StaticRing::<i32>::RING);
+    let ring = Rc::new(ZZi64);
     let mut ring_ref = None;
     assert!(ring_ref.is_none());
     {
@@ -1397,7 +1396,8 @@ pub mod generic_tests {
     use std::cmp::min;
 
     use super::*;
-    use crate::ring_properties::integer::{BigIntRing, int_cast};
+    use crate::ring_properties::integer::int_cast;
+    use crate::primitive_int::*;
 
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where
@@ -1685,7 +1685,6 @@ pub mod generic_tests {
         }
 
         // check characteristic
-        let ZZbig = ZZbig;
         let char = ring.characteristic(&ZZbig).unwrap();
 
         if ZZbig.is_geq(&char, &ZZbig.power_of_two(7)) {

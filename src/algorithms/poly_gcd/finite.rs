@@ -5,14 +5,9 @@ use tracing::instrument;
 use crate::algorithms::eea::partial_eea_poly;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::strassen::{dispatch_strassen_impl, strassen_mem_size};
-use crate::ring_properties::divisibility::*;
-use crate::ring_properties::field::*;
-use crate::ring_properties::integer::*;
 use crate::matrix::*;
-use crate::ring_properties::pid::*;
-use crate::primitive_int::*;
 use crate::prelude::*;
-use crate::ring_impls::finite::*;
+use crate::ring_properties::finite::*;
 use crate::ring_impls::poly::*;
 
 /// Returns a list of `(fi, ki)` such that the `fi` are monic, square-free and pairwise coprime, and

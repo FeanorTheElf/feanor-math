@@ -1,15 +1,12 @@
 use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::BigIntRing;
 use crate::ring_properties::integer::generic_impls::map_from_integer_ring;
 use crate::matrix::transform::{
     DuplicateTransforms, OffsetTransformIndex, TransformCols, TransformRows, TransformTarget,
 };
 use crate::matrix::*;
-use crate::ring_properties::ordered::*;
 use crate::prelude::*;
 use crate::ring_impls::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
 

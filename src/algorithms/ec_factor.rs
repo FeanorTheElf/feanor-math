@@ -5,14 +5,12 @@ use tracing::{Level, Span, event, instrument, span};
 
 use super::int_factor::is_prime_power;
 use crate::algorithms::sqr_mul;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::Homomorphism;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::primitive_int::StaticRing;
 use crate::prelude::*;
-use crate::ring_impls::finite::*;
+use crate::ring_properties::finite::*;
 use crate::ring_impls::zn::*;
 use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
 
@@ -439,8 +437,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[ignore]
 fn test_ec_factor_large() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = ZZbig;
-
+    
     let n: i128 = 1073741827 * 71316922984999;
 
     let p = StaticRing::<i128>::RING.coerce(
@@ -468,7 +465,6 @@ fn test_ec_factor_large() {
 #[ignore]
 fn test_compute_partial_factorization() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = ZZbig;
     let n = int_cast(
         RustBigintRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
         ZZbig,

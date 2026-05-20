@@ -836,7 +836,6 @@ fn test_ceil_floor_div() {
 #[test]
 fn test_parse() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = ZZbig;
     assert_el_eq!(&ZZbig, &ZZbig.int_hom().map(3), ZZbig.parse("3", 10).unwrap());
     assert_el_eq!(
         &ZZbig,
@@ -864,7 +863,6 @@ fn test_parse() {
 #[test]
 fn test_map_from_integer() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = ZZbig;
     assert_el_eq!(
         &ZZbig,
         ZZbig.parse("0", 10).unwrap(),

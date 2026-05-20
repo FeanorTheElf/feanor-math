@@ -16,7 +16,7 @@ pub mod poly;
 /// This module contains the wrapper [`field::AsField`] that can be used to create a ring
 /// implementing [`crate::ring_properties::field::Field`] from rings that are fields, but do not implement
 /// the trait (e.g. because being a field for them might be only determinable at runtime).
-pub mod field;
+pub mod as_field;
 
 /// An approximate implementation of the field of complex numbers `C`, using 64-bit floating point
 /// numbers.
@@ -26,9 +26,6 @@ pub mod float_complex;
 /// finite rank over a base ring. It also provides one implementation in
 /// [`extension::extension_impl`] based on polynomial division.
 pub mod extension;
-
-/// This module contains the trait [`finite::FiniteRing`] for all rings with finitely many elements.
-pub mod finite;
 
 /// This module contains the trait [`multivariate::MultivariatePolyRing`] for all multivariate
 /// polynomial rings.

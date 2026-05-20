@@ -23,3 +23,5 @@ pub mod specialization;
 /// serialization and deserialization usually require access to the ring. Hence, we need to use
 /// [`serde::de::DeserializeSeed`], but this is incompatible with `#[derive]`
 pub mod serialization;
+/// This module contains the trait [`finite::FiniteRing`] for all rings with finitely many elements.
+pub mod finite;

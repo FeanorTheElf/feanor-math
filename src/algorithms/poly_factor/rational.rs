@@ -2,7 +2,6 @@ use tracing::{Level, event, instrument};
 
 use super::IntegerRing;
 use crate::algorithms::poly_factor::factor_locally::poly_factor_integer;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
 use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRingStore};
 use crate::prelude::*;

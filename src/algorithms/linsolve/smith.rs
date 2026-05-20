@@ -5,7 +5,6 @@ use tracing::{Level, event, instrument};
 use transform::TransformList;
 
 use crate::algorithms::linsolve::SolveResult;
-use crate::ring_properties::divisibility::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::matrix::*;
 use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};

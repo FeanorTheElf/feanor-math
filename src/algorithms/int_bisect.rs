@@ -1,7 +1,5 @@
 use tracing::instrument;
 
-use crate::ring_properties::integer::*;
-use crate::ring_properties::ordered::*;
 use crate::prelude::*;
 
 /// Finds some integer `left <= n < right` such that `f(n) <= 0` and `f(n + 1) > 0`, given

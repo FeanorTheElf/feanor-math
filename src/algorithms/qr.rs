@@ -4,7 +4,6 @@ use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::ring_properties::field::{Field, FieldStore};
-use crate::ring_properties::integer::*;
 use crate::matrix::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::prelude::*;

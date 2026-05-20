@@ -221,12 +221,7 @@ where
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;
-    use crate::algorithms::int_factor::factor;
-    use crate::homomorphism::Homomorphism;
-    use crate::ring_properties::integer::{BigIntRing, IntegerRingStore, int_cast};
-    use crate::ring_properties::ordered::OrderedRingStore;
-    use crate::primitive_int::StaticRing;
-    use crate::ring::El;
+    use crate::{algorithms::int_factor::factor, prelude::*};
 
     pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where
@@ -323,7 +318,6 @@ pub mod generic_tests {
             }
         }
 
-        let ZZbig = ZZbig;
         let char = ring.characteristic(ZZbig).unwrap();
         if !ZZbig.is_zero(&char) && !ZZbig.is_one(&char) && ZZbig.is_leq(&char, &ZZbig.power_of_two(30)) {
             let p = factor(ZZbig, char.clone()).into_iter().next().unwrap().0;
@@ -340,7 +334,7 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::prelude::*;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static::Zn;
 

@@ -9,7 +9,6 @@ use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingSto
 use crate::homomorphism::Homomorphism;
 use crate::ring_properties::integer::IntegerRingStore;
 use crate::iters::multi_cartesian_product;
-use crate::primitive_int::StaticRing;
 use crate::prelude::*;
 use crate::ring_impls::multivariate::*;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;

@@ -2,9 +2,7 @@ use oorandom;
 use tracing::instrument;
 
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::primitive_int::*;

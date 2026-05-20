@@ -1,6 +1,5 @@
 use std::collections::HashMap;
 
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::wrapper::RingElementWrapper;

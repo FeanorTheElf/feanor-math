@@ -2,7 +2,6 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::ops::*;
 
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
 use crate::ring::HashableElRing;
 use crate::prelude::*;

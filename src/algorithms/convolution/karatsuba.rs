@@ -4,8 +4,6 @@ use std::cmp::{max, min};
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::ring_properties::integer::*;
-use crate::primitive_int::*;
 use crate::prelude::*;
 use crate::seq::*;
 

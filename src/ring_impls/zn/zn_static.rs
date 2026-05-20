@@ -318,10 +318,10 @@ pub const F17: Fp<17> = Fp::<17>::RING;
 #[test]
 fn test_finite_field_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&F17);
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Zn::<128>::RING);
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Fp::<257>::RING);
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Zn::<256>::RING);
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&F17);
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn::<128>::RING);
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Fp::<257>::RING);
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn::<256>::RING);
 }
 
 #[test]

@@ -5,15 +5,13 @@ use crate::algorithms::miller_rabin::is_prime;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::delegate::*;
-use crate::ring_properties::divisibility::*;
 use crate::ring_properties::field::Field;
 use crate::function::no_error;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRing;
 use crate::prelude::*;
-use crate::ring_impls::field::{AsField, AsFieldBase};
-use crate::ring_impls::finite::FiniteRing;
+use crate::ring_impls::as_field::{AsField, AsFieldBase};
+use crate::ring_properties::finite::FiniteRing;
 use crate::ring_impls::zn::*;
 use crate::seq::*;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
@@ -807,9 +805,9 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                 where Self: 'ring;
             type LocalRingBase<'ring> = $crate::ring_impls::zn::zn_big::ZnGBBase<BigIntRing>
                 where Self: 'ring;
-            type LocalFieldBase<'ring> = $crate::ring_impls::field::AsFieldBase<$crate::ring_impls::zn::zn_64b::Zn64B>
+            type LocalFieldBase<'ring> = $crate::ring_impls::as_field::AsFieldBase<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
-            type LocalField<'ring> = $crate::ring_impls::field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>
+            type LocalField<'ring> = $crate::ring_impls::as_field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
             type SuitableIdeal<'ring> = i64
                 where Self: 'ring;

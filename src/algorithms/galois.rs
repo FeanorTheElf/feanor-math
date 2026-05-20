@@ -6,14 +6,11 @@ use tracing::instrument;
 
 use crate::function::no_error;
 use crate::homomorphism::*;
-use crate::ring_properties::field::*;
-use crate::ring_properties::divisibility::*;
 use crate::rings::extension::number_field::*;
 use crate::rings::extension::*;
 use crate::primitive_int::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
-use crate::ring_properties::integer::*;
 use crate::rings::rational::*;
 use crate::prelude::*;
 use crate::seq::VectorFn;

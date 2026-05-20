@@ -664,7 +664,7 @@ fn test_finite_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     for n in TEST_MODULI {
         if n < 100 {
-            crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Zn64M::new(n));
+            crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64M::new(n));
         }
     }
 }

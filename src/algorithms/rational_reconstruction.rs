@@ -3,9 +3,7 @@ use std::mem::swap;
 
 use tracing::instrument;
 
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_properties::pid::*;
 use crate::prelude::*;
 use crate::ring_impls::zn::*;
 

@@ -9,10 +9,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
 use crate::algorithms::matmul::StrassenHint;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
-use crate::ring_properties::ordered::*;
+use crate::ring_properties::divisibility::PreparedDivisor;
 use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
@@ -103,7 +101,7 @@ impl PrimitiveInt for i128 {
 macro_rules! specialize_int_cast {
     ($(($int_from:ty, $int_to:ty)),*) => {
         $(
-            impl IntCast<StaticRingBase<$int_from>> for StaticRingBase<$int_to> {
+            impl $crate::ring_properties::integer::IntCast<StaticRingBase<$int_from>> for StaticRingBase<$int_to> {
 
                 fn cast(&self, _: &StaticRingBase<$int_from>, value: $int_from) -> Self::Element {
                     <$int_to>::try_from(<_ as Into<i128>>::into(value)).map_err(|_| ()).unwrap()

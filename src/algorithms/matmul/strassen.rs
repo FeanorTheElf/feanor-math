@@ -4,7 +4,6 @@ use std::ops::Range;
 use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::schoolbook_matmul;
-use crate::ring_properties::integer::*;
 use crate::matrix::*;
 use crate::primitive_int::StaticRing;
 use crate::prelude::*;

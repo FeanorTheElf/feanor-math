@@ -172,7 +172,7 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use crate::ring_properties::integer::{BigIntRing, IntegerRingStore};
+use crate::prelude::*;
 
 #[test]
 fn test_serialize() {

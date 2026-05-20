@@ -4,7 +4,7 @@ use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
 use crate::ring_properties::field::*;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring_impls::finite::FiniteRing;
+use crate::ring_properties::finite::FiniteRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 /// Trait for rings that can be temporarily replaced by an extension when we need more points,
@@ -663,13 +663,13 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
         impl<$($gen_args)*> $crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for $int_ring_type
             where $($constraints)*
         {
-            type LocalComputationData<'ring> = $crate::ring_impls::zn::zn_rns::ZnRNS<$crate::ring_impls::field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>, RingRef<'ring, Self>>
+            type LocalComputationData<'ring> = $crate::ring_impls::zn::zn_rns::ZnRNS<$crate::ring_impls::as_field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>, RingRef<'ring, Self>>
                 where Self: 'ring;
 
-            type LocalRing<'ring> = $crate::ring_impls::field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>
+            type LocalRing<'ring> = $crate::ring_impls::as_field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
 
-            type LocalRingBase<'ring> = $crate::ring_impls::field::AsFieldBase<$crate::ring_impls::zn::zn_64b::Zn64B>
+            type LocalRingBase<'ring> = $crate::ring_impls::as_field::AsFieldBase<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
 
             fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
@@ -686,7 +686,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
                     primes.push(Fp);
                 }
                 return $crate::ring_impls::zn::zn_rns::ZnRNS::new(
-                    primes.into_iter().map(|Fp| $crate::ring_impls::field::AsField::from($crate::ring_impls::field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
+                    primes.into_iter().map(|Fp| $crate::ring_impls::as_field::AsField::from($crate::ring_impls::as_field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
                     RingRef::from(self)
                 );
             }

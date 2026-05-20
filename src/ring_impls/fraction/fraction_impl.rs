@@ -6,7 +6,6 @@ use crate::algorithms::convolution::{
     DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
 };
 use crate::algorithms::matmul::StrassenHint;
-use crate::ring_properties::divisibility::*;
 use crate::ring_properties::field::Field;
 use crate::homomorphism::{Homomorphism, *};
 use crate::ring_properties::integer::IntegerRing;
@@ -565,8 +564,6 @@ where
 
 #[cfg(test)]
 use crate::iters::multi_cartesian_product;
-#[cfg(test)]
-use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_balance_factor() {

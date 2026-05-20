@@ -3,7 +3,6 @@ use tracing::instrument;
 use crate::algorithms::ec_factor::lenstra_ec_factor;
 use crate::ring_properties::divisibility::DivisibilityRingStore;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::prelude::*;
@@ -178,7 +177,6 @@ where
 #[test]
 fn test_factor() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = ZZbig;
     assert_eq!(
         vec![(3, 2), (5, 1), (29, 1)],
         factor(&ZZi64, 3 * 3 * 5 * 29)

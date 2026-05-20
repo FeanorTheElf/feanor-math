@@ -1,6 +1,5 @@
 use tracing::instrument;
 
-use crate::ring_properties::integer::*;
 use crate::primitive_int::StaticRing;
 use crate::prelude::*;
 

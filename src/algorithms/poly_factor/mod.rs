@@ -2,12 +2,9 @@ use finite::*;
 use rational::*;
 
 use super::poly_gcd::PolyTFracGCDRing;
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
-use crate::ring_properties::pid::*;
 use crate::prelude::*;
-use crate::ring_impls::finite::FiniteRing;
+use crate::ring_properties::finite::FiniteRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::rational::*;
 use crate::ring_impls::zn::zn_64b::*;

@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use super::{
+use crate::seq::{
     SelfSubvectorFn, SelfSubvectorView, SparseVectorViewOperation, SwappableVectorViewMut, VectorFn, VectorView,
     VectorViewMut, VectorViewSparse,
 };
@@ -218,7 +218,7 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
 #[cfg(test)]
 use super::sparse::SparseMapVector;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::prelude::*;
 
 #[test]
 fn test_subvector_ranges() {

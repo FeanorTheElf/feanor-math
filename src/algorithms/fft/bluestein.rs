@@ -12,7 +12,6 @@ use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::ring_properties::integer::IntegerRingStore;
-use crate::primitive_int::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
 use crate::ring_impls::zn::*;

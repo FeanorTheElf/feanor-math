@@ -1,4 +1,3 @@
-use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::prelude::*;

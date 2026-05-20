@@ -3,9 +3,7 @@ use std::marker::PhantomData;
 use tracing::instrument;
 
 use crate::algorithms::int_factor::is_prime_power;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::ring_properties::pid::*;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::prelude::*;
 use crate::ring_impls::poly::dense_poly::*;

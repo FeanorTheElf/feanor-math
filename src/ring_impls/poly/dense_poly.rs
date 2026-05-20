@@ -13,12 +13,8 @@ use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{FAST_POLY_DIV_THRESHOLD, fast_poly_div_rem, poly_div_rem, poly_rem};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::ring_properties::divisibility::*;
 use crate::ring_properties::field::Field;
 use crate::function::no_error;
-use crate::ring_properties::integer::*;
-use crate::ring_properties::pid::*;
-use crate::primitive_int::StaticRing;
 use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, LiftPolyEvalRing, ToExtRingMap};
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
@@ -986,7 +982,7 @@ use crate::ring_impls::extension::FreeAlgebraStore;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::ring_impls::finite::FiniteRingStore;
+use crate::ring_properties::finite::FiniteRingStore;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static::{Fp, Zn};
 #[cfg(test)]

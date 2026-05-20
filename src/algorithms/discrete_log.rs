@@ -31,7 +31,7 @@ use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
-use crate::ring_impls::finite::FiniteRingStore;
+use crate::ring_properties::finite::FiniteRingStore;
 use crate::ring_impls::rational::RationalField;
 use crate::ring_impls::zn::{ZnRing, ZnRingStore, zn_big};
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializeWithRing};

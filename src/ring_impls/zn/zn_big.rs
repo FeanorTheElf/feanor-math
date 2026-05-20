@@ -12,10 +12,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::convolution::DynConvolution;
 use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::iters::multi_cartesian_product;
 use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_properties::pid::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::prelude::*;
 use crate::ring_impls::extension::FreeAlgebraStore;
@@ -874,9 +872,9 @@ fn test_canonical_iso_axioms_zn_64() {
 #[test]
 fn test_finite_field_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 128));
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 15));
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i128>::RING, 1 << 32));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 128));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 15));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i128>::RING, 1 << 32));
 }
 
 #[test]
@@ -888,7 +886,6 @@ fn test_serialize() {
 #[test]
 fn test_unreduced() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = RustBigintRing::RING;
     let ring = ZnGB::new(
         ZZbig,
         ZZbig.prod(

@@ -1,8 +1,8 @@
 use crate::ring::*;
-use crate::ring_impls::finite::*;
+use crate::ring_properties::finite::*;
 
 /// Operation on a ring `R` that only makes sense if `R` implements
-/// the trait [`crate::rings::finite::FiniteRing`].
+/// the trait [`crate::ring_properties::finite::FiniteRing`].
 ///
 /// Used through the trait [`FiniteRingSpecializable`].
 pub trait FiniteRingOperation<R>
@@ -21,7 +21,7 @@ where
 }
 
 /// Trait for ring types that can check (at compile time) whether they implement
-/// [`crate::rings::finite::FiniteRing`].
+/// [`crate::ring_properties::finite::FiniteRing`].
 ///
 /// This serves as a workaround while specialization is not properly supported.
 pub trait FiniteRingSpecializable: RingBase {
@@ -44,9 +44,7 @@ pub trait FiniteRingSpecializable: RingBase {
 }
 
 #[cfg(test)]
-use crate::homomorphism::*;
-#[cfg(test)]
-use crate::ring_properties::integer::*;
+use crate::prelude::*;
 #[cfg(test)]
 use crate::ring_impls::extension::extension_impl::*;
 #[cfg(test)]
@@ -54,7 +52,7 @@ use crate::ring_impls::extension::galois_field::*;
 #[cfg(test)]
 use crate::ring_impls::extension::*;
 #[cfg(test)]
-use crate::ring_impls::field::*;
+use crate::ring_impls::as_field::*;
 #[cfg(test)]
 use crate::ring_impls::rational::*;
 #[cfg(test)]

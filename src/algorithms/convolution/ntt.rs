@@ -7,8 +7,6 @@ use super::ConvolutionAlgorithm;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
-use crate::primitive_int::StaticRing;
 use crate::prelude::*;
 use crate::ring_impls::zn::*;
 use crate::seq::VectorView;

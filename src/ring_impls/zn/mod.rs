@@ -1,6 +1,5 @@
-use super::field::AsFieldBase;
-use super::finite::FiniteRing;
 use crate::algorithms;
+use crate::ring_impls::as_field::AsFieldBase;
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::ring_properties::integer::*;
@@ -8,7 +7,6 @@ use crate::ring_properties::ordered::*;
 use crate::ring_properties::pid::{EuclideanRingStore, PrincipalIdealRing, *};
 use crate::primitive_int::StaticRing;
 use crate::prelude::*;
-use crate::ring_impls::finite::FiniteRingStore;
 
 /// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
 /// for moduli `n` of size slightly smaller than 64 bits.
@@ -105,7 +103,7 @@ pub mod generic_impls {
     use crate::ring_properties::field::*;
     use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
     use crate::ring_properties::ordered::*;
-    use crate::primitive_int::{StaticRing, StaticRingBase};
+    use crate::primitive_int::StaticRingBase;
     use crate::ring_impls::extension::galois_field::*;
     use crate::ring_impls::zn::*;
 

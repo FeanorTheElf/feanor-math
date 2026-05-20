@@ -9,8 +9,8 @@ use tracing::instrument;
 
 use crate::algorithms::int_bisect;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
 use crate::iters::multiset_combinations;
+use crate::ring_properties::integer::binomial;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 use crate::prelude::*;

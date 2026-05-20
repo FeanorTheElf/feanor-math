@@ -15,8 +15,8 @@ use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
-use crate::ring_properties::divisibility::*;
 use crate::iters::multi_cartesian_product;
+use crate::ring_properties::divisibility::PreparedDivisor;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::primitive_int::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
@@ -1403,10 +1403,10 @@ fn test_hom_from_fastmul() {
 fn test_finite_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
-        crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(n));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(n));
     }
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(128));
-    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(1 << 32));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(128));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(1 << 32));
 }
 
 #[test]
