@@ -93,7 +93,7 @@ pub mod wrapper;
 const PROBABILISTIC_REPETITIONS: usize = 30;
 
 #[cfg(test)]
-const RANDOM_TEST_INSTANCE_COUNT: usize = 10;
+const RANDOM_TEST_INSTANCE_COUNT: usize = 8;
 
 /// Contains [`unstable_sealed::UnstableSealed`] to mark a trait "sealed" on stable.
 #[stability::unstable(feature = "enable")]

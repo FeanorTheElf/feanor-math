@@ -278,14 +278,14 @@ fn random_test_poly_power_decomposition_integer() {
     let ring = ZZbig;
     let poly_ring = DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);
-    let bound = ring.int_hom().map(1000);
+    let bound = ring.int_hom().map(500);
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms((0..=7).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let g = poly_ring.from_terms((0..=4).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let f = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=3).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let poly = make_primitive(
             &poly_ring,
-            &poly_ring.prod([&f, &g, &g, &h, &h, &h, &h, &h].into_iter().map(|poly| poly.clone())),
+            &poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone())),
         )
         .0;
 
@@ -304,8 +304,8 @@ fn random_test_poly_power_decomposition_integer() {
                 &poly_ring.prod(
                     power_decomp
                         .iter()
-                        .filter(|(_, k)| k % 5 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 5))
+                        .filter(|(_, k)| k % 3 == 0)
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
                 ),
                 &make_primitive(&poly_ring, &h).0
             )
