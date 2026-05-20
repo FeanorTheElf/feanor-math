@@ -7,11 +7,7 @@ use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::integer::BigIntRing;
-use crate::ordered::OrderedRingStore;
 use crate::ring::*;
-use crate::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 
 /// Trait for implementations of generic abelian groups, for which only
 /// the group operation, equality testing and computing hash values is supported.
@@ -22,7 +18,6 @@ use crate::serialization::{DeserializeWithRing, SerializableElementRing, Seriali
 ///
 /// The design mirrors [`RingBase`] and [`RingStore`], with [`AbelianGroupStore`] being
 /// the counterpart to [`RingStore`].
-#[stability::unstable(feature = "enable")]
 pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     /// Type used to represent elements of this group.
     type Element: Sized + Send + Sync + Clone;

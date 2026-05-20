@@ -1,15 +1,8 @@
 use oorandom;
 use tracing::instrument;
 
-use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
-use crate::divisibility::*;
-use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::pid::PrincipalIdealRingStore;
-use crate::primitive_int::*;
-use crate::ring::*;
-use crate::rings::zn::{ZnRingStore, choose_zn_impl, *};
+use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::prelude::*;
 
 struct CheckIsFieldMillerRabin {
     probability_param: usize,
@@ -205,9 +198,6 @@ where
     }
     return true;
 }
-
-#[cfg(test)]
-use crate::rings::rust_bigint::RustBigintRing;
 
 #[test]
 fn test_is_prime() {

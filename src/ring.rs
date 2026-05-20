@@ -7,9 +7,9 @@ use serde::{Deserialize, Serialize};
 
 use crate::algorithms;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::primitive_int::StaticRing;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_impls::primitive_int::StaticRing;
 
 /// Describes the context in which to print an algebraic expression.
 /// It is usually used to determine when to use parenthesis during printing.
@@ -567,6 +567,16 @@ macro_rules! assert_el_eq {
                     <_ as $crate::ring::RingStore>::formatted_el(ring_val, rhs_val)
                 );
             }
+        }
+    };
+}
+
+/// Like [`assert_el_eq!`], but only active when debug assertions are enabled
+#[macro_export]
+macro_rules! debug_assert_el_eq {
+    ($ring:expr, $lhs:expr, $rhs:expr) => {
+        #[cfg(debug_assertions)] {
+            $crate::assert_el_eq!($ring, $lhs, $rhs)
         }
     };
 }
@@ -1397,7 +1407,7 @@ pub mod generic_tests {
     use std::cmp::min;
 
     use super::*;
-    use crate::integer::{BigIntRing, int_cast};
+    use crate::prelude::*;
 
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where

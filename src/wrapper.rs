@@ -2,9 +2,7 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::ops::*;
 
-use crate::field::*;
-use crate::homomorphism::*;
-use crate::ring::*;
+use crate::prelude::*;
 
 /// Stores a ring element together with its ring, so that ring operations do
 /// not require explicit mention of the ring object. This can be used both for
@@ -419,7 +417,7 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64b;
+use crate::ring_impls::zn::zn_64b;
 
 #[test]
 fn test_arithmetic_expression() {

@@ -12,7 +12,7 @@ use crate::pid::*;
 use crate::ring::*;
 use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
 use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
-use crate::rings::field::{AsField, AsFieldBase};
+use crate::rings::as_field::{AsField, AsFieldBase};
 use crate::rings::finite::{FiniteRing, FiniteRingStore};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::{PolyRing, PolyRingStore};

@@ -9,7 +9,7 @@ use crate::homomorphism::*;
 use crate::pid::*;
 use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring::*;
-use crate::rings::field::*;
+use crate::rings::as_field::*;
 use crate::rings::finite::*;
 use crate::rings::poly::dense_poly::*;
 use crate::rings::poly::*;

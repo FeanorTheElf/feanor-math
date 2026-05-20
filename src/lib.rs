@@ -35,32 +35,39 @@
 #[cfg(test)]
 extern crate test;
 
-mod cow;
-pub mod function;
-/// Contains the core traits of the library - [`ring::RingBase`] and [`ring::RingStore`].
+pub mod prelude;
+
+// ---- RING FRAMEWORK ----
+
+/// Contains the traits [`ring::RingBase`] and [`ring::RingStore`], which are the foundation of the ring framework in this crate.
 #[macro_use]
 pub mod ring;
-/// A collection of all number-theoretic algorithms that are currently implemented in
-/// this crate.
-pub mod algorithms;
-/// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the
-/// newtype-pattern for rings.
-pub mod delegate;
-/// Contains the trait [`divisibility::DivisibilityRing`] for rings that provide information
-/// about divisibility of their elements.
-pub mod divisibility;
-/// Contains the trait [`field::Field`] for rings that are fields.
-pub mod field;
-/// Contains the traits [`group::AbelianGroupBase`] and [`group::AbelianGroupStore`], which (in
-/// analogue to [`ring::RingBase`] and [`ring::RingStore`]) model groups. These are much less
-/// central to this library than the ring traits, however.
-pub mod group;
 /// Contains the trait [`homomorphism::Homomorphism`], [`homomorphism::CanHomFrom`] and
 /// others that are the foundation of the homomorphism framework, that enables mapping
 /// elements between different rings.
 pub mod homomorphism;
-/// Contains the trait [`integer::IntegerRing`] for rings that represent the ring of integers `Z`.
-pub mod integer;
+/// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the
+/// newtype-pattern for rings.
+pub mod delegate;
+pub mod ring_properties;
+pub mod ring_impls;
+
+// ---- ABELIAN GROUP FRAMEWORK ----
+
+/// Contains the traits [`group::AbelianGroupBase`] and [`group::AbelianGroupStore`], which are the foundation of the group framework in this crate.
+/// They are designed analogeously to [`ring::RingBase`] and [`ring::RingStore`].
+pub mod group;
+pub mod group_impls;
+
+// ---- ALGORITHMS ----
+
+/// A collection of all number-theoretic algorithms that are currently implemented in
+/// this crate.
+pub mod algorithms;
+
+// ---- UTILITY ----
+
+pub mod function;
 /// Contains implementations of various iterators and combinators, like [`iters::powerset()`]
 /// or [`iters::multi_cartesian_product`].
 pub mod iters;
@@ -68,39 +75,11 @@ pub mod iters;
 /// particular, we use [`matrix::Submatrix`] and [`matrix::SubmatrixMut`] for matrices that don't
 /// own their data.
 pub mod matrix;
-/// Contains the trait [`ordered::OrderedRing`] for rings with a total ordering that is compatible
-/// with the ring operations.
-pub mod ordered;
-/// Contains the trait [`pid::PrincipalIdealRing`] for rings in whom every ideal is principal.
-/// Also contains [`pid::EuclideanRing`], which is the simplest way how a ring can become a
-/// principal idea ring.
-pub mod pid;
-/// Provides the ring implementation [`primitive_int::StaticRing`] that represents the integer ring
-/// with arithmetic given by the primitive integer types ``i8` to `i128`.
-pub mod primitive_int;
-/// Contains the two traits [`reduce_lift::poly_eval::LiftPolyEvalRing`] and
-/// [`reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`] that formalize the assumptions required
-/// to perform certain computations over a ring modulo prime ideals, and then reconstruct the
-/// element from the resulting congruences.
-pub mod reduce_lift;
-/// A collection of various more complicated ring traits and implementations, in particular
-/// arbitrary-precision integer rings, the integer quotients `Z/nZ` or polynomial rings.
-pub mod rings;
 /// Contains different traits for sequences of elements, namely [`seq::VectorView`] and
 /// [`seq::VectorFn`]. They all have some functional overlap with [`ExactSizeIterator`], but differ
 /// in how they allow access to the elements of the sequence.
 pub mod seq;
-/// Contains the trait [`serialization::SerializableElementRing`] for rings whose elements can be
-/// serialized by using `serde`.
-///
-/// It also contains some utilities to simplify this, since it is usually not possible to use
-/// `#[derive(Serialize, Deserialize)]` to implement serialization - the reason is that
-/// serialization and deserialization usually require access to the ring. Hence, we need to use
-/// [`serde::de::DeserializeSeed`], but this is incompatible with `#[derive]`
-pub mod serialization;
-/// Contains a workaround for specialization.
-pub mod specialization;
-/// Ccontains the struct [`wrapper::RingElementWrapper`] that contains an element together with its
+/// Contains the struct [`wrapper::RingElementWrapper`] that contains an element together with its
 /// ring, and thus can provide ring operations without explicit access to the ring.
 ///
 /// Using this is for example necessary if you want to use elements of a
@@ -124,8 +103,11 @@ pub mod specialization;
 /// ```
 pub mod wrapper;
 
+// ---- PRIVATE HELPERS ----
+
+mod cow;
+
 const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
-const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
 
 #[cfg(test)]
 const RANDOM_TEST_INSTANCE_COUNT: usize = 10;

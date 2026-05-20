@@ -1,8 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, hash_map};
 
-use crate::ring::*;
-use crate::seq::*;
+use crate::prelude::*;
 
 pub struct SparseMapVector<R: RingStore> {
     data: HashMap<usize, El<R>>,
@@ -170,9 +169,6 @@ impl<R: RingStore> VectorViewMut<El<R>> for SparseMapVector<R> {
         return &mut self.modify_entry.1;
     }
 }
-
-#[cfg(test)]
-use crate::primitive_int::StaticRing;
 
 #[cfg(test)]
 fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, values: [i64; N]) {

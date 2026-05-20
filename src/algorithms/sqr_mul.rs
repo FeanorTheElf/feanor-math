@@ -1,7 +1,5 @@
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::primitive_int::*;
-use crate::ring::*;
+
+use crate::prelude::*;
 
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
 /// w.r.t. the given operation. The operation must be associative to provide correct results.

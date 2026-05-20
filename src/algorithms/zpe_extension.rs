@@ -1,13 +1,7 @@
 use tracing::instrument;
 
 use crate::algorithms::hensel::local_zn_ring_bezout_identity;
-use crate::algorithms::linsolve::LinSolveRing;
-use crate::homomorphism::*;
-use crate::ring::*;
-use crate::rings::extension::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::*;
-use crate::rings::zn::*;
+use crate::prelude::*;
 
 /// Computes the inverse of a unit `a` in the ring `(Z/p^eZ)[X]/(f(X))` with a
 /// monic irreducible polynomial `f(X)`. Returns `None` if `a` is not a unit.

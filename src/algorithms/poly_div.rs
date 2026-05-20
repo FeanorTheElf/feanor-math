@@ -2,8 +2,7 @@ use std::cmp::max;
 
 use tracing::instrument;
 
-use crate::ring::*;
-use crate::rings::poly::*;
+use crate::prelude::*;
 
 /// Computes the polynomial division of `lhs` by `rhs`, i.e. `lhs = q * rhs + r` with
 /// `deg(r) < deg(rhs)`.
@@ -209,13 +208,9 @@ where
     return fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc);
 }
 
-#[cfg(test)]
-use dense_poly::DensePolyRing;
 
 #[cfg(test)]
 use crate::function::no_error;
-#[cfg(test)]
-use crate::integer::*;
 
 #[test]
 fn test_fast_poly_div() {

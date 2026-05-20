@@ -1,8 +1,7 @@
 use std::alloc::{Allocator, Global};
 use std::fmt::{Debug, Formatter, Result};
 
-use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
-use super::*;
+use crate::prelude::*;
 
 /// A matrix that owns its elements.
 ///
@@ -185,9 +184,6 @@ impl<T: Clone, A: Allocator + Clone> Clone for OwnedMatrix<T, A> {
         }
     }
 }
-
-#[cfg(test)]
-use crate::primitive_int::*;
 
 #[test]
 fn test_zero_col_matrix() {

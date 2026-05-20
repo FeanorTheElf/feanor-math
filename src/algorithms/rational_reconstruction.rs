@@ -3,11 +3,8 @@ use std::mem::swap;
 
 use tracing::instrument;
 
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::pid::*;
-use crate::ring::*;
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::zn::*;
 
 /// Uses an optimized version of the LLL algorithm to compute a reduced
 /// basis of the lattice

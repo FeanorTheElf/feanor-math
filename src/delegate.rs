@@ -1,16 +1,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::divisibility::DivisibilityRing;
-use crate::homomorphism::*;
-use crate::integer::{IntegerRing, IntegerRingStore};
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::ring::*;
-use crate::rings::extension::FreeAlgebra;
-use crate::rings::finite::FiniteRing;
-use crate::rings::zn::ZnRing;
-use crate::serialization::SerializableElementRing;
-use crate::specialization::*;
+use crate::prelude::*;
 
 /// Trait to simplify implementing newtype-pattern for rings.
 /// When you want to create a ring that just wraps another ring,
