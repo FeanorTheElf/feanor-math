@@ -14,14 +14,14 @@ use crate::algorithms::convolution::{
 use crate::algorithms::eea::const_eea;
 use crate::algorithms::matmul::StrassenHint;
 use crate::iters::multi_cartesian_product;
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_impls::primitive_int::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
-use crate::seq::*;
+use crate::ring_impls::primitive_int::*;
+use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
+use crate::seq::*;
 use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 
 /// Represents the ring `Z/nZ` for odd `n` somewhat below 64 bits in size.
@@ -490,8 +490,7 @@ impl PrincipalIdealRing for Zn64MBase {
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
         // we can actually work in Montgomery form, since R is a unit modulo n
-        let (s, t, d) =
-            ZZi64.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
+        let (s, t, d) = ZZi64.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
         let quo = RingRef::from(self).into_can_hom(ZZi64).ok().unwrap();
         (quo.map(s), quo.map(t), Zn64MEl(d as u64))
     }
@@ -681,11 +680,7 @@ fn test_from_int_hom() {
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, Zn, -8..8);
     }
     let Zn = Zn64M::new(5);
-    assert_el_eq!(
-        Zn,
-        Zn.int_hom().map(3),
-        Zn.can_hom(&ZZi64).unwrap().map(-1596802)
-    );
+    assert_el_eq!(Zn, Zn.int_hom().map(3), Zn.can_hom(&ZZi64).unwrap().map(-1596802));
 }
 
 #[test]
@@ -734,5 +729,8 @@ fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
 fn test_serialize() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64M::new(129);
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, (0..129).map(|x| ring.int_hom().map(x)))
+    crate::ring_properties::serialization::generic_tests::test_serialization(
+        ring,
+        (0..129).map(|x| ring.int_hom().map(x)),
+    )
 }

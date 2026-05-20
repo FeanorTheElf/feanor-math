@@ -7,24 +7,23 @@ use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::ring::{EnvBindingStrength, HashableElRing};
-use crate::ring_impls::zn::zn_big;
-use crate::ring_impls::zn::*;
 use crate::algorithms::convolution::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::iters::multi_cartesian_product;
-use crate::ring_properties::divisibility::PreparedDivisor;
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_impls::primitive_int::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
+use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
-use crate::seq::*;
+use crate::ring_impls::primitive_int::*;
+use crate::ring_impls::zn::{zn_big, *};
+use crate::ring_properties::divisibility::PreparedDivisor;
+use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
+use crate::seq::*;
 use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 
 fn high(x: u128) -> u64 { (x >> 64) as u64 }
@@ -731,8 +730,7 @@ impl PrincipalIdealRing for Zn64BBase {
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) =
-            ZZi64.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
+        let (s, t, d) = ZZi64.extended_ideal_gen(&lhs.0.try_into().unwrap(), &rhs.0.try_into().unwrap());
         let quo = RingRef::from(self).into_can_hom(ZZi64).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }
@@ -1349,7 +1347,10 @@ fn test_divisibility_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let Zn = Zn64B::new(n as u64);
-        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&Zn, (0..n).map(|x| Zn.int_hom().map(x)));
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+            &Zn,
+            (0..n).map(|x| Zn.int_hom().map(x)),
+        );
     }
     for n in LARGE_MODULI {
         let Zn = Zn64B::new(n);
@@ -1371,10 +1372,16 @@ fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     for n in 2..=17 {
         let R = Zn64B::new(n as u64);
-        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, (0..n).map(|x| R.int_hom().map(x)));
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            R,
+            (0..n).map(|x| R.int_hom().map(x)),
+        );
     }
     let R = Zn64B::new(63);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, (0..63).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        R,
+        (0..63).map(|x| R.int_hom().map(x)),
+    );
 }
 
 #[test]
@@ -1421,11 +1428,7 @@ fn test_from_int_hom() {
         crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, Zn, -8..8);
     }
     let Zn = Zn64B::new(5);
-    assert_el_eq!(
-        Zn,
-        Zn.int_hom().map(3),
-        Zn.can_hom(&ZZi64).unwrap().map(-1596802)
-    );
+    assert_el_eq!(Zn, Zn.int_hom().map(3), Zn.can_hom(&ZZi64).unwrap().map(-1596802));
 }
 
 #[test]
@@ -1611,5 +1614,8 @@ fn bench_inner_product(bencher: &mut Bencher) {
 fn test_serialize() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new(128);
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, (0..128).map(|x| ring.int_hom().map(x)))
+    crate::ring_properties::serialization::generic_tests::test_serialization(
+        ring,
+        (0..128).map(|x| ring.int_hom().map(x)),
+    )
 }

@@ -463,10 +463,10 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     ///
     /// If `None` is returned, this means the given integer ring might not be able
     /// to represent the characteristic. This must never happen if the given implementation
-    /// of `ZZ` allows for unbounded integers (like [`crate::ring_properties::integer::BigIntRing`]).
-    /// In other cases however, we allow to perform the size check heuristically only,
-    /// so this might return `None` even in some cases where the integer ring would in
-    /// fact be able to represent the characteristic.
+    /// of `ZZ` allows for unbounded integers (like
+    /// [`crate::ring_properties::integer::BigIntRing`]). In other cases however, we allow to
+    /// perform the size check heuristically only, so this might return `None` even in some
+    /// cases where the integer ring would in fact be able to represent the characteristic.
     ///
     /// # Example
     /// ```rust
@@ -548,11 +548,7 @@ macro_rules! delegate {
 /// # use feanor_math::integer::*;
 /// # use feanor_math::assert_el_eq;
 /// // this does not have an equivalent representation with assert_eq!
-/// assert_el_eq!(
-///     ZZbig,
-///     ZZbig.int_hom().map(3),
-///     ZZbig.int_hom().map(3)
-/// );
+/// assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), ZZbig.int_hom().map(3));
 /// ```
 #[macro_export]
 macro_rules! assert_el_eq {
@@ -738,8 +734,9 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::assert_el_eq;
     /// fn sum<R, I>(ring: R, els: I) -> El<R>
-    ///     where R: RingStore,
-    ///         I: IntoIterator<Item = El<R>>
+    /// where
+    ///     R: RingStore,
+    ///     I: IntoIterator<Item = El<R>>,
     /// {
     ///     els.into_iter().fold(ring.zero(), |a, b| ring.add(a, b))
     /// }
@@ -783,8 +780,9 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::assert_el_eq;
     /// fn prod<R, I>(ring: R, els: I) -> El<R>
-    ///     where R: RingStore,
-    ///         I: IntoIterator<Item = El<R>>
+    /// where
+    ///     R: RingStore,
+    ///     I: IntoIterator<Item = El<R>>,
     /// {
     ///     els.into_iter().fold(ring.one(), |a, b| ring.mul(a, b))
     /// }
@@ -1396,8 +1394,8 @@ pub mod generic_tests {
     use std::cmp::min;
 
     use super::*;
-    use crate::ring_properties::integer::int_cast;
     use crate::ring_impls::primitive_int::*;
+    use crate::ring_properties::integer::int_cast;
 
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where

@@ -9,11 +9,11 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::bigint_ops::deserialize_bigint_from_bytes;
 use crate::homomorphism::*;
-use crate::ring_impls::primitive_int::*;
 use crate::prelude::*;
-use crate::rings::rust_bigint::*;
+use crate::ring_impls::primitive_int::*;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing};
 use crate::ring_properties::specialization::*;
+use crate::rings::rust_bigint::*;
 use crate::{
     algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
 };
@@ -914,11 +914,7 @@ fn test_canonical_iso_axioms_i64() {
     );
     assert_eq!(
         i64::MIN,
-        int_cast(
-            MPZ::RING.negate(MPZ::RING.power_of_two(63)),
-            &ZZi64,
-            MPZ::RING
-        )
+        int_cast(MPZ::RING.negate(MPZ::RING.power_of_two(63)), &ZZi64, MPZ::RING)
     );
 }
 

@@ -1,13 +1,13 @@
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::ring_properties::field::*;
 use crate::homomorphism::Homomorphism;
-use crate::ring_properties::integer::*;
 use crate::matrix::*;
-use crate::ring_properties::ordered::OrderedRingStore;
 use crate::prelude::*;
 use crate::ring_impls::approx_real::ApproxRealField;
+use crate::ring_properties::field::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
 
 /// Uses the Fincke-Pohst algorithm to find integer points close to `target`, where
 /// "closeness" is measured according to the norm defined by the given quadratic form.
@@ -122,8 +122,6 @@ pub fn fincke_pohst<I, R, H, V, F>(
     }
 }
 
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::approx_real::float::*;
 

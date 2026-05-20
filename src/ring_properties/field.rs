@@ -1,6 +1,6 @@
+use crate::ring::*;
 use crate::ring_properties::divisibility::Domain;
 use crate::ring_properties::pid::*;
-use crate::ring::*;
 
 /// Trait for rings that are fields, i.e. where every
 /// nonzero element has an inverse.

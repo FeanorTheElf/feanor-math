@@ -10,12 +10,12 @@ use tracing::instrument;
 use crate::algorithms::int_bisect;
 use crate::homomorphism::*;
 use crate::iters::multiset_combinations;
-use crate::ring_properties::integer::binomial;
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, RingArc};
 use crate::ring_impls::multivariate::*;
+use crate::ring_impls::primitive_int::StaticRing;
+use crate::ring_properties::integer::binomial;
+use crate::ring_properties::ordered::OrderedRingStore;
 use crate::seq::{VectorFn, VectorView};
 
 type Exponent = u16;
@@ -117,21 +117,13 @@ where
         let max_degree_for_orderidx = if variable_count == 1 || variable_count == 2 {
             usize::MAX
         } else {
-            let k = int_cast(
-                TryInto::<i64>::try_into(variable_count).unwrap() - 1,
-                ZZbig,
-                ZZi64,
-            );
+            let k = int_cast(TryInto::<i64>::try_into(variable_count).unwrap() - 1, ZZbig, ZZi64);
             // ensure that cum_binomial() always fits within an u64
             int_bisect::find_root_floor(ZZi64, 0, |d| {
                 if ZZbig.is_lt(
                     &ZZbig.mul(
                         binomial(
-                            int_cast(
-                                d + TryInto::<i64>::try_into(variable_count).unwrap() - 1,
-                                ZZbig,
-                                ZZi64,
-                            ),
+                            int_cast(d + TryInto::<i64>::try_into(variable_count).unwrap() - 1, ZZbig, ZZi64),
                             &k,
                             ZZbig,
                         ),

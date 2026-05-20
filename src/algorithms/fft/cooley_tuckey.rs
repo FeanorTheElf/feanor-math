@@ -7,10 +7,10 @@ use tracing::instrument;
 use super::complex_fft::*;
 use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2_zn, is_prim_root_of_unity_pow2};
 use crate::algorithms::fft::*;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::ring_impls::float_complex::*;
 use crate::ring_impls::zn::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 
 /// An optimized implementation of the Cooley-Tukey FFT algorithm, to compute
@@ -982,10 +982,6 @@ where
     }
 }
 
-#[cfg(test)]
-use crate::ring_properties::field::*;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::*;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_big;
 #[cfg(test)]

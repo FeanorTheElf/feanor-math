@@ -9,10 +9,10 @@ use crate::algorithms::linsolve::*;
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::homomorphism::Homomorphism;
 use crate::matrix::OwnedMatrix;
-use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::prelude::*;
 use crate::ring_impls::extension::*;
 use crate::ring_impls::poly::{PolyRing, *};
+use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::seq::*;
 
 /// Default impl for [`FreeAlgebra::from_canonical_basis_extended()`]

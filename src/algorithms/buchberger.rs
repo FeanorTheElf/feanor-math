@@ -5,12 +5,12 @@ use elsa::sync::FrozenVec;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tracing::{Level, Span, event, instrument, span};
 
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::ring_properties::field::Field;
 use crate::homomorphism::Homomorphism;
-use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::prelude::*;
 use crate::ring_impls::multivariate::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::field::Field;
+use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::seq::*;
 
 #[stability::unstable(feature = "enable")]
@@ -655,8 +655,6 @@ where
     buchberger_with_strategy::<_, _, _, _>(ring, input_basis, order, default_sort_fn(ring, order), |_| false)
 }
 
-#[cfg(test)]
-use crate::ring_properties::integer::BigIntRing;
 #[cfg(test)]
 use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]

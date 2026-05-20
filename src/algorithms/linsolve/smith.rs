@@ -7,8 +7,8 @@ use transform::TransformList;
 use crate::algorithms::linsolve::SolveResult;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::matrix::*;
-use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::prelude::*;
+use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 
 /// Transforms `A` into `A'` via transformations `L, R` such that
 /// `L A R = A'` and `A'` is diagonal.
@@ -285,8 +285,6 @@ use crate::algorithms::matmul::*;
 use crate::assert_matrix_eq;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::extension::FreeAlgebraStore;
 #[cfg(test)]

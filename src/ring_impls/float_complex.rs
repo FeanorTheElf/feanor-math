@@ -1,15 +1,15 @@
 use std::f64::EPSILON;
 use std::f64::consts::PI;
 
-use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
-use crate::ring_properties::field::Field;
 use crate::homomorphism::CanHomFrom;
 use crate::impl_eq_based_self_iso;
-use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::prelude::*;
 use crate::ring_impls::approx_real::float::Real64;
 use crate::ring_impls::rational::RationalFieldBase;
+use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
+use crate::ring_properties::field::Field;
+use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 
 /// An approximate implementation of the complex numbers `C`, using 64 bit floating
 /// point numbers.

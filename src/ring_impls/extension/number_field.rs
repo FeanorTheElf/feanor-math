@@ -23,13 +23,13 @@ use crate::algorithms::poly_gcd::*;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::delegate::*;
-use crate::reduce_lift::lift_poly_factors::*;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_factors::*;
+use crate::ring_impls::as_field::AsField;
 use crate::ring_impls::extension::extension_impl::*;
 use crate::ring_impls::extension::number_field::newton::find_approximate_complex_root;
 use crate::ring_impls::extension::sparse::SparseMapVector;
 use crate::ring_impls::extension::*;
-use crate::ring_impls::as_field::AsField;
 use crate::ring_impls::float_complex::{Complex64, Complex64Base};
 use crate::ring_impls::rational::*;
 use crate::ring_impls::zn::ZnRingStore;
@@ -244,9 +244,7 @@ impl NumberFieldBase {
         let modulus = (0..rank)
             .map(|i| QQ.negate(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i))))
             .collect::<Vec<_>>();
-        let log2_padded_len = ZZi64
-            .abs_log2_ceil(&rank.try_into().unwrap())
-            .unwrap();
+        let log2_padded_len = ZZi64.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
         let convolution = RationalFieldBase::create_default_convolution(QQ.clone(), Some(2 << log2_padded_len));
         return RingValue::from(FreeAlgebraImplBase::new_with_convolution(
             QQ,
@@ -1538,7 +1536,10 @@ fn test_principal_ideal_ring_axioms() {
     )
     .collect::<Vec<_>>();
 
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&K, elements.iter().map(|x| x.clone()));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &K,
+        elements.iter().map(|x| x.clone()),
+    );
 }
 
 #[test]

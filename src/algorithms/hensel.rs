@@ -4,8 +4,8 @@ use tracing::instrument;
 
 use crate::algorithms::int_factor::is_prime_power;
 use crate::homomorphism::*;
-use crate::reduce_lift::lift_poly_factors::*;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::zn::{FromModulusCreateableZnRing, *};
@@ -550,8 +550,6 @@ where
     return lifted.factorization().cloned().collect();
 }
 
-#[cfg(test)]
-use crate::ring_properties::integer::*;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_64b::Zn64B;
 

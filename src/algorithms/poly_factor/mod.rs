@@ -4,10 +4,10 @@ use rational::*;
 use super::poly_gcd::PolyTFracGCDRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring_properties::finite::FiniteRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::rational::*;
 use crate::ring_impls::zn::zn_64b::*;
+use crate::ring_properties::finite::FiniteRing;
 
 /// Contains an implementation of the Cantor-Zassenhaus algorithm for
 /// finding factors of univariate polynomials over finite fields.

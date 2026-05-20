@@ -5,8 +5,8 @@ use tracing::instrument;
 
 use crate::delegate::DelegateRing;
 use crate::homomorphism::*;
-use crate::reduce_lift::lift_poly_factors::*;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring_impls::as_field::*;
 use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
@@ -52,7 +52,8 @@ pub mod squarefree_part;
 /// defined by the trait [`PolyLiftFactorsDomain`], and there is a blanket impl `R: PolyTFracGCDRing
 /// where R: PolyLiftFactorsDomain`.
 ///
-/// Note that this blanket impl used [`crate::ring_properties::specialization::FiniteRingSpecializable`] to use the
+/// Note that this blanket impl used
+/// [`crate::ring_properties::specialization::FiniteRingSpecializable`] to use the
 /// standard algorithm whenever the corresponding ring is actually finite. In other words, despite
 /// the fact that the blanket implementation for `PolyLiftFactorsDomain`s also applies to finite
 /// fields, the local implementation is not actually used in these cases.
@@ -374,8 +375,6 @@ where
     }
 }
 
-#[cfg(test)]
-use crate::ring_properties::integer::*;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]

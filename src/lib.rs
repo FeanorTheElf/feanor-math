@@ -38,20 +38,21 @@
 extern crate test;
 
 pub mod prelude;
-/// Contains the traits [`ring::RingBase`] and [`ring::RingStore`], which are the foundation of the ring framework in this library.
+/// Contains the traits [`ring::RingBase`] and [`ring::RingStore`], which are the foundation of the
+/// ring framework in this library.
 #[macro_use]
 pub mod ring;
-pub mod ring_properties;
 /// A collection of various more complicated ring traits and implementations, in particular
 /// arbitrary-precision integer rings, the integer quotients `Z/nZ` or polynomial rings.
 pub mod ring_impls;
+pub mod ring_properties;
 
-mod cow;
-pub mod function;
 pub mod algorithms;
+mod cow;
 /// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the
 /// newtype-pattern for rings.
 pub mod delegate;
+pub mod function;
 /// Contains the traits [`group::AbelianGroupBase`] and [`group::AbelianGroupStore`], which (in
 /// analogue to [`ring::RingBase`] and [`ring::RingStore`]) model groups. These are much less
 /// central to this library than the ring traits, however.
@@ -89,14 +90,8 @@ pub mod seq;
 /// # use std::collections::HashSet;
 ///
 /// let mut set = HashSet::new();
-/// set.insert(RingElementWrapper::new(
-///     ZZbig,
-///     ZZbig.int_hom().map(3),
-/// ));
-/// assert!(set.contains(&RingElementWrapper::new(
-///     ZZbig,
-///     ZZbig.int_hom().map(3)
-/// )));
+/// set.insert(RingElementWrapper::new(ZZbig, ZZbig.int_hom().map(3)));
+/// assert!(set.contains(&RingElementWrapper::new(ZZbig, ZZbig.int_hom().map(3))));
 /// ```
 pub mod wrapper;
 

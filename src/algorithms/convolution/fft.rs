@@ -10,9 +10,9 @@ use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
-use crate::ring_impls::primitive_int::StaticRingBase;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
+use crate::ring_impls::primitive_int::StaticRingBase;
 use crate::ring_impls::zn::*;
 use crate::seq::*;
 
@@ -320,13 +320,7 @@ where
     R: RingStore,
     R::Ring: ZnRing,
 {
-    move |x| {
-        int_cast(
-            ring.smallest_lift(x.clone()),
-            ZZi64,
-            ring.integer_ring(),
-        )
-    }
+    move |x| int_cast(ring.smallest_lift(x.clone()), ZZi64, ring.integer_ring())
 }
 
 fn from_int_zn<R>(ring: R) -> impl use<R> + Fn(i64) -> El<R>

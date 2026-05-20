@@ -50,9 +50,7 @@ where
         if ZZbig.is_even(&ring.characteristic(ZZbig).unwrap()) {
             return Err(());
         }
-        let mut log2_len = ZZi64
-            .abs_log2_ceil(&abort_if_ntt_len_le.try_into().unwrap())
-            .unwrap();
+        let mut log2_len = ZZi64.abs_log2_ceil(&abort_if_ntt_len_le.try_into().unwrap()).unwrap();
         if get_prim_root_of_unity_pow2_zn(&ring, log2_len).is_none() {
             return Err(());
         }

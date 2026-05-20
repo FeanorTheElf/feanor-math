@@ -5,14 +5,14 @@ use std::ops::Range;
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::homomorphism::Homomorphism;
-use crate::ring_properties::integer::IntegerRingStore;
 use crate::iters::multi_cartesian_product;
 use crate::prelude::*;
 use crate::ring_impls::multivariate::*;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
+use crate::ring_properties::integer::IntegerRingStore;
 use crate::seq::*;
 
 /// Computes `out[i] = prod_(j != i) values[j]`.

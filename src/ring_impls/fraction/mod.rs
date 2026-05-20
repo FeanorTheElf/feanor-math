@@ -1,5 +1,5 @@
-use crate::ring_properties::field::Field;
 use crate::prelude::*;
+use crate::ring_properties::field::Field;
 
 /// Contains [`fraction_impl::FractionFieldImpl`], an implementation of the fraction
 /// fields of an arbitrary principal ideal domain.
@@ -20,8 +20,9 @@ pub trait FractionField: Field + RingExtension {
     /// Returns `a, b` such that the given element is `a/b`.
     ///
     /// The return value does not have to be reduced, i.e. `gcd(a, b)` is not
-    /// guaranteed to be a unit (for rings that are not [`crate::ring_properties::pid::PrincipalIdealRing`], this
-    /// is not even defined). Hence, when you want to convert the result to the base ring, use
+    /// guaranteed to be a unit (for rings that are not
+    /// [`crate::ring_properties::pid::PrincipalIdealRing`], this is not even defined). Hence,
+    /// when you want to convert the result to the base ring, use
     /// [`crate::ring_properties::divisibility::DivisibilityRing::checked_div()`] as follows:
     /// ```rust
     /// # use feanor_math::ring::*;

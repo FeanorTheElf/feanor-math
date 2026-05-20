@@ -1,13 +1,14 @@
 use oorandom;
 use tracing::instrument;
 
-use crate::{PROBABILISTIC_REPETITIONS, homomorphism::*};
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_properties::pid::PrincipalIdealRingStore;
-use crate::ring_impls::primitive_int::*;
+use crate::PROBABILISTIC_REPETITIONS;
+use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring::HashableElRingStore;
+use crate::ring_impls::primitive_int::*;
 use crate::ring_impls::zn::{ZnRingStore, choose_zn_impl, *};
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::PrincipalIdealRingStore;
 
 struct CheckIsFieldMillerRabin {
     probability_param: usize,

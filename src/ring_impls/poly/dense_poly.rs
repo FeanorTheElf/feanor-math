@@ -13,15 +13,15 @@ use crate::algorithms::convolution::*;
 use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{FAST_POLY_DIV_THRESHOLD, fast_poly_div_rem, poly_div_rem, poly_rem};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::ring_properties::field::Field;
 use crate::function::no_error;
-use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, LiftPolyEvalRing, ToExtRingMap};
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, LiftPolyEvalRing, ToExtRingMap};
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::poly::*;
-use crate::seq::*;
+use crate::ring_properties::field::Field;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::{FiniteRingOperation, FiniteRingSpecializable};
+use crate::seq::*;
 
 /// The univariate polynomial ring `R[X]`. Polynomials are stored as dense vectors of
 /// coefficients, allocated by the given memory provider.
@@ -291,10 +291,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         // this can make it much faster; in particular, in the (not too uncommon) special case that we
         // compute the product of degree 1 polynomials, this means we actually make use of karatsuba
         // multiplication
-        for i in 0..ZZi64
-            .abs_log2_ceil(&elements.len().try_into().unwrap())
-            .unwrap()
-        {
+        for i in 0..ZZi64.abs_log2_ceil(&elements.len().try_into().unwrap()).unwrap() {
             let step = 1 << i;
             for j in (0..(elements.len() - step)).step_by(2 * step) {
                 let (a, b) = (&mut elements[j..(j + step + 1)]).split_at_mut(step);
@@ -974,19 +971,19 @@ use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
 use crate::iters::multiset_combinations;
 #[cfg(test)]
-use crate::ring_properties::ordered::OrderedRingStore;
-#[cfg(test)]
 use crate::ring_impls::approx_real::float::Real64;
 #[cfg(test)]
 use crate::ring_impls::extension::FreeAlgebraStore;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::ring_properties::finite::FiniteRingStore;
-#[cfg(test)]
 use crate::ring_impls::zn::zn_static::{Fp, Zn};
 #[cfg(test)]
 use crate::ring_impls::zn::*;
+#[cfg(test)]
+use crate::ring_properties::finite::FiniteRingStore;
+#[cfg(test)]
+use crate::ring_properties::ordered::OrderedRingStore;
 
 #[cfg(test)]
 fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
@@ -1083,7 +1080,10 @@ fn test_poly_ring_axioms() {
 fn test_divisibility_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+        &poly_ring,
+        edge_case_elements(&poly_ring),
+    );
 }
 
 #[test]
@@ -1097,7 +1097,10 @@ fn test_euclidean_ring_axioms() {
 fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &poly_ring,
+        edge_case_elements(&poly_ring),
+    );
 }
 
 #[test]
@@ -1171,7 +1174,10 @@ fn test_expensive_prod() {
 fn test_serialize() {
     feanor_tracing::DelayedLogger::init_test();
     let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    crate::ring_properties::serialization::generic_tests::test_serialization(&poly_ring, edge_case_elements(&poly_ring));
+    crate::ring_properties::serialization::generic_tests::test_serialization(
+        &poly_ring,
+        edge_case_elements(&poly_ring),
+    );
 }
 
 #[test]

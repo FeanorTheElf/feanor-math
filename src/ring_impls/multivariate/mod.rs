@@ -692,9 +692,8 @@ where
 pub mod generic_impls {
     use std::fmt::{Formatter, Result};
 
+    use super::*;
     use crate::ring::EnvBindingStrength;
-
-use super::*;
 
     #[stability::unstable(feature = "enable")]
     pub fn print<P>(ring: P, poly: &El<P>, out: &mut Formatter, env: EnvBindingStrength) -> Result

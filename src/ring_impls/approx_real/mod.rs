@@ -1,7 +1,7 @@
+use crate::prelude::*;
 use crate::ring_properties::field::Field;
 use crate::ring_properties::integer::IntegerRing;
 use crate::ring_properties::ordered::OrderedRing;
-use crate::prelude::*;
 
 /// Contains [`float::Real64`] as implementation of [`ApproxRealField`]
 /// based on the primitive type [`f64`].

@@ -9,15 +9,13 @@ pub mod exact;
 #[cfg(test)]
 use crate::homomorphism::*;
 #[cfg(test)]
-use crate::ring_properties::integer::IntegerRing;
-#[cfg(test)]
 use crate::matrix::*;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::prelude::*;
 #[cfg(test)]
 use crate::ring_impls::rational::RationalFieldBase;
+#[cfg(test)]
+use crate::ring_properties::integer::IntegerRing;
 #[cfg(test)]
 use crate::seq::*;
 

@@ -18,8 +18,8 @@ pub trait DivisibilityRing: RingBase {
     /// Note that this does not have to be unique, if rhs is a left zero-divisor.
     /// In particular, this function will return any element in the ring if `lhs = rhs = 0`.
     /// In rings with many zero-divisors, this can sometimes lead to unintuitive behavior.
-    /// See also [`crate::ring_properties::pid::PrincipalIdealRing::checked_div_min()`] for a function that,
-    /// if available, might sometimes behave more intuitively.
+    /// See also [`crate::ring_properties::pid::PrincipalIdealRing::checked_div_min()`] for a
+    /// function that, if available, might sometimes behave more intuitively.
     ///
     /// # Example
     /// ```rust

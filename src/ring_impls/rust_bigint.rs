@@ -12,11 +12,11 @@ use tracing::instrument;
 
 use crate::algorithms::bigint_ops::*;
 use crate::algorithms::eea::{eea, gcd, partial_eea_int};
-use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
 use crate::homomorphism::*;
-use crate::ring_impls::primitive_int::*;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
+use crate::ring_impls::primitive_int::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
 use crate::ring_properties::integer::IntCast;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;

@@ -1,15 +1,15 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::FreeAlgebra;
-use crate::ring_properties::finite::FiniteRing;
 use crate::ring_impls::zn::ZnRing;
+use crate::ring_properties::divisibility::DivisibilityRing;
+use crate::ring_properties::finite::FiniteRing;
+use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring_properties::serialization::SerializableElementRing;
 use crate::ring_properties::specialization::*;
 

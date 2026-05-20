@@ -473,9 +473,6 @@ impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
 #[cfg(test)]
 use test;
 
-#[cfg(test)]
-use crate::ring_impls::primitive_int::*;
-
 #[bench]
 fn bench_schoolbook_convolution(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
@@ -512,7 +509,6 @@ pub mod generic_tests {
     use std::cmp::min;
 
     use super::*;
-    use crate::homomorphism::*;
 
     pub fn test_convolution<C, R>(convolution: C, ring: R, scale: El<R>)
     where

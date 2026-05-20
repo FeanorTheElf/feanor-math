@@ -7,16 +7,14 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::*;
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::IntegerRing;
-use crate::ring_properties::field::PerfectField;
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
 use crate::prelude::*;
-use crate::ring_impls::zn::ZnRing;
-use crate::ring_impls::zn::*;
-use crate::ring_impls::zn::FromModulusCreateableZnRing;
+use crate::reduce_lift::lift_poly_eval::{InterpolationBaseRing, InterpolationBaseRingStore};
+use crate::ring_impls::zn::{FromModulusCreateableZnRing, ZnRing, *};
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::field::PerfectField;
+use crate::ring_properties::integer::IntegerRing;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 /// A wrapper around a ring that marks this ring to be a perfect field. In particular,
@@ -621,7 +619,10 @@ fn test_canonical_hom_axioms_static_int() {
 fn test_divisibility_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+        &R,
+        (0..17).map(|x| R.int_hom().map(x)),
+    );
 }
 
 #[test]
@@ -637,7 +638,10 @@ fn test_canonical_hom_axioms_wrap_unwrap() {
 fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        (0..17).map(|x| R.int_hom().map(x)),
+    );
     crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
 }
 

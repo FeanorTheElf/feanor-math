@@ -1,4 +1,3 @@
-
 /// Provides the ring implementation [`primitive_int::StaticRing`] that represents the integer ring
 /// with arithmetic given by the primitive integer types ``i8` to `i128`.
 pub mod primitive_int;
@@ -19,8 +18,8 @@ pub mod zn;
 pub mod poly;
 
 /// Contains the wrapper [`field::AsField`] that can be used to create a ring
-/// implementing [`crate::ring_properties::field::Field`] from rings that are fields, but do not implement
-/// the trait (e.g. because being a field for them might be only determinable at runtime).
+/// implementing [`crate::ring_properties::field::Field`] from rings that are fields, but do not
+/// implement the trait (e.g. because being a field for them might be only determinable at runtime).
 pub mod as_field;
 
 /// An approximate implementation of the field of complex numbers `C`, using 64-bit floating point

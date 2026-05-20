@@ -5,13 +5,13 @@ use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_gcd::squarefree_part::poly_squarefree_part_local;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::ring_properties::field::FieldStore;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::{Complex64, Complex64Base, Complex64El};
 use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::field::FieldStore;
 
 const NEWTON_MAX_SCALE: u32 = 10;
 const NEWTON_ITERATIONS: usize = 16;
@@ -293,8 +293,6 @@ use std::f64::consts::PI;
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
 use crate::ring_properties::pid::PrincipalIdealRingStore;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
 
 #[test]
 fn test_find_approximate_complex_root() {

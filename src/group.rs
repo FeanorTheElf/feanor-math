@@ -7,11 +7,11 @@ use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
+use crate::prelude::*;
+use crate::ring::HashableElRing;
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::ring_properties::integer::BigIntRing;
 use crate::ring_properties::ordered::OrderedRingStore;
-use crate::prelude::*;
-use crate::ring::HashableElRing;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 
 /// Trait for implementations of generic abelian groups, for which only
@@ -69,11 +69,7 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
             |a, b| self.op_ref_snd(b, &a),
             self.identity(),
         );
-        if !ZZbig.is_neg(e) {
-            res
-        } else {
-            self.inv(&res)
-        }
+        if !ZZbig.is_neg(e) { res } else { self.inv(&res) }
     }
 
     /// Checks whether the given element is the identity element of the group.

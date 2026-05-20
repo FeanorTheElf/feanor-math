@@ -1,5 +1,5 @@
-use crate::ring_properties::divisibility::*;
 use crate::ring::*;
+use crate::ring_properties::divisibility::*;
 
 /// Trait for rings that are principal ideal rings, i.e. every ideal is generated
 /// by a single element.
@@ -221,7 +221,8 @@ where
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;
-    use crate::{algorithms::int_factor::factor, prelude::*};
+    use crate::algorithms::int_factor::factor;
+    use crate::prelude::*;
 
     pub fn test_euclidean_ring_axioms<R: RingStore, I: Iterator<Item = El<R>>>(ring: R, edge_case_elements: I)
     where

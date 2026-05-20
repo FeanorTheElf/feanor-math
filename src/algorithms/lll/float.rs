@@ -2,13 +2,13 @@ use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
 use crate::homomorphism::*;
-use crate::ring_properties::integer::generic_impls::map_from_integer_ring;
 use crate::matrix::transform::{
     DuplicateTransforms, OffsetTransformIndex, TransformCols, TransformRows, TransformTarget,
 };
 use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring_impls::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
+use crate::ring_properties::integer::generic_impls::map_from_integer_ring;
 
 /// Stores the Gram matrix, its (partial) floating-point Cholesky decomposition,
 /// and an error bound on the latter. These values are jointly modified during the
@@ -510,9 +510,9 @@ use crate::algorithms::lll::{assert_lattice_isomorphic, norm_squared};
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
-#[cfg(test)]
 use crate::ring_impls::approx_real::float::*;
+#[cfg(test)]
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[test]
 fn test_compute_cholesky_column_without_pivot() {
@@ -611,12 +611,7 @@ fn test_lll_float_2d() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_eq!(4, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
 }
@@ -648,12 +643,7 @@ fn test_lll_float_3d() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_eq!(144 * 144, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_eq!(
         72 * 72 + 279 * 279,
@@ -692,12 +682,7 @@ fn test_lll_precision() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 200);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 300);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 300);
@@ -727,12 +712,7 @@ fn test_lll_precision() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 500);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 900);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 1200);
@@ -762,12 +742,7 @@ fn test_lll_precision() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)) < 1800);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)) < 1800);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)) < 4600);
@@ -800,12 +775,7 @@ fn test_lll_generating_set() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
     assert_el_eq!(ZZ, 5, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
@@ -833,12 +803,7 @@ fn test_lll_generating_set() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));
@@ -914,12 +879,7 @@ fn test_lll_generating_set() {
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
 
-    assert_lattice_isomorphic(
-        ZZ,
-        ZZbig,
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
+    assert_lattice_isomorphic(ZZ, ZZbig, Submatrix::from_2d(&original), reduced_matrix.as_const());
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(0)));
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(1)));
     assert_el_eq!(ZZ, 0, norm_squared(ZZ, &reduced_matrix.as_const().col_at(2)));

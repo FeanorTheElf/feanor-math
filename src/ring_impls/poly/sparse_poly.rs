@@ -9,10 +9,10 @@ use crate::algorithms;
 use crate::algorithms::convolution::ConvolutionAlgorithm;
 use crate::algorithms::eea::eea;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
-use crate::ring_properties::field::Field;
-use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
 use crate::prelude::*;
 use crate::ring_impls::poly::*;
+use crate::ring_properties::field::Field;
+use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
 use crate::seq::sparse::*;
 use crate::seq::{VectorViewMut, *};
 
@@ -623,7 +623,10 @@ fn test_canonical_iso_dense_poly_ring() {
 fn test_divisibility_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+        &poly_ring,
+        edge_case_elements(&poly_ring),
+    );
 }
 
 #[test]
@@ -637,5 +640,8 @@ fn test_euclidean_ring_axioms() {
 fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &poly_ring,
+        edge_case_elements(&poly_ring),
+    );
 }

@@ -3,9 +3,9 @@ use std::mem::swap;
 
 use tracing::instrument;
 
-use crate::ring_properties::ordered::OrderedRingStore;
 use crate::prelude::*;
 use crate::ring_impls::zn::*;
+use crate::ring_properties::ordered::OrderedRingStore;
 
 /// Uses an optimized version of the LLL algorithm to compute a reduced
 /// basis of the lattice
@@ -117,11 +117,11 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_properties::divisibility::DivisibilityRingStore;
-#[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::ring_impls::primitive_int::StaticRing;
+#[cfg(test)]
+use crate::ring_properties::divisibility::DivisibilityRingStore;
 
 #[test]
 fn test_rational_reconstruction() {

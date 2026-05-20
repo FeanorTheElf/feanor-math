@@ -5,8 +5,8 @@ use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::schoolbook_matmul;
 use crate::matrix::*;
-use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
+use crate::ring_impls::primitive_int::StaticRing;
 
 fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T3: bool, const T4: bool>(
     a: TransposableSubmatrix<V1, El<R>, T1>,

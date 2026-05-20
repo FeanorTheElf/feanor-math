@@ -10,9 +10,9 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
 use crate::algorithms::matmul::StrassenHint;
 use crate::homomorphism::*;
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::ring_properties::serialization::SerializableElementRing;
 use crate::ring_properties::specialization::*;
 use crate::{
@@ -599,7 +599,10 @@ fn test_euclidean_ring_axioms() {
 #[test]
 fn test_principal_ideal_ring_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2].into_iter());
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        StaticRing::<i8>::RING,
+        [-2, -1, 0, 1, 2].into_iter(),
+    );
     crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
         StaticRing::<i16>::RING,
         [-2, -1, 0, 1, 2, 3, 4].into_iter(),

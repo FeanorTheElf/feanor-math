@@ -4,10 +4,10 @@ use super::poly::{PolyRing, PolyRingStore};
 use crate::algorithms::extension_ops;
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
-use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::prelude::*;
+use crate::ring_properties::divisibility::DivisibilityRing;
+use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::seq::*;
 use crate::wrapper::RingElementWrapper;
 

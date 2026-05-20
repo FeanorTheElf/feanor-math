@@ -1,4 +1,5 @@
 use std::cmp::*;
+
 use crate::ring::*;
 
 /// Trait for rings that have a total ordering on their elements.

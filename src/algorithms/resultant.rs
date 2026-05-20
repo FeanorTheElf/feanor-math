@@ -4,16 +4,16 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tracing::{Level, Span, instrument, span};
 
 use crate::delegate::{UnwrapHom, WrapHom};
-use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::homomorphism::*;
-use crate::ring_properties::pid::{EuclideanRingStore, *};
-use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::fraction::FractionFieldStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::rational::*;
+use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
+use crate::ring_properties::pid::{EuclideanRingStore, *};
 use crate::ring_properties::specialization::FiniteRingOperation;
 
 /// Computes the resultant of two polynomials `f` and `g` over a finite field.
@@ -245,8 +245,6 @@ where
 
 #[cfg(test)]
 use crate::algorithms::buchberger::buchberger;
-#[cfg(test)]
-use crate::ring_properties::integer::BigIntRing;
 #[cfg(test)]
 use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]

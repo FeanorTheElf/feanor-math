@@ -1,9 +1,9 @@
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::resultant::ComputeResultantRing;
-use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
 use crate::prelude::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
+use crate::ring_properties::field::*;
 use crate::ring_properties::finite::FiniteRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
 

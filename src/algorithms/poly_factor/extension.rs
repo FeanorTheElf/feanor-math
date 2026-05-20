@@ -4,17 +4,17 @@ use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_properties::pid::EuclideanRing;
-use crate::ring_impls::primitive_int::StaticRing;
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
+use crate::ring_impls::primitive_int::StaticRing;
+use crate::ring_properties::field::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::EuclideanRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 #[stability::unstable(feature = "enable")]
@@ -87,10 +87,7 @@ where
     let bound = LX.degree(f).unwrap() * LX.degree(f).unwrap() * L.rank();
     assert!(
         ZZbig.is_zero(&characteristic)
-            || ZZbig.is_geq(
-                &characteristic,
-                &int_cast(bound.try_into().unwrap(), ZZbig, ZZi64)
-            )
+            || ZZbig.is_geq(&characteristic, &int_cast(bound.try_into().unwrap(), ZZbig, ZZi64))
     );
 
     let mut rng = oorandom::Rand64::new(1);

@@ -1,15 +1,16 @@
 use tracing::instrument;
 
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::ec_factor::lenstra_ec_factor;
 use crate::algorithms::eratosthenes::enumerate_primes;
 use crate::algorithms::int_bisect::root_floor;
 use crate::algorithms::miller_rabin::is_prime;
-use crate::ring_properties::divisibility::DivisibilityRingStore;
-use crate::{PROBABILISTIC_REPETITIONS, homomorphism::*};
-use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
-use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
+use crate::homomorphism::*;
 use crate::prelude::*;
+use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring_impls::zn::{ZnOperation, ZnRing, ZnRingStore, choose_zn_impl};
+use crate::ring_properties::divisibility::DivisibilityRingStore;
+use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
 
 struct ECFactorInt<I>
 where
@@ -179,10 +180,7 @@ where
 #[test]
 fn test_factor() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(
-        vec![(3, 2), (5, 1), (29, 1)],
-        factor(&ZZi64, 3 * 3 * 5 * 29)
-    );
+    assert_eq!(vec![(3, 2), (5, 1), (29, 1)], factor(&ZZi64, 3 * 3 * 5 * 29));
     assert_eq!(vec![(2, 8)], factor(&ZZi64, 256));
     assert_eq!(vec![(1009, 2)], factor(&ZZi64, 1009 * 1009));
     assert_eq!(vec![(0, 1)], factor(&ZZi64, 0));
@@ -245,8 +243,5 @@ fn test_is_prime_power() {
 #[test]
 fn test_is_prime_power_large_n() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(
-        Some((5, 25)),
-        is_prime_power(&ZZi64, &ZZi64.pow(5, 25))
-    );
+    assert_eq!(Some((5, 25)), is_prime_power(&ZZi64, &ZZi64.pow(5, 25)));
 }

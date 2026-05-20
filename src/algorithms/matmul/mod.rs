@@ -274,9 +274,6 @@ pub fn schoolbook_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, 
 use test;
 
 #[cfg(test)]
-use crate::ring_impls::primitive_int::*;
-
-#[cfg(test)]
 const BENCH_SIZE: usize = 128;
 #[cfg(test)]
 type BenchInt = i64;

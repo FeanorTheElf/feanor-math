@@ -3,8 +3,8 @@ use std::hash::Hash;
 use std::ops::*;
 
 use crate::homomorphism::*;
-use crate::ring::HashableElRing;
 use crate::prelude::*;
+use crate::ring::HashableElRing;
 
 /// Stores a ring element together with its ring, so that ring operations do
 /// not require explicit mention of the ring object. This can be used both for

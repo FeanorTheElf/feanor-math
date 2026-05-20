@@ -123,9 +123,7 @@ where
         V: VectorView<R_main::Element>,
     {
         assert!(data.len() <= significant_entries);
-        let log2_len = ZZi64
-            .abs_log2_ceil(&significant_entries.try_into().unwrap())
-            .unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
         let compute_result = || {
             let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
@@ -207,9 +205,7 @@ where
                 significant_entries,
             };
         }
-        let log2_len = ZZi64
-            .abs_log2_ceil(&significant_entries.try_into().unwrap())
-            .unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&significant_entries.try_into().unwrap()).unwrap();
 
         let mut result = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         result.extend(data.as_iter().map(|x| x.clone()));

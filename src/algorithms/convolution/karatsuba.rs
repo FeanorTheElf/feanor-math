@@ -315,14 +315,7 @@ fn test_karatsuba_impl() {
 fn test_karatsuba_mul() {
     feanor_tracing::DelayedLogger::init_test();
     let mut c = vec![0, 0, 0, 0];
-    karatsuba(
-        0,
-        &mut c[..],
-        &[-1, 0][..],
-        &[1, 0][..],
-        ZZi64,
-        &Global,
-    );
+    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], ZZi64, &Global);
     assert_eq!(vec![-1, 0, 0, 0], c);
 
     let a = vec![1, 0, 1, 0, 1, 2, 3];

@@ -19,21 +19,21 @@ use crate::algorithms::linsolve::LinSolveRingStore;
 use crate::algorithms::linsolve::smith::{determinant_using_pre_smith, pre_smith};
 use crate::algorithms::lll::exact::lll;
 use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::ring_properties::field::FieldStore;
 use crate::group::{HashableGroupEl, MultGroup, *};
 use crate::homomorphism::Homomorphism;
-use crate::ring_properties::integer::{BigIntRing, int_cast};
 use crate::iters::multi_cartesian_product;
 use crate::matrix::transform::TransformTarget;
 use crate::matrix::*;
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
-use crate::ring_properties::finite::FiniteRingStore;
 use crate::ring_impls::rational::RationalField;
 use crate::ring_impls::zn::{ZnRing, ZnRingStore, zn_big};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::field::FieldStore;
+use crate::ring_properties::finite::FiniteRingStore;
+use crate::ring_properties::integer::{BigIntRing, int_cast};
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializeWithRing};
 
 /// Represents a subgroup of an [`AbelianGroupBase`] by a set of generators.
@@ -389,7 +389,10 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 .unwrap();
             let padic_dlog = self.padic_dlog(p_idx, e, &group.pow(target, &power))?;
             for j in 0..n {
-                current_dlog[j] = ZZi64.inv_crt([&current_dlog[j], &padic_dlog[j]], [&current_order[j], &ZZi64.pow(p, e)]);
+                current_dlog[j] = ZZi64.inv_crt(
+                    [&current_dlog[j], &padic_dlog[j]],
+                    [&current_order[j], &ZZi64.pow(p, e)],
+                );
                 current_order[j] *= ZZi64.pow(p, e);
                 if ZZi64.is_neg(&current_dlog[j]) {
                     ZZi64.add_assign_ref(&mut current_dlog[j], &current_order[j]);
@@ -1097,7 +1100,8 @@ fn test_padic_relation_lattice() {
     assert_eq!(-1, *matrix.at(1, 1));
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([3, 6].iter()))
             % 81
     );
@@ -1108,7 +1112,8 @@ fn test_padic_relation_lattice() {
     assert_eq!(-1, *matrix.at(1, 1));
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([3, 9].iter()))
             % 81
     );
@@ -1120,13 +1125,15 @@ fn test_padic_relation_lattice() {
     assert_eq!(-1, *matrix.at(2, 2));
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([6, 18, 9].iter()))
             % 81
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(2).iter().zip([6, 18, 9].iter()))
             % 81
     );
@@ -1139,13 +1146,15 @@ fn test_padic_relation_lattice() {
     assert_eq!(-27, *matrix.at(1, 1));
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([1, 1].iter()))
             % 81
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([4, 1].iter()))
             % 81
     );
@@ -1159,37 +1168,43 @@ fn test_padic_relation_lattice() {
     assert_eq!(-2, *matrix.at(2, 2));
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([6, 6, 4].iter()))
             % 8
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([3, 2, 5].iter()))
             % 8
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(1).iter().zip([5, 6, 7].iter()))
             % 8
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(2).iter().zip([6, 6, 4].iter()))
             % 8
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(2).iter().zip([3, 2, 5].iter()))
             % 8
     );
     assert_eq!(
         0,
-        ZZi64.get_ring()
+        ZZi64
+            .get_ring()
             .inner_product_ref(matrix.data().row_at(2).iter().zip([5, 6, 7].iter()))
             % 8
     );

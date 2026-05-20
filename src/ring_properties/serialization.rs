@@ -1,5 +1,6 @@
 use serde::de::*;
 use serde::{Deserializer, Serialize, Serializer};
+
 use crate::ring::*;
 
 /// Trait for rings whose elements can be serialized.

@@ -3,12 +3,12 @@ use tracing::{Level, event, instrument};
 use super::IntegerRing;
 use crate::algorithms::poly_factor::factor_locally::poly_factor_integer;
 use crate::homomorphism::*;
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRingStore};
 use crate::prelude::*;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::rational::RationalFieldBase;
 use crate::ring_impls::zn::zn_64b::*;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRingStore};
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]

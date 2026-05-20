@@ -46,13 +46,13 @@ pub trait FiniteRingSpecializable: RingBase {
 #[cfg(test)]
 use crate::prelude::*;
 #[cfg(test)]
+use crate::ring_impls::as_field::*;
+#[cfg(test)]
 use crate::ring_impls::extension::extension_impl::*;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::*;
 #[cfg(test)]
 use crate::ring_impls::extension::*;
-#[cfg(test)]
-use crate::ring_impls::as_field::*;
 #[cfg(test)]
 use crate::ring_impls::rational::*;
 #[cfg(test)]
@@ -76,11 +76,7 @@ fn test_specialize_finite_field() {
         where
             R: FiniteRing,
         {
-            assert_el_eq!(
-                ZZbig,
-                ZZbig.int_hom().map(self.1),
-                self.0.size(&ZZbig).unwrap()
-            );
+            assert_el_eq!(ZZbig, ZZbig.int_hom().map(self.1), self.0.size(&ZZbig).unwrap());
             return true;
         }
 

@@ -10,18 +10,18 @@ use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::convolution::DynConvolution;
-use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::zn::*;
-use crate::seq::*;
+use crate::ring_properties::divisibility::DivisibilityRing;
+use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
+use crate::seq::*;
 use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 
 /// Represents the ring `Z/nZ` for general integers `n`.
@@ -756,9 +756,9 @@ impl_field_wrap_unwrap_homs! { <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingSt
 impl_field_wrap_unwrap_isos! { <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Ring: IntegerRing, J: RingStore, J::Ring: IntegerRing }
 
 #[cfg(test)]
-use crate::ring_properties::integer::BigIntRing;
-#[cfg(test)]
 use crate::ring_impls::rust_bigint::*;
+#[cfg(test)]
+use crate::ring_properties::integer::BigIntRing;
 
 #[test]
 fn test_mul() {
@@ -835,16 +835,25 @@ fn test_zn_map_in_small_int() {
 fn test_divisibility_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let R = ZnGB::new(ZZi64, 17);
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+        &R,
+        (0..17).map(|x| R.int_hom().map(x)),
+    );
 }
 
 #[test]
 fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let R = ZnGB::new(ZZi64, 17);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        (0..17).map(|x| R.int_hom().map(x)),
+    );
     let R = ZnGB::new(ZZi64, 63);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..63).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        (0..63).map(|x| R.int_hom().map(x)),
+    );
 }
 
 #[test]
@@ -874,14 +883,20 @@ fn test_finite_field_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 128));
     crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 15));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&StaticRing::<i128>::RING, 1 << 32));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(
+        &StaticRing::<i128>::RING,
+        1 << 32,
+    ));
 }
 
 #[test]
 fn test_serialize() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZnGB::new(&ZZi64, 128);
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, (0..128).map(|x| ring.int_hom().map(x)))
+    crate::ring_properties::serialization::generic_tests::test_serialization(
+        ring,
+        (0..128).map(|x| ring.int_hom().map(x)),
+    )
 }
 #[test]
 fn test_unreduced() {

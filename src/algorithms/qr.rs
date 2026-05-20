@@ -3,12 +3,12 @@ use std::cmp::min;
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::ring_properties::field::{Field, FieldStore};
 use crate::matrix::*;
-use crate::ring_properties::ordered::OrderedRingStore;
 use crate::prelude::*;
 use crate::ring_impls::approx_real::{ApproxRealField, SqrtRing};
 use crate::ring_impls::rational::*;
+use crate::ring_properties::field::{Field, FieldStore};
+use crate::ring_properties::ordered::OrderedRingStore;
 
 #[stability::unstable(feature = "enable")]
 pub trait QRDecompositionField: Field {
@@ -332,8 +332,6 @@ use crate::homomorphism::Homomorphism;
 use crate::matrix::format_matrix;
 #[cfg(test)]
 use crate::matrix::{TransposableSubmatrix, TransposableSubmatrixMut};
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::approx_real::float::Real64;
 #[cfg(test)]

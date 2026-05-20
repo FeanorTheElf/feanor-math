@@ -3,19 +3,19 @@ use std::fmt::Debug;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::algorithms::convolution::DynConvolution;
-use crate::ring_properties::divisibility::*;
-use crate::ring_properties::field::*;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
-use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::zn::*;
-use crate::seq::*;
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::field::*;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring_properties::serialization::SerializableElementRing;
 use crate::ring_properties::specialization::*;
+use crate::seq::*;
 
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
 /// at compile time.
@@ -74,9 +74,7 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnSBase<N, IS_FIELD> {
         *lhs = ((*lhs as u128 * rhs as u128) % (N as u128)) as u64
     }
 
-    fn from_int(&self, value: i32) -> Self::Element {
-        RingRef::from(self).coerce(&ZZi64, value.into())
-    }
+    fn from_int(&self, value: i32) -> Self::Element { RingRef::from(self).coerce(&ZZi64, value.into()) }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
 
@@ -153,8 +151,7 @@ impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnSBase<N, IS_FI
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        let (s, t, d) =
-            ZZi64.extended_ideal_gen(&(*lhs).try_into().unwrap(), &(*rhs).try_into().unwrap());
+        let (s, t, d) = ZZi64.extended_ideal_gen(&(*lhs).try_into().unwrap(), &(*rhs).try_into().unwrap());
         let quo = RingRef::from(self).into_can_hom(ZZi64).ok().unwrap();
         (quo.map(s), quo.map(t), quo.map(d))
     }

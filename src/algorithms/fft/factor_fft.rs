@@ -7,9 +7,9 @@ use crate::algorithms::fft::complex_fft::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3FFT;
 use crate::algorithms::fft::*;
-use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
 use crate::ring_impls::float_complex::*;
+use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::seq::subvector::SubvectorView;
 
 /// A generic variant of the Cooley-Tukey FFT algorithm that can be used to compute the Fourier

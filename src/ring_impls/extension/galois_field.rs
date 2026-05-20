@@ -19,20 +19,20 @@ use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_factor::cantor_zassenhaus;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
+use crate::prelude::*;
+use crate::ring_impls::as_field::{AsField, AsFieldBase};
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::galois_field::extlen::LengthExtendedConvolution;
+use crate::ring_impls::extension::*;
+use crate::ring_impls::poly::PolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRingBase;
+use crate::ring_impls::primitive_int::StaticRingBase;
+use crate::ring_impls::zn::zn_64b::Zn64BBase;
+use crate::ring_impls::zn::*;
 use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::ring_properties::field::*;
 use crate::ring_properties::integer::*;
 use crate::ring_properties::pid::*;
-use crate::ring_impls::primitive_int::StaticRingBase;
-use crate::prelude::*;
-use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
-use crate::ring_impls::extension::galois_field::extlen::LengthExtendedConvolution;
-use crate::ring_impls::extension::*;
-use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_impls::poly::PolyRing;
-use crate::ring_impls::poly::dense_poly::DensePolyRingBase;
-use crate::ring_impls::zn::zn_64b::Zn64BBase;
-use crate::ring_impls::zn::*;
 use crate::ring_properties::serialization::*;
 
 /// Implementation of a galois field `GF(p^e)`; Also known as galois field, and sometimes denoted by
@@ -231,9 +231,7 @@ where
     /// );
     /// ```
     pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
-        let log2_padded_len = ZZi64
-            .abs_log2_ceil(&degree.try_into().unwrap())
-            .unwrap();
+        let log2_padded_len = ZZi64.abs_log2_ceil(&degree.try_into().unwrap()).unwrap();
         let convolution = <R::Ring>::create_default_convolution(base_field.clone(), Some(2 << log2_padded_len));
         Self::new_with_convolution(base_field, degree, Global, convolution)
     }
@@ -385,9 +383,7 @@ where
         e: usize,
     ) -> FreeAlgebraImplBase<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
         let base_ring = Zn64B::new(ZZi64.pow(*self.base_ring().modulus(), e) as u64);
-        let log2_padded_len = ZZi64
-            .abs_log2_ceil(&self.rank().try_into().unwrap())
-            .unwrap();
+        let log2_padded_len = ZZi64.abs_log2_ceil(&self.rank().try_into().unwrap()).unwrap();
         let convolution = Zn64BBase::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
         self.galois_ring_with_convolution(
             base_ring,
@@ -905,8 +901,7 @@ where
     if degree > 3 {
         // first try trinomials, they seem to have a good chance of being irreducible
         for _ in 0..16 {
-            let i = (ZZi64
-                .get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
+            let i = (ZZi64.get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
                 + 1) as usize;
             let a = Fp.random_element(|| rng.rand_u64());
             let b = Fp.random_element(|| rng.rand_u64());
@@ -926,11 +921,7 @@ where
             int_cast(
                 ZZbig.ideal_gen(
                     &Fq_star_order,
-                    &int_cast(
-                        TryInto::<i64>::try_into(degree).unwrap() / small_d,
-                        ZZbig,
-                        ZZi64,
-                    ),
+                    &int_cast(TryInto::<i64>::try_into(degree).unwrap() / small_d, ZZbig, ZZi64),
                 ),
                 ZZi64,
                 ZZbig,
@@ -946,11 +937,7 @@ where
                 let new_large_d = int_cast(
                     ZZbig.ideal_gen(
                         &Fq_star_order,
-                        &int_cast(
-                            TryInto::<i64>::try_into(degree).unwrap() / new_small_d,
-                            ZZbig,
-                            ZZi64,
-                        ),
+                        &int_cast(TryInto::<i64>::try_into(degree).unwrap() / new_small_d, ZZbig, ZZi64),
                     ),
                     ZZi64,
                     ZZbig,

@@ -9,8 +9,8 @@ use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local
 use crate::algorithms::poly_gcd::*;
 use crate::homomorphism::*;
 use crate::iters::{clone_slice, powerset};
-use crate::reduce_lift::lift_poly_factors::*;
 use crate::prelude::*;
+use crate::reduce_lift::lift_poly_factors::*;
 use crate::ring_impls::poly::dense_poly::*;
 use crate::ring_impls::poly::*;
 use crate::seq::VectorView;
@@ -260,8 +260,6 @@ where
 
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::*;
 
 #[test]
 fn test_factor_int_poly() {

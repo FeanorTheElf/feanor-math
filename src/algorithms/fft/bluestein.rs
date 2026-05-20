@@ -9,12 +9,12 @@ use crate::algorithms::cyclotomic::{
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
-use crate::ring_properties::integer::IntegerRingStore;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
 use crate::ring_impls::zn::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::integer::IntegerRingStore;
 use crate::seq::SwappableVectorViewMut;
 
 type BaseFFT<R_main, R_twiddle, H, A> = CooleyTuckeyFFT<R_main, R_twiddle, H, A>;
@@ -252,9 +252,7 @@ where
         R_twiddle: ZnRing,
     {
         let root_of_unity_2n = get_prim_root_of_unity_zn(hom.domain(), 2 * n)?;
-        let log2_m = ZZi64
-            .abs_log2_ceil(&(n * 2).try_into().unwrap())
-            .unwrap();
+        let log2_m = ZZi64.abs_log2_ceil(&(n * 2).try_into().unwrap()).unwrap();
         let root_of_unity_m = get_prim_root_of_unity_pow2_zn(hom.domain(), log2_m)?;
         return Some(Self::new_with_hom(
             hom,

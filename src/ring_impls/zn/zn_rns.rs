@@ -8,12 +8,12 @@ use serde::de::DeserializeSeed;
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::ring_properties::divisibility::DivisibilityRingStore;
 use crate::ring_impls::primitive_int::*;
 use crate::ring_impls::zn::*;
-use crate::seq::VectorView;
+use crate::ring_properties::divisibility::DivisibilityRingStore;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 use crate::ring_properties::specialization::*;
+use crate::seq::VectorView;
 
 /// A ring representing `Z/nZ` for composite n by storing the
 /// values modulo `m1, ..., mr` for `n = m1 * ... * mr`.
@@ -978,13 +978,22 @@ fn test_zn_map_in_large_int() {
 fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
     let R = ZnRNS::create_from_primes(vec![5], ZZbig);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..5).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        (0..5).map(|x| R.int_hom().map(x)),
+    );
 
     let R = ZnRNS::create_from_primes(vec![3, 5], ZZbig);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..15).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        (0..15).map(|x| R.int_hom().map(x)),
+    );
 
     let R = ZnRNS::create_from_primes(vec![2, 3, 5], ZZbig);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..30).map(|x| R.int_hom().map(x)));
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        (0..30).map(|x| R.int_hom().map(x)),
+    );
 
     let R = ZnRNS::create_from_primes(vec![3, 5, 2], ZZbig);
     let modulo = R.int_hom();
@@ -1005,26 +1014,20 @@ fn test_finite_ring_axioms() {
         vec![3, 5],
         ZZi64,
     ));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
-        vec![3],
-        ZZi64,
-    ));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
-        vec![2],
-        ZZi64,
-    ));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![3], ZZi64));
+    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![2], ZZi64));
 }
 
 #[test]
 fn test_not_prime() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::new(
-        vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)],
-        ZZi64,
-    );
+    let ring = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)], ZZi64);
     let equivalent_ring = zn_big::ZnGB::new(ZZi64, 15 * 7);
     crate::ring::generic_tests::test_ring_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
+    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+        &ring,
+        (0..105).map(|x| ring.int_hom().map(x)),
+    );
     crate::homomorphism::generic_tests::test_homomorphism_axioms(
         ring.can_hom(&equivalent_ring).unwrap(),
         (0..105).map(|x| equivalent_ring.int_hom().map(x)),
@@ -1039,17 +1042,15 @@ fn test_not_prime() {
 fn test_serialization() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZnRNS::create_from_primes(vec![3, 5, 7], ZZi64);
-    crate::ring_properties::serialization::generic_tests::test_serialization(&ring, (0..105).map(|x| ring.int_hom().map(x)));
+    crate::ring_properties::serialization::generic_tests::test_serialization(
+        &ring,
+        (0..105).map(|x| ring.int_hom().map(x)),
+    );
 }
 
 #[test]
 #[should_panic]
-fn test_not_coprime() {
-    _ = ZnRNS::new(
-        vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(35)],
-        ZZi64,
-    );
-}
+fn test_not_coprime() { _ = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(35)], ZZi64); }
 
 #[test]
 fn test_format() {

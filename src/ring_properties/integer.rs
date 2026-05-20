@@ -1,11 +1,11 @@
-use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::ring_properties::ordered::*;
-use crate::ring_properties::pid::*;
-use crate::ring_impls::primitive_int::*;
 use crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing;
 use crate::reduce_lift::lift_poly_factors::IntegerPolyLiftFactorsDomain;
 use crate::ring::*;
+use crate::ring_impls::primitive_int::*;
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::ordered::*;
+use crate::ring_properties::pid::*;
 
 /// Type alias for the current default used big integer ring implementation.
 ///
@@ -34,7 +34,8 @@ pub type BigIntRingBase = crate::ring_impls::rust_bigint::RustBigintRingBase;
 
 /// Singleton constant of [`BigIntRing`].
 pub const ZZbig: BigIntRing = BigIntRing::RING;
-/// Singleton constant for the ring of integers realized via primitive 64-bit integers and [`StaticRing`].
+/// Singleton constant for the ring of integers realized via primitive 64-bit integers and
+/// [`StaticRing`].
 pub const ZZi64: StaticRing<i64> = StaticRing::RING;
 
 /// Trait for rings that are isomorphic to the ring of integers `ZZ = { ..., -2, -1, 0, 1, 2, ...
@@ -611,9 +612,6 @@ pub mod generic_impls {
 
 #[cfg(test)]
 use generic_impls::map_from_integer_ring;
-
-#[cfg(test)]
-use crate::ring_impls::primitive_int::*;
 
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]

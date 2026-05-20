@@ -214,8 +214,6 @@ use dense_poly::DensePolyRing;
 
 #[cfg(test)]
 use crate::function::no_error;
-#[cfg(test)]
-use crate::ring_properties::integer::*;
 
 #[test]
 fn test_fast_poly_div() {

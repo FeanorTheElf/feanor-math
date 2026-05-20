@@ -4,18 +4,18 @@ use tracing::instrument;
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::is_prime_power;
-use crate::ring_properties::divisibility::DivisibilityRingStore;
-use crate::ring_properties::field::{Field, FieldStore};
 use crate::homomorphism::*;
-use crate::ring_properties::integer::*;
-use crate::ring_properties::pid::*;
 use crate::prelude::*;
+use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
 use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
-use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_properties::finite::{FiniteRing, FiniteRingStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
+use crate::ring_properties::divisibility::DivisibilityRingStore;
+use crate::ring_properties::field::{Field, FieldStore};
+use crate::ring_properties::finite::{FiniteRing, FiniteRingStore};
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::*;
 use crate::seq::VectorFn;
 
 /// Let `a` be the given ring element and `q` the size of the finite base field.

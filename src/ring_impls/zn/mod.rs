@@ -1,12 +1,12 @@
 use crate::algorithms;
-use crate::ring_impls::as_field::AsFieldBase;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
+use crate::prelude::*;
+use crate::ring_impls::as_field::AsFieldBase;
+use crate::ring_impls::primitive_int::StaticRing;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::*;
 use crate::ring_properties::pid::{EuclideanRingStore, PrincipalIdealRing, *};
-use crate::ring_impls::primitive_int::StaticRing;
-use crate::prelude::*;
 
 /// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
 /// for moduli `n` of size slightly smaller than 64 bits.
@@ -99,13 +99,13 @@ pub mod generic_impls {
 
     use crate::algorithms::convolution::DynConvolution;
     use crate::algorithms::int_bisect;
+    use crate::ring_impls::extension::galois_field::*;
+    use crate::ring_impls::primitive_int::StaticRingBase;
+    use crate::ring_impls::zn::*;
     use crate::ring_properties::divisibility::DivisibilityRingStore;
     use crate::ring_properties::field::*;
     use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
     use crate::ring_properties::ordered::*;
-    use crate::ring_impls::primitive_int::StaticRingBase;
-    use crate::ring_impls::extension::galois_field::*;
-    use crate::ring_impls::zn::*;
 
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
     /// large, but allow for efficient estimation of their approximate size.
@@ -426,10 +426,7 @@ fn test_choose_zn_impl() {
             R: 'a + RingStore,
             R::Ring: ZnRing,
         {
-            let value = Zn.coerce(
-                Zn.integer_ring(),
-                int_cast(self.int_value, Zn.integer_ring(), &ZZi64),
-            );
+            let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &ZZi64));
             assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));
         }
     }

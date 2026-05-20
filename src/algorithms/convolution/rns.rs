@@ -283,12 +283,8 @@ where
     /// "width" refers to the number of RNS factors we need
     fn compute_required_width(&self, input_size_log2: usize, lhs_rhs_min_len: usize, inner_prod_len: usize) -> usize {
         let log2_output_size = input_size_log2 * 2
-            + ZZi64
-                .abs_log2_ceil(&lhs_rhs_min_len.try_into().unwrap())
-                .unwrap_or(0)
-            + ZZi64
-                .abs_log2_ceil(&inner_prod_len.try_into().unwrap())
-                .unwrap_or(0)
+            + ZZi64.abs_log2_ceil(&lhs_rhs_min_len.try_into().unwrap()).unwrap_or(0)
+            + ZZi64.abs_log2_ceil(&inner_prod_len.try_into().unwrap()).unwrap_or(0)
             + 1;
         let mut width = log2_output_size.div_ceil(57);
         while log2_output_size
@@ -730,8 +726,7 @@ use crate::algorithms::convolution::KaratsubaAlgorithm;
 fn test_convolution_integer() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
-    let convolution =
-        RNSConvolution::new_with_convolution(7, usize::MAX, ZZbig, Global, NTTConvolution::new);
+    let convolution = RNSConvolution::new_with_convolution(7, usize::MAX, ZZbig, Global, NTTConvolution::new);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }

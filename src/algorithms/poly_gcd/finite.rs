@@ -69,8 +69,7 @@ where
         let p_usize = int_cast(p.clone(), ZZi64, ZZbig) as usize;
         assert!(p_usize > 0);
         let power = ZZbig.pow(p, e - 1);
-        let undo_frobenius =
-            |x: &El<BaseRingStore<P>>| poly_ring.base_ring().pow_gen(x.clone(), &power, ZZbig);
+        let undo_frobenius = |x: &El<BaseRingStore<P>>| poly_ring.base_ring().pow_gen(x.clone(), &power, ZZbig);
         let base_poly = poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| {
             debug_assert!(i % p_usize == 0);
             (undo_frobenius(c), i / p_usize)
@@ -86,15 +85,17 @@ where
 const FAST_POLY_EEA_THRESHOLD: usize = 32;
 
 /// Computes a Bezout identity for polynomials, using a fast divide-and-conquer
-/// polynomial gcd algorithm. Unless you are implementing [`crate::ring_properties::pid::PrincipalIdealRing`]
-/// for a custom type, you should use [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`]
-/// to get a Bezout identity instead.
+/// polynomial gcd algorithm. Unless you are implementing
+/// [`crate::ring_properties::pid::PrincipalIdealRing`] for a custom type, you should use
+/// [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`] to get a Bezout
+/// identity instead.
 ///
 /// A Bezout identity is exactly as specified by
-/// [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`], i.e. `s, t, d` such that `d` is the
-/// gcd of `lhs` and `rhs`, and `d = lhs * s + rhs * t`. Note that this algorithm does not try to
-/// avoid coefficient growth, and thus is only fast over finite fields. Furthermore, it will fall
-/// back to a slightly less efficient variant of the standard Euclidean algorithm on small inputs.
+/// [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`], i.e. `s, t, d` such
+/// that `d` is the gcd of `lhs` and `rhs`, and `d = lhs * s + rhs * t`. Note that this algorithm
+/// does not try to avoid coefficient growth, and thus is only fast over finite fields. Furthermore,
+/// it will fall back to a slightly less efficient variant of the standard Euclidean algorithm on
+/// small inputs.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, El<P>)

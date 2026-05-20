@@ -3,10 +3,10 @@ use std::mem::swap;
 
 use tracing::instrument;
 
-use crate::ring_properties::integer::IntegerRing;
-use crate::ring_properties::ordered::OrderedRingStore;
 use crate::prelude::*;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
+use crate::ring_properties::integer::IntegerRing;
+use crate::ring_properties::ordered::OrderedRingStore;
 
 /// For `a, b` computes `s, t, d` such that `s*a + t*b == d` is a greatest
 /// common divisor of `a` and `b`.
@@ -272,8 +272,6 @@ where
     return ([sa, ta, sb, tb], [a, b]);
 }
 
-#[cfg(test)]
-use crate::ring_impls::primitive_int::*;
 #[cfg(test)]
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]

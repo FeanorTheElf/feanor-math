@@ -5,16 +5,16 @@ use crate::algorithms::miller_rabin::is_prime;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::delegate::*;
-use crate::ring_properties::field::Field;
 use crate::function::no_error;
 use crate::homomorphism::*;
-use crate::ring_properties::ordered::OrderedRing;
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_properties::finite::FiniteRing;
 use crate::ring_impls::zn::*;
-use crate::seq::*;
+use crate::ring_properties::field::Field;
+use crate::ring_properties::finite::FiniteRing;
+use crate::ring_properties::ordered::OrderedRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
+use crate::seq::*;
 
 /// Trait for rings that support lifting partial factorizations of polynomials modulo a prime
 /// to the ring. For infinite fields, this is the most important approach to computing gcd's,

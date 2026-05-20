@@ -6,18 +6,18 @@ use crate::algorithms::convolution::{
     DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
 };
 use crate::algorithms::matmul::StrassenHint;
-use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
-use crate::ring_properties::field::Field;
 use crate::homomorphism::*;
 use crate::impl_eq_based_self_iso;
-use crate::ring_properties::integer::{IntegerRing, IntegerRingStore, int_cast};
-use crate::ring_properties::ordered::OrderedRing;
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
 use crate::ring::EnvBindingStrength;
 use crate::ring_impls::approx_real::{ApproxRealField, SqrtRing};
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::ring_impls::rational::{RationalField, RationalFieldBase};
+use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
+use crate::ring_properties::field::Field;
+use crate::ring_properties::integer::{IntegerRing, IntegerRingStore, int_cast};
+use crate::ring_properties::ordered::OrderedRing;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 
 /// An approximate implementation of the real numbers `R`, using 64 bit floating
 /// point numbers.

@@ -5,11 +5,11 @@ use crate::algorithms::matmul::*;
 use crate::homomorphism::*;
 use crate::matrix::transform::{TransformCols, TransformTarget};
 use crate::matrix::*;
-use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
 use crate::prelude::*;
 use crate::ring_impls::approx_real::float::Real64;
 use crate::ring_impls::fraction::FractionFieldStore;
 use crate::ring_impls::rational::*;
+use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
 use crate::seq::*;
 
 /// Size-reduces `target` w.r.t. the GSO matrix, and also sends the performed
@@ -565,10 +565,7 @@ fn test_lll_generating_set() {
         &QQ,
         OwnedMatrix::identity(5, 5, &QQ).data(),
         reduced_matrix.reborrow(),
-        &QQ.from_fraction(
-            int_cast(999, ZZ, ZZi64),
-            int_cast(1000, ZZ, ZZi64),
-        ),
+        &QQ.from_fraction(int_cast(999, ZZ, ZZi64), int_cast(1000, ZZ, ZZi64)),
         Global,
         true,
     );
@@ -663,10 +660,7 @@ fn test_lll_generating_set() {
         &QQ,
         OwnedMatrix::identity(5, 5, &QQ).data(),
         reduced_matrix.reborrow(),
-        &QQ.from_fraction(
-            int_cast(999, ZZ, ZZi64),
-            int_cast(1000, ZZ, ZZi64),
-        ),
+        &QQ.from_fraction(int_cast(999, ZZ, ZZi64), int_cast(1000, ZZ, ZZi64)),
         Global,
         true,
     );
@@ -727,10 +721,7 @@ fn bench_lll_10d(bencher: &mut Bencher) {
         );
         let mut reduced = original.clone();
         let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-        let delta = QQ.from_fraction(
-            int_cast(9, ZZ, ZZi64),
-            int_cast(10, ZZ, ZZi64),
-        );
+        let delta = QQ.from_fraction(int_cast(9, ZZ, ZZi64), int_cast(10, ZZ, ZZi64));
         lll(
             &QQ,
             OwnedMatrix::identity(10, 10, &QQ).data(),

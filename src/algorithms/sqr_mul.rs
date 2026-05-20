@@ -1,6 +1,6 @@
-use crate::ring_properties::ordered::OrderedRingStore;
-use crate::ring_impls::primitive_int::*;
 use crate::prelude::*;
+use crate::ring_impls::primitive_int::*;
+use crate::ring_properties::ordered::OrderedRingStore;
 
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
 /// w.r.t. the given operation. The operation must be associative to provide correct results.
@@ -287,8 +287,6 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
 use test::Bencher;
 use tracing::instrument;
 
-#[cfg(test)]
-use crate::homomorphism::*;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_64b;
 

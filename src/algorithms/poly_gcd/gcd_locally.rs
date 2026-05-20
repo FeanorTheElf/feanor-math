@@ -281,8 +281,6 @@ where
 use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
-#[cfg(test)]
-use crate::ring_properties::integer::*;
 
 #[test]
 fn test_poly_gcd_local() {

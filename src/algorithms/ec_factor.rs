@@ -6,11 +6,11 @@ use tracing::{Level, Span, event, instrument, span};
 use super::int_factor::is_prime_power;
 use crate::algorithms::sqr_mul;
 use crate::homomorphism::Homomorphism;
+use crate::prelude::*;
+use crate::ring_impls::primitive_int::StaticRing;
+use crate::ring_impls::zn::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
-use crate::ring_impls::primitive_int::StaticRing;
-use crate::prelude::*;
-use crate::ring_impls::zn::*;
 use crate::{PROBABILISTIC_REPETITIONS, algorithms};
 
 type Point<R> = (El<R>, El<R>, El<R>);
@@ -84,10 +84,7 @@ where
             return false;
         }
 
-        let Zn_new = zn_big::ZnGB::new(
-            ZZbig,
-            int_cast(factor_of_n, ZZbig, Zn.integer_ring()),
-        );
+        let Zn_new = zn_big::ZnGB::new(ZZbig, int_cast(factor_of_n, ZZbig, Zn.integer_ring()));
         let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0))
             && Zn_new.is_zero(&red_map.map_ref(&Q.1))

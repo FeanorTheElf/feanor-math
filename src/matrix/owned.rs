@@ -186,9 +186,6 @@ impl<T: Clone, A: Allocator + Clone> Clone for OwnedMatrix<T, A> {
     }
 }
 
-#[cfg(test)]
-use crate::ring_impls::primitive_int::*;
-
 #[test]
 fn test_zero_col_matrix() {
     feanor_tracing::DelayedLogger::init_test();

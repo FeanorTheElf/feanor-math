@@ -6,12 +6,12 @@ use crate::algorithms::convolution::{
     DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
 };
 use crate::algorithms::matmul::StrassenHint;
-use crate::ring_properties::field::Field;
 use crate::homomorphism::{Homomorphism, *};
-use crate::ring_properties::integer::IntegerRing;
-use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::rational::RationalFieldBase;
+use crate::ring_properties::field::Field;
+use crate::ring_properties::integer::IntegerRing;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 
 #[stability::unstable(feature = "enable")]
 pub struct FractionFieldImplBase<R>
