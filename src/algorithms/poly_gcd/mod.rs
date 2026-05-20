@@ -1,14 +1,22 @@
 use tracing::instrument;
 
+use crate::algorithms::convolution::DynConvolution;
+use crate::algorithms::poly_gcd::finite::{
+    fast_poly_eea, poly_power_decomposition_finite_field, poly_squarefree_part_finite_field,
+};
+use crate::homomorphism::Identity;
 use crate::prelude::*;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;
 
 /// Contains an implementation of polynomial gcd and squarefree decomposition over finite fields.
 pub mod finite;
+pub mod gcd_lift;
 /// Contains an implementation of polynomial gcd and squarefree decomposition over the integers.
 pub mod integer;
 /// Contains an implementation of polynomial gcd and squarefree decomposition over a number field.
 pub mod numberfield;
+pub mod power_decomposition_lift;
 
 /// Trait for rings R, whose total ring of fractions `TFrac(R)` gives rise to a well-defined and
 /// efficiently computable notion of the gcd of univariate polynomials over `TFrac(R)`.
@@ -217,25 +225,69 @@ impl<R> PolyTFracGCDRing for R
 where
     R: ?Sized + FiniteRing + Field,
 {
-    default fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
+    default fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        unimplemented!()
-        // poly_power_decomposition_finite_field(poly_ring, poly)
+        let (to, from) = make_poly_ring_euclidean(&poly_ring);
+        poly_power_decomposition_finite_field(to.codomain(), &to.map_ref(poly))
+            .into_iter()
+            .map(|(f, e)| (from.map(f), e))
+            .collect()
     }
 
-    default fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
+    default fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        unimplemented!()
-        // poly_ring.normalize(fast_poly_eea(poly_ring, lhs.clone(), rhs.clone()).2).0
+        let (to, from) = make_poly_ring_euclidean(&poly_ring);
+        from.map(
+            to.codomain()
+                .normalize(fast_poly_eea(to.codomain(), to.map_ref(lhs), to.map_ref(rhs)).2)
+                .0,
+        )
     }
+
+    default fn squarefree_part<P>(poly_ring: P, poly: &El<P>) -> El<P>
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingStore<P>: RingStore<Ring = Self>,
+    {
+        let (to, from) = make_poly_ring_euclidean(&poly_ring);
+        from.map(poly_squarefree_part_finite_field(to.codomain(), &to.map_ref(poly)))
+    }
+}
+
+fn make_poly_ring_euclidean<'a, P>(
+    poly_ring: &'a P,
+) -> (
+    CoefficientHom<
+        &'a P,
+        DensePolyRing<&'a BaseRingStore<P>, DynConvolution<'a, BaseRingBase<P>>>,
+        Identity<&'a BaseRingStore<P>>,
+    >,
+    CoefficientHom<
+        DensePolyRing<&'a BaseRingStore<P>, DynConvolution<'a, BaseRingBase<P>>>,
+        &'a P,
+        Identity<&'a BaseRingStore<P>>,
+    >,
+)
+where
+    P: RingStore,
+    P::Ring: PolyRing,
+    BaseRingBase<P>: Field + PolyTFracGCDRing,
+{
+    let new_poly_ring = DensePolyRing::new(poly_ring.base_ring(), "X");
+    let to = new_poly_ring
+        .clone()
+        .into_lifted_hom(poly_ring, poly_ring.base_ring().identity());
+    let from = poly_ring.into_lifted_hom(new_poly_ring.clone(), poly_ring.base_ring().identity());
+    return (to, from);
 }
 
 #[cfg(test)]

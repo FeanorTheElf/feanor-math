@@ -6,6 +6,9 @@ use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::poly::*;
 
+#[derive(Debug)]
+pub struct FactorsNotCoprimeError;
+
 #[derive(Clone)]
 pub struct HenselLift<P_current>
 where
@@ -30,13 +33,13 @@ where
     P_current::Ring: PolyRing + PrincipalIdealRing,
 {
     #[instrument(skip_all, level = "trace")]
-    pub fn new(poly_ring: P_current, mut factors: Vec<El<P_current>>) -> Self {
+    pub fn new(poly_ring: P_current, mut factors: Vec<El<P_current>>) -> Result<Self, FactorsNotCoprimeError> {
         assert!(factors.len() >= 1);
         for f in &factors {
             assert!(poly_ring.base_ring().is_one(poly_ring.lc(f).unwrap()));
         }
         if factors.len() == 1 {
-            return Self {
+            return Ok(Self {
                 current_e: 1,
                 current_factor_bezout: Vec::new(),
                 current_partial_prods_bezout: Vec::new(),
@@ -44,7 +47,7 @@ where
                 current_partial_prods: Vec::new(),
                 single_factor: Some(factors.into_iter().next().unwrap()),
                 current_poly_ring: poly_ring,
-            };
+            });
         }
         let n = factors.len();
         let last = factors.pop().unwrap();
@@ -79,10 +82,10 @@ where
                 factor_reducers.push(HenselLiftableBarrettReducer::new(&poly_ring, g, deg_delta_bound, 1));
                 partial_prod_reducers.push(HenselLiftableBarrettReducer::new(&poly_ring, h, deg_delta_bound, 1));
             } else {
-                panic!("given polynomials are not pairwise coprime")
+                return Err(FactorsNotCoprimeError);
             }
         }
-        return Self {
+        return Ok(Self {
             current_e: 1,
             current_factor_bezout: factor_bezout,
             current_partial_prods_bezout: partial_prods_bezout,
@@ -90,7 +93,7 @@ where
             current_partial_prods: partial_prod_reducers,
             single_factor: None,
             current_poly_ring: poly_ring,
-        };
+        });
     }
 }
 
@@ -99,11 +102,59 @@ where
     P_current: RingStore,
     P_current::Ring: PolyRing,
 {
+    pub fn change_ring<P_new, H>(self, new_ring: P_new, hom: H) -> HenselLift<P_new>
+    where
+        P_new: RingStore,
+        P_new::Ring: PolyRing,
+        H: Homomorphism<BaseRingBase<P_current>, BaseRingBase<P_new>>,
+    {
+        let poly_hom = new_ring.lifted_hom(&self.current_poly_ring, &hom);
+        HenselLift {
+            current_e: self.current_e,
+            current_factor_bezout: self
+                .current_factor_bezout
+                .into_iter()
+                .map(|f| poly_hom.map(f))
+                .collect(),
+            current_factors: self
+                .current_factors
+                .into_iter()
+                .map(|f| HenselLiftableBarrettReducer {
+                    ring: PhantomData,
+                    n: f.n,
+                    neg_Xn_div_poly: poly_hom.map(f.neg_Xn_div_poly),
+                    poly: poly_hom.map(f.poly),
+                    poly_deg: f.poly_deg,
+                    e: f.e,
+                })
+                .collect(),
+            current_partial_prods: self
+                .current_partial_prods
+                .into_iter()
+                .map(|f| HenselLiftableBarrettReducer {
+                    ring: PhantomData,
+                    n: f.n,
+                    neg_Xn_div_poly: poly_hom.map(f.neg_Xn_div_poly),
+                    poly: poly_hom.map(f.poly),
+                    poly_deg: f.poly_deg,
+                    e: f.e,
+                })
+                .collect(),
+            single_factor: self.single_factor.map(|f| poly_hom.map(f)),
+            current_partial_prods_bezout: self
+                .current_partial_prods_bezout
+                .into_iter()
+                .map(|f| poly_hom.map(f))
+                .collect(),
+            current_poly_ring: new_ring,
+        }
+    }
+
     /// Lifts the current factorization to a factorization of `target` in `new_ring`.
     ///
     /// This function requires that `target` is congruent to the product of the current
     /// factors modulo `m^prev_e`, and unfortunately cannot check this with the current information.
-    #[instrument(skip_all, level = "trace")]
+    #[instrument(skip_all, level = "trace", fields(e = %new_e))]
     pub fn lift_to<P_new, L>(self, new_e: usize, new_ring: P_new, target: &El<P_new>, mut lift: L) -> HenselLift<P_new>
     where
         P_new: RingStore,
@@ -341,7 +392,7 @@ fn test_hensel_lift() {
     let target = ZpeX.mul_ref(&g, &h);
     let mod_p = ZnReductionMap::new(ZpeX.base_ring(), FpX.base_ring()).unwrap();
     let poly_mod_p = FpX.lifted_hom(&ZpeX, &mod_p);
-    let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]);
+    let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
     {
         let lifted = lifter.clone().lift_to(6, &ZpeX, &target, |x| mod_p.any_preimage(*x));
         let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
@@ -363,7 +414,7 @@ fn test_hensel_lift() {
 
     let [g, h] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 25 * X + 3 + 625, X + 1 + 125]);
     let target = ZpeX.mul_ref(&g, &h);
-    let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]);
+    let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
     {
         let lifted = lifter.clone().lift_to(6, &ZpeX, &target, |x| mod_p.any_preimage(*x));
         let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
