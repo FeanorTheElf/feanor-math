@@ -10,7 +10,6 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
 use crate::algorithms::matmul::StrassenHint;
 use crate::homomorphism::*;
-use crate::ring_properties::divisibility::PreparedDivisor;
 use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
@@ -514,6 +513,9 @@ pub type StaticRing<T> = RingValue<StaticRingBase<T>>;
 impl<T: PrimitiveInt> Default for StaticRingBase<T> {
     fn default() -> Self { StaticRing::RING.into() }
 }
+
+#[cfg(test)]
+use crate::ring_properties::divisibility::PreparedDivisor;
 
 #[test]
 fn test_ixx_bit_op() {

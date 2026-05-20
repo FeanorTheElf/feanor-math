@@ -18,7 +18,7 @@ use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::iters::multi_cartesian_product;
 use crate::ring_properties::divisibility::PreparedDivisor;
 use crate::ring_properties::ordered::OrderedRingStore;
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_impls::extension::FreeAlgebraStore;
 use crate::ring_impls::extension::galois_field::*;

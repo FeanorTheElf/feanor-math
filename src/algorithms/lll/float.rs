@@ -510,7 +510,7 @@ use crate::algorithms::lll::{assert_lattice_isomorphic, norm_squared};
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::approx_real::float::*;
 

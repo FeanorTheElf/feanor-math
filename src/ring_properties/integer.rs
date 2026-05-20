@@ -2,7 +2,7 @@ use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
 use crate::ring_properties::ordered::*;
 use crate::ring_properties::pid::*;
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 use crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing;
 use crate::reduce_lift::lift_poly_factors::IntegerPolyLiftFactorsDomain;
 use crate::ring::*;
@@ -613,7 +613,7 @@ pub mod generic_impls {
 use generic_impls::map_from_integer_ring;
 
 #[cfg(test)]
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]

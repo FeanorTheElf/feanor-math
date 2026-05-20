@@ -1,6 +1,6 @@
 use tracing::instrument;
 
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
@@ -9,7 +9,7 @@ use crate::homomorphism::*;
 use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::EuclideanRing;
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
 use crate::prelude::*;
 use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
@@ -154,7 +154,7 @@ where
     assert!(!KX.is_zero(f));
     let mut result: Vec<(El<P>, usize)> = Vec::new();
     for (non_irred_factor, k) in <_ as PolyTFracGCDRing>::power_decomposition(KX, f) {
-        for factor in poly_factor_extfield_squarefree(KX, &non_irred_factor, MAX_PROBABILISTIC_REPETITIONS)
+        for factor in poly_factor_extfield_squarefree(KX, &non_irred_factor, PROBABILISTIC_REPETITIONS)
             .ok()
             .unwrap()
         {

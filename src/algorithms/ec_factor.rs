@@ -8,11 +8,10 @@ use crate::algorithms::sqr_mul;
 use crate::homomorphism::Homomorphism;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
-use crate::ring_properties::finite::*;
 use crate::ring_impls::zn::*;
-use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
+use crate::{PROBABILISTIC_REPETITIONS, algorithms};
 
 type Point<R> = (El<R>, El<R>, El<R>);
 
@@ -395,7 +394,7 @@ where
         }
     }
     // this is now the general case
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..PROBABILISTIC_REPETITIONS {
         if let Some(factor) = lenstra_ec_factor_base(Zn, log2_N / 2, || rng.rand_u64()) {
             return factor;
         }
@@ -437,7 +436,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[ignore]
 fn test_ec_factor_large() {
     feanor_tracing::DelayedLogger::init_test();
-    
+
     let n: i128 = 1073741827 * 71316922984999;
 
     let p = StaticRing::<i128>::RING.coerce(

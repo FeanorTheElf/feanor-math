@@ -9,7 +9,7 @@ use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::ring_properties::divisibility::DivisibilityRingStore;
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 use crate::ring_impls::zn::*;
 use crate::seq::VectorView;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
@@ -891,7 +891,7 @@ where
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[cfg(test)]
 const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];

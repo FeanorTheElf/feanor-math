@@ -13,7 +13,7 @@ use crate::ring_properties::integer::IntegerRing;
 #[cfg(test)]
 use crate::matrix::*;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::prelude::*;
 #[cfg(test)]

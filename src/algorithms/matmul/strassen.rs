@@ -5,7 +5,7 @@ use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::schoolbook_matmul;
 use crate::matrix::*;
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
 
 fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T3: bool, const T4: bool>(

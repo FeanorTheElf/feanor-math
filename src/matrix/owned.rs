@@ -187,7 +187,7 @@ impl<T: Clone, A: Allocator + Clone> Clone for OwnedMatrix<T, A> {
 }
 
 #[cfg(test)]
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 
 #[test]
 fn test_zero_col_matrix() {

@@ -9,7 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::bigint_ops::deserialize_bigint_from_bytes;
 use crate::homomorphism::*;
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 use crate::prelude::*;
 use crate::rings::rust_bigint::*;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing};

@@ -1,11 +1,10 @@
 use oorandom;
 use tracing::instrument;
 
-use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
-use crate::homomorphism::*;
+use crate::{PROBABILISTIC_REPETITIONS, homomorphism::*};
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 use crate::prelude::*;
 use crate::ring::HashableElRingStore;
 use crate::ring_impls::zn::{ZnRingStore, choose_zn_impl, *};
@@ -102,7 +101,7 @@ where
         if remaining_steps == 0 {
             break;
         }
-        if is_prime(&ZZ, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        if is_prime(&ZZ, &n, PROBABILISTIC_REPETITIONS) {
             return Some(n);
         } else {
             diff_to_n = delta;
@@ -113,7 +112,7 @@ where
     let mut n = int_cast(n, ZZi64, &ZZ);
     assert!(n <= m.try_into().unwrap());
     while n > 0 {
-        if is_prime(&ZZi64, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        if is_prime(&ZZi64, &n, PROBABILISTIC_REPETITIONS) {
             return Some(Zi64_to_ZZ.map(n));
         }
         n += delta;
@@ -258,7 +257,7 @@ fn test_prev_prime() {
     let mut last_prime = 11;
     for i in 12..1000 {
         assert_eq!(Some(last_prime), prev_prime(ZZi64, i));
-        if is_prime(ZZi64, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        if is_prime(ZZi64, &i, PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }
@@ -270,7 +269,7 @@ fn test_next_prime() {
     let mut last_prime = 1009;
     for i in (2..1000).rev() {
         assert_eq!(last_prime, next_prime(ZZi64, i));
-        if is_prime(ZZi64, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        if is_prime(ZZi64, &i, PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }

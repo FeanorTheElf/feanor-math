@@ -1,7 +1,7 @@
 use oorandom;
 use tracing::instrument;
 
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::ring_properties::divisibility::DivisibilityRingStore;
@@ -276,7 +276,7 @@ where
     let exp = ZZ.half_exact(ZZ.sub(q.clone(), ZZ.one()));
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..PROBABILISTIC_REPETITIONS {
         let T = mod_f_ring.from_canonical_basis(
             (0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())),
         );
@@ -377,7 +377,7 @@ where
     // - T = T (T^e + 1) (T^e + zeta) (T^e + zeta^2)`; here `d'` is either `d` or `2d`, and `e =
     // (q^d' - 1) / 3`
 
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..PROBABILISTIC_REPETITIONS {
         let T = mod_f_ring.from_canonical_basis(
             (0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())),
         );

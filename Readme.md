@@ -525,7 +525,7 @@ However, I did not have the time so far to thoroughly optimize many of the algor
  - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`SparsePolyRing`] vs [`DensePolyRing`], [`KaratsubaAlgorithm`] vs [`NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
 
 [`IntegerRing`]: crate::ring_properties::integer::IntegerRing
-[`StaticRing`]: crate::primitive_int::StaticRing
+[`StaticRing`]: crate::ring_impls::primitive_int::StaticRing
 [`RustBigintRing`]: crate::rings::rust_bigint::RustBigintRing
 [`MPZ`]: crate::rings::mpir::MPZ
 [`ZnRing`]: crate::rings::zn::ZnRing

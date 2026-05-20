@@ -12,7 +12,7 @@ use crate::homomorphism::*;
 use crate::iters::multiset_combinations;
 use crate::ring_properties::integer::binomial;
 use crate::ring_properties::ordered::OrderedRingStore;
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, RingArc};
 use crate::ring_impls::multivariate::*;

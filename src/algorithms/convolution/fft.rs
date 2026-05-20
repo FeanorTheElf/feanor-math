@@ -10,7 +10,7 @@ use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
-use crate::primitive_int::StaticRingBase;
+use crate::ring_impls::primitive_int::StaticRingBase;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
 use crate::ring_impls::zn::*;

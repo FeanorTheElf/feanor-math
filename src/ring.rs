@@ -1397,7 +1397,7 @@ pub mod generic_tests {
 
     use super::*;
     use crate::ring_properties::integer::int_cast;
-    use crate::primitive_int::*;
+    use crate::ring_impls::primitive_int::*;
 
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where

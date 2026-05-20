@@ -8,7 +8,7 @@ use crate::function::no_error;
 use crate::homomorphism::*;
 use crate::rings::extension::number_field::*;
 use crate::rings::extension::*;
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
 use crate::rings::rational::*;

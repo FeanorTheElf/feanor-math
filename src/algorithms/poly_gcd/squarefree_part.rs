@@ -3,7 +3,7 @@ use std::fmt::Debug;
 use tracing::{Level, event, instrument};
 
 use super::{evaluate_aX, unevaluate_aX};
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::hensel::*;
 use crate::algorithms::poly_gcd::*;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
@@ -161,7 +161,7 @@ where
     let ring = poly_ring.base_ring().get_ring();
     let mut rng = oorandom::Rand64::new(1);
 
-    'try_random_ideal: for current_attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+    'try_random_ideal: for current_attempt in 0..PROBABILISTIC_REPETITIONS {
         let ideal = ring.random_suitable_ideal(|| rng.rand_u64(), current_attempt);
         let heuristic_e = ring.heuristic_exponent(
             &ideal,

@@ -11,7 +11,7 @@ use sparse::SparseMapVector;
 use tracing::instrument;
 use zn_64b::Zn64B;
 
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::convolution::*;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::*;
@@ -23,7 +23,7 @@ use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::ring_properties::field::*;
 use crate::ring_properties::integer::*;
 use crate::ring_properties::pid::*;
-use crate::primitive_int::StaticRingBase;
+use crate::ring_impls::primitive_int::StaticRingBase;
 use crate::prelude::*;
 use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
 use crate::ring_impls::extension::galois_field::extlen::LengthExtendedConvolution;
@@ -1008,7 +1008,7 @@ where
     }
 
     // fallback, just generate a random irreducible polynomial
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..PROBABILISTIC_REPETITIONS {
         let f = poly_ring.from_terms(
             (0..degree)
                 .map(|i| (Fp.random_element(|| rng.rand_u64()), i))

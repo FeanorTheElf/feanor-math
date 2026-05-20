@@ -19,7 +19,6 @@ use crate::homomorphism::*;
 use crate::ring_properties::integer::{IntegerRingStore, *};
 use crate::matrix::OwnedMatrix;
 use crate::prelude::*;
-use crate::ring_properties::finite::*;
 use crate::ring_impls::poly::PolyRingStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::seq::sparse::SparseMapVector;

@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 use oorandom::Rand64;
 use tracing::instrument;
 
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_gcd::squarefree_part::poly_squarefree_part_local;
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::ring_properties::field::FieldStore;
@@ -149,7 +149,7 @@ where
     );
     let f_prime = derive_poly(&poly_ring, f);
 
-    let (approx_root, approx_radius) = (0..MAX_PROBABILISTIC_REPETITIONS)
+    let (approx_root, approx_radius) = (0..PROBABILISTIC_REPETITIONS)
         .map(|_| {
             let starting_point_unscaled = CC.add(
                 // this cast might wrap around i64::MAX, so also produces negative values
@@ -294,7 +294,7 @@ use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[test]
 fn test_find_approximate_complex_root() {

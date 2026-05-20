@@ -3,7 +3,7 @@ use squarefree_part::poly_power_decomposition_monic_local;
 use tracing::{Level, event, instrument};
 
 use super::{evaluate_aX, unevaluate_aX};
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::hensel::*;
 use crate::algorithms::poly_gcd::*;
 use crate::seq::*;
@@ -219,7 +219,7 @@ where
         if poly_ring.is_one(&squarefree_part_i) {
             return d;
         }
-        for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+        for attempt in 0..PROBABILISTIC_REPETITIONS {
             if let Some(di) = poly_gcd_coprime_local(
                 poly_ring,
                 squarefree_part_i.clone(),

@@ -4,7 +4,6 @@ use super::cantor_zassenhaus;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::homomorphism::SelfIso;
 use crate::prelude::*;
-use crate::ring_properties::finite::*;
 use crate::ring_impls::poly::*;
 
 /// Factors a polynomial with coefficients in a finite field.

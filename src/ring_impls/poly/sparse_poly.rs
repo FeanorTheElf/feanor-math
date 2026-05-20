@@ -552,7 +552,7 @@ where
 #[cfg(test)]
 use super::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static::{Fp, Zn};
 #[cfg(test)]

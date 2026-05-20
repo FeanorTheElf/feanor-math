@@ -5,7 +5,7 @@ use crate::homomorphism::*;
 use crate::ring_properties::integer::*;
 use crate::ring_properties::ordered::*;
 use crate::ring_properties::pid::{EuclideanRingStore, PrincipalIdealRing, *};
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
 
 /// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
@@ -103,7 +103,7 @@ pub mod generic_impls {
     use crate::ring_properties::field::*;
     use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
     use crate::ring_properties::ordered::*;
-    use crate::primitive_int::StaticRingBase;
+    use crate::ring_impls::primitive_int::StaticRingBase;
     use crate::ring_impls::extension::galois_field::*;
     use crate::ring_impls::zn::*;
 
@@ -609,7 +609,7 @@ where
 pub mod generic_tests {
 
     use super::*;
-    use crate::primitive_int::{StaticRing, StaticRingBase};
+    use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
 
     pub fn test_zn_axioms<R: RingStore>(R: R)
     where

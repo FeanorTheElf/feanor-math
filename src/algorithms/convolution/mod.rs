@@ -474,7 +474,7 @@ impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
 use test;
 
 #[cfg(test)]
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 
 #[bench]
 fn bench_schoolbook_convolution(bencher: &mut test::Bencher) {

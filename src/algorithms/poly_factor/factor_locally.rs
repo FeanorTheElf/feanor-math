@@ -2,7 +2,7 @@ use std::convert::identity;
 
 use tracing::{Level, event, instrument};
 
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::hensel::*;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
@@ -194,7 +194,7 @@ where
     let mut rng = oorandom::Rand64::new(1);
     let bound = ln_factor_max_coeff(ZZX, f);
 
-    for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for attempt in 0..PROBABILISTIC_REPETITIONS {
         let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
         let prime_f64 = ZZbig.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
@@ -261,7 +261,7 @@ where
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
 #[cfg(test)]
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 
 #[test]
 fn test_factor_int_poly() {

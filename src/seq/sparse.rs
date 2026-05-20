@@ -172,7 +172,7 @@ impl<R: RingStore> VectorViewMut<El<R>> for SparseMapVector<R> {
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[cfg(test)]
 fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, values: [i64; N]) {

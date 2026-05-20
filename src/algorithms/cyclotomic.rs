@@ -8,13 +8,12 @@ use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain, *};
 use crate::ring_properties::field::Field;
 use crate::ring_properties::integer::*;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
-use crate::ring_properties::finite::*;
 use crate::ring_impls::poly::sparse_poly::SparsePolyRing;
 use crate::ring_impls::poly::*;
 use crate::ring_impls::zn::{ZnRing, ZnRingStore};
-use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
+use crate::{PROBABILISTIC_REPETITIONS, algorithms};
 
 /// Computes the `n`-th cyclotomic polynomial.
 ///
@@ -188,7 +187,7 @@ where
 
     let mut rng = oorandom::Rand64::new(1);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZbig);
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..PROBABILISTIC_REPETITIONS {
         if is_prim_root_of_unity_with_factorization(&ring, &current, n, &n_factorization) {
             return Some(current);
         }
@@ -235,7 +234,7 @@ where
         let base = ring.mul_ref_snd(ring.random_element(|| rng.rand_u64()), &scale);
         let mut current = ring.pow_gen(base, &power, ZZ);
         let one_mod_p = ring.pow_gen(current.clone(), &n, ZZ);
-        for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        for _ in 0..PROBABILISTIC_REPETITIONS {
             if n_factorization.iter().all(|(factor_n, _)| {
                 !ring.eq_el(
                     &one_mod_p,
@@ -282,7 +281,7 @@ where
 
     let mut rng = oorandom::Rand64::new(1);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZbig);
-    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+    for _ in 0..PROBABILISTIC_REPETITIONS {
         if is_prim_root_of_unity_pow2(&ring, &current, log2_n) {
             return Some(current);
         }
@@ -326,7 +325,7 @@ where
             ZZ,
         );
         let one_mod_p = ring.pow_gen(current.clone(), &ZZ.power_of_two(log2_n), ZZ);
-        for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        for _ in 0..PROBABILISTIC_REPETITIONS {
             if !ring.eq_el(
                 &one_mod_p,
                 &ring.pow_gen(current.clone(), &ZZ.power_of_two(log2_n - 1), ZZ),

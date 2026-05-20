@@ -136,7 +136,7 @@ where
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[test]
 fn test_bisect_floor() {

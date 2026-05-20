@@ -1,13 +1,15 @@
 use tracing::instrument;
 
 use crate::algorithms::ec_factor::lenstra_ec_factor;
+use crate::algorithms::eratosthenes::enumerate_primes;
+use crate::algorithms::int_bisect::root_floor;
+use crate::algorithms::miller_rabin::is_prime;
 use crate::ring_properties::divisibility::DivisibilityRingStore;
-use crate::homomorphism::*;
+use crate::{PROBABILISTIC_REPETITIONS, homomorphism::*};
 use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
-use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
 use crate::prelude::*;
 use crate::ring_impls::zn::{ZnOperation, ZnRing, ZnRingStore, choose_zn_impl};
-use crate::{DEFAULT_PROBABILISTIC_REPETITIONS, algorithms};
 
 struct ECFactorInt<I>
 where
@@ -44,11 +46,11 @@ where
     I: RingStore + Copy,
     I::Ring: IntegerRing,
 {
-    if algorithms::miller_rabin::is_prime(ZZ, n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+    if is_prime(ZZ, n, PROBABILISTIC_REPETITIONS) {
         return Some((n.clone(), 1));
     }
     let (p, e) = is_power(ZZ, n)?;
-    if algorithms::miller_rabin::is_prime(ZZ, &p, DEFAULT_PROBABILISTIC_REPETITIONS) {
+    if is_prime(ZZ, &p, PROBABILISTIC_REPETITIONS) {
         return Some((p, e));
     } else {
         return None;
@@ -62,9 +64,9 @@ where
 {
     assert!(!ZZ.is_zero(n));
     for i in (2..=ZZ.abs_log2_ceil(n).unwrap()).rev() {
-        let root = algorithms::int_bisect::root_floor(ZZ, n.clone(), i);
+        let root = root_floor(ZZ, n.clone(), i);
         if ZZ.eq_el(&ZZ.pow(root, i), n) {
-            return Some((algorithms::int_bisect::root_floor(ZZ, n.clone(), i), i));
+            return Some((root_floor(ZZ, n.clone(), i), i));
         }
     }
     return None;
@@ -97,13 +99,13 @@ where
     // check if we are done
     if ZZ.is_one(&n) {
         return result;
-    } else if algorithms::miller_rabin::is_prime(ZZ, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+    } else if is_prime(ZZ, &n, PROBABILISTIC_REPETITIONS) {
         result.push((n, 1));
         return result;
     }
 
     // then we remove small factors
-    for p in algorithms::eratosthenes::enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND) {
+    for p in enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND) {
         let ZZ_p = ZZ.int_hom().map(p);
         let mut count = 0;
         while let Some(quo) = ZZ.checked_div(&n, &ZZ_p) {
@@ -118,7 +120,7 @@ where
     // check again if we are done
     if ZZ.is_one(&n) {
         return result;
-    } else if algorithms::miller_rabin::is_prime(ZZ, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+    } else if is_prime(ZZ, &n, PROBABILISTIC_REPETITIONS) {
         result.push((n, 1));
         return result;
     }

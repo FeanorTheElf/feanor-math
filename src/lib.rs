@@ -67,9 +67,6 @@ pub mod iters;
 /// particular, we use [`matrix::Submatrix`] and [`matrix::SubmatrixMut`] for matrices that don't
 /// own their data.
 pub mod matrix;
-/// Provides the ring implementation [`primitive_int::StaticRing`] that represents the integer ring
-/// with arithmetic given by the primitive integer types ``i8` to `i128`.
-pub mod primitive_int;
 /// Contains the two traits [`reduce_lift::poly_eval::LiftPolyEvalRing`] and
 /// [`reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`] that formalize the assumptions required
 /// to perform certain computations over a ring modulo prime ideals, and then reconstruct the
@@ -79,7 +76,7 @@ pub mod reduce_lift;
 /// [`seq::VectorFn`]. They all have some functional overlap with [`ExactSizeIterator`], but differ
 /// in how they allow access to the elements of the sequence.
 pub mod seq;
-/// Ccontains the struct [`wrapper::RingElementWrapper`] that contains an element together with its
+/// Contains the struct [`wrapper::RingElementWrapper`] that contains an element together with its
 /// ring, and thus can provide ring operations without explicit access to the ring.
 ///
 /// Using this is for example necessary if you want to use elements of a
@@ -103,8 +100,7 @@ pub mod seq;
 /// ```
 pub mod wrapper;
 
-const MAX_PROBABILISTIC_REPETITIONS: usize = 30;
-const DEFAULT_PROBABILISTIC_REPETITIONS: usize = 30;
+const PROBABILISTIC_REPETITIONS: usize = 30;
 
 #[cfg(test)]
 const RANDOM_TEST_INSTANCE_COUNT: usize = 10;

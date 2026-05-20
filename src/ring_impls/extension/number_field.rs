@@ -10,7 +10,7 @@ use tracing::{Level, event, instrument};
 
 use super::extension_impl::FreeAlgebraImpl;
 use super::{Field, FreeAlgebra};
-use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::convolution::*;
 use crate::algorithms::hensel;
 use crate::algorithms::interpolate::product_except_one;
@@ -1143,7 +1143,7 @@ where
         );
 
         // search for a prime `p` such that the minimal polynomial is unramified modulo `p`
-        for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        for _ in 0..PROBABILISTIC_REPETITIONS {
             let p = ZZ.get_ring().random_suitable_ideal(&mut rng, attempt);
             assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&p));
 

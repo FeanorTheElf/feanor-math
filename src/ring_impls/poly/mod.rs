@@ -790,7 +790,7 @@ use std::fmt::{Display, Formatter};
 use dense_poly::DensePolyRing;
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[test]
 fn test_dbg_poly() {

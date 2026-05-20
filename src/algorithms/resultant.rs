@@ -10,7 +10,6 @@ use crate::ring_properties::pid::{EuclideanRingStore, *};
 use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_properties::finite::*;
 use crate::ring_impls::fraction::FractionFieldStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;

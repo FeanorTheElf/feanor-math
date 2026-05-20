@@ -123,7 +123,7 @@ pub fn fincke_pohst<I, R, H, V, F>(
 }
 
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::approx_real::float::*;
 

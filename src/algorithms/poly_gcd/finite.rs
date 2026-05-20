@@ -7,7 +7,6 @@ use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::strassen::{dispatch_strassen_impl, strassen_mem_size};
 use crate::matrix::*;
 use crate::prelude::*;
-use crate::ring_properties::finite::*;
 use crate::ring_impls::poly::*;
 
 /// Returns a list of `(fi, ki)` such that the `fi` are monic, square-free and pairwise coprime, and

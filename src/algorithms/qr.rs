@@ -333,7 +333,7 @@ use crate::matrix::format_matrix;
 #[cfg(test)]
 use crate::matrix::{TransposableSubmatrix, TransposableSubmatrixMut};
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::approx_real::float::Real64;
 #[cfg(test)]

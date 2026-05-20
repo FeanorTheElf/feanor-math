@@ -273,7 +273,7 @@ where
 }
 
 #[cfg(test)]
-use crate::primitive_int::*;
+use crate::ring_impls::primitive_int::*;
 #[cfg(test)]
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]

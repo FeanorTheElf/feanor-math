@@ -121,7 +121,7 @@ use crate::ring_properties::divisibility::DivisibilityRingStore;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[test]
 fn test_rational_reconstruction() {

@@ -7,7 +7,7 @@ use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::rings::extension::galois_field::*;
 use crate::rings::extension::number_field::*;
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::rings::extension::extension_impl::*;
 use crate::rings::extension::*;
 use crate::rings::field::{AsField, AsFieldBase};

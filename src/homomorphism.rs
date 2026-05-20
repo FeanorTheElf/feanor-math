@@ -1,7 +1,7 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
 use crate::prelude::*;
 
 /// The user-facing trait for ring homomorphisms, i.e. maps `R -> S`

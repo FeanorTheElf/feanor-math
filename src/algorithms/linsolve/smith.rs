@@ -286,7 +286,7 @@ use crate::assert_matrix_eq;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 #[cfg(test)]
 use crate::ring_impls::extension::FreeAlgebraStore;
 #[cfg(test)]

@@ -13,7 +13,7 @@ use crate::impl_eq_based_self_iso;
 use crate::ring_properties::integer::{IntegerRing, IntegerRingStore, int_cast};
 use crate::ring_properties::ordered::OrderedRing;
 use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 use crate::prelude::*;
 use crate::ring::EnvBindingStrength;
 use crate::ring_impls::approx_real::{ApproxRealField, SqrtRing};

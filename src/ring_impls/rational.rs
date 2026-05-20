@@ -844,7 +844,7 @@ where
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
-use crate::primitive_int::StaticRing;
+use crate::ring_impls::primitive_int::StaticRing;
 
 #[cfg(test)]
 fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
@@ -942,7 +942,7 @@ fn test_serialize_deserialize() {
 #[test]
 fn test_serialize_postcard() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring: RingValue<RationalFieldBase<RingValue<crate::primitive_int::StaticRingBase<i64>>>> =
+    let ring: RingValue<RationalFieldBase<RingValue<crate::ring_impls::primitive_int::StaticRingBase<i64>>>> =
         RationalField::new(ZZi64);
     let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
     let result = DeserializeWithRing::new(&ring)
