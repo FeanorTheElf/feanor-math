@@ -2,9 +2,10 @@ use std::fmt::{Debug, Display};
 use std::hash::Hash;
 use std::ops::*;
 
-use crate::field::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::ring::*;
+use crate::ring::HashableElRing;
+use crate::prelude::*;
 
 /// Stores a ring element together with its ring, so that ring operations do
 /// not require explicit mention of the ring object. This can be used both for
@@ -18,7 +19,7 @@ use crate::ring::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::primitive_int::*;
-/// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let ring = DensePolyRing::new(ZZi64, "X");
 /// let x = RingElementWrapper::new(&ring, ring.indeterminate());
 /// println!("The result is: {}", x.clone() + x.clone() * x);
 /// // instead of
@@ -36,7 +37,7 @@ use crate::ring::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::primitive_int::*;
-/// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let ring = DensePolyRing::new(ZZi64, "X");
 /// let x = RingElementWrapper::new(&ring, ring.indeterminate());
 /// assert_el_eq!(
 ///     &ring,
@@ -419,7 +420,7 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64b;
+use crate::ring_impls::zn::zn_64b;
 
 #[test]
 fn test_arithmetic_expression() {

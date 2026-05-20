@@ -6,7 +6,7 @@ use super::{evaluate_aX, unevaluate_aX};
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::hensel::*;
 use crate::algorithms::poly_gcd::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::seq::*;
 
 const INCREASE_EXPONENT_PER_ATTEMPT_CONSTANT: f64 = 1.5;
@@ -303,7 +303,7 @@ use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[test]
 fn test_squarefree_part_local() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = BigIntRing::RING;
+    let ring = ZZbig;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| {
         [
@@ -349,7 +349,7 @@ fn test_squarefree_part_local() {
 #[test]
 fn random_test_poly_power_decomposition_local() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = BigIntRing::RING;
+    let ring = ZZbig;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);
     let bound = ring.int_hom().map(1000);

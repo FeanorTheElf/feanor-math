@@ -7,11 +7,12 @@ use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::integer::BigIntRing;
-use crate::ordered::OrderedRingStore;
-use crate::ring::*;
-use crate::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::integer::BigIntRing;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::prelude::*;
+use crate::ring::HashableElRing;
+use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
 
 /// Trait for implementations of generic abelian groups, for which only
 /// the group operation, equality testing and computing hash values is supported.
@@ -63,12 +64,12 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
         let res = generic_abs_square_and_multiply(
             x.clone(),
             e,
-            BigIntRing::RING,
+            ZZbig,
             |a| self.op_ref(&a, &a),
             |a, b| self.op_ref_snd(b, &a),
             self.identity(),
         );
-        if !BigIntRing::RING.is_neg(e) {
+        if !ZZbig.is_neg(e) {
             res
         } else {
             self.inv(&res)

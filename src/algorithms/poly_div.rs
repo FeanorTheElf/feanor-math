@@ -2,8 +2,8 @@ use std::cmp::max;
 
 use tracing::instrument;
 
-use crate::ring::*;
-use crate::rings::poly::*;
+use crate::prelude::*;
+use crate::ring_impls::poly::*;
 
 /// Computes the polynomial division of `lhs` by `rhs`, i.e. `lhs = q * rhs + r` with
 /// `deg(r) < deg(rhs)`.
@@ -215,12 +215,12 @@ use dense_poly::DensePolyRing;
 #[cfg(test)]
 use crate::function::no_error;
 #[cfg(test)]
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 
 #[test]
 fn test_fast_poly_div() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(ZZ, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| {
         [

@@ -1,6 +1,6 @@
 use std::fmt::Display;
 
-use crate::ring::*;
+use crate::prelude::*;
 
 mod owned;
 mod submatrix;
@@ -176,8 +176,8 @@ pub mod matrix_compare {
 /// # use feanor_math::matrix::*;
 /// # use feanor_math::assert_matrix_eq;
 /// let lhs = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];
-/// let rhs = OwnedMatrix::zero(3, 3, StaticRing::<i64>::RING);
-/// assert_matrix_eq!(StaticRing::<i64>::RING, lhs, rhs);
+/// let rhs = OwnedMatrix::zero(3, 3, ZZi64);
+/// assert_matrix_eq!(ZZi64, lhs, rhs);
 ///  ```
 #[macro_export]
 macro_rules! assert_matrix_eq {

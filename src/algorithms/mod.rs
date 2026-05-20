@@ -1,6 +1,6 @@
 /// Contains basic algorithms for implementing operations on arbitrary-precision
 /// integers. Unless you are implementing your own big integer type, you should use
-/// [`crate::integer::BigIntRing`] instead.
+/// [`crate::ring_properties::integer::BigIntRing`] instead.
 pub mod bigint_ops;
 /// Contains Buchberger's algorithm for computing Groebner basis.
 pub mod buchberger;
@@ -59,7 +59,7 @@ pub mod miller_rabin;
 pub mod newton;
 /// Contains [`poly_div::poly_div_rem()`] for computing polynomial division. In most cases,
 /// you will instead use this functionality through
-/// [`crate::pid::EuclideanRing::euclidean_div_rem()`].
+/// [`crate::ring_properties::pid::EuclideanRing::euclidean_div_rem()`].
 pub mod poly_div;
 /// Contains [`poly_factor::FactorPolyField`] for fields over which we can factor polynomials.
 ///

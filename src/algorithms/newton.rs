@@ -5,14 +5,14 @@ use tracing::instrument;
 
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_gcd::squarefree_part::poly_squarefree_part_local;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::field::FieldStore;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::field::FieldStore;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ring::*;
-use crate::rings::float_complex::{Complex64, Complex64Base, Complex64El};
-use crate::rings::poly::dense_poly::*;
-use crate::rings::poly::*;
+use crate::ring_properties::integer::*;
+use crate::prelude::*;
+use crate::ring_impls::float_complex::{Complex64, Complex64Base, Complex64El};
+use crate::ring_impls::poly::dense_poly::*;
+use crate::ring_impls::poly::*;
 
 const NEWTON_MAX_SCALE: u32 = 10;
 const NEWTON_ITERATIONS: usize = 16;
@@ -293,14 +293,14 @@ use std::f64::consts::PI;
 #[cfg(test)]
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]
-use crate::pid::PrincipalIdealRingStore;
+use crate::ring_properties::pid::PrincipalIdealRingStore;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 
 #[test]
 fn test_find_approximate_complex_root() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     let CC = Complex64::RING;
 
@@ -323,7 +323,7 @@ fn test_find_approximate_complex_root() {
     let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
     assert!(
         (0..105)
-            .filter(|k| StaticRing::<i64>::RING.ideal_gen(k, &105) == 1)
+            .filter(|k| ZZi64.ideal_gen(k, &105) == 1)
             .any(|k| CC.abs(CC.sub(root_of_unity(k, 105), root)) <= radius)
     );
 
@@ -348,7 +348,7 @@ fn test_find_approximate_complex_root() {
 #[test]
 fn test_find_all_approximate_complex_roots() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     let CC = Complex64::RING;
 
@@ -380,7 +380,7 @@ fn test_find_all_approximate_complex_roots() {
     let f = cyclotomic_polynomial(&ZZX, 105);
     let expected = (1..=52)
         .rev()
-        .filter(|i| StaticRing::<i64>::RING.ideal_gen(i, &105) == 1)
+        .filter(|i| ZZi64.ideal_gen(i, &105) == 1)
         .flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)])
         .chain([CC.one()]);
     let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();

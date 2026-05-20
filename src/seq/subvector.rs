@@ -283,7 +283,7 @@ fn test_subvector_fn_subvector_oob() {
 #[test]
 fn test_subvector_sparse() {
     feanor_tracing::DelayedLogger::init_test();
-    let mut sparse_vector = SparseMapVector::new(1000, StaticRing::<i64>::RING);
+    let mut sparse_vector = SparseMapVector::new(1000, ZZi64);
     *sparse_vector.at_mut(6) = 6;
     *sparse_vector.at_mut(20) = 20;
     *sparse_vector.at_mut(256) = 256;

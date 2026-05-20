@@ -5,11 +5,11 @@ use tracing::{Level, event, instrument};
 use transform::TransformList;
 
 use crate::algorithms::linsolve::SolveResult;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
 use crate::matrix::*;
-use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
-use crate::ring::*;
+use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::prelude::*;
 
 /// Transforms `A` into `A'` via transformations `L, R` such that
 /// `L A R = A'` and `A'` is diagonal.
@@ -289,17 +289,17 @@ use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::extension::FreeAlgebraStore;
+use crate::ring_impls::extension::FreeAlgebraStore;
 #[cfg(test)]
-use crate::rings::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
-use crate::rings::extension::galois_field::GaloisField;
+use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::rings::zn::ZnRingStore;
+use crate::ring_impls::zn::ZnRingStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 #[cfg(test)]
-use crate::rings::zn::zn_static;
+use crate::ring_impls::zn::zn_static;
 #[cfg(test)]
 use crate::seq::VectorView;
 
@@ -340,11 +340,11 @@ where
 #[test]
 fn test_smith_integers() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let mut A = OwnedMatrix::new(vec![1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6], 4);
     let original_A = A.clone();
-    let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, StaticRing::<i64>::RING);
-    let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, StaticRing::<i64>::RING);
+    let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, ZZi64);
+    let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, ZZi64);
     pre_smith(
         ring,
         &mut TransformRows(L.data_mut(), ring.get_ring()),
@@ -435,7 +435,7 @@ fn test_unique_solution_correct() {
 #[test]
 fn test_solve_int() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let A = OwnedMatrix::new(vec![3, 6, 2, 0, 4, 7, 5, 5, 4, 5, 5, 5], 6);
     let B: OwnedMatrix<i64> = OwnedMatrix::identity(2, 2, ring);
     let mut solution: OwnedMatrix<i64> = OwnedMatrix::zero(6, 2, ring);
@@ -475,7 +475,7 @@ fn test_large() {
 #[test]
 fn test_determinant() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let A = OwnedMatrix::new(vec![1, 0, 3, 2, 1, 0, 9, 8, 7], 3);
     assert_el_eq!(
         ring,
@@ -535,7 +535,7 @@ fn test_determinant() {
 
 #[test]
 fn test_kernel_basis() {
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let mut A = OwnedMatrix::identity(2, 2, ring);
     assert_matrix_eq!(ring, [[], []], kernel_basis_using_pre_smith(ring, A.data_mut(), Global));
 

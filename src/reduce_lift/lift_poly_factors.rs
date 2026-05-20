@@ -5,18 +5,18 @@ use crate::algorithms::miller_rabin::is_prime;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::delegate::*;
-use crate::divisibility::*;
-use crate::field::Field;
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::field::Field;
 use crate::function::no_error;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::OrderedRing;
-use crate::ring::*;
-use crate::rings::field::{AsField, AsFieldBase};
-use crate::rings::finite::FiniteRing;
-use crate::rings::zn::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRing;
+use crate::prelude::*;
+use crate::ring_impls::field::{AsField, AsFieldBase};
+use crate::ring_impls::finite::FiniteRing;
+use crate::ring_impls::zn::*;
 use crate::seq::*;
-use crate::specialization::FiniteRingSpecializable;
+use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 /// Trait for rings that support lifting partial factorizations of polynomials modulo a prime
 /// to the ring. For infinite fields, this is the most important approach to computing gcd's,
@@ -306,7 +306,7 @@ pub trait IntegerPolyLiftFactorsDomain: PolyLiftFactorsDomain {
         assert_eq!(1, self.maximal_ideal_factor_count(p));
         let Fp = self.quotient_ring_at(p, 1, 0);
         let Fp = self.local_ring_as_zn(&Fp);
-        return int_cast(Fp.modulus().clone(), BigIntRing::RING, Fp.integer_ring());
+        return int_cast(Fp.modulus().clone(), ZZbig, Fp.integer_ring());
     }
 }
 
@@ -803,13 +803,13 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
         impl<$($gen_args)*> $crate::reduce_lift::lift_poly_factors::PolyLiftFactorsDomain for $int_ring_type
             where $($constraints)*
         {
-            type LocalRing<'ring> = $crate::rings::zn::zn_big::ZnGB<BigIntRing>
+            type LocalRing<'ring> = $crate::ring_impls::zn::zn_big::ZnGB<BigIntRing>
                 where Self: 'ring;
-            type LocalRingBase<'ring> = $crate::rings::zn::zn_big::ZnGBBase<BigIntRing>
+            type LocalRingBase<'ring> = $crate::ring_impls::zn::zn_big::ZnGBBase<BigIntRing>
                 where Self: 'ring;
-            type LocalFieldBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64b::Zn64B>
+            type LocalFieldBase<'ring> = $crate::ring_impls::field::AsFieldBase<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
-            type LocalField<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64b::Zn64B>
+            type LocalField<'ring> = $crate::ring_impls::field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
             type SuitableIdeal<'ring> = i64
                 where Self: 'ring;
@@ -819,12 +819,12 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
                     V1: $crate::seq::VectorFn<&'local Self::LocalRing<'ring>>,
                     V2: $crate::seq::VectorFn<&'element El<Self::LocalRing<'ring>>>
             {
-                use $crate::rings::zn::*;
+                use $crate::ring_impls::zn::*;
                 #[allow(unused)]
                 use $crate::seq::*;
                 assert_eq!(1, from.len());
                 assert_eq!(1, x.len());
-                int_cast(from.at(0).smallest_lift(x.at(0).clone()), RingRef::from(self), BigIntRing::RING)
+                int_cast(from.at(0).smallest_lift(x.at(0).clone()), RingRef::from(self), ZZbig)
             }
 
             fn maximal_ideal_factor_count<'ring>(&self, _p: &Self::SuitableIdeal<'ring>) -> usize
@@ -836,7 +836,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             fn lift_partial<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRingBase<'ring>, usize), to: (&Self::LocalRingBase<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
                 where Self: 'ring
             {
-                use $crate::rings::zn::*;
+                use $crate::ring_impls::zn::*;
                 use $crate::homomorphism::*;
 
                 assert_eq!(0, max_ideal_idx);
@@ -848,35 +848,35 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             fn quotient_field_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, max_ideal_idx: usize) -> Self::LocalField<'ring>
                 where Self: 'ring
             {
-                use $crate::rings::zn::*;
+                use $crate::ring_impls::zn::*;
 
                 assert_eq!(0, max_ideal_idx);
-                $crate::rings::zn::zn_64b::Zn64B::new(*p as u64).as_field().ok().unwrap()
+                $crate::ring_impls::zn::zn_64b::Zn64B::new(*p as u64).as_field().ok().unwrap()
             }
 
             fn quotient_ring_at<'ring>(&self, p: &Self::SuitableIdeal<'ring>, e: usize, max_ideal_idx: usize) -> Self::LocalRing<'ring>
                 where Self: 'ring
             {
                 assert_eq!(0, max_ideal_idx);
-                $crate::rings::zn::zn_big::ZnGB::new(BigIntRing::RING, BigIntRing::RING.pow(int_cast(*p, BigIntRing::RING, StaticRing::<i64>::RING), e))
+                $crate::ring_impls::zn::zn_big::ZnGB::new(ZZbig, ZZbig.pow(int_cast(*p, ZZbig, ZZi64), e))
             }
 
             fn random_suitable_ideal<'ring, F>(&'ring self, rng: F, attempt: usize) -> Self::SuitableIdeal<'ring>
                 where F: FnMut() -> u64
             {
-                let lower_bound = StaticRing::<i64>::RING.get_ring().get_uniformly_random_bits(std::cmp::min(57, 8 + 8 * attempt), rng);
-                return $crate::algorithms::miller_rabin::next_prime(StaticRing::<i64>::RING, lower_bound);
+                let lower_bound = ZZi64.get_ring().get_uniformly_random_bits(std::cmp::min(57, 8 + 8 * attempt), rng);
+                return $crate::algorithms::miller_rabin::next_prime(ZZi64, lower_bound);
             }
 
             fn base_ring_to_field<'ring>(&self, _ideal: &Self::SuitableIdeal<'ring>, from: &Self::LocalRingBase<'ring>, to: &Self::LocalFieldBase<'ring>, max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalField<'ring>>
                 where Self: 'ring
             {
                 assert_eq!(0, max_ideal_idx);
-                assert_eq!(from.characteristic(StaticRing::<i64>::RING).unwrap(), to.characteristic(StaticRing::<i64>::RING).unwrap());
-                <_ as $crate::rings::zn::ZnRing>::from_int_promise_reduced(to, $crate::integer::int_cast(
-                    <_ as $crate::rings::zn::ZnRing>::smallest_positive_lift(from, x),
-                    <_ as $crate::rings::zn::ZnRing>::integer_ring(to),
-                    <_ as $crate::rings::zn::ZnRing>::integer_ring(from),
+                assert_eq!(from.characteristic(ZZi64).unwrap(), to.characteristic(ZZi64).unwrap());
+                <_ as $crate::ring_impls::zn::ZnRing>::from_int_promise_reduced(to, $crate::ring_properties::integer::int_cast(
+                    <_ as $crate::ring_impls::zn::ZnRing>::smallest_positive_lift(from, x),
+                    <_ as $crate::ring_impls::zn::ZnRing>::integer_ring(to),
+                    <_ as $crate::ring_impls::zn::ZnRing>::integer_ring(from),
                 ))
             }
 
@@ -885,11 +885,11 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             {
 
                 assert_eq!(0, max_ideal_idx);
-                assert_eq!(from.characteristic(StaticRing::<i64>::RING).unwrap(), to.characteristic(StaticRing::<i64>::RING).unwrap());
-                <_ as $crate::rings::zn::ZnRing>::from_int_promise_reduced(to, $crate::integer::int_cast(
-                    <_ as $crate::rings::zn::ZnRing>::smallest_positive_lift(from, x),
-                    <_ as $crate::rings::zn::ZnRing>::integer_ring(to),
-                    <_ as $crate::rings::zn::ZnRing>::integer_ring(from),
+                assert_eq!(from.characteristic(ZZi64).unwrap(), to.characteristic(ZZi64).unwrap());
+                <_ as $crate::ring_impls::zn::ZnRing>::from_int_promise_reduced(to, $crate::ring_properties::integer::int_cast(
+                    <_ as $crate::ring_impls::zn::ZnRing>::smallest_positive_lift(from, x),
+                    <_ as $crate::ring_impls::zn::ZnRing>::integer_ring(to),
+                    <_ as $crate::ring_impls::zn::ZnRing>::integer_ring(from),
                 ))
             }
 
@@ -907,7 +907,7 @@ macro_rules! impl_poly_gcd_locally_for_ZZ {
             fn reduce_partial<'ring>(&self, _p: &Self::SuitableIdeal<'ring>, from: (&Self::LocalRingBase<'ring>, usize), to: (&Self::LocalRingBase<'ring>, usize), max_ideal_idx: usize, x: El<Self::LocalRing<'ring>>) -> El<Self::LocalRing<'ring>>
                 where Self: 'ring
             {
-                use $crate::rings::zn::*;
+                use $crate::ring_impls::zn::*;
                 use $crate::homomorphism::*;
 
                 assert_eq!(0, max_ideal_idx);

@@ -1,8 +1,8 @@
 use tracing::instrument;
 
-use crate::integer::*;
-use crate::ordered::*;
-use crate::ring::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::*;
+use crate::prelude::*;
 
 /// Finds some integer `left <= n < right` such that `f(n) <= 0` and `f(n + 1) > 0`, given
 /// that `f(left) <= 0` and `f(right) > 0`.
@@ -82,7 +82,7 @@ where
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::int_bisect::*;
 /// # use feanor_math::primitive_int::*;
-/// let ZZ = StaticRing::<i64>::RING;
+/// let ZZ = ZZi64;
 /// assert_eq!(2, root_floor(&ZZ, 1 << 62, 62));
 /// ```
 /// I some edge cases this is not enough, and so integer overflow can occur.
@@ -90,7 +90,7 @@ where
 /// # use feanor_math::ring::*;
 /// # use feanor_math::algorithms::int_bisect::*;
 /// # use feanor_math::primitive_int::*;
-/// let ZZ = StaticRing::<i64>::RING;
+/// let ZZ = ZZi64;
 /// assert_eq!(26, root_floor(&ZZ, ZZ.pow(5, 26), 26));
 /// ```
 #[instrument(skip_all, level = "trace")]
@@ -145,38 +145,38 @@ fn test_bisect_floor() {
     feanor_tracing::DelayedLogger::init_test();
     assert_eq!(
         0,
-        bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 0 { 0 } else { 1 })
+        bisect_floor(&ZZi64, 0, 10, |x| if *x == 0 { 0 } else { 1 })
     );
     assert_eq!(
         9,
-        bisect_floor(&StaticRing::<i64>::RING, 0, 10, |x| if *x == 10 { 1 } else { 0 })
+        bisect_floor(&ZZi64, 0, 10, |x| if *x == 10 { 1 } else { 0 })
     );
-    assert_eq!(-15, bisect_floor(&StaticRing::<i64>::RING, -20, -10, |x| *x + 15));
+    assert_eq!(-15, bisect_floor(&ZZi64, -20, -10, |x| *x + 15));
 }
 
 #[test]
 fn test_root_floor() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 16, 2));
-    assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 27, 3));
-    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 17, 2));
-    assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 28, 3));
-    assert_eq!(4, root_floor(&StaticRing::<i64>::RING, 24, 2));
-    assert_eq!(3, root_floor(&StaticRing::<i64>::RING, 63, 3));
+    assert_eq!(4, root_floor(&ZZi64, 16, 2));
+    assert_eq!(3, root_floor(&ZZi64, 27, 3));
+    assert_eq!(4, root_floor(&ZZi64, 17, 2));
+    assert_eq!(3, root_floor(&ZZi64, 28, 3));
+    assert_eq!(4, root_floor(&ZZi64, 24, 2));
+    assert_eq!(3, root_floor(&ZZi64, 63, 3));
     assert_eq!(
         5,
-        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 25)
+        root_floor(&ZZi64, ZZi64.pow(5, 25), 25)
     );
     assert_eq!(
         4,
-        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 26)
+        root_floor(&ZZi64, ZZi64.pow(5, 25), 26)
     );
     assert_eq!(
         4,
-        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 27)
+        root_floor(&ZZi64, ZZi64.pow(5, 25), 27)
     );
     assert_eq!(
         4,
-        root_floor(&StaticRing::<i64>::RING, StaticRing::<i64>::RING.pow(5, 25), 28)
+        root_floor(&ZZi64, ZZi64.pow(5, 25), 28)
     );
 }

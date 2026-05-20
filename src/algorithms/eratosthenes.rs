@@ -1,8 +1,8 @@
 use tracing::instrument;
 
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
+use crate::prelude::*;
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
@@ -53,9 +53,9 @@ fn test_enumerate_primes() {
 #[test]
 fn test_enumerate_primes_large() {
     feanor_tracing::DelayedLogger::init_test();
-    for p in enumerate_primes(&StaticRing::<i64>::RING, &100000) {
+    for p in enumerate_primes(&ZZi64, &100000) {
         assert!(algorithms::miller_rabin::is_prime(
-            &StaticRing::<i64>::RING,
+            &ZZi64,
             &p,
             DEFAULT_PROBABILISTIC_REPETITIONS
         ));

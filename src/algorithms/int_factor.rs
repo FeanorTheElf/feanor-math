@@ -1,13 +1,13 @@
 use tracing::instrument;
 
 use crate::algorithms::ec_factor::lenstra_ec_factor;
-use crate::divisibility::DivisibilityRingStore;
+use crate::ring_properties::divisibility::DivisibilityRingStore;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::{OrderedRing, OrderedRingStore};
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
 use crate::primitive_int::{StaticRing, StaticRingBase};
-use crate::ring::*;
-use crate::rings::zn::{ZnOperation, ZnRing, ZnRingStore, choose_zn_impl};
+use crate::prelude::*;
+use crate::ring_impls::zn::{ZnOperation, ZnRing, ZnRingStore, choose_zn_impl};
 use crate::{DEFAULT_PROBABILISTIC_REPETITIONS, algorithms};
 
 struct ECFactorInt<I>
@@ -178,16 +178,16 @@ where
 #[test]
 fn test_factor() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = BigIntRing::RING;
+    let ZZbig = ZZbig;
     assert_eq!(
         vec![(3, 2), (5, 1), (29, 1)],
-        factor(&StaticRing::<i64>::RING, 3 * 3 * 5 * 29)
+        factor(&ZZi64, 3 * 3 * 5 * 29)
     );
-    assert_eq!(vec![(2, 8)], factor(&StaticRing::<i64>::RING, 256));
-    assert_eq!(vec![(1009, 2)], factor(&StaticRing::<i64>::RING, 1009 * 1009));
-    assert_eq!(vec![(0, 1)], factor(&StaticRing::<i64>::RING, 0));
-    assert_eq!(Vec::<(i64, usize)>::new(), factor(&StaticRing::<i64>::RING, 1));
-    assert_eq!(vec![(-1, 1)], factor(&StaticRing::<i64>::RING, -1));
+    assert_eq!(vec![(2, 8)], factor(&ZZi64, 256));
+    assert_eq!(vec![(1009, 2)], factor(&ZZi64, 1009 * 1009));
+    assert_eq!(vec![(0, 1)], factor(&ZZi64, 0));
+    assert_eq!(Vec::<(i64, usize)>::new(), factor(&ZZi64, 1));
+    assert_eq!(vec![(-1, 1)], factor(&ZZi64, -1));
     assert_eq!(
         vec![(257, 1), (1009, 2)],
         factor(&StaticRing::<i128>::RING, 257 * 1009 * 1009)
@@ -239,7 +239,7 @@ fn test_factor() {
 #[test]
 fn test_is_prime_power() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(Some((2, 6)), is_prime_power(&StaticRing::<i64>::RING, &64));
+    assert_eq!(Some((2, 6)), is_prime_power(&ZZi64, &64));
 }
 
 #[test]
@@ -247,6 +247,6 @@ fn test_is_prime_power_large_n() {
     feanor_tracing::DelayedLogger::init_test();
     assert_eq!(
         Some((5, 25)),
-        is_prime_power(&StaticRing::<i64>::RING, &StaticRing::<i64>::RING.pow(5, 25))
+        is_prime_power(&ZZi64, &ZZi64.pow(5, 25))
     );
 }

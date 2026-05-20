@@ -9,13 +9,13 @@ use crate::algorithms::cyclotomic::{
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
-use crate::integer::IntegerRingStore;
+use crate::ring_properties::integer::IntegerRingStore;
 use crate::primitive_int::*;
-use crate::ring::*;
-use crate::rings::float_complex::*;
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::float_complex::*;
+use crate::ring_impls::zn::*;
 use crate::seq::SwappableVectorViewMut;
 
 type BaseFFT<R_main, R_twiddle, H, A> = CooleyTuckeyFFT<R_main, R_twiddle, H, A>;
@@ -58,7 +58,7 @@ where
     /// it currently does not make much sense to use a different homomorphism than the identity.
     /// Hence, it is simpler to use [`BluesteinFFT::for_complex()`].
     pub fn for_complex_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Self {
-        let ZZ = StaticRing::<i64>::RING;
+        let ZZ = ZZi64;
         let CC = Complex64::RING;
         let n_i64: i64 = n.try_into().unwrap();
         let log2_m = ZZ.abs_log2_ceil(&(2 * n_i64 + 1)).unwrap();
@@ -253,7 +253,7 @@ where
         R_twiddle: ZnRing,
     {
         let root_of_unity_2n = get_prim_root_of_unity_zn(hom.domain(), 2 * n)?;
-        let log2_m = StaticRing::<i64>::RING
+        let log2_m = ZZi64
             .abs_log2_ceil(&(n * 2).try_into().unwrap())
             .unwrap();
         let root_of_unity_m = get_prim_root_of_unity_pow2_zn(hom.domain(), log2_m)?;
@@ -507,7 +507,7 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static::*;
+use crate::ring_impls::zn::zn_static::*;
 
 #[test]
 fn test_fft_base() {

@@ -8,13 +8,13 @@ use tracing::instrument;
 use super::ConvolutionAlgorithm;
 use super::ntt::NTTConvolution;
 use crate::algorithms::miller_rabin::is_prime;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::zn::zn_64b::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::zn::zn_64b::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
+use crate::ring_impls::zn::*;
 use crate::seq::*;
 
 /// A [`ConvolutionAlgorithm`] that computes convolutions by computing them modulo a
@@ -171,7 +171,7 @@ impl RNSConvolution {
         Self::new_with_convolution(
             max_log2_n,
             usize::MAX,
-            BigIntRing::RING,
+            ZZbig,
             Global,
             CreateNTTConvolution { allocator: Global },
         )
@@ -228,13 +228,13 @@ where
     }
 
     fn sample_next_prime(required_root_of_unity_log2: usize, current: i64) -> Option<i64> {
-        let mut k = StaticRing::<i64>::RING
+        let mut k = ZZi64
             .checked_div(&(current - 1), &(1 << required_root_of_unity_log2))
             .unwrap();
         while k > 0 {
             k -= 1;
             let candidate = (k << required_root_of_unity_log2) + 1;
-            if is_prime(StaticRing::<i64>::RING, &candidate, 10) {
+            if is_prime(ZZi64, &candidate, 10) {
                 return Some(candidate);
             }
         }
@@ -286,10 +286,10 @@ where
     /// "width" refers to the number of RNS factors we need
     fn compute_required_width(&self, input_size_log2: usize, lhs_rhs_min_len: usize, inner_prod_len: usize) -> usize {
         let log2_output_size = input_size_log2 * 2
-            + StaticRing::<i64>::RING
+            + ZZi64
                 .abs_log2_ceil(&lhs_rhs_min_len.try_into().unwrap())
                 .unwrap_or(0)
-            + StaticRing::<i64>::RING
+            + ZZi64
                 .abs_log2_ceil(&inner_prod_len.try_into().unwrap())
                 .unwrap_or(0)
             + 1;
@@ -734,7 +734,7 @@ fn test_convolution_integer() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
     let convolution =
-        RNSConvolution::new_with_convolution(7, usize::MAX, BigIntRing::RING, Global, NTTConvolution::new);
+        RNSConvolution::new_with_convolution(7, usize::MAX, ZZbig, Global, NTTConvolution::new);
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -746,7 +746,7 @@ fn test_convolution_zn() {
     let convolution = RNSConvolutionZn::from(RNSConvolution::new_with_convolution(
         7,
         usize::MAX,
-        BigIntRing::RING,
+        ZZbig,
         Global,
         NTTConvolution::new,
     ));
@@ -758,7 +758,7 @@ fn test_convolution_zn() {
 fn test_convolution_sum() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with_convolution(7, 20, BigIntRing::RING, Global, NTTConvolution::new);
+    let convolution = RNSConvolution::new_with_convolution(7, 20, ZZbig, Global, NTTConvolution::new);
 
     let data = (0..40usize)
         .map(|i| {

@@ -6,16 +6,16 @@ use tracing::instrument;
 
 use crate::function::no_error;
 use crate::homomorphism::*;
-use crate::field::*;
-use crate::divisibility::*;
+use crate::ring_properties::field::*;
+use crate::ring_properties::divisibility::*;
 use crate::rings::extension::number_field::*;
 use crate::rings::extension::*;
 use crate::primitive_int::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::rings::rational::*;
-use crate::ring::*;
+use crate::prelude::*;
 use crate::seq::VectorFn;
 use super::splitting_field::extend_number_field_promise_is_irreducible;
 use super::splitting_field::splitting_field;
@@ -119,7 +119,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
         let new_image = generic_pow_shortest_chain_table(
             field.clone_el(&self.image_of_canonical_gen_powers[1]), 
             &(k as i64), 
-            StaticRing::<i64>::RING, 
+            ZZi64, 
             |x| Ok(poly_ring.evaluate(&field.poly_repr(&poly_ring, x, field.base_ring().identity()), x, field.inclusion())), 
             |x, y| Ok(poly_ring.evaluate(&field.poly_repr(&poly_ring, x, field.base_ring().identity()), y, field.inclusion())), 
             |x| x.clone(), 
@@ -312,7 +312,7 @@ use crate::algorithms::poly_factor::FactorPolyField;
 #[test]
 fn test_compute_galois_closure() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(&ZZ, "X");
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2]);
@@ -354,7 +354,7 @@ fn test_compute_galois_group() {
     // ));
     // tracing_subscriber::registry().with(filtered_chrome_layer).init();
 
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     
     // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) - 6 * X + 7]);
@@ -402,7 +402,7 @@ fn test_compute_galois_group() {
 #[test]
 fn test_complex_conjugation() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(&ZZ, "X");
     
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);

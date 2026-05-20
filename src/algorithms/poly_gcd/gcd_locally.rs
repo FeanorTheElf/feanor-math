@@ -282,12 +282,12 @@ use crate::RANDOM_TEST_INSTANCE_COUNT;
 #[cfg(test)]
 use crate::algorithms::poly_gcd::make_primitive;
 #[cfg(test)]
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 
 #[test]
 fn test_poly_gcd_local() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = BigIntRing::RING;
+    let ring = ZZbig;
     let poly_ring = DensePolyRing::new(ring, "X");
     let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
         [
@@ -338,7 +338,7 @@ fn test_poly_gcd_local() {
 #[test]
 fn random_test_poly_gcd_local() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = BigIntRing::RING;
+    let ring = ZZbig;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);
     let bound = ring.int_hom().map(10000);

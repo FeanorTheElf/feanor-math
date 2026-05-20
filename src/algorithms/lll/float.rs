@@ -1,17 +1,17 @@
 use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
-use crate::field::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::integer::BigIntRing;
-use crate::integer::generic_impls::map_from_integer_ring;
+use crate::ring_properties::integer::BigIntRing;
+use crate::ring_properties::integer::generic_impls::map_from_integer_ring;
 use crate::matrix::transform::{
     DuplicateTransforms, OffsetTransformIndex, TransformCols, TransformRows, TransformTarget,
 };
 use crate::matrix::*;
-use crate::ordered::*;
-use crate::ring::*;
-use crate::rings::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
+use crate::ring_properties::ordered::*;
+use crate::prelude::*;
+use crate::ring_impls::approx_real::{ApproxRealField, NotEnoughPrecision, SqrtRing};
 
 /// Stores the Gram matrix, its (partial) floating-point Cholesky decomposition,
 /// and an error bound on the latter. These values are jointly modified during the
@@ -253,16 +253,16 @@ where
             };
             let min_mu = RR.div(&min_entry, gso.cholesky.at(k, k));
 
-            let factor = match RR.get_ring().round_to_integer(BigIntRing::RING, min_mu) {
+            let factor = match RR.get_ring().round_to_integer(ZZbig, min_mu) {
                 Some(factor) => factor,
                 None => {
                     event!(Level::TRACE, value = %RR.formatted_el(&RR.div(&min_entry, gso.cholesky.at(k, k))), "invalid_float");
                     return Err(NotEnoughPrecision);
                 }
             };
-            if !BigIntRing::RING.is_zero(&factor) {
+            if !ZZbig.is_zero(&factor) {
                 let (mut target, rest) = gso.cholesky.reborrow().split_cols(i..(i + 1), 0..i);
-                let factor = map_from_integer_ring(&BigIntRing::RING, h.domain(), factor);
+                let factor = map_from_integer_ring(&ZZbig, h.domain(), factor);
                 for l in 0..k {
                     RR.sub_assign(target.at_mut(l, 0), h.mul_ref_map(rest.at(l, k), &factor));
                 }
@@ -515,7 +515,7 @@ use crate::assert_matrix_eq;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::approx_real::float::*;
+use crate::ring_impls::approx_real::float::*;
 
 #[test]
 fn test_compute_cholesky_column_without_pivot() {
@@ -565,7 +565,7 @@ fn test_compute_cholesky_column_without_pivot() {
 #[test]
 fn test_lll_float_2d() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let RR = Real64::RING;
     let original = [DerefArray::from([146, 265]), DerefArray::from([265, 481])];
     let mut reduced = original;
@@ -616,7 +616,7 @@ fn test_lll_float_2d() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -627,7 +627,7 @@ fn test_lll_float_2d() {
 #[test]
 fn test_lll_float_3d() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let RR = Real64::RING;
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
@@ -653,7 +653,7 @@ fn test_lll_float_3d() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -697,7 +697,7 @@ fn test_lll_precision() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -707,7 +707,7 @@ fn test_lll_precision() {
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(3)) < 400);
     assert!(norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)) < 500);
 
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let original = [
         DerefArray::from([1, 0, 0, 0, 0]),
         DerefArray::from([-3085729, 1, 0, 0, 0]),
@@ -732,7 +732,7 @@ fn test_lll_precision() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -767,7 +767,7 @@ fn test_lll_precision() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -805,7 +805,7 @@ fn test_lll_generating_set() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -838,7 +838,7 @@ fn test_lll_generating_set() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -919,7 +919,7 @@ fn test_lll_generating_set() {
 
     assert_lattice_isomorphic(
         ZZ,
-        BigIntRing::RING,
+        ZZbig,
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );

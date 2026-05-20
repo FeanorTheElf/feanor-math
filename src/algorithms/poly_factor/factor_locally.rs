@@ -7,14 +7,14 @@ use crate::algorithms::hensel::*;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::squarefree_part::poly_power_decomposition_local;
 use crate::algorithms::poly_gcd::*;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::iters::{clone_slice, powerset};
 use crate::reduce_lift::lift_poly_factors::*;
-use crate::ring::*;
-use crate::rings::poly::dense_poly::*;
-use crate::rings::poly::*;
+use crate::prelude::*;
+use crate::ring_impls::poly::dense_poly::*;
+use crate::ring_impls::poly::*;
 use crate::seq::VectorView;
 
 #[instrument(skip_all, level = "trace")]
@@ -199,7 +199,7 @@ where
     for attempt in 0..MAX_PROBABILISTIC_REPETITIONS {
         let prime = ZZ.get_ring().random_suitable_ideal(|| rng.rand_u64(), attempt);
         assert_eq!(1, ZZ.get_ring().maximal_ideal_factor_count(&prime));
-        let prime_f64 = BigIntRing::RING.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
+        let prime_f64 = ZZbig.to_float_approx(&ZZ.get_ring().principal_ideal_generator(&prime));
         let e = (bound / prime_f64.ln()).ceil() as usize + 1;
         match factor_and_lift_mod_pe(ZZX, &prime, e, f) {
             FactorAndLiftModpeResult::Irreducible => return vec![f.clone()],
@@ -268,7 +268,7 @@ use crate::primitive_int::*;
 #[test]
 fn test_factor_int_poly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let ZZX = DensePolyRing::new(ZZi64, "X");
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1, X + 1]);
     let input = ZZX.mul_ref(&f, &g);
     let actual = poly_factor_integer(&ZZX, input);

@@ -1,13 +1,13 @@
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::field::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::Homomorphism;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::matrix::*;
-use crate::ordered::OrderedRingStore;
-use crate::ring::*;
-use crate::rings::approx_real::ApproxRealField;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::prelude::*;
+use crate::ring_impls::approx_real::ApproxRealField;
 
 /// Uses the Fincke-Pohst algorithm to find integer points close to `target`, where
 /// "closeness" is measured according to the norm defined by the given quadratic form.
@@ -125,12 +125,12 @@ pub fn fincke_pohst<I, R, H, V, F>(
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::approx_real::float::*;
+use crate::ring_impls::approx_real::float::*;
 
 #[test]
 fn test_fincke_pohst_2d() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let RR = Real64::RING;
 
     let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
@@ -231,7 +231,7 @@ fn test_fincke_pohst_2d() {
 #[test]
 fn test_fincke_pohst_3d() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let RR = Real64::RING;
 
     let quadratic_form = [vec![2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0], vec![1.0, 1.0, 2.0]];

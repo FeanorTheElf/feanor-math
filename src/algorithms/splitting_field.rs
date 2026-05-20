@@ -7,7 +7,7 @@ use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::rings::extension::galois_field::*;
 use crate::rings::extension::number_field::*;
-use crate::pid::*;
+use crate::ring_properties::pid::*;
 use crate::primitive_int::StaticRing;
 use crate::rings::extension::extension_impl::*;
 use crate::rings::extension::*;
@@ -16,13 +16,13 @@ use crate::rings::finite::FiniteRingStore;
 use crate::rings::multivariate::{MultivariatePolyRing, MultivariatePolyRingStore};
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
-use crate::divisibility::*;
-use crate::field::*;
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::field::*;
 use crate::seq::sparse::SparseMapVector;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::seq::*;
-use crate::ring::*;
+use crate::prelude::*;
 use crate::algorithms::linsolve::*;
 use super::poly_factor::FactorPolyField;
 use super::poly_gcd::PolyTFracGCDRing;
@@ -471,7 +471,7 @@ use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[test]
 fn test_extend_field() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let QQ = RationalField::new(ZZ);
     let ZZX = DensePolyRing::new(&ZZ, "X");
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
@@ -508,7 +508,7 @@ fn test_extend_field() {
 #[test]
 #[ignore]
 fn test_variety_from_lex_gb() {
-    let ZZX = DensePolyRing::new(BigIntRing::RING, "X");
+    let ZZX = DensePolyRing::new(ZZbig, "X");
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X - 1]);
     let QQ = NumberField::new(ZZX, &f);
     let QQXYZ = MultivariatePolyRingImpl::new(&QQ, 3);

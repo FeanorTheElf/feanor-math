@@ -3,14 +3,14 @@ use std::marker::PhantomData;
 use tracing::instrument;
 
 use crate::algorithms::int_factor::is_prime_power;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::pid::*;
+use crate::ring_properties::pid::*;
 use crate::reduce_lift::lift_poly_factors::*;
-use crate::ring::*;
-use crate::rings::poly::dense_poly::*;
-use crate::rings::poly::*;
-use crate::rings::zn::{FromModulusCreateableZnRing, *};
+use crate::prelude::*;
+use crate::ring_impls::poly::dense_poly::*;
+use crate::ring_impls::poly::*;
+use crate::ring_impls::zn::{FromModulusCreateableZnRing, *};
 use crate::seq::*;
 
 #[derive(Clone)]
@@ -553,9 +553,9 @@ where
 }
 
 #[cfg(test)]
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 
 #[test]
 fn test_hensel_lift() {
@@ -601,7 +601,7 @@ fn test_hensel_lift() {
 #[test]
 fn test_hensel_lift_bezout_identity() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let prime = 5;
     let Zp = ZZ.get_ring().quotient_ring_at(&prime, 1, 0);
     let Fp = ZZ.get_ring().quotient_field_at(&prime, 0);

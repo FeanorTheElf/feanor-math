@@ -2,7 +2,7 @@ use std::fmt::Debug;
 use std::marker::PhantomData;
 
 use crate::primitive_int::{StaticRing, StaticRingBase};
-use crate::ring::*;
+use crate::prelude::*;
 
 /// The user-facing trait for ring homomorphisms, i.e. maps `R -> S`
 /// between rings that respect the ring structure. Since all considered
@@ -212,8 +212,8 @@ where
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::integer::*;
-/// let R = StaticRing::<i64>::RING;
-/// let S = BigIntRing::RING;
+/// let R = ZZi64;
+/// let S = ZZbig;
 /// let eight = S.int_hom().map(8);
 /// // on RingBase level
 /// let hom = R.get_ring().has_canonical_hom(S.get_ring()).unwrap();
@@ -253,7 +253,7 @@ where
 /// let Z_i8 = StaticRing::<i8>::RING;
 /// let Z_i32 = StaticRing::<i32>::RING;
 /// let Z_i128 = StaticRing::<i128>::RING;
-/// let Z_big = BigIntRing::RING;
+/// let Z_big = ZZbig;
 ///
 /// assert!(Z_i8.can_iso(&Z_i8).is_some());
 /// assert!(Z_i8.can_iso(&Z_i32).is_some());
@@ -281,15 +281,7 @@ where
 /// Due to conflicting implementations, only the most useful conversions
 /// are implemented for `Z/nZ`.
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_big;
-/// # use feanor_math::rings::zn::zn_rns;
-/// let ZZ = StaticRing::<i128>::RING;
-/// let ZZ_big = BigIntRing::RING;
+/// # use feanor_math::prelude::*;
 ///
 /// let zn_big_i128 = zn_big::ZnGB::new(ZZ, 17 * 257);
 /// let zn_big_big = zn_big::ZnGB::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
@@ -334,7 +326,7 @@ where
 /// # use feanor_math::integer::*;
 /// # use feanor_math::rings::zn::*;
 /// let ZZ = StaticRing::<i128>::RING;
-/// let ZZ_big = BigIntRing::RING;
+/// let ZZ_big = ZZbig;
 ///
 /// let zn_big_i128 = zn_big::ZnGB::new(ZZ, 17 * 257);
 /// let zn_big_big = zn_big::ZnGB::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
@@ -488,7 +480,7 @@ impl<R: ?Sized + CanIsoFromTo<R>> SelfIso for R {}
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// let from = StaticRing::<i32>::RING;
-/// let to = StaticRing::<i64>::RING;
+/// let to = ZZi64;
 /// let hom = to.can_hom(&from).unwrap();
 /// assert_eq!(7, hom.map(7));
 /// // instead of
@@ -694,7 +686,7 @@ where
 /// # use feanor_math::primitive_int::*;
 ///
 /// let from = StaticRing::<i32>::RING;
-/// let to = StaticRing::<i64>::RING;
+/// let to = ZZi64;
 /// let hom = to.can_iso(&from).unwrap();
 /// assert_eq!(7, hom.map(7));
 /// // instead of

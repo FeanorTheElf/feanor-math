@@ -3,13 +3,13 @@ use std::cmp::min;
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::field::{Field, FieldStore};
-use crate::integer::*;
+use crate::ring_properties::field::{Field, FieldStore};
+use crate::ring_properties::integer::*;
 use crate::matrix::*;
-use crate::ordered::OrderedRingStore;
-use crate::ring::*;
-use crate::rings::approx_real::{ApproxRealField, SqrtRing};
-use crate::rings::rational::*;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::prelude::*;
+use crate::ring_impls::approx_real::{ApproxRealField, SqrtRing};
+use crate::ring_impls::rational::*;
 
 #[stability::unstable(feature = "enable")]
 pub trait QRDecompositionField: Field {
@@ -336,9 +336,9 @@ use crate::matrix::{TransposableSubmatrix, TransposableSubmatrixMut};
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::rings::approx_real::float::Real64;
+use crate::ring_impls::approx_real::float::Real64;
 #[cfg(test)]
-use crate::rings::fraction::FractionFieldStore;
+use crate::ring_impls::fraction::FractionFieldStore;
 
 #[cfg(test)]
 fn assert_is_correct_qr<V1, V2, V3>(original: Submatrix<V1, f64>, q: Submatrix<V2, f64>, r: Submatrix<V3, f64>)
@@ -543,7 +543,7 @@ fn test_float_ldl() {
 #[test]
 fn test_rational_qdr() {
     feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(StaticRing::<i64>::RING);
+    let QQ = RationalField::new(ZZi64);
     let mut actual_r = OwnedMatrix::new_with_shape((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
     let mut actual_q = OwnedMatrix::zero(3, 3, &QQ);
     let diags = QQ

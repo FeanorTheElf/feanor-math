@@ -1,0 +1,1071 @@
+use std::alloc::{Allocator, Global};
+use std::fmt::Debug;
+
+use feanor_serde::newtype_struct::*;
+use feanor_serde::seq::*;
+use serde::Serialize;
+use serde::de::DeserializeSeed;
+use tracing::instrument;
+
+use crate::algorithms::matmul::ComputeInnerProduct;
+use crate::ring_properties::divisibility::DivisibilityRingStore;
+use crate::ring_properties::integer::*;
+use crate::primitive_int::*;
+use crate::ring_impls::zn::*;
+use crate::seq::VectorView;
+use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing, SerializeWithRing};
+use crate::ring_properties::specialization::*;
+
+/// A ring representing `Z/nZ` for composite n by storing the
+/// values modulo `m1, ..., mr` for `n = m1 * ... * mr`.
+/// Generally, the advantage is improved performance in cases
+/// where `m1`, ..., `mr` are sufficiently small, and can e.g.
+/// by implemented without large integers.
+///
+/// Note that the component rings `Z/miZ` of this ring can be
+/// accessed via the [`crate::seq::VectorView`]-functions.
+///
+/// # Example
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_rns::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::seq::*;
+///
+/// let R = ZnRNS::create_from_primes(vec![17, 19], ZZi64);
+/// let x = R.get_ring().from_congruence(
+///     [
+///         R.get_ring().at(0).int_hom().map(1),
+///         R.get_ring().at(1).int_hom().map(16),
+///     ]
+///     .into_iter(),
+/// );
+/// assert_eq!(35, R.smallest_lift(x.clone()));
+/// let y = R.mul_ref(&x, &x);
+/// let z = R.get_ring().from_congruence(
+///     [
+///         R.get_ring().at(0).int_hom().map(1 * 1),
+///         R.get_ring().at(1).int_hom().map(16 * 16),
+///     ]
+///     .into_iter(),
+/// );
+/// assert!(R.eq_el(&z, &y));
+/// ```
+///
+/// # Canonical mappings
+/// This ring has a canonical isomorphism to Barett-reduction based Zn
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_rns::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = ZnRNS::create_from_primes(vec![17, 19], ZZbig);
+/// let S = zn_big::ZnGB::new(ZZi64, 17 * 19);
+/// assert!(R.eq_el(&R.int_hom().map(12), &R.coerce(&S, S.int_hom().map(12))));
+/// assert!(S.eq_el(
+///     &S.int_hom().map(12),
+///     &R.can_iso(&S).unwrap().map(R.int_hom().map(12))
+/// ));
+/// ```
+/// and a canonical homomorphism from any integer ring
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::rings::zn::zn_rns::*;
+/// # use feanor_math::integer::*;
+/// # use feanor_math::primitive_int::*;
+/// let R = ZnRNS::create_from_primes(vec![3, 5, 7], ZZbig);
+/// let S = ZZbig;
+/// assert!(R.eq_el(
+///     &R.int_hom().map(120493),
+///     &R.coerce(&S, S.int_hom().map(120493))
+/// ));
+/// ```
+pub struct ZnRNSBase<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone = Global>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    components: Vec<C>,
+    total_ring: zn_big::ZnGB<J>,
+    unit_vectors: Vec<El<zn_big::ZnGB<J>>>,
+    element_allocator: A,
+}
+
+/// The ring `Z/nZ` for composite `n` implemented using the residue number system (RNS),
+/// i.e. storing values by storing their value modulo every factor of `n`.
+/// For details, see [`ZnBase`].
+pub type ZnRNS<C, J, A = Global> = RingValue<ZnRNSBase<C, J, A>>;
+
+pub struct ZnRNSEl<C: RingStore, A: Allocator + Send + Sync + Clone>
+where
+    C::Ring: ZnRing,
+{
+    data: Vec<El<C>, A>,
+}
+
+impl<C: RingStore, J: RingStore> ZnRNS<C, J, Global>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    /// Creates a new ring for `Z/nZ` with `n = m1 ... mr` where the `mi` are the moduli
+    /// of the given component rings. Furthermore, the corresponding large integer ring must be
+    /// provided, which has to be able to store values of size at least `n^3`.
+    pub fn new(summands: Vec<C>, large_integers: J) -> Self { Self::new_with_alloc(summands, large_integers, Global) }
+}
+
+impl<J: RingStore> ZnRNS<zn_64b::Zn64B, J, Global>
+where
+    zn_64b::Zn64BBase: CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+{
+    pub fn create_from_primes(primes: Vec<i64>, large_integers: J) -> Self {
+        Self::new_with_alloc(
+            primes.into_iter().map(|p| zn_64b::Zn64B::new(p as u64)).collect(),
+            large_integers,
+            Global,
+        )
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRNS<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    /// Creates a new ring for `Z/nZ` with `n = m1 ... mr` where the `mi` are the moduli
+    /// of the given component rings. Furthermore, the corresponding large integer ring must be
+    /// provided, which has to be able to store values of size at least `n^3`.
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn new_with_alloc(summands: Vec<C>, large_integers: J, element_allocator: A) -> Self {
+        assert!(summands.len() > 0);
+        let total_modulus = large_integers.prod(
+            summands
+                .iter()
+                .map(|R| R.integer_ring().can_iso(&large_integers).unwrap().map_ref(R.modulus())),
+        );
+        let total_ring = zn_big::ZnGB::new(large_integers, total_modulus);
+        let ZZ = total_ring.integer_ring();
+        for R in &summands {
+            let R_modulus = R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus());
+            assert!(
+                ZZ.is_unit(&ZZ.ideal_gen(&ZZ.checked_div(total_ring.modulus(), &R_modulus).unwrap(), &R_modulus)),
+                "all moduli must be coprime"
+            );
+            // makes things much easier, e.g. during CanIsoFromTo implementation
+            assert!(R.integer_ring().get_ring() == summands[0].integer_ring().get_ring());
+        }
+        let unit_vectors = summands
+            .iter()
+            .map(|R: &C| {
+                (
+                    R,
+                    ZZ.checked_div(
+                        total_ring.modulus(),
+                        &R.integer_ring().can_iso(ZZ).unwrap().map_ref(R.modulus()),
+                    )
+                    .unwrap(),
+                )
+            })
+            .map(|(R, n)| {
+                (
+                    int_cast(
+                        R.any_lift(R.invert(&R.coerce(&ZZ, n.clone())).unwrap()),
+                        ZZ,
+                        R.integer_ring(),
+                    ),
+                    n,
+                )
+            })
+            .map(|(n_mod_inv, n)| total_ring.mul(total_ring.coerce(&ZZ, n_mod_inv), total_ring.coerce(&ZZ, n)))
+            .collect();
+        RingValue::from(ZnRNSBase {
+            components: summands,
+            total_ring,
+            unit_vectors,
+            element_allocator,
+        })
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRNS<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    /// Given values `ai` for each component ring `Z/miZ`, computes the unique element in this
+    /// ring `Z/nZ` that is congruent to `ai` modulo `mi`. The "opposite" function is
+    /// [`Zn::get_congruence()`].
+    pub fn from_congruence<I>(&self, el: I) -> ZnRNSEl<C, A>
+    where
+        I: IntoIterator<Item = El<C>>,
+    {
+        self.get_ring().from_congruence(el)
+    }
+
+    /// Given `a` in `Z/nZ`, returns the vector whose `i`-th entry is `a mod mi`, where the `mi` are
+    /// the moduli of the component rings of this ring.
+    pub fn get_congruence<'a>(&self, el: &'a ZnRNSEl<C, A>) -> impl 'a + VectorView<El<C>> {
+        self.get_ring().get_congruence(el)
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    /// Given values `ai` for each component ring `Z/miZ`, computes the unique element in this
+    /// ring `Z/nZ` that is congruent to `ai` modulo `mi`. The "opposite" function is
+    /// [`ZnRNSBase::get_congruence()`].
+    pub fn from_congruence<I>(&self, el: I) -> ZnRNSEl<C, A>
+    where
+        I: IntoIterator<Item = El<C>>,
+    {
+        let mut data = Vec::with_capacity_in(self.len(), self.element_allocator.clone());
+        data.extend(el);
+        assert_eq!(self.len(), data.len());
+        ZnRNSEl { data }
+    }
+
+    /// Given `a` in `Z/nZ`, returns the vector whose `i`-th entry is `a mod mi`, where the `mi` are
+    /// the moduli of the component rings of this ring.
+    pub fn get_congruence<'a>(&self, el: &'a ZnRNSEl<C, A>) -> impl 'a + VectorView<El<C>> { &el.data as &[El<C>] }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Debug for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Z/{}Z", self.integer_ring().formatted_el(self.modulus()))
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<C> for ZnRNS<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn len(&self) -> usize { self.get_ring().len() }
+
+    fn at(&self, index: usize) -> &C { &self.get_ring().at(index) }
+
+    fn specialize_sparse<Op: crate::seq::SparseVectorViewOperation<C, Self>>(op: Op) -> Op::Output { op.fallback() }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> VectorView<C> for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn len(&self) -> usize { self.components.len() }
+
+    fn at(&self, index: usize) -> &C { &self.components[index] }
+
+    fn specialize_sparse<Op: crate::seq::SparseVectorViewOperation<C, Self>>(op: Op) -> Op::Output { op.fallback() }
+}
+impl<C, A> Debug for ZnRNSEl<C, A>
+where
+    C: RingStore,
+    C::Ring: ZnRing,
+    A: Allocator + Send + Sync + Clone,
+    El<C>: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ZnEl").field("congruences", &self.data).finish()
+    }
+}
+
+impl<C, A> Clone for ZnRNSEl<C, A>
+where
+    C: RingStore,
+    C::Ring: ZnRing,
+    A: Allocator + Send + Sync + Clone,
+{
+    fn clone(&self) -> Self {
+        Self {
+            data: self.data.clone(),
+        }
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> RingBase for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    type Element = ZnRNSEl<C, A>;
+
+    fn add_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        for i in 0..self.components.len() {
+            self.components[i].add_assign_ref(&mut lhs.data[i], &rhs.data[i])
+        }
+    }
+
+    fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        for (i, el) in (0..self.components.len()).zip(rhs.data.into_iter()) {
+            self.components[i].add_assign_ref(&mut lhs.data[i], &el)
+        }
+    }
+
+    fn sub_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        for i in 0..self.components.len() {
+            self.components[i].sub_assign_ref(&mut lhs.data[i], &rhs.data[i])
+        }
+    }
+
+    fn negate_inplace(&self, lhs: &mut Self::Element) {
+        for i in 0..self.components.len() {
+            self.components[i].negate_inplace(&mut lhs.data[i])
+        }
+    }
+
+    fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
+        for (i, el) in (0..self.components.len()).zip(rhs.data.into_iter()) {
+            self.components[i].mul_assign_ref(&mut lhs.data[i], &el)
+        }
+    }
+
+    fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) {
+        for i in 0..self.components.len() {
+            self.components[i].mul_assign_ref(&mut lhs.data[i], &rhs.data[i])
+        }
+    }
+
+    fn from_int(&self, value: i32) -> Self::Element {
+        self.from_congruence((0..self.len()).map(|i| self.components[i].get_ring().from_int(value)))
+    }
+
+    fn mul_assign_int(&self, lhs: &mut Self::Element, rhs: i32) {
+        for i in 0..self.components.len() {
+            self.components[i].int_hom().mul_assign_map(&mut lhs.data[i], rhs)
+        }
+    }
+
+    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+        (0..self.components.len())
+            .zip(lhs.data.iter())
+            .zip(rhs.data.iter())
+            .all(|((i, l), r)| self.components[i].eq_el(l, r))
+    }
+
+    fn is_zero(&self, value: &Self::Element) -> bool {
+        (0..self.components.len())
+            .zip(value.data.iter())
+            .all(|(i, x)| self.components[i].is_zero(x))
+    }
+
+    fn is_one(&self, value: &Self::Element) -> bool {
+        (0..self.components.len())
+            .zip(value.data.iter())
+            .all(|(i, x)| self.components[i].is_one(x))
+    }
+
+    fn is_neg_one(&self, value: &Self::Element) -> bool {
+        (0..self.components.len())
+            .zip(value.data.iter())
+            .all(|(i, x)| self.components[i].is_neg_one(x))
+    }
+
+    fn is_commutative(&self) -> bool { true }
+    fn is_noetherian(&self) -> bool { true }
+
+    fn fmt_el_within<'a>(
+        &self,
+        value: &Self::Element,
+        out: &mut std::fmt::Formatter<'a>,
+        _: EnvBindingStrength,
+    ) -> std::fmt::Result {
+        self.total_ring.get_ring().fmt_el(
+            &RingRef::from(self).can_iso(&self.total_ring).unwrap().map_ref(value),
+            out,
+        )
+    }
+
+    fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    where
+        I::Ring: IntegerRing,
+    {
+        self.size(ZZ)
+    }
+
+    fn is_approximate(&self) -> bool { false }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> Clone for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+    C: Clone,
+    J: Clone,
+{
+    fn clone(&self) -> Self {
+        ZnRNSBase {
+            components: self.components.clone(),
+            total_ring: self.total_ring.clone(),
+            unit_vectors: self.unit_vectors.iter().map(Clone::clone).collect(),
+            element_allocator: self.element_allocator.clone(),
+        }
+    }
+}
+
+impl<
+    C1: RingStore,
+    J1: RingStore,
+    C2: RingStore,
+    J2: RingStore,
+    A1: Allocator + Send + Sync + Clone,
+    A2: Allocator + Send + Sync + Clone,
+> CanHomFrom<ZnRNSBase<C2, J2, A2>> for ZnRNSBase<C1, J1, A1>
+where
+    C1::Ring: ZnRing + CanHomFrom<C2::Ring> + CanHomFrom<J1::Ring>,
+    <C1::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J1::Ring>,
+    C2::Ring: ZnRing + CanHomFrom<J2::Ring>,
+    <C2::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J2::Ring>,
+    J1::Ring: IntegerRing,
+    J2::Ring: IntegerRing,
+{
+    type Homomorphism = Vec<<C1::Ring as CanHomFrom<C2::Ring>>::Homomorphism>;
+
+    fn has_canonical_hom(&self, from: &ZnRNSBase<C2, J2, A2>) -> Option<Self::Homomorphism> {
+        if self.components.len() == from.components.len() {
+            self.components
+                .iter()
+                .zip(from.components.iter())
+                .map(|(s, f): (&C1, &C2)| s.get_ring().has_canonical_hom(f.get_ring()).ok_or(()))
+                .collect::<Result<Self::Homomorphism, ()>>()
+                .ok()
+        } else {
+            None
+        }
+    }
+
+    fn map_in_ref(
+        &self,
+        from: &ZnRNSBase<C2, J2, A2>,
+        el: &ZnRNSEl<C2, A2>,
+        hom: &Self::Homomorphism,
+    ) -> Self::Element {
+        assert_eq!(from.len(), el.data.len());
+        self.from_congruence((0..self.len()).map(|i| {
+            self.at(i)
+                .get_ring()
+                .map_in_ref(from.at(i).get_ring(), el.data.at(i), &hom[i])
+        }))
+    }
+
+    fn map_in(&self, from: &ZnRNSBase<C2, J2, A2>, el: ZnRNSEl<C2, A2>, hom: &Self::Homomorphism) -> Self::Element {
+        self.map_in_ref(from, &el, hom)
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> PartialEq for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+    J::Ring: IntegerRing,
+{
+    fn eq(&self, other: &Self) -> bool {
+        self.components.len() == other.components.len()
+            && self
+                .components
+                .iter()
+                .zip(other.components.iter())
+                .all(|(R1, R2)| R1.get_ring() == R2.get_ring())
+    }
+}
+
+impl<
+    C1: RingStore,
+    J1: RingStore,
+    C2: RingStore,
+    J2: RingStore,
+    A1: Allocator + Send + Sync + Clone,
+    A2: Allocator + Send + Sync + Clone,
+> CanIsoFromTo<ZnRNSBase<C2, J2, A2>> for ZnRNSBase<C1, J1, A1>
+where
+    C1::Ring: ZnRing + CanIsoFromTo<C2::Ring> + CanHomFrom<J1::Ring>,
+    <C1::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J1::Ring>,
+    C2::Ring: ZnRing + CanHomFrom<J2::Ring>,
+    <C2::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J2::Ring>,
+    J1::Ring: IntegerRing,
+    J2::Ring: IntegerRing,
+{
+    type Isomorphism = Vec<<C1::Ring as CanIsoFromTo<C2::Ring>>::Isomorphism>;
+
+    fn has_canonical_iso(&self, from: &ZnRNSBase<C2, J2, A2>) -> Option<Self::Isomorphism> {
+        if self.components.len() == from.components.len() {
+            self.components
+                .iter()
+                .zip(from.components.iter())
+                .map(|(s, f): (&C1, &C2)| s.get_ring().has_canonical_iso(f.get_ring()).ok_or(()))
+                .collect::<Result<Self::Isomorphism, ()>>()
+                .ok()
+        } else {
+            None
+        }
+    }
+
+    fn map_out(&self, from: &ZnRNSBase<C2, J2, A2>, el: ZnRNSEl<C1, A1>, iso: &Self::Isomorphism) -> ZnRNSEl<C2, A2> {
+        assert_eq!(self.len(), el.data.len());
+        from.from_congruence((0..from.len()).map(|i| {
+            self.at(i)
+                .get_ring()
+                .map_out(from.at(i).get_ring(), el.data.at(i).clone(), &iso[i])
+        }))
+    }
+}
+
+impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Send + Sync + Clone> CanHomFrom<zn_big::ZnGBBase<K>>
+    for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing + CanIsoFromTo<K::Ring>,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+    K::Ring: IntegerRing,
+{
+    type Homomorphism = (
+        <J::Ring as CanHomFrom<K::Ring>>::Homomorphism,
+        Vec<<C::Ring as CanHomFrom<J::Ring>>::Homomorphism>,
+    );
+
+    fn has_canonical_hom(&self, from: &zn_big::ZnGBBase<K>) -> Option<Self::Homomorphism> {
+        if self.total_ring.get_ring().has_canonical_hom(from).is_some() {
+            Some((
+                self.total_ring.get_ring().has_canonical_hom(from)?,
+                self.components
+                    .iter()
+                    .map(|s| s.get_ring())
+                    .map(|s| s.has_canonical_hom(self.integer_ring().get_ring()).ok_or(()))
+                    .collect::<Result<Vec<_>, ()>>()
+                    .ok()?,
+            ))
+        } else {
+            None
+        }
+    }
+
+    fn map_in(&self, from: &zn_big::ZnGBBase<K>, el: zn_big::ZnGBEl<K>, hom: &Self::Homomorphism) -> ZnRNSEl<C, A> {
+        let lift = from.smallest_positive_lift(el);
+        let mapped_lift = <J::Ring as CanHomFrom<K::Ring>>::map_in(
+            self.integer_ring().get_ring(),
+            from.integer_ring().get_ring(),
+            lift,
+            &hom.0,
+        );
+        self.from_congruence((0..self.len()).map(|i| {
+            self.at(i)
+                .get_ring()
+                .map_in_ref(self.integer_ring().get_ring(), &mapped_lift, &hom.1[i])
+        }))
+    }
+}
+
+impl<C: RingStore, J: RingStore, K: RingStore, A: Allocator + Send + Sync + Clone> CanIsoFromTo<zn_big::ZnGBBase<K>>
+    for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing + CanIsoFromTo<K::Ring>,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+    K::Ring: IntegerRing,
+{
+    // we first map each `lift(x[i]) into `self.total_ring.integer_ring(): J`, then reduce it to
+    // `self.total_ring: Zn<J>`, then compute the value `sum_i lift(x[i]) * unit_vectors[i]`
+    // in `self.total_ring: Zn<J>` and then map this to `from: Zn<K>`.
+    type Isomorphism = (
+        <zn_big::ZnGBBase<J> as CanIsoFromTo<zn_big::ZnGBBase<K>>>::Isomorphism,
+        <zn_big::ZnGBBase<J> as CanHomFrom<J::Ring>>::Homomorphism,
+    );
+
+    fn has_canonical_iso(&self, from: &zn_big::ZnGBBase<K>) -> Option<Self::Isomorphism> {
+        Some((
+            <zn_big::ZnGBBase<J> as CanIsoFromTo<zn_big::ZnGBBase<K>>>::has_canonical_iso(
+                self.total_ring.get_ring(),
+                from,
+            )?,
+            self.total_ring
+                .get_ring()
+                .has_canonical_hom(self.total_ring.integer_ring().get_ring())?,
+        ))
+    }
+
+    #[instrument(skip_all, level = "trace")]
+    fn map_out(
+        &self,
+        from: &zn_big::ZnGBBase<K>,
+        el: Self::Element,
+        (final_iso, red): &Self::Isomorphism,
+    ) -> zn_big::ZnGBEl<K> {
+        assert_eq!(self.len(), el.data.len());
+        let small_integer_ring = self.at(0).integer_ring();
+        let result = <_ as ComputeInnerProduct>::inner_product_ref_fst(
+            self.total_ring.get_ring(),
+            self.components
+                .iter()
+                .zip(el.data.into_iter())
+                .map(|(R, x): (&C, El<C>)| R.smallest_positive_lift(x))
+                .zip(self.unit_vectors.iter())
+                .map(|(x, u)| {
+                    (
+                        u,
+                        self.total_ring.get_ring().map_in(
+                            self.total_ring.integer_ring().get_ring(),
+                            int_cast(x, self.total_ring.integer_ring(), small_integer_ring),
+                            red,
+                        ),
+                    )
+                }),
+        );
+        return <zn_big::ZnGBBase<J> as CanIsoFromTo<zn_big::ZnGBBase<K>>>::map_out(
+            self.total_ring.get_ring(),
+            from,
+            result,
+            final_iso,
+        );
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> CanHomFrom<zn_64b::Zn64BBase>
+    for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing + CanIsoFromTo<StaticRingBase<i64>>,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    type Homomorphism = (
+        <Self as CanHomFrom<zn_big::ZnGBBase<J>>>::Homomorphism,
+        <zn_big::ZnGBBase<J> as CanHomFrom<zn_64b::Zn64BBase>>::Homomorphism,
+    );
+
+    fn has_canonical_hom(&self, from: &zn_64b::Zn64BBase) -> Option<Self::Homomorphism> {
+        Some((
+            self.has_canonical_hom(self.total_ring.get_ring())?,
+            self.total_ring.get_ring().has_canonical_hom(from)?,
+        ))
+    }
+
+    fn map_in(&self, from: &zn_64b::Zn64BBase, el: zn_64b::Zn64BEl, hom: &Self::Homomorphism) -> ZnRNSEl<C, A> {
+        self.map_in(
+            self.total_ring.get_ring(),
+            self.total_ring.get_ring().map_in(from, el, &hom.1),
+            &hom.0,
+        )
+    }
+}
+
+impl<C: RingStore, J: RingStore, K: IntegerRing, A: Allocator + Send + Sync + Clone> CanHomFrom<K>
+    for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring> + CanHomFrom<K>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+    K: ?Sized,
+{
+    type Homomorphism = Vec<<C::Ring as CanHomFrom<K>>::Homomorphism>;
+
+    fn has_canonical_hom(&self, from: &K) -> Option<Self::Homomorphism> {
+        Some(
+            self.components
+                .iter()
+                .map(|R| <C::Ring as CanHomFrom<K>>::has_canonical_hom(R.get_ring(), from).ok_or(()))
+                .collect::<Result<Vec<<C::Ring as CanHomFrom<K>>::Homomorphism>, ()>>()
+                .ok()?,
+        )
+    }
+
+    fn map_in(&self, from: &K, el: K::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.from_congruence(
+            (0..self.len()).map(|i| <C::Ring as CanHomFrom<K>>::map_in_ref(self.at(i).get_ring(), from, &el, &hom[i])),
+        )
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> DivisibilityRing for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        let mut data = Vec::with_capacity_in(self.len(), self.element_allocator.clone());
+        for i in 0..self.len() {
+            data.push(self.at(i).checked_div(lhs.data.at(i), rhs.data.at(i))?);
+        }
+        return Some(ZnRNSEl { data });
+    }
+
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> HashableElRing for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring> + HashableElRing,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
+        for (i, el) in (0..self.components.len()).zip(el.data.iter()) {
+            self.components[i].hash(el, h);
+        }
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FiniteRingSpecializable for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.execute() }
+}
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> FiniteRing for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn random_element<G: FnMut() -> u64>(&self, mut rng: G) -> ZnRNSEl<C, A> {
+        self.from_congruence((0..self.len()).map(|i| self.at(i).random_element(&mut rng)))
+    }
+
+    fn size<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+    where
+        I::Ring: IntegerRing,
+    {
+        if ZZ.get_ring().representable_bits().is_none()
+            || self.integer_ring().abs_log2_ceil(self.modulus()) < ZZ.get_ring().representable_bits()
+        {
+            Some(int_cast(self.modulus().clone(), ZZ, self.integer_ring()))
+        } else {
+            None
+        }
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> PrincipalIdealRing for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        let mut data = Vec::with_capacity_in(self.len(), self.element_allocator.clone());
+        for i in 0..self.len() {
+            data.push(self.at(i).checked_div_min(lhs.data.at(i), rhs.data.at(i))?);
+        }
+        return Some(ZnRNSEl { data });
+    }
+
+    fn extended_ideal_gen(
+        &self,
+        lhs: &Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element, Self::Element) {
+        let mut result = (self.zero(), self.zero(), self.zero());
+        for (i, Zn) in self.as_iter().enumerate() {
+            (result.0.data[i], result.1.data[i], result.2.data[i]) = Zn.extended_ideal_gen(&lhs.data[i], &rhs.data[i]);
+        }
+        return result;
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> ZnRing for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring>,
+    J::Ring: IntegerRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    type IntegerRingBase = J::Ring;
+    type IntegerRing = J;
+
+    fn integer_ring(&self) -> &Self::IntegerRing { self.total_ring.integer_ring() }
+
+    fn modulus(&self) -> &El<Self::IntegerRing> { self.total_ring.modulus() }
+
+    fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
+        self.total_ring
+            .smallest_positive_lift(<Self as CanIsoFromTo<zn_big::ZnGBBase<J>>>::map_out(
+                self,
+                self.total_ring.get_ring(),
+                el,
+                &<Self as CanIsoFromTo<zn_big::ZnGBBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring())
+                    .unwrap(),
+            ))
+    }
+
+    fn smallest_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
+        self.total_ring
+            .smallest_lift(<Self as CanIsoFromTo<zn_big::ZnGBBase<J>>>::map_out(
+                self,
+                self.total_ring.get_ring(),
+                el,
+                &<Self as CanIsoFromTo<zn_big::ZnGBBase<J>>>::has_canonical_iso(self, self.total_ring.get_ring())
+                    .unwrap(),
+            ))
+    }
+
+    fn is_field(&self) -> bool { self.components.len() == 1 && self.components[0].is_field() }
+
+    fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
+        debug_assert!(!self.integer_ring().is_neg(&x));
+        debug_assert!(self.integer_ring().is_lt(&x, self.modulus()));
+        RingRef::from(self).can_hom(self.integer_ring()).unwrap().map(x)
+    }
+}
+
+impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> SerializableElementRing for ZnRNSBase<C, J, A>
+where
+    C::Ring: ZnRing + CanHomFrom<J::Ring> + SerializableElementRing,
+    J::Ring: IntegerRing + SerializableElementRing,
+    <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
+{
+    fn serialize<S>(&self, el: &Self::Element, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        if serializer.is_human_readable() {
+            self.total_ring.get_ring().serialize(
+                &RingRef::from(self).can_iso(&self.total_ring).unwrap().map_ref(el),
+                serializer,
+            )
+        } else {
+            let el_congruence = self.get_congruence(el);
+            SerializableNewtypeStruct::new(
+                "RNSZnEl",
+                SerializableSeq::new_with_len(
+                    (0..self.len()).map(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i))),
+                    self.len(),
+                ),
+            )
+            .serialize(serializer)
+        }
+    }
+
+    fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        if deserializer.is_human_readable() {
+            Ok(RingRef::from(self)
+                .can_hom(&self.total_ring)
+                .unwrap()
+                .map(self.total_ring.get_ring().deserialize(deserializer)?))
+        } else {
+            let dummy_ring = self.at(0);
+            DeserializeSeedNewtypeStruct::new(
+                "RNSZnEl",
+                DeserializeSeedSeq::new(
+                    self.as_iter()
+                        .map(|ring| DeserializeWithRing::new(ring))
+                        .chain([DeserializeWithRing::new(dummy_ring)].into_iter()),
+                    Vec::with_capacity_in(self.len(), self.element_allocator.clone()),
+                    |mut current, next| {
+                        current.push(next);
+                        current
+                    },
+                ),
+            )
+            .deserialize(deserializer)
+            .map(|result| ZnRNSEl { data: result })
+        }
+    }
+}
+
+#[cfg(test)]
+use crate::primitive_int::StaticRing;
+
+#[cfg(test)]
+const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
+
+#[test]
+fn test_ring_axioms() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+    crate::ring::generic_tests::test_ring_axioms(
+        &ring,
+        EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)),
+    )
+}
+
+#[test]
+fn test_hash_axioms() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+    crate::ring::generic_tests::test_hash_axioms(
+        &ring,
+        EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)),
+    )
+}
+
+#[test]
+fn test_map_in_map_out() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring1 = ZnRNS::create_from_primes(vec![7, 11, 17], ZZi64);
+    let ring2 = zn_big::ZnGB::new(ZZi64, 7 * 11 * 17);
+    for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
+        let value = ring2.int_hom().map(x);
+        assert!(ring2.eq_el(
+            &value,
+            &ring1.can_iso(&ring2).unwrap().map(ring1.coerce(&ring2, value.clone()))
+        ));
+    }
+}
+
+#[test]
+fn test_canonical_iso_axioms_zn_big() {
+    feanor_tracing::DelayedLogger::init_test();
+    let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
+    let to = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+
+    let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11 * 65537);
+    let to = ZnRNS::create_from_primes(vec![7, 11, 65537], StaticRing::<i128>::RING);
+    crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x * 65536)));
+    crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x * 65536)));
+}
+
+#[test]
+fn test_canonical_hom_axioms_static_int() {
+    feanor_tracing::DelayedLogger::init_test();
+    let from = StaticRing::<i32>::RING;
+    let to = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+    crate::ring::generic_tests::test_hom_axioms(
+        &from,
+        to,
+        EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)),
+    );
+}
+
+#[test]
+fn test_zn_ring_axioms() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+    super::generic_tests::test_zn_axioms(ring);
+}
+
+#[test]
+fn test_zn_map_in_large_int() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZbig);
+    super::generic_tests::test_map_in_large_int(ring);
+
+    let R = ZnRNS::create_from_primes(vec![3, 5, 7], ZZbig);
+    let S = ZZbig;
+    assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    feanor_tracing::DelayedLogger::init_test();
+    let R = ZnRNS::create_from_primes(vec![5], ZZbig);
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..5).map(|x| R.int_hom().map(x)));
+
+    let R = ZnRNS::create_from_primes(vec![3, 5], ZZbig);
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..15).map(|x| R.int_hom().map(x)));
+
+    let R = ZnRNS::create_from_primes(vec![2, 3, 5], ZZbig);
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&R, (0..30).map(|x| R.int_hom().map(x)));
+
+    let R = ZnRNS::create_from_primes(vec![3, 5, 2], ZZbig);
+    let modulo = R.int_hom();
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        &R,
+        [-1, 0, 1, 3, 2, 4, 5, 9, 18, 15, 30].into_iter().map(|x| modulo.map(x)),
+    );
+}
+
+#[test]
+fn test_finite_ring_axioms() {
+    feanor_tracing::DelayedLogger::init_test();
+    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+        vec![3, 5, 7, 11],
+        ZZi64,
+    ));
+    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+        vec![3, 5],
+        ZZi64,
+    ));
+    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+        vec![3],
+        ZZi64,
+    ));
+    crate::ring_impls::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+        vec![2],
+        ZZi64,
+    ));
+}
+
+#[test]
+fn test_not_prime() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::new(
+        vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)],
+        ZZi64,
+    );
+    let equivalent_ring = zn_big::ZnGB::new(ZZi64, 15 * 7);
+    crate::ring::generic_tests::test_ring_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
+    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(
+        ring.can_hom(&equivalent_ring).unwrap(),
+        (0..105).map(|x| equivalent_ring.int_hom().map(x)),
+    );
+    crate::homomorphism::generic_tests::test_homomorphism_axioms(
+        ring.can_iso(&equivalent_ring).unwrap(),
+        (0..105).map(|x| ring.int_hom().map(x)),
+    );
+}
+
+#[test]
+fn test_serialization() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::create_from_primes(vec![3, 5, 7], ZZi64);
+    crate::ring_properties::serialization::generic_tests::test_serialization(&ring, (0..105).map(|x| ring.int_hom().map(x)));
+}
+
+#[test]
+#[should_panic]
+fn test_not_coprime() {
+    _ = ZnRNS::new(
+        vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(35)],
+        ZZi64,
+    );
+}
+
+#[test]
+fn test_format() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZnRNS::new(
+        [
+            72057594035352641,
+            72057594035418113,
+            72057594036334721,
+            72057594036945793,
+        ]
+        .iter()
+        .map(|p| zn_64b::Zn64B::new(*p))
+        .collect(),
+        ZZbig,
+    );
+    assert_eq!("1", format!("{}", ring.formatted_el(&ring.int_hom().map(1))));
+}

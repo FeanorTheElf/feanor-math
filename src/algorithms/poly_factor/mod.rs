@@ -2,15 +2,15 @@ use finite::*;
 use rational::*;
 
 use super::poly_gcd::PolyTFracGCDRing;
-use crate::field::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::pid::*;
-use crate::ring::*;
-use crate::rings::finite::FiniteRing;
-use crate::rings::poly::*;
-use crate::rings::rational::*;
-use crate::rings::zn::zn_64b::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::*;
+use crate::prelude::*;
+use crate::ring_impls::finite::FiniteRing;
+use crate::ring_impls::poly::*;
+use crate::ring_impls::rational::*;
+use crate::ring_impls::zn::zn_64b::*;
 
 /// Contains an implementation of the Cantor-Zassenhaus algorithm for
 /// finding factors of univariate polynomials over finite fields.
@@ -54,7 +54,7 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     /// # use feanor_math::field::*;
     /// # use feanor_math::algorithms::poly_factor::*;
     /// // Unfortunately, the internal gcd computations will *extremely* blow up coefficients;
-    /// // If you are unsure, use BigIntRing::RING as underlying implementation of ZZ
+    /// // If you are unsure, use ZZbig as underlying implementation of ZZ
     /// let ZZ = StaticRing::<i128>::RING;
     /// let QQ = RationalField::new(ZZ);
     /// let P = dense_poly::DensePolyRing::new(QQ, "X");
@@ -145,14 +145,14 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::zn::*;
+use crate::ring_impls::zn::*;
 
 #[test]
 fn test_factor_rational_poly() {
     feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(BigIntRing::RING);
+    let QQ = RationalField::new(ZZbig);
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
     let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
@@ -190,7 +190,7 @@ fn test_factor_rational_poly() {
 #[test]
 fn test_factor_nonmonic_poly() {
     feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(BigIntRing::RING);
+    let QQ = RationalField::new(ZZbig);
     let incl = QQ.int_hom();
     let poly_ring = DensePolyRing::new(&QQ, "X");
     let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());

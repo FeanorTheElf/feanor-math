@@ -4,19 +4,19 @@ use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tracing::{Level, Span, instrument, span};
 
 use crate::delegate::{UnwrapHom, WrapHom};
-use crate::divisibility::{DivisibilityRingStore, Domain};
+use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::pid::{EuclideanRingStore, *};
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::{EuclideanRingStore, *};
 use crate::reduce_lift::lift_poly_eval::{LiftPolyEvalRing, LiftPolyEvalRingReductionMap};
-use crate::ring::*;
-use crate::rings::field::{AsField, AsFieldBase};
-use crate::rings::finite::*;
-use crate::rings::fraction::FractionFieldStore;
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::*;
-use crate::rings::rational::*;
-use crate::specialization::FiniteRingOperation;
+use crate::prelude::*;
+use crate::ring_impls::field::{AsField, AsFieldBase};
+use crate::ring_impls::finite::*;
+use crate::ring_impls::fraction::FractionFieldStore;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::*;
+use crate::ring_impls::rational::*;
+use crate::ring_properties::specialization::FiniteRingOperation;
 
 /// Computes the resultant of two polynomials `f` and `g` over a finite field.
 ///
@@ -140,7 +140,7 @@ pub trait ComputeResultantRing: RingBase {
     /// use feanor_math::ring::*;
     /// use feanor_math::rings::poly::dense_poly::DensePolyRing;
     /// use feanor_math::rings::poly::*;
-    /// let ZZ = BigIntRing::RING;
+    /// let ZZ = ZZbig;
     /// let ZZX = DensePolyRing::new(ZZ, "X");
     /// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1]);
     /// // the discrimiant is the resultant of f and f'
@@ -248,16 +248,16 @@ where
 #[cfg(test)]
 use crate::algorithms::buchberger::buchberger;
 #[cfg(test)]
-use crate::integer::BigIntRing;
+use crate::ring_properties::integer::BigIntRing;
 #[cfg(test)]
-use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
+use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
-use crate::rings::multivariate::*;
+use crate::ring_impls::multivariate::*;
 
 #[test]
 #[allow(deprecated)]
 fn test_resultant_local_polynomial() {
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let QQ = RationalField::new(ZZ);
     // we eliminate `Y`, so add it as the outer indeterminate
     let QQX = DensePolyRing::new(&QQ, "X");
@@ -323,7 +323,7 @@ fn test_resultant_local_polynomial() {
 #[test]
 fn test_resultant_local_integer() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
     let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(32) + 1, X.pow_ref(2) - X - 1]);
@@ -352,7 +352,7 @@ fn test_resultant_local_integer() {
 #[ignore]
 fn test_resultant_large() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let ZZX = DensePolyRing::new(ZZ, "X");
 
     let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2]);

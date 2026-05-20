@@ -9,14 +9,15 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
 use crate::algorithms::matmul::StrassenHint;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::*;
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::ring::*;
-use crate::serialization::SerializableElementRing;
-use crate::specialization::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::*;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::prelude::*;
+use crate::ring::{EnvBindingStrength, HashableElRing};
+use crate::ring_properties::serialization::SerializableElementRing;
+use crate::ring_properties::specialization::*;
 use crate::{
     algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
 };
@@ -538,33 +539,33 @@ fn test_ixx_bit_op() {
 #[test]
 fn test_get_uniformly_random() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i8>::RING);
-    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i16>::RING);
-    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i32>::RING);
-    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i64>::RING);
-    crate::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i128>::RING);
+    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i8>::RING);
+    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i16>::RING);
+    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i32>::RING);
+    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(ZZi64);
+    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i128>::RING);
 }
 
 #[test]
 fn test_integer_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::integer::generic_tests::test_integer_axioms(
+    crate::ring_properties::integer::generic_tests::test_integer_axioms(
         StaticRing::<i8>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::integer::generic_tests::test_integer_axioms(
+    crate::ring_properties::integer::generic_tests::test_integer_axioms(
         StaticRing::<i16>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::integer::generic_tests::test_integer_axioms(
+    crate::ring_properties::integer::generic_tests::test_integer_axioms(
         StaticRing::<i32>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::integer::generic_tests::test_integer_axioms(
-        StaticRing::<i64>::RING,
+    crate::ring_properties::integer::generic_tests::test_integer_axioms(
+        ZZi64,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::integer::generic_tests::test_integer_axioms(
+    crate::ring_properties::integer::generic_tests::test_integer_axioms(
         StaticRing::<i128>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
@@ -573,23 +574,23 @@ fn test_integer_axioms() {
 #[test]
 fn test_euclidean_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
         StaticRing::<i8>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
         StaticRing::<i16>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
         StaticRing::<i32>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
-        StaticRing::<i64>::RING,
+    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+        ZZi64,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::pid::generic_tests::test_euclidean_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
         StaticRing::<i128>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
@@ -598,20 +599,20 @@ fn test_euclidean_ring_axioms() {
 #[test]
 fn test_principal_ideal_ring_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2].into_iter());
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(StaticRing::<i8>::RING, [-2, -1, 0, 1, 2].into_iter());
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
         StaticRing::<i16>::RING,
         [-2, -1, 0, 1, 2, 3, 4].into_iter(),
     );
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
         StaticRing::<i32>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
-        StaticRing::<i64>::RING,
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+        ZZi64,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
-    crate::pid::generic_tests::test_principal_ideal_ring_axioms(
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
         StaticRing::<i128>::RING,
         [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
     );
@@ -672,9 +673,9 @@ fn test_prepared_div() {
 #[test]
 fn test_serialization() {
     feanor_tracing::DelayedLogger::init_test();
-    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i8>::RING.into());
-    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i16>::RING.into());
-    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i32>::RING.into());
-    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i64>::RING.into());
-    crate::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i128>::RING.into());
+    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i8>::RING.into());
+    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i16>::RING.into());
+    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i32>::RING.into());
+    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZZi64.into());
+    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i128>::RING.into());
 }

@@ -5,12 +5,12 @@ use tracing::instrument;
 use crate::algorithms::cyclotomic::{get_prim_root_of_unity_zn, is_prim_root_of_unity_general};
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::*;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::float_complex::Complex64Base;
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::float_complex::Complex64Base;
+use crate::ring_impls::zn::*;
 use crate::seq::{SwappableVectorViewMut, VectorFn};
 
 /// Implementation of the Cooley-Tukey FFT algorithm for power-of-three lengths.
@@ -575,9 +575,9 @@ where
 use std::array::from_fn;
 
 #[cfg(test)]
-use crate::rings::zn::zn_64b::*;
+use crate::ring_impls::zn::zn_64b::*;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Fp;
+use crate::ring_impls::zn::zn_static::Fp;
 
 #[test]
 fn test_radix3_butterflies() {

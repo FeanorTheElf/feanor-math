@@ -5,12 +5,12 @@ use elsa::sync::FrozenVec;
 use rayon::iter::{IntoParallelIterator, ParallelIterator};
 use tracing::{Level, Span, event, instrument, span};
 
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::field::Field;
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::field::Field;
 use crate::homomorphism::Homomorphism;
-use crate::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
-use crate::ring::*;
-use crate::rings::multivariate::*;
+use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
+use crate::prelude::*;
+use crate::ring_impls::multivariate::*;
 use crate::seq::*;
 
 #[stability::unstable(feature = "enable")]
@@ -656,15 +656,15 @@ where
 }
 
 #[cfg(test)]
-use crate::integer::BigIntRing;
+use crate::ring_properties::integer::BigIntRing;
 #[cfg(test)]
-use crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl;
+use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
 #[cfg(test)]
-use crate::rings::poly::{PolyRingStore, dense_poly};
+use crate::ring_impls::poly::{PolyRingStore, dense_poly};
 #[cfg(test)]
-use crate::rings::rational::RationalField;
+use crate::ring_impls::rational::RationalField;
 #[cfg(test)]
-use crate::rings::zn::zn_static;
+use crate::ring_impls::zn::zn_static;
 
 #[test]
 fn test_buchberger_small() {
@@ -852,7 +852,7 @@ fn test_gb_local_ring() {
 #[test]
 fn test_gb_lex() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let QQ = RationalField::new(ZZ);
     let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
     let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| {

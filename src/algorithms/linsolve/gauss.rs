@@ -1,9 +1,9 @@
 use tracing::instrument;
 
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::local::{PrincipalLocalRing, PrincipalLocalRingStore};
 use crate::matrix::{AsPointerToSlice, SubmatrixMut, TransposableSubmatrixMut};
-use crate::ring::*;
+use crate::prelude::*;
 
 ///
 /// Computes the largest square submatrix of `A` that has nonzero determinant. In particular,
@@ -28,7 +28,7 @@ use crate::ring::*;
 /// # use feanor_math::rings::local::*;
 /// # use feanor_math::algorithms;
 /// # use feanor_math::matrix::SubmatrixMut;
-/// let ZZ = StaticRing::<i64>::RING;
+/// let ZZ = ZZi64;
 /// let QQ = RationalField::new(ZZ);
 /// // due to a suboptimal interface of `RationalField`, it currently doesn't implement `PrincipalLocalRing`;
 /// // Thus we must use a wrapper

@@ -9,15 +9,15 @@ pub mod exact;
 #[cfg(test)]
 use crate::homomorphism::*;
 #[cfg(test)]
-use crate::integer::IntegerRing;
+use crate::ring_properties::integer::IntegerRing;
 #[cfg(test)]
 use crate::matrix::*;
 #[cfg(test)]
 use crate::primitive_int::StaticRing;
 #[cfg(test)]
-use crate::ring::*;
+use crate::prelude::*;
 #[cfg(test)]
-use crate::rings::rational::RationalFieldBase;
+use crate::ring_impls::rational::RationalFieldBase;
 #[cfg(test)]
 use crate::seq::*;
 
@@ -102,8 +102,8 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
     use std::alloc::Global;
 
     use crate::algorithms::linsolve::smith::solve_right_using_pre_smith;
-    use crate::divisibility::DivisibilityRingStore;
-    use crate::pid::PrincipalIdealRingStore;
+    use crate::ring_properties::divisibility::DivisibilityRingStore;
+    use crate::ring_properties::pid::PrincipalIdealRingStore;
 
     let n = lhs.row_count();
     assert_eq!(n, rhs.row_count());
@@ -166,7 +166,7 @@ fn assert_rational_lattice_isomorphic<R, S, I, V1, V2>(
 #[test]
 fn test_assert_lattice_isomorphic() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
 
     let lhs = [DerefArray::from([1, 2, 0]), DerefArray::from([1, 2, 4])];
     let rhs = [DerefArray::from([1, -2]), DerefArray::from([1, 2])];
@@ -176,7 +176,7 @@ fn test_assert_lattice_isomorphic() {
 #[test]
 #[should_panic]
 fn test_assert_lattice_not_isomorphic() {
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
 
     let lhs = [DerefArray::from([1, 2, 0]), DerefArray::from([1, 3, 4])];
     let rhs = [DerefArray::from([1, -2]), DerefArray::from([1, 2])];

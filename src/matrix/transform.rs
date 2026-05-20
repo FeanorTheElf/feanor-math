@@ -1,7 +1,7 @@
 use std::marker::PhantomData;
 
 use super::{AsPointerToSlice, OwnedMatrix, SubmatrixMut};
-use crate::ring::*;
+use crate::prelude::*;
 
 /// A trait for a "target" that can "consume" elementary operations on matrices.
 ///  

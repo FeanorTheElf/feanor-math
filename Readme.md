@@ -182,13 +182,7 @@ This library is not "just" a collection of algorithms on certain rings, but is s
 In particular, a user should be able to write high-performance algorithms that directly operate on provided rings, or rings that work seamlessly with provided algorithms.
 First, we show demonstrate how one could implement the Fermat primality test.
 ```rust
-use feanor_math::homomorphism::*;
-use feanor_math::assert_el_eq;
-use feanor_math::ring::*;
-use feanor_math::primitive_int::*;
-use feanor_math::rings::zn::zn_big::*;
-use feanor_math::rings::zn::*;
-use feanor_math::rings::finite::*;
+use feanor_math::prelude::*;
 use feanor_math::algorithms;
 use oorandom;
 
@@ -198,9 +192,7 @@ fn fermat_is_prime(n: i64) -> bool {
     // a such that this is not the case. 
     // Note that this is not always the case, and so more advanced primality tests should 
     // be used in practice. This is just a proof of concept.
-
-    let ZZ = StaticRing::<i64>::RING;
-    let Zn = ZnGB::new(ZZ, n); // the ring Z/nZ
+    let Zn = ZnGB::new(ZZi64, n); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
     let mut rng = oorandom::Rand64::new(1);
@@ -214,9 +206,9 @@ fn fermat_is_prime(n: i64) -> bool {
     return true;
 }
 
-assert!(algorithms::miller_rabin::is_prime(StaticRing::<i64>::RING, &91, 6) == fermat_is_prime(91));
+assert!(algorithms::miller_rabin::is_prime(ZZi64, &91, 6) == fermat_is_prime(91));
 ```
-If we want to support arbitrary rings of integers - e.g. `BigIntRing::RING`, which is a simple
+If we want to support arbitrary rings of integers - e.g. `ZZbig`, which is a simple
 implementation of arbitrary-precision integers - we could make the function generic as
 
 ```rust
@@ -259,8 +251,8 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
 
 // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
 // check our implementation
-let n = BigIntRing::RING.int_hom().map(91);
-assert!(algorithms::miller_rabin::is_prime(BigIntRing::RING, &n, 6) == fermat_is_prime(BigIntRing::RING, n));
+let n = ZZbig.int_hom().map(91);
+assert!(algorithms::miller_rabin::is_prime(ZZbig, &n, 6) == fermat_is_prime(ZZbig, n));
 ```
 This function now works with any ring that implements `IntegerRing`, a subtrait of `RingBase`.
 
@@ -532,7 +524,7 @@ However, I did not have the time so far to thoroughly optimize many of the algor
  - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
  - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`SparsePolyRing`] vs [`DensePolyRing`], [`KaratsubaAlgorithm`] vs [`NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
 
-[`IntegerRing`]: crate::integer::IntegerRing
+[`IntegerRing`]: crate::ring_properties::integer::IntegerRing
 [`StaticRing`]: crate::primitive_int::StaticRing
 [`RustBigintRing`]: crate::rings::rust_bigint::RustBigintRing
 [`MPZ`]: crate::rings::mpir::MPZ

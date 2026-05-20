@@ -4,16 +4,16 @@ use squarefree_part::poly_power_decomposition_local;
 use tracing::instrument;
 
 use crate::delegate::DelegateRing;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::pid::*;
+use crate::ring_properties::pid::*;
 use crate::reduce_lift::lift_poly_factors::*;
-use crate::ring::*;
-use crate::rings::field::*;
-use crate::rings::finite::*;
-use crate::rings::poly::dense_poly::*;
-use crate::rings::poly::*;
-use crate::specialization::FiniteRingOperation;
+use crate::prelude::*;
+use crate::ring_impls::field::*;
+use crate::ring_impls::finite::*;
+use crate::ring_impls::poly::dense_poly::*;
+use crate::ring_impls::poly::*;
+use crate::ring_properties::specialization::FiniteRingOperation;
 
 /// Contains an implementation of factoring polynomials over finite fields.
 pub mod finite;
@@ -40,7 +40,7 @@ pub mod squarefree_part;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::primitive_int::*;
-/// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let ZZX = DensePolyRing::new(ZZi64, "X");
 /// let [f, g, expected] =
 ///     ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, X.pow_ref(2) - 1, X - 1]);
 /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
@@ -55,7 +55,7 @@ pub mod squarefree_part;
 /// defined by the trait [`PolyLiftFactorsDomain`], and there is a blanket impl `R: PolyTFracGCDRing
 /// where R: PolyLiftFactorsDomain`.
 ///
-/// Note that this blanket impl used [`crate::specialization::FiniteRingSpecializable`] to use the
+/// Note that this blanket impl used [`crate::ring_properties::specialization::FiniteRingSpecializable`] to use the
 /// standard algorithm whenever the corresponding ring is actually finite. In other words, despite
 /// the fact that the blanket implementation for `PolyLiftFactorsDomain`s also applies to finite
 /// fields, the local implementation is not actually used in these cases.
@@ -74,7 +74,7 @@ pub trait PolyTFracGCDRing {
     /// # use feanor_math::rings::poly::*;
     /// # use feanor_math::rings::poly::dense_poly::*;
     /// # use feanor_math::primitive_int::*;
-    /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let ZZX = DensePolyRing::new(ZZi64, "X");
     /// let [f] = ZZX.with_wrapped_indeterminate(|X| [1 - X.pow_ref(2)]);
     /// assert_el_eq!(
     ///     &ZZX,
@@ -118,7 +118,7 @@ pub trait PolyTFracGCDRing {
     /// # use feanor_math::rings::poly::*;
     /// # use feanor_math::rings::poly::dense_poly::*;
     /// # use feanor_math::primitive_int::*;
-    /// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let ZZX = DensePolyRing::new(ZZi64, "X");
     /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, 2 * X.pow_ref(2) - 2, X - 1]);
     /// // note that `expected` is not the gcd over `ZZ[X]` (which would be `2 X - 2`), but `X - 1`, i.e. the (monic) gcd over `QQ[X]`
     /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
@@ -223,7 +223,7 @@ where
 /// # use feanor_math::rings::poly::dense_poly::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::algorithms::poly_gcd::*;
-/// let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let poly_ring = DensePolyRing::new(ZZi64, "X");
 /// let [f, f_sqrt] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 2 * X + 1, X + 1]);
 /// assert_el_eq!(&poly_ring, f_sqrt, poly_root(&poly_ring, &f, 2).unwrap());
 /// ```
@@ -378,18 +378,18 @@ where
 }
 
 #[cfg(test)]
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 #[cfg(test)]
-use crate::rings::extension::galois_field::GaloisField;
+use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::rings::zn::ZnRingStore;
+use crate::ring_impls::zn::ZnRingStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64b;
+use crate::ring_impls::zn::zn_64b;
 
 #[test]
 fn test_poly_root() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = BigIntRing::RING;
+    let ring = ZZbig;
     let poly_ring = DensePolyRing::new(ring, "X");
     let [f] = poly_ring.with_wrapped_indeterminate(|X| {
         [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]

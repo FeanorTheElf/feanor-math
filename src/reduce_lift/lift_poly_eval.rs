@@ -1,11 +1,11 @@
 use crate::algorithms::linsolve::LinSolveRing;
 use crate::algorithms::resultant::ComputeResultantRing;
-use crate::divisibility::{DivisibilityRing, Domain};
-use crate::field::*;
+use crate::ring_properties::divisibility::{DivisibilityRing, Domain};
+use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::ring::*;
-use crate::rings::finite::FiniteRing;
-use crate::specialization::FiniteRingSpecializable;
+use crate::prelude::*;
+use crate::ring_impls::finite::FiniteRing;
+use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 /// Trait for rings that can be temporarily replaced by an extension when we need more points,
 /// e.g. for interpolation.
@@ -587,7 +587,7 @@ where
 /// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
 ///
 /// // now we can use `InterpolationBaseRing`-functionality
-/// let ring = MyRingWrapper(StaticRing::<i64>::RING.into());
+/// let ring = MyRingWrapper(ZZi64.into());
 /// let (embedding, points) = ToExtRingMap::for_interpolation(&ring, 3);
 /// assert_eq!(0, points[0]);
 /// assert_eq!(-1, points[1]);
@@ -632,7 +632,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
             }
 
             fn interpolation_points<'a>(&'a self, count: usize) -> (Self::ExtendedRing<'a>, Vec<El<Self::ExtendedRing<'a>>>) {
-                assert_eq!(0, self.characteristic($crate::primitive_int::StaticRing::<i64>::RING).unwrap());
+                assert_eq!(0, self.characteristic($crate::prelude::ZZi64).unwrap());
                 let ring = $crate::ring::RingRef::from(self);
                 // yield both positive and negative integers, since that keeps the absolute value of the points as small as possible
                 // (this will improve performance in some cases that are sensitive to the size of coefficients)
@@ -663,13 +663,13 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
         impl<$($gen_args)*> $crate::reduce_lift::lift_poly_eval::LiftPolyEvalRing for $int_ring_type
             where $($constraints)*
         {
-            type LocalComputationData<'ring> = $crate::rings::zn::zn_rns::ZnRNS<$crate::rings::field::AsField<$crate::rings::zn::zn_64b::Zn64B>, RingRef<'ring, Self>>
+            type LocalComputationData<'ring> = $crate::ring_impls::zn::zn_rns::ZnRNS<$crate::ring_impls::field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>, RingRef<'ring, Self>>
                 where Self: 'ring;
 
-            type LocalRing<'ring> = $crate::rings::field::AsField<$crate::rings::zn::zn_64b::Zn64B>
+            type LocalRing<'ring> = $crate::ring_impls::field::AsField<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
 
-            type LocalRingBase<'ring> = $crate::rings::field::AsFieldBase<$crate::rings::zn::zn_64b::Zn64B>
+            type LocalRingBase<'ring> = $crate::ring_impls::field::AsFieldBase<$crate::ring_impls::zn::zn_64b::Zn64B>
                 where Self: 'ring;
 
             fn ln_pseudo_norm(&self, el: &Self::Element) -> f64 {
@@ -679,14 +679,14 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut prime_it = $crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::rings::zn::zn_64b::Zn64B::new(p as u64));
+                let mut prime_it = $crate::reduce_lift::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::ring_impls::zn::zn_64b::Zn64B::new(p as u64));
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
-                    ln_current += (*$crate::rings::zn::ZnRingStore::modulus(&Fp) as f64).ln();
+                    ln_current += (*$crate::ring_impls::zn::ZnRingStore::modulus(&Fp) as f64).ln();
                     primes.push(Fp);
                 }
-                return $crate::rings::zn::zn_rns::ZnRNS::new(
-                    primes.into_iter().map(|Fp| $crate::rings::field::AsField::from($crate::rings::field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
+                return $crate::ring_impls::zn::zn_rns::ZnRNS::new(
+                    primes.into_iter().map(|Fp| $crate::ring_impls::field::AsField::from($crate::ring_impls::field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
                     RingRef::from(self)
                 );
             }
@@ -712,7 +712,7 @@ macro_rules! impl_eval_poly_locally_for_ZZ {
             fn lift_combine<'ring>(&self, computation: &Self::LocalComputationData<'ring>, el: &[<Self::LocalRingBase<'ring> as RingBase>::Element]) -> Self::Element
                 where Self: 'ring
             {
-                <_ as $crate::rings::zn::ZnRingStore>::smallest_lift(computation, computation.from_congruence(el.iter().copied()))
+                <_ as $crate::ring_impls::zn::ZnRingStore>::smallest_lift(computation, computation.from_congruence(el.iter().copied()))
             }
         }
     };

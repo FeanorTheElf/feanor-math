@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::ring::*;
+use crate::prelude::*;
 use crate::seq::*;
 
 /// Contains the implementation [`bluestein::BluesteinFFT`] of the Bluestein FFT algorithm

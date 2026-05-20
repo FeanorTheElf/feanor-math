@@ -4,10 +4,10 @@ use std::ops::Range;
 use tracing::{Level, event, instrument};
 
 use crate::algorithms::matmul::schoolbook_matmul;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::matrix::*;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
+use crate::prelude::*;
 
 fn matrix_add_add_sub<R, V1, V2, V3, V4, const T1: bool, const T2: bool, const T3: bool, const T4: bool>(
     a: TransposableSubmatrix<V1, El<R>, T1>,
@@ -686,7 +686,7 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
         m = rhs.col_count()
     );
 
-    const ZZ: StaticRing<i64> = StaticRing::<i64>::RING;
+    const ZZ: StaticRing<i64> = ZZi64;
 
     let max_block_size_log2 = [
         ZZ.abs_log2_floor(&lhs.row_count().try_into().unwrap()),
@@ -949,19 +949,19 @@ fn test_dispatch_strassen_more_levels() {
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(result.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
         &mut memory,
     );
 
-    let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, StaticRing::<i64>::RING);
+    let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, ZZi64);
     schoolbook_matmul::<_, _, _, _, false, false, false, false>(
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(expected.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
     );
 
-    assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
+    assert_matrix_eq!(&ZZi64, &expected, &result);
     assert!(memory.iter().all(|x| *x != i64::MIN));
 }
 
@@ -980,7 +980,7 @@ fn test_dispatch_strassen_add_assign_more_levels() {
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(result.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
         &mut memory,
     );
 
@@ -990,10 +990,10 @@ fn test_dispatch_strassen_add_assign_more_levels() {
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(expected.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
     );
 
-    assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
+    assert_matrix_eq!(&ZZi64, &expected, &result);
     assert!(memory.iter().all(|x| *x != i64::MIN));
 }
 
@@ -1010,19 +1010,19 @@ fn test_strassen_non_power_of_two() {
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(result.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
         &Global,
     );
 
-    let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(15, 17, StaticRing::<i64>::RING);
+    let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(15, 17, ZZi64);
     schoolbook_matmul::<_, _, _, _, false, false, false, false>(
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(expected.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
     );
 
-    assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
+    assert_matrix_eq!(&ZZi64, &expected, &result);
 }
 
 #[test]
@@ -1039,7 +1039,7 @@ fn test_strassen_non_power_of_two_add_assign() {
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(result.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
         &Global,
     );
 
@@ -1049,8 +1049,8 @@ fn test_strassen_non_power_of_two_add_assign() {
         TransposableSubmatrix::from(a.data()),
         TransposableSubmatrix::from(b.data()),
         TransposableSubmatrixMut::from(expected.data_mut()),
-        StaticRing::<i64>::RING,
+        ZZi64,
     );
 
-    assert_matrix_eq!(&StaticRing::<i64>::RING, &expected, &result);
+    assert_matrix_eq!(&ZZi64, &expected, &result);
 }

@@ -1,0 +1,1197 @@
+use std::alloc::{Allocator, Global};
+use std::fmt::{Debug, Formatter};
+use std::marker::PhantomData;
+use std::sync::Arc;
+
+use extension_impl::FreeAlgebraImplBase;
+use feanor_serde::newtype_struct::*;
+use serde::de::DeserializeSeed;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use sparse::SparseMapVector;
+use tracing::instrument;
+use zn_64b::Zn64B;
+
+use crate::MAX_PROBABILISTIC_REPETITIONS;
+use crate::algorithms::convolution::*;
+use crate::algorithms::cyclotomic::get_prim_root_of_unity;
+use crate::algorithms::int_factor::*;
+use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
+use crate::algorithms::poly_factor::cantor_zassenhaus;
+use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
+use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
+use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
+use crate::ring_properties::field::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::*;
+use crate::primitive_int::{StaticRing, StaticRingBase};
+use crate::prelude::*;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::galois_field::extlen::LengthExtendedConvolution;
+use crate::ring_impls::extension::*;
+use crate::ring_impls::field::{AsField, AsFieldBase};
+use crate::ring_impls::finite::*;
+use crate::ring_impls::poly::PolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRingBase;
+use crate::ring_impls::zn::zn_64b::Zn64BBase;
+use crate::ring_impls::zn::*;
+use crate::ring_properties::serialization::*;
+
+/// Implementation of a galois field `GF(p^e)`; Also known as galois field, and sometimes denoted by
+/// `Fq` where `q = p^e`.
+///
+/// There exists a finite field with `q` elements if and only if `q = p^e` is a prime power. In
+/// these cases, this struct provides an implementation of arithmetic in these fields. Note that
+/// since those fields are always finite-degree extensions of `Z/pZ`, they can also be used by
+/// creating a suitable instance of [`super::extension_impl::FreeAlgebraImpl`]. In fact, this is the
+/// way the old implementation of galois fields was designed. However, providing a new type can
+/// provide both ergonomic and performance benefits, and also gives better encapsulation.
+///
+/// # Example
+///
+/// The easiest way to create a Galois field is by using `new()`:
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::extension::galois_field::*;
+/// let F25: GaloisField = GaloisField::new(5, 2);
+/// assert_eq!(5, F25.characteristic(&ZZi64).unwrap());
+/// assert_eq!(2, F25.rank());
+/// ```
+/// More configurations are possible using [`GaloisField::new_with_convolution()`] or
+/// [`GaloisField::create()`].
+///
+/// We also support conversion to and from a plain [`super::extension_impl::FreeAlgebraImpl`]
+/// representation.
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::extension::extension_impl::*;
+/// # use feanor_math::rings::field::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::extension::galois_field::*;
+/// let F25: GaloisField = GaloisField::new(5, 2);
+/// let raw_F25: AsField<FreeAlgebraImpl<_, _>> = F25.clone().into().unwrap_self();
+/// assert!(F25.can_iso(&raw_F25).is_some());
+/// ```
+/// The other way is slightly more dangerous, since at some point we either have to check, or assume
+/// that the extension ring is indeed a field.
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::rings::extension::*;
+/// # use feanor_math::rings::extension::extension_impl::*;
+/// # use feanor_math::rings::field::*;
+/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::rings::zn::zn_64b::*;
+/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::rings::extension::galois_field::*;
+/// let base_ring = Zn64B::new(5).as_field().ok().unwrap();
+/// let raw_F25: FreeAlgebraImpl<_, _> = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]);
+/// let asfield_F25 = raw_F25.clone().as_field().ok().unwrap();
+/// // alternatively, you can ensure yourself that the ring is a field and use `promise_is_field` to avoid the check at runtime; be careful when doing this!
+/// let asfield_F25 = AsField::from(AsFieldBase::promise_is_field(raw_F25).ok().unwrap());
+/// let F25 = GaloisField::create(asfield_F25);
+/// assert!(F25.can_iso(&raw_F25).is_some());
+/// ```
+///
+/// # Choice of blanket implementations of [`CanHomFrom`]
+///
+/// As opposed to the more generic [`DelegateRing`]s, here I chose a "ping-pong" way
+/// of implementing [`CanHomFrom`] and [`CanIsoFromTo`] for [`GaloisFieldBase`] that is
+/// very powerful when we use the standard `Impl = AsField<FreeAlgebraImpl<_, _, _, _>>`.
+/// In particular, we implement `GaloisFieldBase<Impl>: CanHomFrom<S>` for all `S` with
+/// `Impl: CanHomFrom<S>`. It is great that we can provide such a large class of blanket impls,
+/// however this impl will then conflict with (almost) all other impls - which is the reason
+/// why we don't do it in other places like [`AsFieldBase`].
+///
+/// Here, we complement it with just the impls `FreeAlgebraImplBase<_, _, _, _>:
+/// CanHomFrom<GaloisFieldBase<_>>` and `AsFieldBase<FreeAlgebraImpl<_, _, _, _>>:
+/// CanHomFrom<GaloisFieldBase<_>>`. This means that if `Impl = AsFieldBase<FreeAlgebraImpl<_, _, _,
+/// _>>`, together with the blanket implementation, it gives the very much desired self-isomorphism
+/// `GaloisFieldBase<_>: CanHomFrom<GaloisFieldBase<_>>`. The only downside of this approach is that
+/// `GaloisFieldBase` does not have a canonical self-isomorphism anymore if a nonstandard `Impl` is
+/// chosen - which I believe will be very rarely the case in practice.
+#[repr(transparent)]
+pub struct GaloisFieldBase<Impl = DefaultGaloisFieldImpl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    base: Impl,
+}
+
+/// Implementation of finite/galois fields.
+///
+/// This is the [`RingStore`] corresponding to [`GaloisFieldBase`]. For more details, see
+/// [`GaloisFieldBase`].
+pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<Impl>>;
+
+/// Type alias for the most common instantiation of [`GaloisField`], which
+/// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
+pub type GaloisFieldOver<R, C = DynConvolution<'static, <R as RingStore>::Ring>, A = Global> =
+    RingValue<GaloisFieldBaseOver<R, C, A>>;
+
+/// Type alias for the most common instantiation of [`GaloisFieldBase`], which
+/// uses [`FreeAlgebraImpl`] to compute ring arithmetic.
+pub type GaloisFieldBaseOver<R, C = DynConvolution<'static, <R as RingStore>::Ring>, A = Global> =
+    GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, C, A>>>;
+
+/// The default implementation of a finite field extension of a prime field,
+/// based on [`Zn`].
+pub type DefaultGaloisFieldImpl = AsField<
+    FreeAlgebraImpl<
+        AsField<Zn64B>,
+        SparseMapVector<AsField<Zn64B>>,
+        DynConvolution<'static, <AsField<Zn64B> as RingStore>::Ring>,
+        Global,
+    >,
+>;
+
+impl GaloisField {
+    /// Creates a new instance of the finite/galois field `GF(p^degree)`.
+    ///
+    /// For details, see [`GaloisFieldBase::new()`].
+    pub fn new(p: i64, degree: usize) -> Self { RingValue::from(GaloisFieldBase::new(p, degree)) }
+}
+
+impl GaloisFieldBase {
+    /// Creates a new instance of the finite/galois field `GF(p^degree)`.
+    ///
+    /// If you need more options for configuration, consider using
+    /// [`GaloisField::new_with_base_field()`], [`GaloisField::new_with_convolution()`] or the
+    /// most general [`GaloisField::create()`].
+    ///
+    /// # Example
+    /// ```rust
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::extension::*;
+    /// # use feanor_math::rings::finite::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::extension::galois_field::*;
+    /// let F25 = GaloisField::new(5, 2);
+    /// let generator = F25.canonical_gen();
+    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+    /// let inclusion = F25.inclusion();
+    /// // the norm must be an element of the prime field
+    /// assert!(
+    ///     F25.base_ring()
+    ///         .elements()
+    ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
+    /// );
+    /// ```
+    ///
+    /// # Panics
+    ///
+    /// Panics if `Z/pZ` is not a field, namely if `p` is not prime.
+    pub fn new(p: i64, degree: usize) -> Self {
+        let field = match Zn64B::new(p as u64).as_field() {
+            Ok(field) => field,
+            Err(_) => panic!("characteristic {p} is not a prime"),
+        };
+
+        Self::new_with_base_field(field, degree)
+    }
+}
+
+impl<'conv, R> GaloisFieldBaseOver<R, DynConvolution<'conv, R::Ring>, Global>
+where
+    R: RingStore + 'conv,
+    R::Ring: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+{
+    /// Creates a new instance of the finite/galois field that is the unique
+    /// field extension of the given base field and the given degree.
+    ///
+    /// If you need to specify more options, consider using [`GaloisField::new_with_convolution()`]
+    /// or the most general [`GaloisField::create()`].
+    ///
+    /// # Example
+    /// ```rust
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::extension::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::rings::finite::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::extension::galois_field::*;
+    /// let F5 = Zn64B::new(5).as_field().ok().unwrap();
+    /// let F25 = GaloisField::new_with_base_field(F5, 2);
+    /// let generator = F25.canonical_gen();
+    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+    /// let inclusion = F25.inclusion();
+    /// // the norm must be an element of the prime field
+    /// assert!(
+    ///     F25.base_ring()
+    ///         .elements()
+    ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
+    /// );
+    /// ```
+    pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
+        let log2_padded_len = ZZi64
+            .abs_log2_ceil(&degree.try_into().unwrap())
+            .unwrap();
+        let convolution = <R::Ring>::create_default_convolution(base_field.clone(), Some(2 << log2_padded_len));
+        Self::new_with_convolution(base_field, degree, Global, convolution)
+    }
+}
+
+impl<R, A, C> GaloisFieldBaseOver<R, C, A>
+where
+    R: RingStore,
+    R::Ring: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+    C: ConvolutionAlgorithm<R::Ring> + Clone,
+    A: Allocator + Clone + Send + Sync,
+{
+    /// Creates a new instance of a finite/galois field, as given-degree extension of the
+    /// given base ring. The base ring must have prime characteristic.
+    ///
+    /// If you need to specify the minimal polynomial used, see also [`GaloisField::create()`].
+    ///
+    /// # Example
+    ///
+    /// Sometimes it is useful to have the base ring also be a field. This can e.g. be achieved
+    /// by
+    /// ```rust
+    /// #![feature(allocator_api)]
+    /// # use std::alloc::Global;
+    /// # use feanor_math::ring::*;
+    /// # use feanor_math::rings::extension::*;
+    /// # use feanor_math::rings::finite::*;
+    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::algorithms::convolution::*;
+    /// # use feanor_math::rings::extension::galois_field::*;
+    /// let F25 = GaloisField::new_with_convolution(
+    ///     Zn64B::new(5).as_field().ok().unwrap(),
+    ///     2,
+    ///     Global,
+    ///     STANDARD_CONVOLUTION,
+    /// );
+    /// let generator = F25.canonical_gen();
+    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+    /// let inclusion = F25.inclusion();
+    /// // the norm must be an element of the prime field
+    /// assert!(
+    ///     F25.base_ring()
+    ///         .elements()
+    ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
+    /// );
+    /// ```
+    pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
+        assert!(degree >= 1);
+        let poly_ring = RingValue::from(DensePolyRingBase::new_with_convolution(
+            &base_field,
+            "X",
+            &allocator,
+            &convolution_algorithm,
+        ));
+        let mut rng = oorandom::Rand64::new(
+            poly_ring
+                .base_ring()
+                .integer_ring()
+                .default_hash(poly_ring.base_ring().modulus()) as u128,
+        );
+        let modulus = find_small_irreducible_poly(&poly_ring, degree, &convolution_algorithm, &mut rng);
+        let mut modulus_vec = SparseMapVector::new(degree, base_field.clone());
+        for (c, i) in poly_ring.terms(&modulus) {
+            if i != degree {
+                *modulus_vec.at_mut(i) = base_field.negate(c.clone());
+            }
+        }
+        drop(poly_ring);
+        drop(modulus);
+        return GaloisFieldBase {
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(RingValue::from(
+                FreeAlgebraImplBase::new_with_convolution(
+                    base_field,
+                    degree,
+                    modulus_vec,
+                    "θ",
+                    allocator,
+                    convolution_algorithm,
+                ),
+            ))),
+        };
+    }
+
+    /// Instantiates the galois field by calling `find_small_irreducible_poly()` with a poly ring
+    /// whose base ring is exactly `R` and a convolution that is exactly `C`; this prevents
+    /// infinite generic argument recursion,  which might otherwise happen if each recursive
+    /// call adds a reference `&` to `R` resp. `C`.
+    fn new_internal(base_ring: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self
+    where
+        R: Copy,
+        C: Copy,
+    {
+        assert!(degree >= 1);
+        let poly_ring = RingValue::from(DensePolyRingBase::new_with_convolution(
+            base_ring,
+            "X",
+            &allocator,
+            convolution_algorithm,
+        ));
+        let mut rng = oorandom::Rand64::new(
+            poly_ring
+                .base_ring()
+                .integer_ring()
+                .default_hash(poly_ring.base_ring().modulus()) as u128,
+        );
+        let modulus = find_small_irreducible_poly(&poly_ring, degree, convolution_algorithm, &mut rng);
+        let mut modulus_vec = SparseMapVector::new(degree, base_ring.clone());
+        for (c, i) in poly_ring.terms(&modulus) {
+            if i != degree {
+                *modulus_vec.at_mut(i) = base_ring.negate(c.clone());
+            }
+        }
+        drop(poly_ring);
+        drop(modulus);
+        return GaloisFieldBase {
+            base: AsField::from(AsFieldBase::promise_is_perfect_field(RingValue::from(
+                FreeAlgebraImplBase::new_with_convolution(
+                    base_ring,
+                    degree,
+                    modulus_vec,
+                    "θ",
+                    allocator,
+                    convolution_algorithm,
+                ),
+            ))),
+        };
+    }
+}
+
+impl<A, C> GaloisFieldBase<AsField<FreeAlgebraImpl<AsField<Zn64B>, SparseMapVector<AsField<Zn64B>>, C, A>>>
+where
+    A: Allocator + Clone + Send + Sync,
+    C: ConvolutionAlgorithm<AsFieldBase<Zn64B>> + Clone,
+{
+    /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
+    ///
+    /// A galois ring is similar to a galois field, but not a field anymore since it has prime power
+    /// characteristic instead of prime characteristic. It can be constructed as
+    /// `(Z/p^eZ)[X]/(f)` where `f` is a monic polynomial of degree `degree` such that `f mod p`
+    /// is irreducible. When using this function, the generating polynomial of the resulting
+    /// galois ring will be the coefficient-wise shortest lift of the generating polynomial of this
+    /// galois field.
+    ///
+    /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
+    pub fn galois_ring(
+        &self,
+        e: usize,
+    ) -> FreeAlgebraImplBase<Zn64B, SparseMapVector<Zn64B>, DynConvolution<'static, Zn64BBase>, A> {
+        let base_ring = Zn64B::new(ZZi64.pow(*self.base_ring().modulus(), e) as u64);
+        let log2_padded_len = ZZi64
+            .abs_log2_ceil(&self.rank().try_into().unwrap())
+            .unwrap();
+        let convolution = Zn64BBase::create_default_convolution(base_ring.clone(), Some(2 << log2_padded_len));
+        self.galois_ring_with_convolution(
+            base_ring,
+            self.base.get_ring().get_delegate().allocator().clone(),
+            convolution,
+        )
+    }
+}
+
+impl<Impl> GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
+    ///
+    /// A galois ring is similar to a galois field, but not a field anymore since it has prime power
+    /// characteristic instead of prime characteristic. It can be constructed as
+    /// `(Z/p^eZ)[X]/(f)` where `f` is a monic polynomial of degree `degree` such that `f mod p`
+    /// is irreducible. When using this function, the generating polynomial of the resulting
+    /// galois ring will be the coefficient-wise shortest lift of the generating polynomial of this
+    /// galois field.
+    ///
+    /// See also [`GaloisFieldBase::galois_ring()`] for a simpler version of this function.
+    pub fn galois_ring_with_convolution<S, A2, C2>(
+        &self,
+        new_base_ring: S,
+        allocator: A2,
+        convolution_algorithm: C2,
+    ) -> FreeAlgebraImplBase<S, SparseMapVector<S>, C2, A2>
+    where
+        S: RingStore,
+        S::Ring: ZnRing + CanHomFrom<<<BaseRingStore<Impl> as RingStore>::Ring as ZnRing>::IntegerRingBase>,
+        C2: ConvolutionAlgorithm<S::Ring>,
+        A2: Allocator + Clone + Send + Sync,
+    {
+        let (p, _e) = is_prime_power(&ZZbig, &new_base_ring.size(&ZZbig).unwrap()).unwrap();
+        assert!(ZZbig.eq_el(&p, &self.base_ring().size(&ZZbig).unwrap()));
+        let mut modulus_vec = SparseMapVector::new(self.rank(), new_base_ring.clone());
+        let x_pow_deg = RingRef::from(self).pow(self.canonical_gen(), self.rank());
+        let x_pow_deg = self.wrt_canonical_basis(&x_pow_deg);
+        let hom = new_base_ring.can_hom(self.base_ring().integer_ring()).unwrap();
+        for i in 0..self.rank() {
+            if !self.base_ring().is_zero(&x_pow_deg.at(i)) {
+                *modulus_vec.at_mut(i) = hom.map(self.base_ring().smallest_lift(x_pow_deg.at(i)));
+            }
+        }
+        let result = FreeAlgebraImplBase::new_with_convolution(
+            new_base_ring,
+            self.rank(),
+            modulus_vec,
+            "θ",
+            allocator,
+            convolution_algorithm,
+        );
+        return result;
+    }
+
+    pub fn unwrap_self(self) -> Impl { self.base }
+}
+
+impl<Impl> GaloisField<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    /// Most generic function to create a finite/galois field.
+    ///
+    /// It allows specifying all associated data. Note also that the passed implementation
+    /// must indeed be a field, and this is not checked at runtime. Passing a non-field
+    /// is impossible, unless [`AsFieldBase::promise_is_field()`] is used.
+    #[stability::unstable(feature = "enable")]
+    pub fn create(base: Impl) -> Self { RingValue::from(GaloisFieldBase { base }) }
+}
+
+impl<Impl> Clone for GaloisFieldBase<Impl>
+where
+    Impl: RingStore + Clone,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn clone(&self) -> Self {
+        Self {
+            base: self.base.clone(),
+        }
+    }
+}
+
+impl<Impl> Copy for GaloisFieldBase<Impl>
+where
+    Impl: RingStore + Copy,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    El<Impl>: Copy,
+{
+}
+
+impl<Impl> PartialEq for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
+}
+
+impl<Impl> DefaultConvolutionRing for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    default fn create_default_convolution<'conv, S>(self_: S, _: Option<usize>) -> DynConvolution<'conv, Self>
+    where
+        S: RingStore<Ring = Self> + 'conv,
+        Self: 'conv,
+    {
+        LengthExtendedConvolution::for_zn_extension(self_, 64)
+            .map(|x| Arc::new(TypeErasedConvolution::new(x)) as DynConvolution<'conv, _>)
+            .unwrap_or_else(|_| Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(0, Global))))
+    }
+}
+
+impl<Impl> Debug for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "GF({:?})", self.base.get_ring()) }
+}
+
+impl<Impl> DelegateRing for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    type Base = Impl::Ring;
+    type Element = El<Impl>;
+
+    fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
+    fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
+    fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
+    fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
+
+    fn get_delegate(&self) -> &Self::Base { self.base.get_ring() }
+}
+
+impl<Impl> DelegateRingImplFiniteRing for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+}
+
+impl<Impl> Domain for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+}
+
+impl<Impl> Field for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+}
+
+impl<Impl> PerfectField for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+}
+
+impl<Impl> EuclideanRing for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
+        assert!(!self.is_zero(rhs));
+        (self.base.checked_div(&lhs, rhs).unwrap(), self.zero())
+    }
+
+    fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
+
+    fn euclidean_rem(&self, _: Self::Element, rhs: &Self::Element) -> Self::Element {
+        assert!(!self.is_zero(rhs));
+        self.zero()
+    }
+}
+
+impl<Impl> PrincipalIdealRing for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        if self.is_zero(lhs) && self.is_zero(rhs) {
+            Some(self.one())
+        } else {
+            self.checked_left_div(lhs, rhs)
+        }
+    }
+
+    fn extended_ideal_gen(
+        &self,
+        lhs: &Self::Element,
+        rhs: &Self::Element,
+    ) -> (Self::Element, Self::Element, Self::Element) {
+        if self.is_zero(lhs) {
+            (self.zero(), self.one(), rhs.clone())
+        } else {
+            (self.one(), self.zero(), lhs.clone())
+        }
+    }
+}
+
+impl<Impl> Serialize for GaloisFieldBase<Impl>
+where
+    Impl: RingStore + Serialize,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing + SerializableElementRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        SerializableNewtypeStruct::new("GaloisField", &self.base).serialize(serializer)
+    }
+}
+
+impl<'de, Impl> Deserialize<'de> for GaloisFieldBase<Impl>
+where
+    Impl: RingStore + Deserialize<'de>,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing + SerializableElementRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        DeserializeSeedNewtypeStruct::new("GaloisField", PhantomData::<Impl>)
+            .deserialize(deserializer)
+            .map(|res| GaloisField::create(res).into())
+    }
+}
+
+impl<Impl> ComputeInnerProduct for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn inner_product<I: IntoIterator<Item = (Self::Element, Self::Element)>>(&self, els: I) -> Self::Element {
+        self.rev_delegate(
+            self.get_delegate()
+                .inner_product(els.into_iter().map(|(a, b)| (self.delegate(a), self.delegate(b)))),
+        )
+    }
+
+    fn inner_product_ref<'a, I: IntoIterator<Item = (&'a Self::Element, &'a Self::Element)>>(
+        &self,
+        els: I,
+    ) -> Self::Element
+    where
+        Self::Element: 'a,
+        Self: 'a,
+    {
+        self.rev_delegate(
+            self.get_delegate().inner_product_ref(
+                els.into_iter()
+                    .map(|(a, b)| (self.delegate_ref(a), self.delegate_ref(b))),
+            ),
+        )
+    }
+
+    fn inner_product_ref_fst<'a, I: IntoIterator<Item = (&'a Self::Element, Self::Element)>>(
+        &self,
+        els: I,
+    ) -> Self::Element
+    where
+        Self::Element: 'a,
+        Self: 'a,
+    {
+        self.rev_delegate(
+            self.get_delegate()
+                .inner_product_ref_fst(els.into_iter().map(|(a, b)| (self.delegate_ref(a), self.delegate(b)))),
+        )
+    }
+}
+
+impl<Impl> StrassenHint for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+{
+    fn strassen_threshold(&self) -> usize { self.get_delegate().strassen_threshold() }
+}
+
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+impl<Impl, S> CanHomFrom<S> for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing + CanHomFrom<S>,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    S: ?Sized + RingBase,
+{
+    type Homomorphism = <Impl::Ring as CanHomFrom<S>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &S) -> Option<Self::Homomorphism> { self.base.get_ring().has_canonical_hom(from) }
+
+    fn map_in(&self, from: &S, el: <S as RingBase>::Element, hom: &Self::Homomorphism) -> Self::Element {
+        self.base.get_ring().map_in(from, el, hom)
+    }
+}
+
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, C, A>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    R: RingStore,
+    V: VectorView<El<R>> + Send + Sync,
+    C: ConvolutionAlgorithm<R::Ring>,
+    A: Allocator + Clone + Send + Sync,
+    FreeAlgebraImplBase<R, V, C, A>: CanHomFrom<Impl::Ring>,
+{
+    type Homomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanHomFrom<Impl::Ring>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Homomorphism> {
+        self.has_canonical_hom(from.base.get_ring())
+    }
+
+    fn map_in(
+        &self,
+        from: &GaloisFieldBase<Impl>,
+        el: <GaloisFieldBase<Impl> as RingBase>::Element,
+        hom: &Self::Homomorphism,
+    ) -> Self::Element {
+        self.map_in(from.base.get_ring(), el, hom)
+    }
+}
+
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+impl<Impl, R, A, V, C> CanHomFrom<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, C, A>>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    R: RingStore,
+    R::Ring: LinSolveRing,
+    V: VectorView<El<R>> + Send + Sync + Clone,
+    C: ConvolutionAlgorithm<R::Ring> + Clone,
+    A: Allocator + Clone + Send + Sync,
+    FreeAlgebraImplBase<R, V, C, A>: CanHomFrom<Impl::Ring>,
+{
+    type Homomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanHomFrom<Impl::Ring>>::Homomorphism;
+
+    fn has_canonical_hom(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Homomorphism> {
+        self.get_delegate().has_canonical_hom(from.base.get_ring())
+    }
+
+    fn map_in(
+        &self,
+        from: &GaloisFieldBase<Impl>,
+        el: <GaloisFieldBase<Impl> as RingBase>::Element,
+        hom: &Self::Homomorphism,
+    ) -> Self::Element {
+        self.rev_delegate(self.get_delegate().map_in(from.base.get_ring(), el, hom))
+    }
+}
+
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+impl<Impl, S> CanIsoFromTo<S> for GaloisFieldBase<Impl>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing + CanIsoFromTo<S>,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    S: ?Sized + RingBase,
+{
+    type Isomorphism = <Impl::Ring as CanIsoFromTo<S>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &S) -> Option<Self::Isomorphism> { self.base.get_ring().has_canonical_iso(from) }
+
+    fn map_out(&self, from: &S, el: Self::Element, iso: &Self::Isomorphism) -> <S as RingBase>::Element {
+        self.base.get_ring().map_out(from, el, iso)
+    }
+}
+
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for FreeAlgebraImplBase<R, V, C, A>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    R: RingStore,
+    V: VectorView<El<R>> + Send + Sync,
+    C: ConvolutionAlgorithm<R::Ring>,
+    A: Allocator + Clone + Send + Sync,
+    FreeAlgebraImplBase<R, V, C, A>: CanIsoFromTo<Impl::Ring>,
+{
+    type Isomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanIsoFromTo<Impl::Ring>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Isomorphism> {
+        self.has_canonical_iso(from.base.get_ring())
+    }
+
+    fn map_out(
+        &self,
+        from: &GaloisFieldBase<Impl>,
+        el: Self::Element,
+        iso: &Self::Isomorphism,
+    ) -> <GaloisFieldBase<Impl> as RingBase>::Element {
+        self.map_out(from.base.get_ring(), el, iso)
+    }
+}
+
+/// For the rationale which blanket implementations I chose, see the [`GaloisFieldBase`].
+impl<Impl, R, A, V, C> CanIsoFromTo<GaloisFieldBase<Impl>> for AsFieldBase<FreeAlgebraImpl<R, V, C, A>>
+where
+    Impl: RingStore,
+    Impl::Ring: Field + FreeAlgebra + FiniteRing,
+    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
+    R: RingStore,
+    R::Ring: LinSolveRing,
+    V: VectorView<El<R>> + Send + Sync + Clone,
+    C: ConvolutionAlgorithm<R::Ring> + Clone,
+    A: Allocator + Clone + Send + Sync,
+    FreeAlgebraImplBase<R, V, C, A>: CanIsoFromTo<Impl::Ring>,
+{
+    type Isomorphism = <FreeAlgebraImplBase<R, V, C, A> as CanIsoFromTo<Impl::Ring>>::Isomorphism;
+
+    fn has_canonical_iso(&self, from: &GaloisFieldBase<Impl>) -> Option<Self::Isomorphism> {
+        self.get_delegate().has_canonical_iso(from.base.get_ring())
+    }
+
+    fn map_out(
+        &self,
+        from: &GaloisFieldBase<Impl>,
+        el: Self::Element,
+        iso: &Self::Isomorphism,
+    ) -> <GaloisFieldBase<Impl> as RingBase>::Element {
+        self.get_delegate()
+            .map_out(from.base.get_ring(), self.delegate(el), iso)
+    }
+}
+
+#[instrument(skip_all, level = "trace")]
+fn filter_irreducible<R, P>(poly_ring: P, mod_f_ring: R, degree: usize) -> Option<El<P>>
+where
+    P: RingStore,
+    P::Ring: PolyRing + EuclideanRing,
+    <BaseRingStore<P> as RingStore>::Ring: ZnRing + FiniteRing + Field,
+    R: RingStore,
+    R::Ring: FreeAlgebra,
+    BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
+{
+    let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
+    if poly_ring.degree(&squarefree_part) != Some(degree) {
+        return None;
+    }
+    if !cantor_zassenhaus::squarefree_is_irreducible_base(&poly_ring, &mod_f_ring) {
+        return None;
+    }
+    return Some(mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
+}
+
+/// Tries to find a "small" irreducible polynomial of given degree.
+///
+/// "small" is not well-defined, but can mean sparse, or having a small `deg(f - lt(f))`.
+/// Both will lead to more efficient arithmetic in the ring `k[X]/(f)`. However, in general
+/// finding a very small `f` is hard, thus we use heuristics.
+#[instrument(skip_all, level = "trace")]
+fn find_small_irreducible_poly<P, C>(poly_ring: P, degree: usize, convolution: C, rng: &mut oorandom::Rand64) -> El<P>
+where
+    P: RingStore,
+    P::Ring: PolyRing + EuclideanRing,
+    BaseRingStore<P>: Copy,
+    <BaseRingStore<P> as RingStore>::Ring: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+    C: Copy + ConvolutionAlgorithm<<BaseRingStore<P> as RingStore>::Ring>,
+{
+    let Fp = *poly_ring.base_ring();
+    let create_mod_f_ring = |f: &El<P>| {
+        let mut f_body = SparseMapVector::new(degree, poly_ring.base_ring());
+        for (c, i) in poly_ring.terms(f) {
+            if i != degree {
+                *f_body.at_mut(i) = poly_ring.base_ring().negate(c.clone());
+            }
+        }
+        return RingValue::from(FreeAlgebraImplBase::new_with_convolution(
+            Fp,
+            degree,
+            f_body,
+            "θ",
+            Global,
+            convolution,
+        ));
+    };
+
+    if degree > 3 {
+        // first try trinomials, they seem to have a good chance of being irreducible
+        for _ in 0..16 {
+            let i = (ZZi64
+                .get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
+                + 1) as usize;
+            let a = Fp.random_element(|| rng.rand_u64());
+            let b = Fp.random_element(|| rng.rand_u64());
+            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)].into_iter());
+            if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
+                return result;
+            }
+        }
+
+        // next, check for cases where we can take `small_poly(X^high_power)`; these cases are characterized
+        // by the fact that we have `degree = small_d * padding_d * large_d` with `large_d |
+        // #F_(q^small_d)*`
+        let p = Fp.size(&ZZbig).unwrap();
+        let mut small_d = 1;
+        let mut large_d = {
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), small_d as usize), ZZbig.one());
+            int_cast(
+                ZZbig.ideal_gen(
+                    &Fq_star_order,
+                    &int_cast(
+                        TryInto::<i64>::try_into(degree).unwrap() / small_d,
+                        ZZbig,
+                        ZZi64,
+                    ),
+                ),
+                ZZi64,
+                ZZbig,
+            )
+        };
+        let mut increased_small_d = true;
+        while increased_small_d {
+            increased_small_d = false;
+            // use a greedy approach, just add a factor to small_d if it makes large_d larger
+            for (k, _) in factor(&ZZi64, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
+                let new_small_d = small_d * k;
+                let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), new_small_d as usize), ZZbig.one());
+                let new_large_d = int_cast(
+                    ZZbig.ideal_gen(
+                        &Fq_star_order,
+                        &int_cast(
+                            TryInto::<i64>::try_into(degree).unwrap() / new_small_d,
+                            ZZbig,
+                            ZZi64,
+                        ),
+                    ),
+                    ZZi64,
+                    ZZbig,
+                );
+                if new_large_d > large_d {
+                    small_d = new_small_d;
+                    large_d = new_large_d;
+                    increased_small_d = true;
+                    break;
+                }
+            }
+        }
+
+        let base_degree = TryInto::<i64>::try_into(degree).unwrap() / large_d;
+        if large_d != 1 {
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), base_degree as usize), ZZbig.one());
+            // careful here to not get an infinite generic argument recursion
+            let Fq = RingValue::from(GaloisFieldBase::new_internal(
+                Fp,
+                base_degree as usize,
+                Global,
+                convolution,
+            ));
+            // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d
+            // | #Fq*`; hence we can use `MinPoly(primitive_element)(X^large_d)`
+            let primitive_element = get_prim_root_of_unity(&Fq, &Fq_star_order).unwrap();
+            // I thought for a while that it would be enough to have a primitive `gcd(Fq_star_order,
+            // large_d^inf)`-th root of unity, however it is not guaranteed that this would indeed
+            // generate the field
+            let FqX = DensePolyRing::new(&Fq, "X");
+            let minpoly = FqX.prod((0..base_degree).map(|i| {
+                FqX.from_terms(
+                    [
+                        (
+                            Fq.negate(Fq.pow_gen(primitive_element.clone(), &ZZbig.pow(p.clone(), i as usize), ZZbig)),
+                            0,
+                        ),
+                        (Fq.one(), 1),
+                    ]
+                    .into_iter(),
+                )
+            }));
+            let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
+                let c_wrt_basis = Fq.wrt_canonical_basis(c);
+                assert!(c_wrt_basis.iter().skip(1).all(|x| Fp.is_zero(&x)));
+                return (c_wrt_basis.at(0), i);
+            }));
+            let f = poly_ring.evaluate(
+                &minpoly_Fp,
+                &poly_ring.from_terms([(Fp.one(), large_d as usize)].into_iter()),
+                &poly_ring.inclusion(),
+            );
+            return f;
+        }
+    }
+
+    // fallback, just generate a random irreducible polynomial
+    for _ in 0..MAX_PROBABILISTIC_REPETITIONS {
+        let f = poly_ring.from_terms(
+            (0..degree)
+                .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
+                .chain([(Fp.one(), degree)].into_iter()),
+        );
+        if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
+            return result;
+        }
+    }
+    unreachable!()
+}
+
+#[cfg(test)]
+use std::time::Instant;
+
+#[cfg(test)]
+use test::Bencher;
+
+#[test]
+fn test_can_hom_from() {
+    feanor_tracing::DelayedLogger::init_test();
+    #[allow(unused)]
+    fn assert_impl_CanHomFrom<From, To>()
+    where
+        To: ?Sized + CanHomFrom<From>,
+        From: ?Sized + RingBase,
+    {
+    }
+
+    #[allow(unused)]
+    fn FreeAlgebraImpl_wrap_unwrap_homs<R, V, A, C>()
+    where
+        R: RingStore,
+        R::Ring: SelfIso + LinSolveRing,
+        V: VectorView<El<R>> + Send + Sync + Clone,
+        A: Allocator + Clone + Send + Sync,
+        C: ConvolutionAlgorithm<R::Ring> + Clone,
+    {
+        assert_impl_CanHomFrom::<FreeAlgebraImplBase<R, V, C, A>, AsFieldBase<FreeAlgebraImpl<R, V, C, A>>>();
+    }
+
+    #[allow(unused)]
+    fn FreeAlgebraImpl_from_GaloisField<R, V, A, C>()
+    where
+        R: RingStore,
+        R::Ring: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
+        V: VectorView<El<R>> + Send + Sync + Clone,
+        A: Allocator + Clone + Send + Sync,
+        C: ConvolutionAlgorithm<R::Ring> + Clone,
+    {
+        assert_impl_CanHomFrom::<
+            GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>,
+            AsFieldBase<FreeAlgebraImpl<R, V, C, A>>,
+        >();
+    }
+
+    #[allow(unused)]
+    fn GaloisField_from_GaloisField<R, V, A, C>()
+    where
+        R: RingStore,
+        R::Ring: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
+        V: VectorView<El<R>> + Send + Sync + Clone,
+        A: Allocator + Clone + Send + Sync,
+        C: ConvolutionAlgorithm<R::Ring> + Clone,
+    {
+        assert_impl_CanHomFrom::<
+            GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>,
+            GaloisFieldBase<AsField<FreeAlgebraImpl<R, V, C, A>>>,
+        >();
+    }
+}
+
+#[test]
+fn test_galois_field() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = GaloisField::new(3, 1);
+    let elements = (0..3).map(|x| field.int_hom().map(x));
+    crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
+    crate::ring::generic_tests::test_self_iso(&field, elements.clone());
+    crate::ring_properties::field::generic_tests::test_field_axioms(&field, elements.clone());
+
+    let field = GaloisField::new(3, 2);
+    let field_ref = &field;
+    let elements = (0..3).flat_map(|x| {
+        (0..3).map(move |y| {
+            field_ref.from_canonical_basis([
+                field_ref.base_ring().int_hom().map(x),
+                field_ref.base_ring().int_hom().map(y),
+            ])
+        })
+    });
+    crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
+    crate::ring::generic_tests::test_self_iso(&field, elements.clone());
+    crate::ring_properties::field::generic_tests::test_field_axioms(&field, elements.clone());
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = GaloisField::new(3, 2);
+    let field_ref = &field;
+    let elements = (0..3).flat_map(|x| {
+        (0..3).map(move |y| {
+            field_ref.from_canonical_basis([
+                field_ref.base_ring().int_hom().map(x),
+                field_ref.base_ring().int_hom().map(y),
+            ])
+        })
+    });
+    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&field, elements.clone());
+    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&field, elements.clone());
+}
+
+#[test]
+fn test_galois_field_even() {
+    feanor_tracing::DelayedLogger::init_test();
+    for degree in 1..=9 {
+        let field = GaloisField::new(2, degree);
+        assert_eq!(degree, field.rank());
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+    }
+}
+
+#[test]
+fn test_galois_field_odd() {
+    feanor_tracing::DelayedLogger::init_test();
+    for degree in 1..=9 {
+        let field = GaloisField::new(3, degree);
+        assert_eq!(degree, field.rank());
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+    }
+
+    for degree in 1..=9 {
+        let field = GaloisField::new(5, degree);
+        assert_eq!(degree, field.rank());
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+    }
+}
+
+#[test]
+fn test_galois_field_no_trinomial() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = GaloisField::new(2, 24);
+    assert_eq!(24, field.rank());
+    assert!(
+        field
+            .clone()
+            .into()
+            .unwrap_self()
+            .into()
+            .unwrap_self()
+            .as_field()
+            .is_ok()
+    );
+
+    let field = GaloisField::new(3, 30);
+    assert_eq!(30, field.rank());
+    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+
+    let field = GaloisField::new(17, 32);
+    assert_eq!(32, field.rank());
+    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+}
+
+#[bench]
+fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
+    feanor_tracing::DelayedLogger::init_test();
+
+    bencher.iter(|| {
+        let field = GaloisField::new(2, 96);
+        let ring = field.get_ring().galois_ring(14);
+        assert_eq!(96, ring.rank());
+    });
+}
+
+#[test]
+#[ignore]
+fn test_galois_field_huge() {
+    feanor_tracing::DelayedLogger::init_test();
+    let start = Instant::now();
+    let field = GaloisField::new(17, 2048);
+    _ = std::hint::black_box(field);
+    let end = Instant::now();
+    println!("Created GF(17^2048) in {} ms", (end - start).as_millis());
+}

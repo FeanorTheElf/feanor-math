@@ -4,9 +4,9 @@ use std::cmp::{max, min};
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::primitive_int::*;
-use crate::ring::*;
+use crate::prelude::*;
 use crate::seq::*;
 
 #[stability::unstable(feature = "enable")]
@@ -185,8 +185,8 @@ pub fn karatsuba<R, V1, V2, A: Allocator>(
         return;
     }
 
-    let lhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(lhs.len() as i64)).unwrap();
-    let rhs_log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&(rhs.len() as i64)).unwrap();
+    let lhs_log2_len = ZZi64.abs_log2_ceil(&(lhs.len() as i64)).unwrap();
+    let rhs_log2_len = ZZi64.abs_log2_ceil(&(rhs.len() as i64)).unwrap();
 
     fn pad<'a, R, V, A>(data: V, len: usize, ring: R, allocator: &'a A) -> Vec<El<R>, &'a A>
     where
@@ -309,7 +309,7 @@ fn test_karatsuba_impl() {
     let b = [3, 4, 5, 0];
     let mut c = [0; 8];
     let mut tmp = [0; 4];
-    dispatch_karatsuba_impl::<_, _, _, true>(2, 1, &mut c[..], &a[..], &b[..], &mut tmp[..], StaticRing::<i64>::RING);
+    dispatch_karatsuba_impl::<_, _, _, true>(2, 1, &mut c[..], &a[..], &b[..], &mut tmp[..], ZZi64);
     assert_eq!([3, 10, 22, 22, 15, 0, 0, 0], c);
 }
 
@@ -322,7 +322,7 @@ fn test_karatsuba_mul() {
         &mut c[..],
         &[-1, 0][..],
         &[1, 0][..],
-        StaticRing::<i64>::RING,
+        ZZi64,
         &Global,
     );
     assert_eq!(vec![-1, 0, 0, 0], c);
@@ -330,6 +330,6 @@ fn test_karatsuba_mul() {
     let a = vec![1, 0, 1, 0, 1, 2, 3];
     let b = vec![3, 4];
     let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &a[..], &b[..], StaticRing::<i64>::RING, &Global);
+    karatsuba(0, &mut c[..], &a[..], &b[..], ZZi64, &Global);
     assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
 }

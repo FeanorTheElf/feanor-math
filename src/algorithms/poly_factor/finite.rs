@@ -2,14 +2,14 @@ use tracing::{Level, event, instrument};
 
 use super::cantor_zassenhaus;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
-use crate::divisibility::*;
-use crate::field::*;
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::SelfIso;
-use crate::integer::*;
-use crate::pid::*;
-use crate::ring::*;
-use crate::rings::finite::*;
-use crate::rings::poly::*;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::*;
+use crate::prelude::*;
+use crate::ring_impls::finite::*;
+use crate::ring_impls::poly::*;
 
 /// Factors a polynomial with coefficients in a finite field.
 #[stability::unstable(feature = "enable")]
@@ -21,13 +21,13 @@ where
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field + SelfIso,
 {
     assert!(!poly_ring.is_zero(&f));
-    let even_char = BigIntRing::RING.is_even(&poly_ring.base_ring().characteristic(&BigIntRing::RING).unwrap());
+    let even_char = ZZbig.is_even(&poly_ring.base_ring().characteristic(&ZZbig).unwrap());
 
     event!(
         Level::TRACE,
         poly_deg = poly_ring.degree(f).unwrap(),
-        field_size_bits = BigIntRing::RING
-            .abs_log2_ceil(&poly_ring.base_ring().size(BigIntRing::RING).unwrap())
+        field_size_bits = ZZbig
+            .abs_log2_ceil(&poly_ring.base_ring().size(ZZbig).unwrap())
             .unwrap()
     );
 

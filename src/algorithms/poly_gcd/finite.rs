@@ -5,15 +5,15 @@ use tracing::instrument;
 use crate::algorithms::eea::partial_eea_poly;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::strassen::{dispatch_strassen_impl, strassen_mem_size};
-use crate::divisibility::*;
-use crate::field::*;
-use crate::integer::*;
+use crate::ring_properties::divisibility::*;
+use crate::ring_properties::field::*;
+use crate::ring_properties::integer::*;
 use crate::matrix::*;
-use crate::pid::*;
+use crate::ring_properties::pid::*;
 use crate::primitive_int::*;
-use crate::ring::*;
-use crate::rings::finite::*;
-use crate::rings::poly::*;
+use crate::prelude::*;
+use crate::ring_impls::finite::*;
+use crate::ring_impls::poly::*;
 
 /// Returns a list of `(fi, ki)` such that the `fi` are monic, square-free and pairwise coprime, and
 /// `f = a prod_i fi^ki` for a unit `a` of the base field.
@@ -70,13 +70,13 @@ where
     }
     let derivate = derive_poly(&poly_ring, poly);
     if poly_ring.is_zero(&derivate) {
-        let q = poly_ring.base_ring().size(&BigIntRing::RING).unwrap();
-        let (p, e) = is_prime_power(BigIntRing::RING, &q).unwrap();
-        let p_usize = int_cast(p.clone(), StaticRing::<i64>::RING, BigIntRing::RING) as usize;
+        let q = poly_ring.base_ring().size(&ZZbig).unwrap();
+        let (p, e) = is_prime_power(ZZbig, &q).unwrap();
+        let p_usize = int_cast(p.clone(), ZZi64, ZZbig) as usize;
         assert!(p_usize > 0);
-        let power = BigIntRing::RING.pow(p, e - 1);
+        let power = ZZbig.pow(p, e - 1);
         let undo_frobenius =
-            |x: &El<BaseRingStore<P>>| poly_ring.base_ring().pow_gen(x.clone(), &power, BigIntRing::RING);
+            |x: &El<BaseRingStore<P>>| poly_ring.base_ring().pow_gen(x.clone(), &power, ZZbig);
         let base_poly = poly_ring.from_terms(poly_ring.terms(poly).map(|(c, i)| {
             debug_assert!(i % p_usize == 0);
             (undo_frobenius(c), i / p_usize)
@@ -92,12 +92,12 @@ where
 const FAST_POLY_EEA_THRESHOLD: usize = 32;
 
 /// Computes a Bezout identity for polynomials, using a fast divide-and-conquer
-/// polynomial gcd algorithm. Unless you are implementing [`crate::pid::PrincipalIdealRing`]
-/// for a custom type, you should use [`crate::pid::PrincipalIdealRing::extended_ideal_gen()`]
+/// polynomial gcd algorithm. Unless you are implementing [`crate::ring_properties::pid::PrincipalIdealRing`]
+/// for a custom type, you should use [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`]
 /// to get a Bezout identity instead.
 ///
 /// A Bezout identity is exactly as specified by
-/// [`crate::pid::PrincipalIdealRing::extended_ideal_gen()`], i.e. `s, t, d` such that `d` is the
+/// [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`], i.e. `s, t, d` such that `d` is the
 /// gcd of `lhs` and `rhs`, and `d = lhs * s + rhs * t`. Note that this algorithm does not try to
 /// avoid coefficient growth, and thus is only fast over finite fields. Furthermore, it will fall
 /// back to a slightly less efficient variant of the standard Euclidean algorithm on small inputs.
@@ -228,11 +228,11 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::zn::zn_64b;
+use crate::ring_impls::zn::zn_64b;
 #[cfg(test)]
-use crate::rings::zn::*;
+use crate::ring_impls::zn::*;
 
 #[test]
 fn test_fast_poly_eea() {

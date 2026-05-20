@@ -5,15 +5,15 @@ use tracing::{Level, Span, event, instrument, span};
 
 use super::int_factor::is_prime_power;
 use crate::algorithms::sqr_mul;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::Homomorphism;
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::pid::PrincipalIdealRingStore;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::finite::*;
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::finite::*;
+use crate::ring_impls::zn::*;
 use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
 
 type Point<R> = (El<R>, El<R>, El<R>);
@@ -55,10 +55,10 @@ where
             .integer_ring()
             .ideal_gen(Zn.modulus(), &Zn.smallest_positive_lift(factor_quo.1.clone()));
         let Zn_new = zn_big::ZnGB::new(
-            BigIntRing::RING,
+            ZZbig,
             int_cast(
                 Zn.integer_ring().checked_div(Zn.modulus(), &factor_of_n).unwrap(),
-                BigIntRing::RING,
+                ZZbig,
                 Zn.integer_ring(),
             ),
         );
@@ -88,8 +88,8 @@ where
         }
 
         let Zn_new = zn_big::ZnGB::new(
-            BigIntRing::RING,
-            int_cast(factor_of_n, BigIntRing::RING, Zn.integer_ring()),
+            ZZbig,
+            int_cast(factor_of_n, ZZbig, Zn.integer_ring()),
         );
         let red_map = ZnReductionMap::new(Zn, &Zn_new).unwrap();
         if (Zn_new.is_zero(&red_map.map_ref(&Q.0))
@@ -193,7 +193,7 @@ where
     R::Ring: ZnRing,
 {
     let copy_point = |(x, y, z): &Point<R>| (x.clone(), y.clone(), z.clone());
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
 
     sqr_mul::generic_pow_shortest_chain_table(
         copy_point(base),
@@ -264,7 +264,7 @@ where
         log2_p = log2_p
     );
 
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     assert!(ZZ.is_leq(&ZZ.power_of_two(log2_p * 2), &Zn.size(&ZZ).unwrap()));
     let log2_n = ZZ.abs_log2_ceil(&Zn.size(&ZZ).unwrap()).unwrap();
     let ln_p = log2_p as f64 * 2.0f64.ln();
@@ -386,7 +386,7 @@ where
 {
     assert!(algorithms::miller_rabin::is_prime_base(&Zn, 10) == false);
     assert!(is_prime_power(Zn.integer_ring(), Zn.modulus()).is_none());
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let log2_N = ZZ.abs_log2_floor(&Zn.size(&ZZ).unwrap()).unwrap();
     let mut rng = oorandom::Rand64::new(Zn.integer_ring().default_hash(Zn.modulus()) as u128);
 
@@ -409,9 +409,9 @@ where
 use test::Bencher;
 
 #[cfg(test)]
-use crate::rings::rust_bigint::*;
+use crate::ring_impls::rust_bigint::*;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 
 #[test]
 fn test_ec_factor() {
@@ -439,7 +439,7 @@ fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
 #[ignore]
 fn test_ec_factor_large() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = BigIntRing::RING;
+    let ZZbig = ZZbig;
 
     let n: i128 = 1073741827 * 71316922984999;
 
@@ -468,7 +468,7 @@ fn test_ec_factor_large() {
 #[ignore]
 fn test_compute_partial_factorization() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZbig = BigIntRing::RING;
+    let ZZbig = ZZbig;
     let n = int_cast(
         RustBigintRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
         ZZbig,

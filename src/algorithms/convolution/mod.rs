@@ -5,7 +5,7 @@ use std::sync::Arc;
 
 use karatsuba::*;
 
-use crate::ring::*;
+use crate::prelude::*;
 
 /// Contains an optimized implementation of Karatsuba's for computing convolutions
 pub mod karatsuba;
@@ -80,7 +80,7 @@ pub mod extlen;
 ///     &rhs[..],
 ///     None,
 ///     &mut expected,
-///     StaticRing::<i64>::RING.get_ring(),
+///     ZZi64.get_ring(),
 /// );
 /// SchoolbookConvolution.compute_convolution(
 ///     &lhs[..],
@@ -88,7 +88,7 @@ pub mod extlen;
 ///     &rhs[..],
 ///     None,
 ///     &mut actual,
-///     StaticRing::<i64>::RING.get_ring(),
+///     ZZi64.get_ring(),
 /// );
 /// assert_eq!(expected, actual);
 /// ```

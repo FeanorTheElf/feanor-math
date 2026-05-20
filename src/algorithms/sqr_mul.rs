@@ -1,7 +1,7 @@
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
 use crate::primitive_int::*;
-use crate::ring::*;
+use crate::prelude::*;
 
 /// Uses the square-and-multiply technique to compute the reduction of `power` times `base`
 /// w.r.t. the given operation. The operation must be associative to provide correct results.
@@ -16,7 +16,7 @@ use crate::ring::*;
 /// let result = generic_abs_square_and_multiply(
 ///     1,
 ///     &120481,
-///     StaticRing::<i64>::RING,
+///     ZZi64,
 ///     |x| {
 ///         square_count += 1;
 ///         return x + x;
@@ -291,7 +291,7 @@ use tracing::instrument;
 #[cfg(test)]
 use crate::homomorphism::*;
 #[cfg(test)]
-use crate::rings::zn::zn_64b;
+use crate::ring_impls::zn::zn_64b;
 
 #[test]
 fn test_generic_abs_square_and_multiply() {
@@ -350,7 +350,7 @@ fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
             try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
                 &x,
                 &536903680,
-                StaticRing::<i64>::RING,
+                ZZi64,
                 |mut res| {
                     ring.square(&mut res);
                     return Ok(res);
@@ -375,7 +375,7 @@ fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
             generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
                 x,
                 &536903680,
-                StaticRing::<i64>::RING,
+                ZZi64,
                 |a| {
                     let mut res = a.clone();
                     ring.square(&mut res);

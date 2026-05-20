@@ -4,18 +4,18 @@ use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
-use crate::field::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::pid::EuclideanRing;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::EuclideanRing;
 use crate::primitive_int::StaticRing;
 use crate::reduce_lift::lift_poly_eval::InterpolationBaseRing;
-use crate::ring::*;
-use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::{PolyRing, PolyRingStore};
-use crate::specialization::FiniteRingSpecializable;
+use crate::prelude::*;
+use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::{PolyRing, PolyRingStore};
+use crate::ring_properties::specialization::FiniteRingSpecializable;
 
 #[stability::unstable(feature = "enable")]
 pub struct ProbablyNotSquarefree;
@@ -82,7 +82,6 @@ where
     // is not squarefree. This would even work if `k` is not an integer, but any element of `K`.
     // Note that we still require `char(K) >= d + 2` for the previous paragraph to work.
 
-    let ZZbig = BigIntRing::RING;
     let characteristic = K.characteristic(&ZZbig).unwrap();
     // choose bound about twice as large as necessary, so the probability of succeeding is almost 1/2
     let bound = LX.degree(f).unwrap() * LX.degree(f).unwrap() * L.rank();
@@ -90,7 +89,7 @@ where
         ZZbig.is_zero(&characteristic)
             || ZZbig.is_geq(
                 &characteristic,
-                &int_cast(bound.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING)
+                &int_cast(bound.try_into().unwrap(), ZZbig, ZZi64)
             )
     );
 

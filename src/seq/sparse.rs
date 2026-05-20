@@ -1,7 +1,7 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, hash_map};
 
-use crate::ring::*;
+use crate::prelude::*;
 use crate::seq::*;
 
 pub struct SparseMapVector<R: RingStore> {
@@ -187,7 +187,7 @@ fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, valu
 #[test]
 fn test_at_mut() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let mut vector = SparseMapVector::new(5, ring);
 
     assert_vector_eq(&mut vector, [0, 0, 0, 0, 0]);
@@ -220,7 +220,7 @@ fn test_at_mut() {
 #[test]
 fn test_nontrivial_entries() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let mut vector = SparseMapVector::new(5, ring);
     assert_eq!(
         vector.nontrivial_entries().collect::<HashMap<_, _>>(),
@@ -273,7 +273,7 @@ fn test_nontrivial_entries() {
 #[test]
 fn test_scan() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let mut vector = SparseMapVector::new(5, ring);
     *vector.at_mut(1) = 2;
     *vector.at_mut(3) = 1;

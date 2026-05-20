@@ -5,9 +5,7 @@ use crate::algorithms::convolution::ntt::NTTConvolution;
 use crate::algorithms::convolution::*;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2_zn;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::primitive_int::*;
-use crate::rings::zn::*;
+use crate::ring_impls::zn::*;
 
 pub struct LengthExtendedConvolution<C> {
     base_convolution: C,
@@ -49,10 +47,10 @@ where
     /// includes the case that the characteristic of the base ring is even (and no power-of-two
     /// primitive roots of unity exist at all).
     pub fn for_zn(ring: R, abort_if_ntt_len_le: usize) -> Result<Self, ()> {
-        if BigIntRing::RING.is_even(&ring.characteristic(BigIntRing::RING).unwrap()) {
+        if ZZbig.is_even(&ring.characteristic(ZZbig).unwrap()) {
             return Err(());
         }
-        let mut log2_len = StaticRing::<i64>::RING
+        let mut log2_len = ZZi64
             .abs_log2_ceil(&abort_if_ntt_len_le.try_into().unwrap())
             .unwrap();
         if get_prim_root_of_unity_pow2_zn(&ring, log2_len).is_none() {
@@ -268,13 +266,13 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
-use crate::rings::extension::galois_field::GaloisField;
+use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Zn;
+use crate::ring_impls::zn::zn_static::Zn;
 
 #[test]
 fn test_convolution() {

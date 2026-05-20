@@ -4,18 +4,18 @@ use tracing::instrument;
 use crate::MAX_PROBABILISTIC_REPETITIONS;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::is_prime_power;
-use crate::divisibility::DivisibilityRingStore;
-use crate::field::{Field, FieldStore};
+use crate::ring_properties::divisibility::DivisibilityRingStore;
+use crate::ring_properties::field::{Field, FieldStore};
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::pid::*;
-use crate::ring::*;
-use crate::rings::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
-use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
-use crate::rings::field::{AsField, AsFieldBase};
-use crate::rings::finite::{FiniteRing, FiniteRingStore};
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::{PolyRing, PolyRingStore};
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::*;
+use crate::prelude::*;
+use crate::ring_impls::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
+use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::ring_impls::field::{AsField, AsFieldBase};
+use crate::ring_impls::finite::{FiniteRing, FiniteRingStore};
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::seq::VectorFn;
 
 /// Let `a` be the given ring element and `q` the size of the finite base field.
@@ -36,27 +36,26 @@ where
     R::Ring: FreeAlgebra,
     <BaseRingStore<R> as RingStore>::Ring: FiniteRing,
 {
-    let q = ring.base_ring().size(BigIntRing::RING).unwrap();
-    let log2_q = BigIntRing::RING.abs_log2_ceil(&q).unwrap();
+    let q = ring.base_ring().size(ZZbig).unwrap();
+    let log2_q = ZZbig.abs_log2_ceil(&q).unwrap();
     let d = ring.rank();
 
     if d == 1 {
         return a;
     } else if log2_q * 2 < d {
         // the standard square-and-multiply approach requires roughly `log2(q^e)` multiplications in `ring`
-        let ZZbig = BigIntRing::RING;
         let exp = ZZbig
             .checked_div(
                 &ZZbig.sub(ZZbig.pow(q.clone(), e + 1), ZZbig.one()),
                 &ZZbig.sub_ref_fst(&q, ZZbig.one()),
             )
             .unwrap();
-        return ring.pow_gen(a, &exp, BigIntRing::RING);
+        return ring.pow_gen(a, &exp, ZZbig);
     } else {
         // the self-composition approach requires `e` compositions of a polynomial with `X^q`
         let mut powers_of_gen_pow_q = Vec::new();
         powers_of_gen_pow_q.push(ring.one());
-        powers_of_gen_pow_q.push(ring.pow_gen(ring.canonical_gen(), &q, BigIntRing::RING));
+        powers_of_gen_pow_q.push(ring.pow_gen(ring.canonical_gen(), &q, ZZbig));
         for i in 2..ring.rank() {
             powers_of_gen_pow_q.push(ring.mul_ref(&powers_of_gen_pow_q[1], &powers_of_gen_pow_q[i - 1]));
         }
@@ -93,7 +92,7 @@ where
         return true;
     }
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
     debug_assert!(ZZ.eq_el(
         &is_prime_power(&ZZ, &q).unwrap().0,
@@ -135,7 +134,7 @@ where
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
     debug_assert!(ZZ.eq_el(
         &is_prime_power(&ZZ, &q).unwrap().0,
@@ -262,7 +261,7 @@ where
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let q = poly_ring.base_ring().size(&ZZ).unwrap();
     debug_assert!(ZZ.eq_el(
         &is_prime_power(&ZZ, &q).unwrap().0,
@@ -357,7 +356,7 @@ where
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
     assert!(poly_ring.base_ring().get_ring() == mod_f_ring.base_ring().get_ring());
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let Fq: &_ = poly_ring.base_ring();
     let q = Fq.size(&ZZ).unwrap();
     let e = ZZ.abs_log2_ceil(&q).unwrap();
@@ -418,7 +417,7 @@ where
     assert!(mod_f_ring.rank() % d == 0);
     assert!(mod_f_ring.rank() > d);
 
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let Fq = poly_ring.base_ring();
     let q = Fq.size(&ZZ).unwrap();
     let e = ZZ.abs_log2_ceil(&q).unwrap();
@@ -513,7 +512,7 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_static::Fp;
+use crate::ring_impls::zn::zn_static::Fp;
 
 #[test]
 fn test_distinct_degree_factorization() {

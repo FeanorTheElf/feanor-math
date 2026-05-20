@@ -7,8 +7,8 @@ use serde::{Deserialize, Serialize};
 
 use crate::algorithms;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
 
 /// Describes the context in which to print an algebraic expression.
@@ -20,7 +20,7 @@ use crate::primitive_int::StaticRing;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
-/// let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let poly_ring = DensePolyRing::new(ZZi64, "X");
 /// let f = poly_ring.add(poly_ring.one(), poly_ring.indeterminate());
 /// assert_eq!(
 ///     "X + 1",
@@ -125,8 +125,8 @@ pub enum EnvBindingStrength {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
-/// let Z7 = zn_big::ZnGB::new(StaticRing::<i64>::RING, 7);
-/// let Z11 = zn_big::ZnGB::new(StaticRing::<i64>::RING, 11);
+/// let Z7 = zn_big::ZnGB::new(ZZi64, 7);
+/// let Z11 = zn_big::ZnGB::new(ZZi64, 11);
 /// assert!(Z11.get_ring() != Z7.get_ring());
 /// let neg_one = Z7.int_hom().map(-1);
 /// assert!(!Z11.is_neg_one(&neg_one));
@@ -142,7 +142,7 @@ pub enum EnvBindingStrength {
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::zn::*;
-/// let Z11_fst = zn_big::ZnGB::new(StaticRing::<i64>::RING, 7);
+/// let Z11_fst = zn_big::ZnGB::new(ZZi64, 7);
 /// let Z11_snd = Z11_fst.clone();
 /// assert!(Z11_fst.get_ring() == Z11_snd.get_ring());
 /// let neg_one = Z11_fst.int_hom().map(-1);
@@ -464,7 +464,7 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     ///
     /// If `None` is returned, this means the given integer ring might not be able
     /// to represent the characteristic. This must never happen if the given implementation
-    /// of `ZZ` allows for unbounded integers (like [`crate::integer::BigIntRing`]).
+    /// of `ZZ` allows for unbounded integers (like [`crate::ring_properties::integer::BigIntRing`]).
     /// In other cases however, we allow to perform the size check heuristically only,
     /// so this might return `None` even in some cases where the integer ring would in
     /// fact be able to represent the characteristic.
@@ -476,7 +476,7 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     /// # use feanor_math::rings::zn::*;
     /// # use feanor_math::rings::zn::zn_64b::*;
     /// let ZZ = StaticRing::<i16>::RING;
-    /// assert_eq!(Some(0), StaticRing::<i64>::RING.characteristic(&ZZ));
+    /// assert_eq!(Some(0), ZZi64.characteristic(&ZZ));
     /// assert_eq!(None, Zn64B::new(i16::MAX as u64 + 1).characteristic(&ZZ));
     /// assert_eq!(
     ///     Some(i16::MAX),
@@ -550,9 +550,9 @@ macro_rules! delegate {
 /// # use feanor_math::assert_el_eq;
 /// // this does not have an equivalent representation with assert_eq!
 /// assert_el_eq!(
-///     BigIntRing::RING,
-///     BigIntRing::RING.int_hom().map(3),
-///     BigIntRing::RING.int_hom().map(3)
+///     ZZbig,
+///     ZZbig.int_hom().map(3),
+///     ZZbig.int_hom().map(3)
 /// );
 /// ```
 #[macro_export]
@@ -595,7 +595,7 @@ macro_rules! assert_el_eq {
 /// # use std::sync::Arc;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> { ring.add(a, b) }
 ///
-/// let ring: RingValue<StaticRingBase<i64>> = StaticRing::<i64>::RING;
+/// let ring: RingValue<StaticRingBase<i64>> = ZZi64;
 /// assert_el_eq!(ring, 7, add_in_ring(ring, 3, 4));
 /// assert_el_eq!(ring, 7, add_in_ring(&ring, 3, 4));
 /// assert_el_eq!(ring, 7, add_in_ring(Arc::new(ring), 3, 4));
@@ -744,7 +744,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// {
     ///     els.into_iter().fold(ring.zero(), |a, b| ring.add(a, b))
     /// }
-    /// # assert_el_eq!(StaticRing::<i64>::RING, StaticRing::<i64>::RING.sum([1, 2, 5]), sum(StaticRing::<i64>::RING, [1, 2, 5]))
+    /// # assert_el_eq!(ZZi64, ZZi64.sum([1, 2, 5]), sum(ZZi64, [1, 2, 5]))
     /// ```
     /// but may be faster.
     fn sum<I>(&self, els: I) -> El<Self>
@@ -789,7 +789,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// {
     ///     els.into_iter().fold(ring.one(), |a, b| ring.mul(a, b))
     /// }
-    /// # assert_el_eq!(StaticRing::<i64>::RING, StaticRing::<i64>::RING.prod([1, 2, 5]), prod(StaticRing::<i64>::RING, [1, 2, 5]))
+    /// # assert_el_eq!(ZZi64, ZZi64.prod([1, 2, 5]), prod(ZZi64, [1, 2, 5]))
     /// ```
     /// but may be faster.
     fn prod<I>(&self, els: I) -> El<Self>
@@ -810,7 +810,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
             self.square(&mut x);
             return x;
         }
-        self.pow_gen(x, &power.try_into().unwrap(), StaticRing::<i64>::RING)
+        self.pow_gen(x, &power.try_into().unwrap(), ZZi64)
     }
 
     /// Raises the given element to the given power, which should be a positive integer
@@ -833,7 +833,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// # use feanor_math::ring::*;
     /// # use feanor_math::homomorphism::*;
     /// # use feanor_math::integer::*;
-    /// let ring = BigIntRing::RING;
+    /// let ring = ZZbig;
     /// let element = ring.int_hom().map(3);
     /// assert_eq!("3", format!("{}", ring.formatted_el(&element)));
     /// ```
@@ -855,7 +855,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// # use feanor_math::rings::poly::dense_poly::*;
     /// # use feanor_math::primitive_int::*;
     /// # use feanor_math::rings::poly::*;
-    /// let ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    /// let ring = DensePolyRing::new(ZZi64, "X");
     /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1]);
     /// assert_eq!(
     ///     "X",
@@ -1397,7 +1397,7 @@ pub mod generic_tests {
     use std::cmp::min;
 
     use super::*;
-    use crate::integer::{BigIntRing, int_cast};
+    use crate::ring_properties::integer::{BigIntRing, int_cast};
 
     pub fn test_hom_axioms<R: RingStore, S: RingStore, I: Iterator<Item = El<R>>>(from: R, to: S, edge_case_elements: I)
     where
@@ -1685,7 +1685,7 @@ pub mod generic_tests {
         }
 
         // check characteristic
-        let ZZbig = BigIntRing::RING;
+        let ZZbig = ZZbig;
         let char = ring.characteristic(&ZZbig).unwrap();
 
         if ZZbig.is_geq(&char, &ZZbig.power_of_two(7)) {
@@ -1698,7 +1698,7 @@ pub mod generic_tests {
             assert_eq!(None, ring.characteristic(&StaticRing::<i32>::RING));
         }
         if ZZbig.is_geq(&char, &ZZbig.power_of_two(63)) {
-            assert_eq!(None, ring.characteristic(&StaticRing::<i64>::RING));
+            assert_eq!(None, ring.characteristic(&ZZi64));
         }
         if ZZbig.is_geq(&char, &ZZbig.power_of_two(127)) {
             assert_eq!(None, ring.characteristic(&StaticRing::<i128>::RING));

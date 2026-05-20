@@ -1,16 +1,17 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
 
-use crate::divisibility::DivisibilityRing;
+use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::homomorphism::*;
-use crate::integer::{IntegerRing, IntegerRingStore};
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
-use crate::ring::*;
-use crate::rings::extension::FreeAlgebra;
-use crate::rings::finite::FiniteRing;
-use crate::rings::zn::ZnRing;
-use crate::serialization::SerializableElementRing;
-use crate::specialization::*;
+use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::prelude::*;
+use crate::ring::{EnvBindingStrength, HashableElRing};
+use crate::ring_impls::extension::FreeAlgebra;
+use crate::ring_impls::finite::FiniteRing;
+use crate::ring_impls::zn::ZnRing;
+use crate::ring_properties::serialization::SerializableElementRing;
+use crate::ring_properties::specialization::*;
 
 /// Trait to simplify implementing newtype-pattern for rings.
 /// When you want to create a ring that just wraps another ring,
@@ -219,7 +220,7 @@ use crate::specialization::*;
 ///         R::Type: FiniteRing
 /// {
 ///     let wrapped_ring = BoringRingWrapper(base_ring);
-///     assert!(wrapped_ring.size(BigIntRing::RING).is_some());
+///     assert!(wrapped_ring.size(ZZbig).is_some());
 /// }
 /// ```
 /// But we can add a delegate-implementation of [`FiniteRing`] by adding the marker trait
@@ -275,7 +276,7 @@ use crate::specialization::*;
 ///         R::Type: FiniteRing
 /// {
 ///     let wrapped_ring = BoringRingWrapper(base_ring);
-///     assert!(wrapped_ring.size(BigIntRing::RING).is_some());
+///     assert!(wrapped_ring.size(ZZbig).is_some());
 /// }
 /// ```
 pub trait DelegateRing: PartialEq + Debug + Send + Sync {

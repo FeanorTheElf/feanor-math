@@ -664,9 +664,9 @@ where
 
 #[cfg(test)]
 fn parse(s: &str, base: u32) -> Vec<BlockInt> {
-    use crate::integer::*;
-    use crate::ring::*;
-    use crate::rings::rust_bigint::RustBigintRing;
+    use crate::ring_properties::integer::*;
+    use crate::prelude::*;
+    use crate::ring_impls::rust_bigint::RustBigintRing;
 
     truncate_zeros(
         RustBigintRing::RING

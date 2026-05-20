@@ -7,10 +7,10 @@ use tracing::instrument;
 use super::complex_fft::*;
 use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2_zn, is_prim_root_of_unity_pow2};
 use crate::algorithms::fft::*;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::homomorphism::*;
-use crate::rings::float_complex::*;
-use crate::rings::zn::*;
+use crate::ring_impls::float_complex::*;
+use crate::ring_impls::zn::*;
 use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 
 /// An optimized implementation of the Cooley-Tukey FFT algorithm, to compute
@@ -983,15 +983,15 @@ where
 }
 
 #[cfg(test)]
-use crate::field::*;
+use crate::ring_properties::field::*;
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
-use crate::rings::zn::zn_big;
+use crate::ring_impls::zn::zn_big;
 #[cfg(test)]
-use crate::rings::zn::zn_static;
+use crate::ring_impls::zn::zn_static;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Fp;
+use crate::ring_impls::zn::zn_static::Fp;
 
 #[test]
 fn test_bitreverse_fft_inplace_basic() {

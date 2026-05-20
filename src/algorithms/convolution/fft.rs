@@ -10,11 +10,11 @@ use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::primitive_int::{StaticRingBase, *};
-use crate::ring::*;
-use crate::rings::float_complex::*;
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::float_complex::*;
+use crate::ring_impls::zn::*;
 use crate::seq::*;
 
 const CC: Complex64 = Complex64::RING;
@@ -84,7 +84,7 @@ where
             log2_data_size
         } else {
             data.as_iter()
-                .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
+                .map(|x| ZZi64.abs_log2_ceil(&to_int(x)).unwrap_or(0))
                 .max()
                 .unwrap()
         };
@@ -140,7 +140,7 @@ where
             log2_data_size
         } else {
             data.as_iter()
-                .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
+                .map(|x| ZZi64.abs_log2_ceil(&to_int(x)).unwrap_or(0))
                 .max()
                 .unwrap_or(0)
         };
@@ -154,7 +154,7 @@ where
         // not expect lazy behavior
         if let Some(len) = length_hint {
             if len > 0 {
-                let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+                let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
                 _ = self.get_fft_data(data, Some(&result), ring, log2_len, to_int, ring_log2_el_size);
             }
         }
@@ -184,7 +184,7 @@ where
         let len = lhs.len() + rhs.len() - 1;
 
         assert!(dst.len() >= len);
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut lhs_fft = self.get_fft_data(lhs, lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
         let mut rhs_fft = self.get_fft_data(rhs, rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
@@ -243,7 +243,7 @@ where
             return;
         }
         assert!(len <= dst.len() + 1);
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize(1 << log2_len, CC.zero());
@@ -260,7 +260,7 @@ where
             } else {
                 lhs.as_iter()
                     .chain(rhs.as_iter())
-                    .map(|x| StaticRing::<i64>::RING.abs_log2_ceil(&to_int(x)).unwrap_or(0))
+                    .map(|x| ZZi64.abs_log2_ceil(&to_int(x)).unwrap_or(0))
                     .max()
                     .unwrap()
             };
@@ -305,7 +305,7 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    move |x| int_cast(x.clone(), StaticRing::<i64>::RING, &ring)
+    move |x| int_cast(x.clone(), ZZi64, &ring)
 }
 
 fn from_int_int<I>(ring: I) -> impl use<I> + Fn(i64) -> El<I>
@@ -313,7 +313,7 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    move |x| int_cast(x, &ring, StaticRing::<i64>::RING)
+    move |x| int_cast(x, &ring, ZZi64)
 }
 
 fn to_int_zn<R>(ring: R) -> impl use<R> + Fn(&El<R>) -> i64
@@ -324,7 +324,7 @@ where
     move |x| {
         int_cast(
             ring.smallest_lift(x.clone()),
-            StaticRing::<i64>::RING,
+            ZZi64,
             ring.integer_ring(),
         )
     }
@@ -339,7 +339,7 @@ where
     move |x| {
         ring.get_ring().map_in(
             ring.integer_ring().get_ring(),
-            int_cast(x, ring.integer_ring(), StaticRing::<i64>::RING),
+            int_cast(x, ring.integer_ring(), ZZi64),
             &hom,
         )
     }
@@ -533,7 +533,7 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 
 #[test]
 fn test_convolution_zn() {
@@ -548,7 +548,7 @@ fn test_convolution_zn() {
 fn test_convolution_int() {
     feanor_tracing::DelayedLogger::init_test();
     let convolution: FFTConvolution = FFTConvolution::new();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }

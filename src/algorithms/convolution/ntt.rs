@@ -7,10 +7,10 @@ use super::ConvolutionAlgorithm;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::cow::*;
 use crate::homomorphism::*;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::zn::*;
+use crate::prelude::*;
+use crate::ring_impls::zn::*;
 use crate::seq::VectorView;
 
 /// Computes the convolution over a finite field that has suitable roots of unity
@@ -125,7 +125,7 @@ where
         V: VectorView<R_main::Element>,
     {
         assert!(data.len() <= significant_entries);
-        let log2_len = StaticRing::<i64>::RING
+        let log2_len = ZZi64
             .abs_log2_ceil(&significant_entries.try_into().unwrap())
             .unwrap();
 
@@ -159,7 +159,7 @@ where
         V1: VectorView<R_main::Element>,
         V2: VectorView<R_main::Element>,
     {
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         if lhs_prep.is_some()
             && (lhs_prep.unwrap().significant_entries < len || lhs_prep.unwrap().ntt_data.len() != 1 << log2_len)
@@ -209,7 +209,7 @@ where
                 significant_entries,
             };
         }
-        let log2_len = StaticRing::<i64>::RING
+        let log2_len = ZZi64
             .abs_log2_ceil(&significant_entries.try_into().unwrap())
             .unwrap();
 
@@ -240,7 +240,7 @@ where
         let len = lhs.len() + rhs.len() - 1;
         assert!(len <= dst.len() + 1);
 
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut lhs_ntt = self.compute_convolution_ntt(lhs, lhs_prep, rhs, rhs_prep, len);
         let lhs_ntt = lhs_ntt.to_mut_with(|_| unreachable!());
@@ -280,7 +280,7 @@ where
             return;
         }
         assert!(len <= dst.len() + 1);
-        let log2_len = StaticRing::<i64>::RING.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
+        let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut buffer = Vec::with_capacity_in(1 << log2_len, self.allocator.clone());
         buffer.resize_with(1 << log2_len, || self.ring().zero());
@@ -360,7 +360,7 @@ use test::Bencher;
 #[cfg(test)]
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BEl};
+use crate::ring_impls::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BEl};
 
 #[test]
 fn test_convolution() {
@@ -390,7 +390,7 @@ where
 
     let mut i = 1;
     let mut actual = Vec::with_capacity(511);
-    let hom = ring.can_hom(&StaticRing::<i64>::RING).unwrap();
+    let hom = ring.can_hom(&ZZi64).unwrap();
     bencher.iter(|| {
         actual.clear();
         actual.resize_with(511, || ring.zero());

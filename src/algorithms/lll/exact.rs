@@ -2,16 +2,16 @@ use std::alloc::Allocator;
 
 use crate::algorithms::lll::float::lll_quadratic_form;
 use crate::algorithms::matmul::*;
-use crate::field::*;
+use crate::ring_properties::field::*;
 use crate::homomorphism::*;
-use crate::integer::*;
+use crate::ring_properties::integer::*;
 use crate::matrix::transform::{TransformCols, TransformTarget};
 use crate::matrix::*;
-use crate::ordered::{OrderedRing, OrderedRingStore};
-use crate::ring::*;
-use crate::rings::approx_real::float::Real64;
-use crate::rings::fraction::FractionFieldStore;
-use crate::rings::rational::*;
+use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
+use crate::prelude::*;
+use crate::ring_impls::approx_real::float::Real64;
+use crate::ring_impls::fraction::FractionFieldStore;
+use crate::ring_impls::rational::*;
 use crate::seq::*;
 
 /// Size-reduces `target` w.r.t. the GSO matrix, and also sends the performed
@@ -351,7 +351,7 @@ macro_rules! matrix {
 #[test]
 fn test_ldl() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let QQ = RationalField::new(ZZ);
     let mut data = matrix!(
         QQ.inclusion(),
@@ -374,7 +374,7 @@ fn test_ldl() {
 #[test]
 fn test_swap_gso_cols() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let QQ = RationalField::new(ZZ);
     let mut matrix = matrix!(
         QQ.inclusion(),
@@ -393,7 +393,7 @@ fn test_swap_gso_cols() {
 #[test]
 fn test_lll_2d() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(QQ.inclusion(), DerefArray::from([5, 9]), DerefArray::from([11, 20]));
     let mut reduced = original;
@@ -409,7 +409,7 @@ fn test_lll_2d() {
 
     assert_rational_lattice_isomorphic(
         QQ,
-        RationalField::new(BigIntRing::RING),
+        RationalField::new(ZZbig),
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -438,7 +438,7 @@ fn test_lll_2d() {
 
     assert_rational_lattice_isomorphic(
         QQ,
-        RationalField::new(BigIntRing::RING),
+        RationalField::new(ZZbig),
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -481,7 +481,7 @@ fn test_lll_3d() {
 
     assert_rational_lattice_isomorphic(
         QQ,
-        RationalField::new(BigIntRing::RING),
+        RationalField::new(ZZbig),
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -505,7 +505,7 @@ fn test_lll_3d() {
 #[test]
 fn test_lll_generating_set() {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i64>::RING;
+    let ZZ = ZZi64;
     let QQ = RationalField::new(ZZ);
 
     let original = matrix!(
@@ -528,7 +528,7 @@ fn test_lll_generating_set() {
 
     assert_rational_lattice_isomorphic(
         QQ,
-        RationalField::new(BigIntRing::RING),
+        RationalField::new(ZZbig),
         Submatrix::from_2d(&original),
         reduced_matrix.as_const(),
     );
@@ -550,7 +550,7 @@ fn test_lll_generating_set() {
         norm_squared(QQ, &reduced_matrix.as_const().col_at(4))
     );
 
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(
         QQ.inclusion()
@@ -568,8 +568,8 @@ fn test_lll_generating_set() {
         OwnedMatrix::identity(5, 5, &QQ).data(),
         reduced_matrix.reborrow(),
         &QQ.from_fraction(
-            int_cast(999, ZZ, StaticRing::<i64>::RING),
-            int_cast(1000, ZZ, StaticRing::<i64>::RING),
+            int_cast(999, ZZ, ZZi64),
+            int_cast(1000, ZZ, ZZi64),
         ),
         Global,
         true,
@@ -666,8 +666,8 @@ fn test_lll_generating_set() {
         OwnedMatrix::identity(5, 5, &QQ).data(),
         reduced_matrix.reborrow(),
         &QQ.from_fraction(
-            int_cast(999, ZZ, StaticRing::<i64>::RING),
-            int_cast(1000, ZZ, StaticRing::<i64>::RING),
+            int_cast(999, ZZ, ZZi64),
+            int_cast(1000, ZZ, ZZi64),
         ),
         Global,
         true,
@@ -707,7 +707,7 @@ fn test_lll_generating_set() {
 #[bench]
 fn bench_lll_10d(bencher: &mut Bencher) {
     feanor_tracing::DelayedLogger::init_test();
-    let ZZ = BigIntRing::RING;
+    let ZZ = ZZbig;
     let QQ = RationalField::new(ZZ);
 
     bencher.iter(|| {
@@ -730,8 +730,8 @@ fn bench_lll_10d(bencher: &mut Bencher) {
         let mut reduced = original.clone();
         let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
         let delta = QQ.from_fraction(
-            int_cast(9, ZZ, StaticRing::<i64>::RING),
-            int_cast(10, ZZ, StaticRing::<i64>::RING),
+            int_cast(9, ZZ, ZZi64),
+            int_cast(10, ZZ, ZZi64),
         );
         lll(
             &QQ,

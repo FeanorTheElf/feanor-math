@@ -4,16 +4,16 @@ use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::int_factor::factor;
-use crate::divisibility::{DivisibilityRingStore, Domain, *};
-use crate::field::Field;
-use crate::integer::*;
-use crate::pid::PrincipalIdealRingStore;
+use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain, *};
+use crate::ring_properties::field::Field;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::finite::*;
-use crate::rings::poly::sparse_poly::SparsePolyRing;
-use crate::rings::poly::*;
-use crate::rings::zn::{ZnRing, ZnRingStore};
+use crate::prelude::*;
+use crate::ring_impls::finite::*;
+use crate::ring_impls::poly::sparse_poly::SparsePolyRing;
+use crate::ring_impls::poly::*;
+use crate::ring_impls::zn::{ZnRing, ZnRingStore};
 use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
 
 /// Computes the `n`-th cyclotomic polynomial.
@@ -41,7 +41,7 @@ use crate::{MAX_PROBABILISTIC_REPETITIONS, algorithms};
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::assert_el_eq;
 ///
-/// let poly_ring = SparsePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let poly_ring = SparsePolyRing::new(ZZi64, "X");
 /// let cyclo_poly = feanor_math::algorithms::cyclotomic::cyclotomic_polynomial(&poly_ring, 3);
 /// assert_el_eq!(
 ///     poly_ring,
@@ -108,8 +108,8 @@ pub fn cyclotomic_polynomial_cache(
 /// [`is_prim_root_of_unity_general()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
-    let characteristic = ring.characteristic(BigIntRing::RING).unwrap();
-    assert!(BigIntRing::RING.is_zero(&characteristic) || BigIntRing::RING.is_odd(&characteristic));
+    let characteristic = ring.characteristic(ZZbig).unwrap();
+    assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_odd(&characteristic));
     if log2_n == 0 {
         return ring.is_one(el);
     }
@@ -132,12 +132,12 @@ where
     R: RingStore,
     R::Ring: Domain,
 {
-    let characteristic = ring.characteristic(BigIntRing::RING).unwrap();
+    let characteristic = ring.characteristic(ZZbig).unwrap();
     assert!(
-        BigIntRing::RING.is_zero(&characteristic)
-            || BigIntRing::RING.is_unit(&BigIntRing::RING.ideal_gen(n, &characteristic))
+        ZZbig.is_zero(&characteristic)
+            || ZZbig.is_unit(&ZZbig.ideal_gen(n, &characteristic))
     );
-    is_prim_root_of_unity_with_factorization(ring, el, n, &factor(BigIntRing::RING, n.clone()))
+    is_prim_root_of_unity_with_factorization(ring, el, n, &factor(ZZbig, n.clone()))
 }
 
 /// Checks if the given ring element is a primitive `n`-th root of unity.
@@ -152,11 +152,11 @@ where
 /// See also [`is_prim_root_of_unity_pow2()`], [`is_root_of_unity()`], [`is_prim_root_of_unity()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_general<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
-    let characteristic = ring.characteristic(BigIntRing::RING).unwrap();
+    let characteristic = ring.characteristic(ZZbig).unwrap();
     assert!(
-        BigIntRing::RING.is_zero(&characteristic)
-            || BigIntRing::RING.is_unit(&BigIntRing::RING.ideal_gen(
-                &int_cast(n.try_into().unwrap(), BigIntRing::RING, StaticRing::<i64>::RING),
+        ZZbig.is_zero(&characteristic)
+            || ZZbig.is_unit(&ZZbig.ideal_gen(
+                &int_cast(n.try_into().unwrap(), ZZbig, ZZi64),
                 &characteristic
             ))
     );
@@ -180,9 +180,8 @@ where
     R: RingStore,
     R::Ring: FiniteRing + Field,
 {
-    let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
-    assert!(BigIntRing::RING.is_zero(&characteristic) || ZZbig.is_unit(&ZZbig.ideal_gen(n, &characteristic)));
+    assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_unit(&ZZbig.ideal_gen(n, &characteristic)));
     let order = ZZbig.sub(ring.size(&ZZbig).unwrap(), ZZbig.one());
     let power = ZZbig.checked_div(&order, n)?;
     let n_factorization = factor(ZZbig, n.clone());
@@ -212,24 +211,23 @@ where
     R: RingStore,
     R::Ring: ZnRing,
 {
-    let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
     assert!(
-        BigIntRing::RING.is_zero(&characteristic)
+        ZZbig.is_zero(&characteristic)
             || ZZbig.is_unit(&ZZbig.ideal_gen(
-                &int_cast(n.try_into().unwrap(), ZZbig, StaticRing::<i64>::RING),
+                &int_cast(n.try_into().unwrap(), ZZbig, ZZi64),
                 &characteristic
             ))
     );
 
-    let n_factorization = factor(StaticRing::<i64>::RING, n.try_into().unwrap());
+    let n_factorization = factor(ZZi64, n.try_into().unwrap());
 
     let mut accumulator = ring.zero();
     let ZZ = ring.integer_ring();
     'mod_pe: for (p, e) in factor(ZZ, ring.modulus().clone()) {
         let pe = ZZ.pow(p.clone(), e);
         let order = ZZ.sub_ref_fst(&pe, ZZ.pow(p, e - 1));
-        let n = int_cast(n.try_into().unwrap(), ZZ, StaticRing::<i64>::RING);
+        let n = int_cast(n.try_into().unwrap(), ZZ, ZZi64);
         let power = ZZ.checked_div(&order, &n)?;
         let scale = ring.coerce(ZZ, ZZ.checked_div(ring.modulus(), &pe).unwrap());
 
@@ -243,7 +241,7 @@ where
                     &one_mod_p,
                     &ring.pow_gen(
                         current.clone(),
-                        &ZZ.checked_div(&n, &int_cast(*factor_n, ZZ, StaticRing::<i64>::RING))
+                        &ZZ.checked_div(&n, &int_cast(*factor_n, ZZ, ZZi64))
                             .unwrap(),
                         ZZ,
                     ),
@@ -277,7 +275,6 @@ where
     R: RingStore,
     R::Ring: FiniteRing + Field,
 {
-    let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
     assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_odd(&characteristic));
     let order = ZZbig.sub(ring.size(&ZZbig).unwrap(), ZZbig.one());
@@ -311,7 +308,6 @@ where
     if log2_n == 0 {
         return Some(ring.one());
     }
-    let ZZbig = BigIntRing::RING;
     let characteristic = ring.characteristic(ZZbig).unwrap();
     assert!(ZZbig.is_zero(&characteristic) || ZZbig.is_odd(&characteristic));
 
@@ -361,12 +357,11 @@ where
     R: RingStore,
     R::Ring: Domain,
 {
-    let characteristic = ring.characteristic(BigIntRing::RING).unwrap();
+    let characteristic = ring.characteristic(ZZbig).unwrap();
     debug_assert!(
-        BigIntRing::RING.is_zero(&characteristic)
-            || BigIntRing::RING.is_unit(&BigIntRing::RING.ideal_gen(n, &characteristic))
+        ZZbig.is_zero(&characteristic)
+            || ZZbig.is_unit(&ZZbig.ideal_gen(n, &characteristic))
     );
-    let ZZbig = BigIntRing::RING;
     debug_assert!(ZZbig.eq_el(
         n,
         &ZZbig.prod(n_factorization.iter().map(|(p, e)| ZZbig.pow(p.clone(), *e)))
@@ -385,19 +380,19 @@ where
 #[cfg(test)]
 use crate::homomorphism::*;
 #[cfg(test)]
-use crate::rings::extension::FreeAlgebraStore;
+use crate::ring_impls::extension::FreeAlgebraStore;
 #[cfg(test)]
-use crate::rings::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
-use crate::rings::extension::galois_field::GaloisField;
+use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
-use crate::rings::poly::PolyRingStore;
+use crate::ring_impls::poly::PolyRingStore;
 #[cfg(test)]
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 #[cfg(test)]
-use crate::rings::zn::zn_static::{Fp, Zn};
+use crate::ring_impls::zn::zn_static::{Fp, Zn};
 
 #[test]
 fn test_cyclotomic_polynomial() {
@@ -473,9 +468,9 @@ fn test_cyclotomic_polynomial() {
 
 #[test]
 fn test_is_prim_root_of_unity_pow2() {
-    assert_eq!(true, is_prim_root_of_unity_pow2(StaticRing::<i64>::RING, &1, 0));
-    assert_eq!(false, is_prim_root_of_unity_pow2(StaticRing::<i64>::RING, &1, 1));
-    assert_eq!(true, is_prim_root_of_unity_pow2(StaticRing::<i64>::RING, &-1, 1));
+    assert_eq!(true, is_prim_root_of_unity_pow2(ZZi64, &1, 0));
+    assert_eq!(false, is_prim_root_of_unity_pow2(ZZi64, &1, 1));
+    assert_eq!(true, is_prim_root_of_unity_pow2(ZZi64, &-1, 1));
 
     assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 1));
     assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 2));
@@ -500,68 +495,68 @@ fn test_is_prim_root_of_unity_pow2() {
 fn test_is_prim_root_of_unity() {
     assert_eq!(
         true,
-        is_prim_root_of_unity(StaticRing::<i64>::RING, &1, &BigIntRing::RING.int_hom().map(1))
+        is_prim_root_of_unity(ZZi64, &1, &ZZbig.int_hom().map(1))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(StaticRing::<i64>::RING, &1, &BigIntRing::RING.int_hom().map(2))
+        is_prim_root_of_unity(ZZi64, &1, &ZZbig.int_hom().map(2))
     );
     assert_eq!(
         true,
-        is_prim_root_of_unity(StaticRing::<i64>::RING, &-1, &BigIntRing::RING.int_hom().map(2))
+        is_prim_root_of_unity(ZZi64, &-1, &ZZbig.int_hom().map(2))
     );
 
     assert_eq!(
         true,
-        is_prim_root_of_unity(Fp::<3>::RING, &2, &BigIntRing::RING.int_hom().map(2))
+        is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(2))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(Fp::<3>::RING, &2, &BigIntRing::RING.int_hom().map(4))
+        is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(4))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(Fp::<3>::RING, &2, &BigIntRing::RING.int_hom().map(1))
+        is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(1))
     );
 
     assert_eq!(
         true,
-        is_prim_root_of_unity(Fp::<19>::RING, &6, &BigIntRing::RING.int_hom().map(9))
+        is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(9))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(Fp::<19>::RING, &6, &BigIntRing::RING.int_hom().map(3))
+        is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(3))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(Fp::<19>::RING, &6, &BigIntRing::RING.int_hom().map(18))
+        is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(18))
     );
 
     let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]).as_field().unwrap();
     let FEl = |x: [u64; 2]| F.from_canonical_basis(x);
     assert_eq!(
         true,
-        is_prim_root_of_unity(&F, &FEl([2, 2]), &BigIntRing::RING.int_hom().map(6))
+        is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(6))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(&F, &FEl([2, 2]), &BigIntRing::RING.int_hom().map(9))
+        is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(9))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(&F, &FEl([2, 2]), &BigIntRing::RING.int_hom().map(4))
+        is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(4))
     );
     assert_eq!(
         false,
-        is_prim_root_of_unity(&F, &FEl([2, 2]), &BigIntRing::RING.int_hom().map(8))
+        is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(8))
     );
 }
 
 #[test]
 fn test_is_prim_root_of_unity_general() {
-    assert_eq!(true, is_prim_root_of_unity_general(StaticRing::<i64>::RING, &1, 1));
-    assert_eq!(false, is_prim_root_of_unity_general(StaticRing::<i64>::RING, &1, 2));
-    assert_eq!(true, is_prim_root_of_unity_general(StaticRing::<i64>::RING, &-1, 2));
+    assert_eq!(true, is_prim_root_of_unity_general(ZZi64, &1, 1));
+    assert_eq!(false, is_prim_root_of_unity_general(ZZi64, &1, 2));
+    assert_eq!(true, is_prim_root_of_unity_general(ZZi64, &-1, 2));
 
     assert_eq!(true, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 2));
     assert_eq!(false, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 4));
@@ -591,51 +586,51 @@ fn test_is_prim_root_of_unity_general() {
 fn test_get_prim_root_of_unity() {
     assert!(is_prim_root_of_unity(
         Fp::<17>::RING,
-        &get_prim_root_of_unity(Fp::<17>::RING, &BigIntRing::RING.int_hom().map(4)).unwrap(),
-        &BigIntRing::RING.int_hom().map(4)
+        &get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(4)).unwrap(),
+        &ZZbig.int_hom().map(4)
     ));
     assert!(is_prim_root_of_unity(
         Fp::<17>::RING,
-        &get_prim_root_of_unity(Fp::<17>::RING, &BigIntRing::RING.int_hom().map(16)).unwrap(),
-        &BigIntRing::RING.int_hom().map(16)
+        &get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(16)).unwrap(),
+        &ZZbig.int_hom().map(16)
     ));
-    assert!(get_prim_root_of_unity(Fp::<17>::RING, &BigIntRing::RING.int_hom().map(32)).is_none());
+    assert!(get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(32)).is_none());
 
     assert!(is_prim_root_of_unity(
         Fp::<19>::RING,
-        &get_prim_root_of_unity(Fp::<19>::RING, &BigIntRing::RING.int_hom().map(9)).unwrap(),
-        &BigIntRing::RING.int_hom().map(9)
+        &get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(9)).unwrap(),
+        &ZZbig.int_hom().map(9)
     ));
     assert!(is_prim_root_of_unity(
         Fp::<19>::RING,
-        &get_prim_root_of_unity(Fp::<19>::RING, &BigIntRing::RING.int_hom().map(6)).unwrap(),
-        &BigIntRing::RING.int_hom().map(6)
+        &get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(6)).unwrap(),
+        &ZZbig.int_hom().map(6)
     ));
-    assert!(get_prim_root_of_unity(Fp::<19>::RING, &BigIntRing::RING.int_hom().map(4)).is_none());
+    assert!(get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(4)).is_none());
 
     let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]).as_field().unwrap();
     assert!(is_prim_root_of_unity(
         &F,
-        &get_prim_root_of_unity(&F, &BigIntRing::RING.int_hom().map(6)).unwrap(),
-        &BigIntRing::RING.int_hom().map(6)
+        &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(6)).unwrap(),
+        &ZZbig.int_hom().map(6)
     ));
     assert!(is_prim_root_of_unity(
         &F,
-        &get_prim_root_of_unity(&F, &BigIntRing::RING.int_hom().map(4)).unwrap(),
-        &BigIntRing::RING.int_hom().map(4)
+        &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(4)).unwrap(),
+        &ZZbig.int_hom().map(4)
     ));
     assert!(is_prim_root_of_unity(
         &F,
-        &get_prim_root_of_unity(&F, &BigIntRing::RING.int_hom().map(8)).unwrap(),
-        &BigIntRing::RING.int_hom().map(8)
+        &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(8)).unwrap(),
+        &ZZbig.int_hom().map(8)
     ));
-    assert!(&get_prim_root_of_unity(&F, &BigIntRing::RING.int_hom().map(89)).is_none());
+    assert!(&get_prim_root_of_unity(&F, &ZZbig.int_hom().map(89)).is_none());
 }
 
 #[test]
 #[should_panic]
 fn test_get_prim_root_of_unity_ramified() {
-    _ = get_prim_root_of_unity(GaloisField::new(17, 2), &BigIntRing::RING.int_hom().map(17));
+    _ = get_prim_root_of_unity(GaloisField::new(17, 2), &ZZbig.int_hom().map(17));
 }
 
 #[test]
@@ -696,14 +691,14 @@ fn test_get_prim_root_of_unity_pow2() {
     assert!(is_prim_root_of_unity(
         Fp::<17>::RING,
         &get_prim_root_of_unity_pow2(Fp::<17>::RING, 2).unwrap(),
-        &BigIntRing::RING.int_hom().map(4)
+        &ZZbig.int_hom().map(4)
     ));
     assert!(is_prim_root_of_unity(
         Fp::<17>::RING,
         &get_prim_root_of_unity_pow2(Fp::<17>::RING, 4).unwrap(),
-        &BigIntRing::RING.int_hom().map(16)
+        &ZZbig.int_hom().map(16)
     ));
-    assert!(get_prim_root_of_unity(Fp::<17>::RING, &BigIntRing::RING.int_hom().map(32)).is_none());
+    assert!(get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(32)).is_none());
 
     assert!(get_prim_root_of_unity_pow2(Fp::<19>::RING, 2).is_none());
 
@@ -711,17 +706,17 @@ fn test_get_prim_root_of_unity_pow2() {
     assert!(is_prim_root_of_unity(
         &F,
         &get_prim_root_of_unity_pow2(&F, 1).unwrap(),
-        &BigIntRing::RING.int_hom().map(2)
+        &ZZbig.int_hom().map(2)
     ));
     assert!(is_prim_root_of_unity(
         &F,
         &get_prim_root_of_unity_pow2(&F, 2).unwrap(),
-        &BigIntRing::RING.int_hom().map(4)
+        &ZZbig.int_hom().map(4)
     ));
     assert!(is_prim_root_of_unity(
         &F,
         &get_prim_root_of_unity_pow2(&F, 3).unwrap(),
-        &BigIntRing::RING.int_hom().map(8)
+        &ZZbig.int_hom().map(8)
     ));
     assert!(&get_prim_root_of_unity_pow2(&F, 4).is_none());
 }

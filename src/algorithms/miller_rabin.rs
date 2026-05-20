@@ -2,14 +2,15 @@ use oorandom;
 use tracing::instrument;
 
 use crate::DEFAULT_PROBABILISTIC_REPETITIONS;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::integer::*;
-use crate::ordered::OrderedRingStore;
-use crate::pid::PrincipalIdealRingStore;
+use crate::ring_properties::integer::*;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::primitive_int::*;
-use crate::ring::*;
-use crate::rings::zn::{ZnRingStore, choose_zn_impl, *};
+use crate::prelude::*;
+use crate::ring::HashableElRingStore;
+use crate::ring_impls::zn::{ZnRingStore, choose_zn_impl, *};
 
 struct CheckIsFieldMillerRabin {
     probability_param: usize,
@@ -40,7 +41,7 @@ impl ZnOperation for CheckIsFieldMillerRabin {
 /// For details, see [`is_prime_base()`]
 pub fn is_prime<I>(ZZ: I, n: &El<I>, k: usize) -> bool
 where
-    I: IntegerRingStore + HashableElRingStore,
+    I: IntegerRingStore,
     I::Ring: IntegerRing + CanIsoFromTo<StaticRingBase<i128>>,
 {
     assert!(ZZ.is_pos(n));
@@ -69,8 +70,8 @@ where
     let Zm = zn_64b::Zn64B::new(m as u64);
     let mut n_mod_m = Zm.coerce(&ZZ, n.clone());
     let mut diff_to_n = 0;
-    let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&StaticRing::<i64>::RING).unwrap();
-    let Zi64_to_ZZ = ZZ.can_hom(&StaticRing::<i64>::RING).unwrap();
+    let Zi64_to_Zm = Zm.can_hom::<StaticRing<i64>>(&ZZi64).unwrap();
+    let Zi64_to_ZZ = ZZ.can_hom(&ZZi64).unwrap();
     debug_assert!(ZZ.is_unit(&ZZ.ideal_gen(&n, &Zi64_to_ZZ.map(delta))));
     let Zm_delta = Zi64_to_Zm.map(delta);
     let ZZ_m = Zi64_to_ZZ.map(m.try_into().unwrap());
@@ -85,7 +86,7 @@ where
             &Zi64_to_ZZ.map(-delta),
         );
         if ZZ.is_lt(&max_steps, &Zi64_to_ZZ.map(i64::MAX)) {
-            int_cast(max_steps, StaticRing::<i64>::RING, &ZZ)
+            int_cast(max_steps, ZZi64, &ZZ)
         } else {
             i64::MAX
         }
@@ -111,10 +112,10 @@ where
             remaining_steps -= 1;
         }
     }
-    let mut n = int_cast(n, StaticRing::<i64>::RING, &ZZ);
+    let mut n = int_cast(n, ZZi64, &ZZ);
     assert!(n <= m.try_into().unwrap());
     while n > 0 {
-        if is_prime(&StaticRing::<i64>::RING, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        if is_prime(&ZZi64, &n, DEFAULT_PROBABILISTIC_REPETITIONS) {
             return Some(Zi64_to_ZZ.map(n));
         }
         n += delta;
@@ -207,7 +208,7 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::rust_bigint::RustBigintRing;
+use crate::ring_impls::rust_bigint::RustBigintRing;
 
 #[test]
 fn test_is_prime() {
@@ -243,23 +244,23 @@ fn test_is_prime() {
 #[test]
 fn test_prev_prime() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 11));
-    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 10));
-    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 9));
-    assert_eq!(Some(7), prev_prime(StaticRing::<i64>::RING, 8));
-    assert_eq!(Some(5), prev_prime(StaticRing::<i64>::RING, 7));
-    assert_eq!(Some(5), prev_prime(StaticRing::<i64>::RING, 6));
-    assert_eq!(Some(3), prev_prime(StaticRing::<i64>::RING, 5));
-    assert_eq!(Some(3), prev_prime(StaticRing::<i64>::RING, 4));
-    assert_eq!(Some(2), prev_prime(StaticRing::<i64>::RING, 3));
-    assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 2));
-    assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 1));
-    assert_eq!(None, prev_prime(StaticRing::<i64>::RING, 0));
+    assert_eq!(Some(7), prev_prime(ZZi64, 11));
+    assert_eq!(Some(7), prev_prime(ZZi64, 10));
+    assert_eq!(Some(7), prev_prime(ZZi64, 9));
+    assert_eq!(Some(7), prev_prime(ZZi64, 8));
+    assert_eq!(Some(5), prev_prime(ZZi64, 7));
+    assert_eq!(Some(5), prev_prime(ZZi64, 6));
+    assert_eq!(Some(3), prev_prime(ZZi64, 5));
+    assert_eq!(Some(3), prev_prime(ZZi64, 4));
+    assert_eq!(Some(2), prev_prime(ZZi64, 3));
+    assert_eq!(None, prev_prime(ZZi64, 2));
+    assert_eq!(None, prev_prime(ZZi64, 1));
+    assert_eq!(None, prev_prime(ZZi64, 0));
 
     let mut last_prime = 11;
     for i in 12..1000 {
-        assert_eq!(Some(last_prime), prev_prime(StaticRing::<i64>::RING, i));
-        if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        assert_eq!(Some(last_prime), prev_prime(ZZi64, i));
+        if is_prime(ZZi64, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }
@@ -270,25 +271,25 @@ fn test_next_prime() {
     feanor_tracing::DelayedLogger::init_test();
     let mut last_prime = 1009;
     for i in (2..1000).rev() {
-        assert_eq!(last_prime, next_prime(StaticRing::<i64>::RING, i));
-        if is_prime(StaticRing::<i64>::RING, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
+        assert_eq!(last_prime, next_prime(ZZi64, i));
+        if is_prime(ZZi64, &i, DEFAULT_PROBABILISTIC_REPETITIONS) {
             last_prime = i;
         }
     }
-    assert_eq!(2, next_prime(StaticRing::<i64>::RING, 1));
-    assert_eq!(2, next_prime(StaticRing::<i64>::RING, 0));
+    assert_eq!(2, next_prime(ZZi64, 1));
+    assert_eq!(2, next_prime(ZZi64, 0));
 }
 
 #[test]
 fn test_search_prime() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(None, search_prime(StaticRing::<i64>::RING, 1, -2));
+    assert_eq!(None, search_prime(ZZi64, 1, -2));
     for (p, n) in [(3, 3), (5, 5), (7, 7), (7, 9), (11, 11)] {
-        assert_eq!(Some(p), search_prime(StaticRing::<i64>::RING, n, -2));
+        assert_eq!(Some(p), search_prime(ZZi64, n, -2));
     }
 
-    assert_eq!(None, search_prime(StaticRing::<i64>::RING, 1, -3));
-    assert_eq!(None, search_prime(StaticRing::<i64>::RING, 4, -3));
+    assert_eq!(None, search_prime(ZZi64, 1, -3));
+    assert_eq!(None, search_prime(ZZi64, 4, -3));
     for (p, n) in [
         (2, 2),
         (5, 5),
@@ -301,7 +302,7 @@ fn test_search_prime() {
         (13, 16),
         (17, 17),
     ] {
-        assert_eq!(Some(p), search_prime(StaticRing::<i64>::RING, n, -3));
+        assert_eq!(Some(p), search_prime(ZZi64, n, -3));
     }
-    assert_eq!(Some(359), search_prime(StaticRing::<i64>::RING, 380, -3));
+    assert_eq!(Some(359), search_prime(ZZi64, 380, -3));
 }

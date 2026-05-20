@@ -1,11 +1,11 @@
 use std::alloc::{Allocator, Global};
 
 use super::convolution::ConvolutionAlgorithm;
-use crate::divisibility::DivisibilityRing;
+use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::matrix::{AsPointerToSlice, SubmatrixMut};
-use crate::pid::PrincipalIdealRing;
-use crate::ring::*;
-use crate::rings::extension::extension_impl::FreeAlgebraImplBase;
+use crate::ring_properties::pid::PrincipalIdealRing;
+use crate::prelude::*;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImplBase;
 use crate::seq::VectorView;
 
 /// Contains the algorithm for solving linear systems over free ring extensions.

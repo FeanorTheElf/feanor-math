@@ -4,8 +4,8 @@ use tracing::instrument;
 
 use super::{LinSolveRing, SolveResult};
 use crate::matrix::*;
-use crate::ring::*;
-use crate::rings::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::prelude::*;
+use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
 use crate::seq::*;
 
 #[stability::unstable(feature = "enable")]
@@ -103,9 +103,9 @@ use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::rings::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
-use crate::rings::zn::zn_static;
+use crate::ring_impls::zn::zn_static;
 
 #[test]
 fn test_solve() {

@@ -5,7 +5,7 @@ use strassen::*;
 use tracing::instrument;
 
 use crate::matrix::*;
-use crate::ring::*;
+use crate::prelude::*;
 
 /// Contains [`strassen::strassen()`], an implementation of Strassen's algorithm
 /// for matrix multiplication.

@@ -3,11 +3,11 @@ use std::mem::swap;
 
 use tracing::instrument;
 
-use crate::integer::IntegerRing;
-use crate::ordered::OrderedRingStore;
-use crate::pid::*;
-use crate::ring::*;
-use crate::rings::poly::{PolyRing, PolyRingStore};
+use crate::ring_properties::integer::IntegerRing;
+use crate::ring_properties::ordered::OrderedRingStore;
+use crate::ring_properties::pid::*;
+use crate::prelude::*;
+use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 
 /// For `a, b` computes `s, t, d` such that `s*a + t*b == d` is a greatest
 /// common divisor of `a` and `b`.
@@ -276,31 +276,31 @@ where
 #[cfg(test)]
 use crate::primitive_int::*;
 #[cfg(test)]
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::*;
+use crate::ring_impls::zn::zn_64b::*;
 #[cfg(test)]
-use crate::rings::zn::*;
+use crate::ring_impls::zn::*;
 
 #[test]
 fn test_gcd() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(3, gcd(15, 6, &StaticRing::<i64>::RING).abs());
-    assert_eq!(3, gcd(6, 15, &StaticRing::<i64>::RING).abs());
+    assert_eq!(3, gcd(15, 6, &ZZi64).abs());
+    assert_eq!(3, gcd(6, 15, &ZZi64).abs());
 
-    assert_eq!(7, gcd(0, 7, &StaticRing::<i64>::RING).abs());
-    assert_eq!(7, gcd(7, 0, &StaticRing::<i64>::RING).abs());
-    assert_eq!(0, gcd(0, 0, &StaticRing::<i64>::RING).abs());
+    assert_eq!(7, gcd(0, 7, &ZZi64).abs());
+    assert_eq!(7, gcd(7, 0, &ZZi64).abs());
+    assert_eq!(0, gcd(0, 0, &ZZi64).abs());
 
-    assert_eq!(1, gcd(9, 1, &StaticRing::<i64>::RING).abs());
-    assert_eq!(1, gcd(1, 9, &StaticRing::<i64>::RING).abs());
+    assert_eq!(1, gcd(9, 1, &ZZi64).abs());
+    assert_eq!(1, gcd(1, 9, &ZZi64).abs());
 
-    assert_eq!(1, gcd(13, 300, &StaticRing::<i64>::RING).abs());
-    assert_eq!(1, gcd(300, 13, &StaticRing::<i64>::RING).abs());
+    assert_eq!(1, gcd(13, 300, &ZZi64).abs());
+    assert_eq!(1, gcd(300, 13, &ZZi64).abs());
 
-    assert_eq!(3, gcd(-15, 6, &StaticRing::<i64>::RING).abs());
-    assert_eq!(3, gcd(6, -15, &StaticRing::<i64>::RING).abs());
-    assert_eq!(3, gcd(-6, -15, &StaticRing::<i64>::RING).abs());
+    assert_eq!(3, gcd(-15, 6, &ZZi64).abs());
+    assert_eq!(3, gcd(6, -15, &ZZi64).abs());
+    assert_eq!(3, gcd(-6, -15, &ZZi64).abs());
 }
 
 #[test]
@@ -369,7 +369,7 @@ fn test_partial_int() {
     let test_on_input = |a: i64, b: i64, size: i64| {
         assert!(a != 0);
         assert!(b != 0);
-        let ([s, t, s_, t_], [x, x_]) = partial_eea_int(StaticRing::<i64>::RING, a, b, &size);
+        let ([s, t, s_, t_], [x, x_]) = partial_eea_int(ZZi64, a, b, &size);
         assert_eq!(x, s * a + t * b);
         assert_eq!(x_, s_ * a + t_ * b);
         if a.abs() <= size && b.abs() <= size {

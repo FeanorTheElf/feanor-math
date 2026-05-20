@@ -2,14 +2,14 @@ use tracing::{Level, event, instrument};
 
 use super::IntegerRing;
 use crate::algorithms::poly_factor::factor_locally::poly_factor_integer;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::*;
-use crate::pid::{EuclideanRing, PrincipalIdealRingStore};
-use crate::ring::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::*;
-use crate::rings::rational::RationalFieldBase;
-use crate::rings::zn::zn_64b::*;
+use crate::ring_properties::pid::{EuclideanRing, PrincipalIdealRingStore};
+use crate::prelude::*;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::*;
+use crate::ring_impls::rational::RationalFieldBase;
+use crate::ring_impls::zn::zn_64b::*;
 
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]

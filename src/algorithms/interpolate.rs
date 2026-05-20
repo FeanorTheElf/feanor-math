@@ -5,15 +5,15 @@ use std::ops::Range;
 use tracing::instrument;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
+use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore, Domain};
 use crate::homomorphism::Homomorphism;
-use crate::integer::IntegerRingStore;
+use crate::ring_properties::integer::IntegerRingStore;
 use crate::iters::multi_cartesian_product;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::multivariate::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::*;
+use crate::prelude::*;
+use crate::ring_impls::multivariate::*;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::*;
 use crate::seq::*;
 
 /// Computes `out[i] = prod_(j != i) values[j]`.
@@ -33,7 +33,7 @@ use crate::seq::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::algorithms::interpolate::*;
 /// # use feanor_math::seq::*;
-/// let ring = StaticRing::<i64>::RING;
+/// let ring = ZZi64;
 /// let mut result = [0; 6];
 /// product_except_one(ring, (1..7).map_fn(|x| x as i64), &mut result);
 /// let factorial_6 = 6 * 5 * 4 * 3 * 2 * 1;
@@ -57,7 +57,7 @@ where
 {
     assert_eq!(values.len(), out.len());
     let n = values.len();
-    let log2_n = StaticRing::<i64>::RING.abs_log2_ceil(&n.try_into().unwrap()).unwrap();
+    let log2_n = ZZi64.abs_log2_ceil(&n.try_into().unwrap()).unwrap();
     assert!(n <= (1 << log2_n));
     if n % 2 == 0 {
         for i in 0..n {
@@ -114,7 +114,7 @@ pub enum InterpolationError {
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::primitive_int::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
-/// let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let ZZX = DensePolyRing::new(ZZi64, "X");
 /// let [expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
 /// let actual = interpolate(&ZZX, [1, 2, 6].copy_els(), [2, 5, 37].copy_els(), Global).unwrap();
 /// assert_el_eq!(&ZZX, expected, actual);
@@ -130,7 +130,7 @@ pub enum InterpolationError {
 /// # use feanor_math::algorithms::interpolate::*;
 /// # use feanor_math::rings::poly::*;
 /// # use feanor_math::rings::poly::dense_poly::*;
-/// let ZnX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+/// let ZnX = DensePolyRing::new(ZZi64, "X");
 /// let actual = interpolate(&ZnX, [-2, 0, 2].copy_els(), [1, 0, 1].copy_els(), Global);
 /// assert!(actual.is_err());
 /// ```
@@ -234,7 +234,7 @@ where
 {
     let dim_prod = |range: Range<usize>| {
         <_ as RingStore>::prod(
-            &StaticRing::<i64>::RING,
+            &ZZi64,
             range.map(|i| interpolation_points.at(i).len().try_into().unwrap()),
         ) as usize
     };
@@ -285,18 +285,18 @@ use std::alloc::Global;
 use multivariate_impl::MultivariatePolyRingImpl;
 
 #[cfg(test)]
-use crate::rings::fraction::FractionFieldStore;
+use crate::ring_impls::fraction::FractionFieldStore;
 #[cfg(test)]
-use crate::rings::rational::RationalField;
+use crate::ring_impls::rational::RationalField;
 #[cfg(test)]
-use crate::rings::zn::ZnRingStore;
+use crate::ring_impls::zn::ZnRingStore;
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 
 #[test]
 fn test_product_except_one() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let data = [2, 3, 5, 7, 11, 13, 17, 19];
     let mut actual = [0; 8];
     let expected = [
@@ -343,7 +343,7 @@ fn test_product_except_one() {
 #[test]
 fn test_interpolate() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i64>::RING;
+    let ring = ZZi64;
     let poly_ring = DensePolyRing::new(ring, "X");
     let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
     let x = (0..6).map_fn(|i| i.try_into().unwrap());
@@ -356,7 +356,7 @@ fn test_interpolate() {
     .unwrap();
     assert_el_eq!(&poly_ring, &poly, &actual);
 
-    let ring = RationalField::new(StaticRing::<i64>::RING);
+    let ring = RationalField::new(ZZi64);
     let poly_ring = DensePolyRing::new(ring, "X");
     let x = (0..4).map_fn(|i| ring.from_fraction(i.try_into().unwrap(), 1));
     let y = (0..4).map_fn(|_| ring.zero());
@@ -434,7 +434,7 @@ fn large_polynomial_interpolation() {
     feanor_tracing::DelayedLogger::init_test();
     let field = Zn64B::new(65537).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
-    let hom = poly_ring.base_ring().can_hom(&StaticRing::<i64>::RING).unwrap();
+    let hom = poly_ring.base_ring().can_hom(&ZZi64).unwrap();
     let actual = interpolate(
         &poly_ring,
         (0..65536).map_fn(|x| hom.map(x as i64)),

@@ -7,14 +7,14 @@ use crate::algorithms::int_bisect::bisect_floor;
 use crate::algorithms::linsolve::smith::determinant_using_pre_smith;
 use crate::algorithms::linsolve::*;
 use crate::algorithms::matmul::ComputeInnerProduct;
-use crate::divisibility::*;
+use crate::ring_properties::divisibility::*;
 use crate::homomorphism::Homomorphism;
 use crate::matrix::OwnedMatrix;
-use crate::pid::PrincipalIdealRing;
+use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
-use crate::rings::extension::*;
-use crate::rings::poly::{PolyRing, *};
+use crate::prelude::*;
+use crate::ring_impls::extension::*;
+use crate::ring_impls::poly::{PolyRing, *};
 use crate::seq::*;
 
 /// Default impl for [`FreeAlgebra::from_canonical_basis_extended()`]
@@ -59,7 +59,7 @@ where
     H: Homomorphism<<R::BaseRing as RingStore>::Ring, <BaseRingStore<P> as RingStore>::Ring>,
 {
     let minpoly = minpoly(ring, el, &poly_ring, hom);
-    let power = StaticRing::<i64>::RING
+    let power = ZZi64
         .checked_div(&(ring.rank() as i64), &(poly_ring.degree(&minpoly).unwrap() as i64))
         .unwrap() as usize;
     return poly_ring.pow(minpoly, power);
@@ -79,7 +79,7 @@ where
     let base_ring = hom.codomain();
 
     let mut result = None;
-    _ = bisect_floor(StaticRing::<i64>::RING, 1, ring.rank() as i64, |d| {
+    _ = bisect_floor(ZZi64, 1, ring.rank() as i64, |d| {
         let d = *d as usize;
         let mut lhs = OwnedMatrix::zero(ring.rank(), d, &base_ring);
         let mut current = ring.one();
@@ -167,17 +167,17 @@ where
 }
 
 #[cfg(test)]
-use crate::rings::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
 #[cfg(test)]
-use crate::rings::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::rings::rational::RationalField;
+use crate::ring_impls::rational::RationalField;
 
 #[test]
 fn test_charpoly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2]);
-    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let ring = FreeAlgebraImpl::new(ZZi64, 3, [2]);
+    let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
     assert_el_eq!(
@@ -215,8 +215,8 @@ fn test_charpoly() {
         )
     );
 
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 4, [2]);
-    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let ring = FreeAlgebraImpl::new(ZZi64, 4, [2]);
+    let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
     assert_el_eq!(
@@ -246,8 +246,8 @@ fn test_charpoly() {
 #[test]
 fn test_minpoly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 6, [2]);
-    let poly_ring = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+    let ring = FreeAlgebraImpl::new(ZZi64, 6, [2]);
+    let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) - 2]);
     assert_el_eq!(
@@ -289,7 +289,7 @@ fn test_minpoly() {
 #[test]
 fn test_trace() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
+    let ring = FreeAlgebraImpl::new(ZZi64, 3, [2, 0, 0]);
 
     assert_eq!(3, ring.trace(ring.from_canonical_basis([1, 0, 0])));
     assert_eq!(0, ring.trace(ring.from_canonical_basis([0, 1, 0])));
@@ -302,16 +302,16 @@ fn test_trace() {
 #[test]
 fn test_discriminant() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 0, 0]);
+    let ring = FreeAlgebraImpl::new(ZZi64, 3, [2, 0, 0]);
     assert_eq!(-108, discriminant(ring.get_ring()));
 
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2, 1, 0]);
+    let ring = FreeAlgebraImpl::new(ZZi64, 3, [2, 1, 0]);
     assert_eq!(-104, discriminant(ring.get_ring()));
 
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [3, 0, 0]);
+    let ring = FreeAlgebraImpl::new(ZZi64, 3, [3, 0, 0]);
     assert_eq!(-243, discriminant(ring.get_ring()));
 
-    let base_ring = DensePolyRing::new(RationalField::new(StaticRing::<i64>::RING), "X");
+    let base_ring = DensePolyRing::new(RationalField::new(ZZi64), "X");
     let [f] = base_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + 1]);
     let ring = FreeAlgebraImpl::new(&base_ring, 2, [f, base_ring.zero()]);
     let [expected] = base_ring.with_wrapped_indeterminate(|X| [4 * X.pow_ref(3) + 4]);
@@ -321,7 +321,7 @@ fn test_discriminant() {
 #[test]
 fn test_from_canonical_basis_extended() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = FreeAlgebraImpl::new(StaticRing::<i64>::RING, 3, [2]);
+    let ring = FreeAlgebraImpl::new(ZZi64, 3, [2]);
     let actual = from_canonical_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
     let expected = ring.from_canonical_basis([37, 12, 15]);
     assert_el_eq!(&ring, expected, actual);
