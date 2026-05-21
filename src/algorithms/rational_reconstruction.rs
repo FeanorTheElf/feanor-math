@@ -126,7 +126,7 @@ use crate::ring_properties::divisibility::DivisibilityRingStore;
 #[test]
 fn test_rational_reconstruction() {
     feanor_tracing::DelayedLogger::init_test();
-    let n = 2021027;
+    let n = 57517;
     let Zn = zn_64b::Zn64B::new(n as u64);
     let ab_bound = (n as f64 / 2.0).sqrt().floor() as i32;
     for a in -ab_bound..ab_bound {

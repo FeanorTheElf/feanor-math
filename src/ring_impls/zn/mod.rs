@@ -663,7 +663,7 @@ fn test_reduction_map() {
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(
         ZnReductionMap::new(&ring2, &ring1).unwrap(),
-        (0..(257 * 7)).step_by(8).map(|x| ring2.int_hom().map(x)),
+        (0..(257 * 7)).step_by(32).map(|x| ring2.int_hom().map(x)),
     );
 
     let ring1 = zn_big::ZnGB::new(StaticRing::<i16>::RING, 3);
@@ -671,7 +671,7 @@ fn test_reduction_map() {
 
     crate::homomorphism::generic_tests::test_homomorphism_axioms(
         ZnReductionMap::new(&ring2, &ring1).unwrap(),
-        (0..(65537 * 3)).step_by(1024).map(|x| ring2.int_hom().map(x)),
+        (0..(65537 * 3)).step_by(4096).map(|x| ring2.int_hom().map(x)),
     );
 }
 

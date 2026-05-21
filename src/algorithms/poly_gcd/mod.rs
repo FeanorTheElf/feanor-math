@@ -15,7 +15,7 @@ pub mod gcd_lift;
 /// Contains an implementation of polynomial gcd and squarefree decomposition over the integers.
 pub mod integer;
 /// Contains an implementation of polynomial gcd and squarefree decomposition over a number field.
-pub mod numberfield;
+pub mod number_field;
 pub mod power_decomposition_lift;
 
 /// Trait for rings R, whose total ring of fractions `TFrac(R)` gives rise to a well-defined and
@@ -270,6 +270,56 @@ where
         let (to, from) = make_poly_ring_euclidean(&poly_ring);
         from.map(poly_squarefree_part_finite_field(to.codomain(), &to.map_ref(poly)))
     }
+}
+
+/// Implements [`PolyTFracGCDRing`] for an integer ring.
+///
+/// The syntax is the same as for other impl-macros, see e.g.
+/// [`crate::impl_interpolation_base_ring_char_zero!`].
+#[macro_export]
+macro_rules! impl_poly_gcd_for_integer {
+    (<{$($gen_args:tt)*}> PolyTFracGCDRing for $self_type:ty where $($constraints:tt)*) => {
+
+        impl<$($gen_args)*> $crate::algorithms::poly_gcd::PolyTFracGCDRing for $self_type
+            where $($constraints)*
+        {
+            fn gcd<P>(poly_ring: P, lhs: &$crate::prelude::El<P>, rhs: &$crate::prelude::El<P>) -> $crate::prelude::El<P>
+            where
+                P: $crate::prelude::RingStore + Copy,
+                P::Ring: $crate::ring_impls::poly::PolyRing + $crate::prelude::DivisibilityRing,
+                $crate::prelude::BaseRingStore<P>: $crate::prelude::RingStore<Ring = Self>,
+            {
+                $crate::algorithms::poly_gcd::integer::poly_gcd_integer(poly_ring, lhs, rhs)
+            }
+
+            fn is_squarefree<P>(poly_ring: P, poly: &$crate::prelude::El<P>) -> bool
+            where
+                P: $crate::prelude::RingStore + Copy,
+                P::Ring: $crate::ring_impls::poly::PolyRing + $crate::prelude::DivisibilityRing,
+                $crate::prelude::BaseRingStore<P>: $crate::prelude::RingStore<Ring = Self>,
+            {
+                if poly_ring.is_zero(poly) {
+                    false
+                } else if $crate::algorithms::poly_gcd::integer::best_effort_poly_is_squarefree_integer(poly_ring, poly) {
+                    true
+                } else {
+                    poly_ring.is_unit(&Self::squarefree_part(poly_ring, poly))
+                }
+            }
+
+            fn power_decomposition<P>(poly_ring: P, poly: &$crate::prelude::El<P>) -> Vec<($crate::prelude::El<P>, usize)>
+            where
+                P: $crate::prelude::RingStore + Copy,
+                P::Ring: $crate::ring_impls::poly::PolyRing + DivisibilityRing,
+                BaseRingStore<P>: RingStore<Ring = Self>,
+            {
+                $crate::algorithms::poly_gcd::integer::poly_power_decomposition_integer(poly_ring, poly)
+            }
+        }
+    };
+    (PolyTFracGCDRing for $self_type:ty) => {
+        impl_field_wrap_unwrap_homs!{ <{}> PolyTFracGCDRing for $self_type where }
+    };
 }
 
 fn make_poly_ring_euclidean<'a, P>(

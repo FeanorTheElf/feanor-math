@@ -20,6 +20,7 @@ use crate::ring_impls::zn::zn_big::ZnGB;
 use crate::ring_impls::zn::*;
 
 const HOPE_FOR_SQUAREFREE_ATTEMPTS: usize = 1;
+const BEST_EFFORT_SQUAREFREE_CHECKS: usize = 3;
 
 fn lift_poly<P>(
     ZZX: P,
@@ -188,6 +189,33 @@ where
         }
     }
     return make_primitive(ZZX, &unmake_monic(ZZX, &result, &lc_lcm, &lc_lcm)).0;
+}
+
+/// Checks whether the given integral polynomial is squarefree modulo a few suitable primes.
+///  - If yes, it is for sure squarefree over the integers.
+///  - If not, it is likely that it is not squarefree over the integers.
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn best_effort_poly_is_squarefree_integer<P>(ZZX: P, poly: &El<P>) -> bool
+where
+    P: RingStore + Copy,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRingBase<P>: IntegerRing,
+{
+    if ZZX.is_zero(poly) {
+        return false;
+    }
+    assert!(!ZZX.is_zero(poly));
+    let ZZ = ZZX.base_ring();
+    large_prime_fields()
+        .filter(|Fp| !ZZ.divides(ZZX.lc(poly).unwrap(), &int_cast(*Fp.modulus(), ZZ, ZZi64)))
+        .take(BEST_EFFORT_SQUAREFREE_CHECKS)
+        .all(|Fp| {
+            let FpX = DensePolyRing::new(Fp, "X");
+            let ZZX_to_FpX = FpX.lifted_hom(&ZZX, Fp.can_hom(ZZ).unwrap());
+            let poly = ZZX_to_FpX.map_ref(poly);
+            PolyTFracGCDRing::is_squarefree(&FpX, &poly)
+        })
 }
 
 fn lift_power_decomposition<P>(

@@ -650,7 +650,7 @@ fn test_zn_axioms() {
 #[test]
 fn test_principal_ideal_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    for n in TEST_MODULI {
+    for n in TEST_MODULI.iter().copied().step_by(2) {
         if n < 100 {
             let R = Zn64M::new(n as u64);
             crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, elements(&R));

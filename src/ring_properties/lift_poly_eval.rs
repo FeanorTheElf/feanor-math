@@ -651,7 +651,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
 /// The syntax is the same as for other impl-macros, see e.g.
 /// [`crate::impl_interpolation_base_ring_char_zero!`].
 #[macro_export]
-macro_rules! impl_eval_poly_locally_for_ZZ {
+macro_rules! impl_eval_poly_locally_for_integer {
     (LiftPolyEvalRing for $int_ring_type:ty) => {
         impl_eval_poly_locally_for_ZZ!{ <{}> LiftPolyEvalRing for $int_ring_type where }
     };

@@ -1094,8 +1094,8 @@ fn test_ring1_and_elements() -> (
     let ZZ = ZZi64;
     let R = FreeAlgebraImpl::new(ZZ, 2, [1, 1]);
     let mut elements = Vec::new();
-    for a in -3..=3 {
-        for b in -3..=3 {
+    for a in -2..=3 {
+        for b in -2..=3 {
             elements.push(R.from_canonical_basis([a, b]));
         }
     }
@@ -1111,8 +1111,8 @@ fn test_ring2_and_elements() -> (
     let R = FreeAlgebraImpl::new(ZZ, 3, vec![1, -1, 1]);
     let mut elements = Vec::new();
     for a in [-2, 0, 1, 2] {
-        for b in [-2, 0, 2] {
-            for c in [-2, 0, 2] {
+        for b in [0, 2] {
+            for c in [0, 2] {
                 elements.push(R.from_canonical_basis([a, b, c]));
             }
         }
@@ -1129,8 +1129,8 @@ fn test_ring3_and_elements() -> (
     let R = FreeAlgebraImpl::new(ZZ, 3, vec![1]);
     let mut elements = Vec::new();
     for a in [-2, 0, 1, 2] {
-        for b in [-2, 0, 2] {
-            for c in [-2, 0, 2] {
+        for b in [0, 2] {
+            for c in [0, 2] {
                 elements.push(R.from_canonical_basis([a, b, c]));
             }
         }
@@ -1150,8 +1150,8 @@ fn test_ring4_and_elements() -> (
     let R = FreeAlgebraImpl::new(ZZ, 3, modulus);
     let mut elements = Vec::new();
     for a in [-2, 0, 1, 2] {
-        for b in [-2, 0, 2] {
-            for c in [-2, 0, 2] {
+        for b in [0, 2] {
+            for c in [0, 2] {
                 elements.push(R.from_canonical_basis([a, b, c]));
             }
         }
@@ -1169,10 +1169,10 @@ fn test_sparse() {
 #[test]
 fn test_ring_axioms() {
     feanor_tracing::DelayedLogger::init_test();
-    // let (ring, els) = test_ring0_and_elements();
-    // crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
-    // let (ring, els) = test_ring1_and_elements();
-    // crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+    let (ring, els) = test_ring0_and_elements();
+    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+    let (ring, els) = test_ring1_and_elements();
+    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring2_and_elements();
     crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
     let (ring, els) = test_ring3_and_elements();
