@@ -145,40 +145,45 @@ pub trait PolyTFracGCDRing {
 
 /// Computes the map
 /// ```text
-///   R[X] -> R[X],  f(X) -> a^(deg(f) - 1) f(X / a)
+///   R[X] -> R[X],  f(X) -> a^(deg(f))/lc(f) f(X / a)
 /// ```
-/// that can be used to make polynomials over a domain monic (when setting `a = lc(f)`).
+/// which makes a polynomial monic, given `a` a multiple of `lc(f)`.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn evaluate_aX<P>(poly_ring: P, f: &El<P>, a: &El<BaseRingStore<P>>) -> El<P>
+pub fn make_monic<P>(poly_ring: P, f: &El<P>, a: &El<BaseRingStore<P>>) -> (El<P>, El<BaseRingStore<P>>)
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
+    BaseRingBase<P>: DivisibilityRing + Domain,
 {
     if poly_ring.is_zero(f) {
-        return poly_ring.zero();
+        return (poly_ring.zero(), poly_ring.base_ring().zero());
     }
     let ring = poly_ring.base_ring();
+    let lc_f = poly_ring.lc(f).unwrap().clone();
+    let a_over_lc_f = ring.checked_div(a, &lc_f).unwrap();
     let d = poly_ring.degree(&f).unwrap();
     let result = poly_ring.from_terms(poly_ring.terms(f).map(|(c, i)| {
         if i == d {
-            (ring.checked_div(c, a).unwrap(), d)
+            (ring.one(), d)
         } else {
-            (ring.mul_ref_fst(c, ring.pow(a.clone(), d - i - 1)), i)
+            (
+                ring.mul_ref_snd(ring.mul_ref_fst(c, ring.pow(a.clone(), d - i - 1)), &a_over_lc_f),
+                i,
+            )
         }
     }));
-    return result;
+    return (result, lc_f);
 }
 
-/// Computes the inverse to [`evaluate_aX()`].
+/// Computes the inverse to [`make_monic()`].
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn unevaluate_aX<P>(poly_ring: P, g: &El<P>, a: &El<BaseRingStore<P>>) -> El<P>
+pub fn unmake_monic<P>(poly_ring: P, g: &El<P>, a: &El<BaseRingStore<P>>, lc_f: &El<BaseRingStore<P>>) -> El<P>
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
+    BaseRingBase<P>: DivisibilityRing + Domain,
 {
     if poly_ring.is_zero(g) {
         return poly_ring.zero();
@@ -187,9 +192,13 @@ where
     let d = poly_ring.degree(&g).unwrap();
     let result = poly_ring.from_terms(poly_ring.terms(g).map(|(c, i)| {
         if i == d {
-            (ring.mul_ref(c, a), d)
+            (lc_f.clone(), d)
         } else {
-            (ring.checked_div(c, &ring.pow(a.clone(), d - i - 1)).unwrap(), i)
+            (
+                ring.checked_div(&ring.mul_ref(lc_f, c), &ring.pow(a.clone(), d - i))
+                    .unwrap(),
+                i,
+            )
         }
     }));
     return result;

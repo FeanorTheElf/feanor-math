@@ -3,6 +3,7 @@ pub enum PolyGCDResult<T> {
     FoundGCD(T),
     NotSquarefree,
     LiftUnsuccessful,
+    TrivialGCD,
 }
 
 #[stability::unstable(feature = "enable")]
@@ -53,7 +54,9 @@ where
     let mut attempts = 0;
     for (signature, state) in gcd_in_quotients {
         attempts += 1;
-        if signature.gcd_deg < expected_gcd_deg {
+        if signature.gcd_deg == 0 {
+            return PolyGCDResult::TrivialGCD;
+        } else if signature.gcd_deg < expected_gcd_deg {
             attempts = 1;
             expected_gcd_deg = signature.gcd_deg;
             queued_lifts.clear();

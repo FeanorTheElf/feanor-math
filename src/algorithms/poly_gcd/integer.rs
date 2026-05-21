@@ -1,4 +1,5 @@
 use std::cmp::Ordering;
+use std::mem::swap;
 
 use tracing::instrument;
 
@@ -16,7 +17,9 @@ use crate::algorithms::primelist::large_prime_fields;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_impls::zn::zn_big::ZnGB;
-use crate::ring_impls::zn::{ZnReductionMap, ZnRing, ZnRingStore};
+use crate::ring_impls::zn::*;
+
+const HOPE_FOR_SQUAREFREE_ATTEMPTS: usize = 1;
 
 fn lift_poly<P>(
     ZZX: P,
@@ -64,10 +67,10 @@ where
     let target_mod_pe = ZpeX
         .lifted_hom(ZZX, ZpeX.base_ring().can_hom(ZZX.base_ring()).unwrap())
         .map_ref(target);
+    let hom = Zpe.can_hom(old_base_ring.integer_ring()).unwrap();
     take_mut::take(lifter, |lifter| {
         lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |x| {
-            Zpe.get_ring()
-                .from_int_promise_reduced(old_base_ring.smallest_lift(x.clone()))
+            hom.map(old_base_ring.smallest_lift(x.clone()))
         })
     });
     let lifted_factorization = lifter
@@ -142,6 +145,49 @@ where
             }
         },
     )
+}
+
+/// Tries to compute the gcd of monic polynomials `f, g in Z[X]`.
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn poly_gcd_integer<P>(ZZX: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+where
+    P: RingStore + Copy,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRingBase<P>: IntegerRing,
+{
+    if ZZX.is_zero(lhs) {
+        return rhs.clone();
+    } else if ZZX.is_zero(rhs) {
+        return lhs.clone();
+    }
+    let lc_lcm = ZZX.base_ring().lcm(ZZX.lc(lhs).unwrap(), ZZX.lc(rhs).unwrap());
+    let (mut lhs, _) = make_monic(ZZX, lhs, &lc_lcm);
+    let (mut rhs, _) = make_monic(ZZX, rhs, &lc_lcm);
+    match poly_gcd_integer_monic(ZZX, &lhs, &rhs, HOPE_FOR_SQUAREFREE_ATTEMPTS) {
+        PolyGCDResult::TrivialGCD => return ZZX.one(),
+        PolyGCDResult::FoundGCD(res) => return make_primitive(ZZX, &unmake_monic(ZZX, &res, &lc_lcm, &lc_lcm)).0,
+        _ => {}
+    }
+
+    if ZZX.degree(&lhs).unwrap() > ZZX.degree(&rhs).unwrap() {
+        swap(&mut lhs, &mut rhs);
+    }
+    let lhs_power_decomposition = poly_power_decomposition_integer_monic(ZZX, &lhs, PROBABILISTIC_REPETITIONS).unwrap();
+    let mut result = ZZX.one();
+    for (fi, i) in &lhs_power_decomposition {
+        for _ in 0..*i {
+            match poly_gcd_integer_monic(ZZX, &fi, &rhs, PROBABILISTIC_REPETITIONS) {
+                PolyGCDResult::TrivialGCD => break,
+                PolyGCDResult::FoundGCD(gcd_i) => {
+                    rhs = ZZX.checked_div(&rhs, &gcd_i).unwrap();
+                    ZZX.mul_assign(&mut result, gcd_i);
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+    return make_primitive(ZZX, &unmake_monic(ZZX, &result, &lc_lcm, &lc_lcm)).0;
 }
 
 fn lift_power_decomposition<P>(
@@ -259,70 +305,18 @@ where
     BaseRingBase<P>: IntegerRing,
 {
     assert!(!ZZX.is_zero(poly));
-    let lc = ZZX.lc(poly).unwrap().clone();
-    let monic_poly = evaluate_aX(&ZZX, poly, &lc);
+    let lc_poly = ZZX.lc(poly).unwrap().clone();
+    let (monic_poly, lc_poly) = make_monic(&ZZX, poly, &lc_poly);
     let power_decomposition = poly_power_decomposition_integer_monic(&ZZX, &monic_poly, PROBABILISTIC_REPETITIONS);
     return power_decomposition
         .unwrap()
         .into_iter()
-        .map(|(f, i)| (unevaluate_aX(&ZZX, &f, &lc), i))
+        .map(|(f, i)| (unmake_monic(&ZZX, &f, &lc_poly, &lc_poly), i))
         .collect();
 }
 
 #[cfg(test)]
 use crate::RANDOM_TEST_INSTANCE_COUNT;
-
-#[test]
-fn random_test_poly_power_decomposition_integer() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZbig;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let mut rng = oorandom::Rand64::new(1);
-    let bound = ring.int_hom().map(500);
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let g = poly_ring.from_terms((0..=3).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let poly = make_primitive(
-            &poly_ring,
-            &poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone())),
-        )
-        .0;
-
-        let mut power_decomp = poly_power_decomposition_integer(&poly_ring, &poly);
-        for (f, _k) in &mut power_decomp {
-            *f = make_primitive(&poly_ring, &f).0;
-        }
-
-        assert_el_eq!(
-            &poly_ring,
-            &poly,
-            poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly.clone(), *k)))
-        );
-        assert!(
-            poly_ring.divides(
-                &poly_ring.prod(
-                    power_decomp
-                        .iter()
-                        .filter(|(_, k)| k % 3 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
-                ),
-                &make_primitive(&poly_ring, &h).0
-            )
-        );
-        assert!(
-            poly_ring.divides(
-                &poly_ring.prod(
-                    power_decomp
-                        .iter()
-                        .filter(|(_, k)| k % 2 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
-                ),
-                &make_primitive(&poly_ring, &g).0
-            )
-        );
-    }
-}
 
 #[test]
 fn test_poly_power_decomposition_integer() {
@@ -378,4 +372,122 @@ fn test_poly_power_decomposition_integer() {
         poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS)
             .unwrap();
     assert_eq(&expected, &actual);
+}
+
+#[test]
+fn test_poly_gcd_integer() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZZbig;
+    let poly_ring = DensePolyRing::new(ring, "X");
+    let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
+        [
+            X - 1,
+            2 * X + 1,
+            X.pow_ref(2) + X + 1,
+            3 * X.pow_ref(3) + X + 100,
+            6 * X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1,
+        ]
+    });
+    let poly = |powers: [usize; 5]| {
+        poly_ring.prod(
+            powers
+                .iter()
+                .zip(irred_polys.iter())
+                .map(|(e, f)| poly_ring.pow(f.clone(), *e)),
+        )
+    };
+
+    assert_el_eq!(
+        &poly_ring,
+        poly([1, 0, 0, 0, 0]),
+        poly_gcd_integer(&poly_ring, &poly([1, 0, 1, 0, 0]), &poly([1, 0, 0, 1, 0]))
+    );
+    assert_el_eq!(
+        &poly_ring,
+        poly([1, 0, 1, 0, 1]),
+        poly_gcd_integer(&poly_ring, &poly([1, 1, 1, 0, 1]), &poly([1, 0, 1, 1, 1]))
+    );
+    assert_el_eq!(
+        &poly_ring,
+        poly([1, 0, 2, 0, 1]),
+        poly_gcd_integer(&poly_ring, &poly([1, 1, 3, 0, 1]), &poly([3, 0, 2, 0, 3]))
+    );
+    assert_el_eq!(
+        &poly_ring,
+        poly([1, 0, 0, 5, 0],),
+        poly_gcd_integer(&poly_ring, &poly([2, 1, 3, 5, 1]), &poly([1, 0, 0, 7, 0]))
+    );
+}
+
+#[test]
+fn random_test_poly_gcd_integer() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZZbig;
+    let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = ring.int_hom().map(500);
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let f = poly_ring.from_terms((0..=16).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=14).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let h = poly_ring.from_terms((0..=12).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let lhs = poly_ring.mul_ref(&f, &h);
+        let rhs = poly_ring.mul_ref(&g, &h);
+        let gcd = make_primitive(&poly_ring, &poly_gcd_integer(&poly_ring, &lhs, &rhs)).0;
+
+        assert!(poly_ring.divides(&lhs, &gcd));
+        assert!(poly_ring.divides(&rhs, &gcd));
+        assert!(poly_ring.divides(&gcd, &make_primitive(&poly_ring, &h).0));
+    }
+}
+
+#[test]
+fn random_test_poly_power_decomposition_integer() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZZbig;
+    let poly_ring = DensePolyRing::new(ring, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = ring.int_hom().map(500);
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let f = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=3).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let poly = make_primitive(
+            &poly_ring,
+            &poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone())),
+        )
+        .0;
+
+        let mut power_decomp = poly_power_decomposition_integer(&poly_ring, &poly);
+        for (f, _k) in &mut power_decomp {
+            *f = make_primitive(&poly_ring, &f).0;
+        }
+
+        assert_el_eq!(
+            &poly_ring,
+            &poly,
+            poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly.clone(), *k)))
+        );
+        assert!(
+            poly_ring.divides(
+                &poly_ring.prod(
+                    power_decomp
+                        .iter()
+                        .filter(|(_, k)| k % 3 == 0)
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
+                ),
+                &make_primitive(&poly_ring, &h).0
+            )
+        );
+        assert!(
+            poly_ring.divides(
+                &poly_ring.prod(
+                    power_decomp
+                        .iter()
+                        .filter(|(_, k)| k % 2 == 0)
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
+                ),
+                &make_primitive(&poly_ring, &g).0
+            )
+        );
+    }
 }
