@@ -657,7 +657,7 @@ impl_interpolation_base_ring_char_zero! { <{A}> InterpolationBaseRing for RustBi
 
 impl_eval_poly_locally_for_integer! { <{A}> LiftPolyEvalRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
-impl_poly_gcd_for_integer!{ <{ A }> PolyTFracGCDRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
+impl_poly_gcd_for_integer! { <{ A }> PolyTFracGCDRing for RustBigintRingBase<A> where A: Allocator + Send + Sync + Clone }
 
 impl<A> FiniteRingSpecializable for RustBigintRingBase<A>
 where

@@ -5,12 +5,8 @@ use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::hensel::HenselLift;
-use crate::algorithms::poly_gcd::gcd_lift::{
-    LiftUnsuccessful, NotSquarefree, PolyGCDResult, PolyGCDSignature, poly_gcd_from_quotients,
-};
-use crate::algorithms::poly_gcd::power_decomposition_lift::{
-    PolyPowerDecompositionResult, PolyPowerDecompositionSignature, poly_power_decomposition_from_quotients,
-};
+use crate::algorithms::poly_gcd::gcd_lift::*;
+use crate::algorithms::poly_gcd::power_decomposition_lift::*;
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_root::poly_root;
 use crate::algorithms::primelist::large_prime_fields;
@@ -22,6 +18,7 @@ use crate::ring_impls::zn::*;
 const HOPE_FOR_SQUAREFREE_ATTEMPTS: usize = 1;
 const BEST_EFFORT_SQUAREFREE_CHECKS: usize = 3;
 
+#[instrument(skip_all, level = "trace")]
 fn lift_poly<P>(
     ZZX: P,
     ZpeX: &DensePolyRing<ZnGB<BigIntRing>>,
@@ -49,6 +46,7 @@ where
     )
 }
 
+#[instrument(skip_all, level = "trace")]
 fn lift_gcd_factorization<P>(
     ZZX: P,
     lifter: &mut HenselLift<DensePolyRing<ZnGB<BigIntRing>>>,
@@ -61,16 +59,14 @@ where
     P::Ring: PolyRing,
     BaseRingBase<P>: IntegerRing,
 {
-    let old_ring = lifter.poly_ring();
-    let old_base_ring = old_ring.base_ring().clone();
     let ZpeX = DensePolyRing::new(ZnGB::new(ZZbig, ZZbig.pow(prime.clone(), lift_to_degree)), "X");
     let Zpe = ZpeX.base_ring().clone();
     let target_mod_pe = ZpeX
         .lifted_hom(ZZX, ZpeX.base_ring().can_hom(ZZX.base_ring()).unwrap())
         .map_ref(target);
-    let hom = Zpe.can_hom(old_base_ring.integer_ring()).unwrap();
+    let hom = Zpe.can_hom(&ZZbig).unwrap();
     take_mut::take(lifter, |lifter| {
-        lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |x| {
+        lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |old_base_ring, _, x| {
             hom.map(old_base_ring.smallest_lift(x.clone()))
         })
     });
@@ -136,7 +132,7 @@ where
             if let Ok(lifter) = HenselLift::new(FpX.clone(), vec![gcd, rhs_over_gcd]) {
                 return Ok((false, lifter.change_ring(new_poly_ring, hom), prime));
             }
-            return Err(NotSquarefree);
+            return Err(NotLiftable::NotSquarefree);
         },
         |(lift_to_lhs, lifter, prime), lift_to_degree| {
             if *lift_to_lhs {
@@ -174,7 +170,7 @@ where
     if ZZX.degree(&lhs).unwrap() > ZZX.degree(&rhs).unwrap() {
         swap(&mut lhs, &mut rhs);
     }
-    let lhs_power_decomposition = poly_power_decomposition_integer_monic(ZZX, &lhs, PROBABILISTIC_REPETITIONS).unwrap();
+    let lhs_power_decomposition = poly_power_decomposition_integer_monic(ZZX, &lhs, PROBABILISTIC_REPETITIONS);
     let mut result = ZZX.one();
     for (fi, i) in &lhs_power_decomposition {
         for _ in 0..*i {
@@ -218,6 +214,7 @@ where
         })
 }
 
+#[instrument(skip_all, level = "trace")]
 fn lift_power_decomposition<P>(
     ZZX: P,
     lifter: &mut HenselLift<DensePolyRing<ZnGB<BigIntRing>>>,
@@ -231,15 +228,14 @@ where
     P::Ring: PolyRing,
     BaseRingBase<P>: IntegerRing,
 {
-    let old_ring = lifter.poly_ring();
-    let old_base_ring = old_ring.base_ring().clone();
     let ZpeX = DensePolyRing::new(ZnGB::new(ZZbig, ZZbig.pow(prime.clone(), lift_to_degree)), "X");
     let Zpe = ZpeX.base_ring().clone();
-    let hom = Zpe.can_hom(ZZX.base_ring()).unwrap();
-    let target_mod_pe = ZpeX.lifted_hom(ZZX, &hom).map_ref(target);
+    let target_mod_pe = ZpeX
+        .lifted_hom(ZZX, ZpeX.base_ring().can_hom(ZZX.base_ring()).unwrap())
+        .map_ref(target);
     let hom = Zpe.can_hom(&ZZbig).unwrap();
     take_mut::take(lifter, |lifter| {
-        lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |x| {
+        lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |old_base_ring, _, x| {
             hom.map(old_base_ring.smallest_lift(x.clone()))
         })
     });
@@ -267,11 +263,7 @@ where
 /// Tries to compute the power decomposition of monic polynomials `f, g in Z[X]`.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_power_decomposition_integer_monic<P>(
-    ZZX: P,
-    poly: &El<P>,
-    attempts: usize,
-) -> PolyPowerDecompositionResult<Vec<(El<P>, usize)>>
+pub fn poly_power_decomposition_integer_monic<P>(ZZX: P, poly: &El<P>, attempts: usize) -> Vec<(El<P>, usize)>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing,
@@ -280,20 +272,14 @@ where
     assert!(!ZZX.is_zero(poly));
     let ZZ = ZZX.base_ring();
     assert!(ZZ.is_one(ZZX.lc(poly).unwrap()));
-    let deg_poly = ZZX.degree(poly).unwrap();
 
     let power_decompositions_modulo_p = large_prime_fields().take(attempts).map(|Fp| {
         let FpX = DensePolyRing::new(Fp, "X");
         let ZZX_to_FpX = FpX.lifted_hom(&ZZX, Fp.can_hom(ZZ).unwrap());
         let poly = ZZX_to_FpX.map_ref(poly);
         let power_decomposition = PolyTFracGCDRing::power_decomposition(&FpX, &poly);
-        let mut signature_vector = Vec::new();
-        for (poly, i) in &power_decomposition {
-            signature_vector.resize(usize::max(signature_vector.len(), *i + 1), 0);
-            signature_vector[*i] = FpX.degree(poly).unwrap();
-        }
         return (
-            PolyPowerDecompositionSignature::new(signature_vector, deg_poly),
+            PolyPowerDecompositionSignature::from_decomposition(&FpX, &power_decomposition),
             (FpX, power_decomposition),
         );
     });
@@ -309,18 +295,19 @@ where
                 .into_iter()
                 .map(|(f, i)| FpX.pow(f, i))
                 .collect::<Vec<_>>();
-            (
+            Ok((
                 exponents,
                 HenselLift::new(FpX.clone(), factorization)
                     .unwrap()
                     .change_ring(new_poly_ring, hom),
                 prime,
-            )
+            ))
         },
         |(exponents, lifter, prime), lift_to_degree| {
             lift_power_decomposition(&ZZX, lifter, exponents, poly, prime, lift_to_degree)
         },
     )
+    .unwrap()
 }
 
 /// Tries to compute the power decomposition of polynomials `f, g in Z[X]`.
@@ -337,7 +324,6 @@ where
     let (monic_poly, lc_poly) = make_monic(&ZZX, poly, &lc_poly);
     let power_decomposition = poly_power_decomposition_integer_monic(&ZZX, &monic_poly, PROBABILISTIC_REPETITIONS);
     return power_decomposition
-        .unwrap()
         .into_iter()
         .map(|(f, i)| (unmake_monic(&ZZX, &f, &lc_poly, &lc_poly), i))
         .collect();
@@ -373,32 +359,27 @@ fn test_poly_power_decomposition_integer() {
 
     let expected = [(f1.clone(), 1)];
     let actual =
-        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS)
-            .unwrap();
+        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f3, &f4), 3)];
     let actual =
-        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS)
-            .unwrap();
+        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS);
     assert_eq(&expected, &actual);
 
     let expected = [(f2.clone(), 2), (poly_ring.mul_ref(&f3, &f4), 3)];
     let actual =
-        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS)
-            .unwrap();
+        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f1, &f2), 1), (f4.clone(), 2), (f3.clone(), 3)];
     let actual =
-        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS)
-            .unwrap();
+        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS);
     assert_eq(&expected, &actual);
 
     let expected = [(poly_ring.mul_ref(&f1, &f2), 2), (f4.clone(), 4), (f3.clone(), 6)];
     let actual =
-        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS)
-            .unwrap();
+        poly_power_decomposition_integer_monic(&poly_ring, &multiply_out(&expected), PROBABILISTIC_REPETITIONS);
     assert_eq(&expected, &actual);
 }
 
@@ -475,10 +456,13 @@ fn random_test_poly_power_decomposition_integer() {
     let poly_ring = DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(1);
     let bound = ring.int_hom().map(500);
+    let mut random_poly_of_deg =
+        |deg: usize| poly_ring.from_terms((0..=deg).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let g = poly_ring.from_terms((0..=3).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let h = poly_ring.from_terms((0..=2).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let f = random_poly_of_deg(5);
+        let g = random_poly_of_deg(3);
+        let h = random_poly_of_deg(2);
         let poly = make_primitive(
             &poly_ring,
             &poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone())),

@@ -324,7 +324,6 @@ where
 
     /// Temporarily wraps the canonical generator in a [`RingElementWrapper`], for more
     /// natural creation of ring elements.
-    #[stability::unstable(feature = "enable")]
     fn with_wrapped_generator<'a, F, const M: usize>(&'a self, f: F) -> [El<Self>; M]
     where
         F: FnOnce(&RingElementWrapper<&'a Self>) -> [RingElementWrapper<&'a Self>; M],
@@ -332,6 +331,40 @@ where
         let wrapped_indet = RingElementWrapper::new(self, self.canonical_gen());
         let mut result_it = f(&wrapped_indet).into_iter();
         return std::array::from_fn(|_| result_it.next().unwrap().unwrap());
+    }
+
+    /// Lifts the given homomorphism of base rings `S -> R` to the corresponding
+    /// homomorphism of polynomial rings `S[a] -> R[b], a -> b`. This is only
+    /// well-defined if `MiPo(a)(b) = 0` in `R`.
+    ///
+    /// As opposed to [`FreeAlgebraStore::lifted_hom()`], this transfers the ownership
+    /// of `self` into the homomorphism object.
+    fn into_lifted_hom<R, H>(self, from: R, hom: H) -> Result<CoefficientHom<R, Self, H>, (Self, R)>
+    where
+        R: RingStore,
+        R::Ring: FreeAlgebra,
+        H: Homomorphism<<BaseRingStore<R> as RingStore>::Ring, BaseRingBase<Self>>,
+    {
+        let RX = DensePolyRing::new(self.base_ring(), "X");
+        let gen_poly = from.generating_poly(&RX, &hom);
+        if self.is_zero(&RX.evaluate(&gen_poly, &self.canonical_gen(), self.inclusion())) {
+            drop(RX);
+            Ok(CoefficientHom { from, to: self, hom })
+        } else {
+            drop(RX);
+            Err((self, from))
+        }
+    }
+
+    /// Lifts the given homomorphism of base rings `S -> R` to the corresponding
+    /// homomorphism of polynomial rings `S[a] -> R[b], a -> b`.
+    fn lifted_hom<'a, R, H>(&'a self, from: R, hom: H) -> Result<CoefficientHom<R, &'a Self, H>, ()>
+    where
+        R: RingStore,
+        R::Ring: FreeAlgebra,
+        H: Homomorphism<<BaseRingStore<R> as RingStore>::Ring, BaseRingBase<Self>>,
+    {
+        self.into_lifted_hom(from, hom).map_err(|_| ())
     }
 }
 
@@ -442,6 +475,48 @@ where
             &self.image_of_generator,
             self.to.inclusion(),
         );
+    }
+}
+
+/// Homomorphism between two [`FreeAlgebra`]s, induced by a homomorphism between their coefficient
+/// rings.
+///
+/// This is the type returned by [`FreeAlgebraStore::lifted_hom()`] and
+/// [`FreeAlgebraStore::into_lifted_hom()`], which should be used to create an instance of this
+/// type.
+pub struct CoefficientHom<RFrom, RTo, H>
+where
+    RFrom: RingStore,
+    RTo: RingStore,
+    RFrom::Ring: FreeAlgebra,
+    RTo::Ring: FreeAlgebra,
+    H: Homomorphism<BaseRingBase<RFrom>, BaseRingBase<RTo>>,
+{
+    from: RFrom,
+    to: RTo,
+    hom: H,
+}
+
+impl<RFrom, RTo, H> Homomorphism<RFrom::Ring, RTo::Ring> for CoefficientHom<RFrom, RTo, H>
+where
+    RFrom: RingStore,
+    RTo: RingStore,
+    RFrom::Ring: FreeAlgebra,
+    RTo::Ring: FreeAlgebra,
+    H: Homomorphism<BaseRingBase<RFrom>, BaseRingBase<RTo>>,
+{
+    type DomainStore = RFrom;
+    type CodomainStore = RTo;
+
+    fn codomain<'a>(&'a self) -> &'a Self::CodomainStore { &self.to }
+
+    fn domain<'a>(&'a self) -> &'a Self::DomainStore { &self.from }
+
+    fn map(&self, x: <RFrom::Ring as RingBase>::Element) -> <RTo::Ring as RingBase>::Element { self.map_ref(&x) }
+
+    fn map_ref(&self, x: &<RFrom::Ring as RingBase>::Element) -> <RTo::Ring as RingBase>::Element {
+        self.to
+            .from_canonical_basis_extended(self.from.wrt_canonical_basis(x).iter().map(|c| self.hom.map(c)))
     }
 }
 

@@ -566,6 +566,17 @@ macro_rules! assert_el_eq {
     };
 }
 
+/// Like [`assert_el_eq!`], but only active when debug assertions are enabled.
+#[macro_export]
+macro_rules! debug_assert_el_eq {
+    ($ring:expr, $lhs:expr, $rhs:expr) => {
+        #[cfg(debug_assertions)]
+        {
+            assert_el_eq!($ring, $lhs, $rhs)
+        }
+    };
+}
+
 /// Basic trait for objects that store (in some sense) a ring. It can also
 /// be considered the user-facing trait for rings, so rings are always supposed
 /// to be used through a `RingStore`-object.

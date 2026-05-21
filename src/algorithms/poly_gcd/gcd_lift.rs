@@ -10,6 +10,12 @@ pub enum PolyGCDResult<T> {
 pub struct NotSquarefree;
 
 #[stability::unstable(feature = "enable")]
+pub enum NotLiftable {
+    NotSquarefree,
+    BadPrime
+}
+
+#[stability::unstable(feature = "enable")]
 #[derive(Debug)]
 pub struct LiftUnsuccessful;
 
@@ -44,7 +50,7 @@ pub fn poly_gcd_from_quotients<I, F_start, F_proc, State, OngoingLift, R>(
 ) -> PolyGCDResult<R>
 where
     I: Iterator<Item = (PolyGCDSignature, State)>,
-    F_start: FnMut(State) -> Result<OngoingLift, NotSquarefree>,
+    F_start: FnMut(State) -> Result<OngoingLift, NotLiftable>,
     F_proc: FnMut(&mut OngoingLift, usize) -> Result<R, LiftUnsuccessful>,
 {
     let mut expected_gcd_deg = usize::MAX;

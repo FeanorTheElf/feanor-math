@@ -21,12 +21,11 @@ use crate::homomorphism::*;
 use crate::impl_interpolation_base_ring_char_zero;
 use crate::prelude::*;
 use crate::ring_impls::fraction::*;
-use crate::ring_impls::poly::PolyRing;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_properties::field::PerfectField;
 use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-use crate::ring_impls::poly::PolyRingStore;
 
 /// An implementation of the rational number `Q`, based on representing them
 /// as a tuple `(numerator, denominator)`.
@@ -749,19 +748,30 @@ where
     }
 }
 
-fn make_poly_integral<'a, P, I, const N: usize>(poly_ring: &'a P, polys: [&El<P>; N]) -> (DensePolyRing<&'a I, DynConvolution<'a, I::Ring>>, [El<DensePolyRing<&'a I, DynConvolution<'a, I::Ring>>>; N])
-    where
-        I: RingStore,
-        I::Ring: IntegerRing,
-        P: RingStore,
-        P::Ring: PolyRing,
-        BaseRingStore<P>: RingStore<Ring = RationalFieldBase<I>>
+fn make_poly_integral<'a, P, I, const N: usize>(
+    poly_ring: &'a P,
+    polys: [&El<P>; N],
+) -> (
+    DensePolyRing<&'a I, DynConvolution<'a, I::Ring>>,
+    [El<DensePolyRing<&'a I, DynConvolution<'a, I::Ring>>>; N],
+)
+where
+    I: RingStore,
+    I::Ring: IntegerRing,
+    P: RingStore,
+    P::Ring: PolyRing,
+    BaseRingStore<P>: RingStore<Ring = RationalFieldBase<I>>,
 {
     let QQ = poly_ring.base_ring();
     let ZZ = QQ.base_ring();
     let ZZX = DensePolyRing::new(ZZ, "X");
-    let hom = ZZX.lifted_hom(poly_ring, LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| ZZ.checked_div(QQ.get_ring().num(x), QQ.get_ring().den(x)).unwrap()));
-    let result = from_fn(|i| {           
+    let hom = ZZX.lifted_hom(
+        poly_ring,
+        LambdaHom::new(QQ, ZZ, |QQ, ZZ, x| {
+            ZZ.checked_div(QQ.get_ring().num(x), QQ.get_ring().den(x)).unwrap()
+        }),
+    );
+    let result = from_fn(|i| {
         let mut poly = polys[i].clone();
         _ = poly_ring.balance_poly(&mut poly);
         hom.map(poly)
@@ -781,7 +791,10 @@ where
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let (ZZX, [poly]) = make_poly_integral(&poly_ring, [poly]);
-        PolyTFracGCDRing::power_decomposition(&ZZX, &poly).into_iter().map(|(f, i)| (poly_ring.lifted_hom(&ZZX, poly_ring.base_ring().inclusion()).map(f), i)).collect()
+        PolyTFracGCDRing::power_decomposition(&ZZX, &poly)
+            .into_iter()
+            .map(|(f, i)| (poly_ring.lifted_hom(&ZZX, poly_ring.base_ring().inclusion()).map(f), i))
+            .collect()
     }
 
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
@@ -791,7 +804,9 @@ where
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let (ZZX, [lhs, rhs]) = make_poly_integral(&poly_ring, [lhs, rhs]);
-        poly_ring.lifted_hom(&ZZX, poly_ring.base_ring().inclusion()).map(PolyTFracGCDRing::gcd(&ZZX, &lhs, &rhs))
+        poly_ring
+            .lifted_hom(&ZZX, poly_ring.base_ring().inclusion())
+            .map(PolyTFracGCDRing::gcd(&ZZX, &lhs, &rhs))
     }
 
     fn is_squarefree<P>(poly_ring: P, poly: &El<P>) -> bool
@@ -811,7 +826,9 @@ where
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
         let (ZZX, [poly]) = make_poly_integral(&poly_ring, [poly]);
-        poly_ring.lifted_hom(&ZZX, poly_ring.base_ring().inclusion()).map(PolyTFracGCDRing::squarefree_part(&ZZX, &poly))
+        poly_ring
+            .lifted_hom(&ZZX, poly_ring.base_ring().inclusion())
+            .map(PolyTFracGCDRing::squarefree_part(&ZZX, &poly))
     }
 }
 
@@ -849,7 +866,10 @@ fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>
     let ring = RationalField::new(ZZi64);
     let incl = ring.into_int_hom();
     [-3, -2, -1, 0, 1, 2].iter().copied().flat_map(move |x| {
-        [1, 4, 5].iter().copied().map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap())
+        [1, 4, 5]
+            .iter()
+            .copied()
+            .map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap())
     })
 }
 

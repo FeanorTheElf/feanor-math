@@ -1,9 +1,15 @@
 use std::iter::repeat;
 
 use crate::algorithms::poly_gcd::gcd_lift::LiftUnsuccessful;
+use crate::prelude::*;
+use crate::ring_impls::poly::*;
 
 const FRACTION_TO_ATTEMPT_LIFT: f64 = 0.51;
 const RAMP_UP_LIFT_TO: f64 = 4.0;
+
+#[stability::unstable(feature = "enable")]
+#[derive(Debug)]
+pub struct BadPrime;
 
 #[stability::unstable(feature = "enable")]
 pub type PolyPowerDecompositionResult<T> = Result<T, LiftUnsuccessful>;
@@ -15,6 +21,23 @@ pub struct PolyPowerDecompositionSignature {
 }
 
 impl PolyPowerDecompositionSignature {
+
+    #[stability::unstable(feature = "enable")]
+    pub fn from_decomposition<P>(poly_ring: P, decomposition: &[(El<P>, usize)]) -> Self
+    where
+        P: RingStore,
+        P::Ring: PolyRing,
+    {
+        let mut signature_vector = Vec::new();
+        let mut total_deg = 0;
+        for (poly, i) in decomposition {
+            signature_vector.resize(usize::max(signature_vector.len(), *i + 1), 0);
+            signature_vector[*i] = poly_ring.degree(poly).unwrap();
+            total_deg += i * poly_ring.degree(poly).unwrap();
+        }
+        return Self::new(signature_vector, total_deg);
+    }
+
     #[stability::unstable(feature = "enable")]
     pub fn new(degrees: Vec<usize>, total_degree: usize) -> Self {
         assert_eq!(0, degrees[0]);
@@ -30,7 +53,8 @@ impl PolyPowerDecompositionSignature {
     /// further in a way that we reach power decomposition with signature x). However,
     /// it is clear that `x <= y` implies `x.signature_sum() <= y.signature_sum()`,
     /// so let's use this as proxy.
-    fn signature_sum(&self) -> usize { self.degrees.iter().copied().sum() }
+    #[stability::unstable(feature = "enable")]
+    pub fn signature_sum(&self) -> usize { self.degrees.iter().copied().sum() }
 }
 
 impl PartialEq for PolyPowerDecompositionSignature {
@@ -59,7 +83,7 @@ pub fn poly_power_decomposition_from_quotients<I, F_start, F_proc, State, Ongoin
 ) -> PolyPowerDecompositionResult<R>
 where
     I: Iterator<Item = (PolyPowerDecompositionSignature, State)>,
-    F_start: FnMut(State) -> OngoingLift,
+    F_start: FnMut(State) -> Result<OngoingLift, BadPrime>,
     F_proc: FnMut(&mut OngoingLift, usize) -> Result<R, LiftUnsuccessful>,
 {
     let mut expected_signature = PolyPowerDecompositionSignature::new(vec![0, usize::MAX], usize::MAX);
@@ -82,7 +106,9 @@ where
         queued_lifts.push(state);
         if ongoing_lifts.len() + queued_lifts.len() >= (attempts as f64 * FRACTION_TO_ATTEMPT_LIFT).ceil() as usize {
             if let Some(state) = queued_lifts.pop() {
-                ongoing_lifts.push((0, start_lift(state)));
+                if let Ok(lift) = start_lift(state) {
+                    ongoing_lifts.push((0, lift));
+                }
             }
             for (lift_attempt, state) in &mut ongoing_lifts {
                 *lift_attempt += 1;

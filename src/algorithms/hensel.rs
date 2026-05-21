@@ -159,8 +159,13 @@ where
     where
         P_new: RingStore,
         P_new::Ring: PolyRing,
-        L: FnMut(&El<BaseRingStore<P_current>>) -> El<BaseRingStore<P_new>>,
+        L: FnMut(
+            &BaseRingStore<P_current>,
+            &BaseRingStore<P_new>,
+            &El<BaseRingStore<P_current>>,
+        ) -> El<BaseRingStore<P_new>>,
     {
+        let old_P = &self.current_poly_ring;
         let P = new_ring;
         let n = self.current_factors.len() + 1;
 
@@ -197,17 +202,33 @@ where
             } else {
                 &partial_prod_reducers.last().unwrap().poly
             };
-            let deg_g = self.current_poly_ring.degree(&g.poly).unwrap();
-            let deg_h = self.current_poly_ring.degree(&h.poly).unwrap();
+            let deg_g = old_P.degree(&g.poly).unwrap();
+            let deg_h = old_P.degree(&h.poly).unwrap();
             let deg_delta_bound = deg_g + deg_h;
             let mut g = g.change_ring(&P, |poly| {
-                P.from_terms(self.current_poly_ring.terms(&poly).map(|(c, i)| (lift(c), i)))
+                P.from_terms(
+                    old_P
+                        .terms(&poly)
+                        .map(|(c, i)| (lift(old_P.base_ring(), P.base_ring(), c), i)),
+                )
             });
             let mut h = h.change_ring(&P, |poly| {
-                P.from_terms(self.current_poly_ring.terms(&poly).map(|(c, i)| (lift(c), i)))
+                P.from_terms(
+                    old_P
+                        .terms(&poly)
+                        .map(|(c, i)| (lift(old_P.base_ring(), P.base_ring(), c), i)),
+                )
             });
-            let mut s = P.from_terms(self.current_poly_ring.terms(&s).map(|(c, i)| (lift(c), i)));
-            let mut t = P.from_terms(self.current_poly_ring.terms(&t).map(|(c, i)| (lift(c), i)));
+            let mut s = P.from_terms(
+                old_P
+                    .terms(&s)
+                    .map(|(c, i)| (lift(old_P.base_ring(), P.base_ring(), c), i)),
+            );
+            let mut t = P.from_terms(
+                old_P
+                    .terms(&t)
+                    .map(|(c, i)| (lift(old_P.base_ring(), P.base_ring(), c), i)),
+            );
             let mut current_e = self.current_e;
             while current_e < new_e {
                 // the formula is `g' = g - delta * t`, `h' = h - delta * s` where `delta = gh - f`
@@ -394,7 +415,9 @@ fn test_hensel_lift() {
     let poly_mod_p = FpX.lifted_hom(&ZpeX, &mod_p);
     let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
     {
-        let lifted = lifter.clone().lift_to(6, &ZpeX, &target, |x| mod_p.any_preimage(*x));
+        let lifted = lifter
+            .clone()
+            .lift_to(6, &ZpeX, &target, |_, _, x| mod_p.any_preimage(*x));
         let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
         assert_el_eq!(&ZpeX, &g, &actual_g);
         assert_el_eq!(&ZpeX, &h, &actual_h);
@@ -405,8 +428,10 @@ fn test_hensel_lift() {
         let Zpe_to_Zpf = ZnReductionMap::new(ZpeX.base_ring(), ZpfX.base_ring()).unwrap();
         let ZpeX_to_ZpfX = ZpfX.lifted_hom(&ZpeX, &Zpe_to_Zpf);
         let lifted = lifter
-            .lift_to(3, &ZpfX, &ZpeX_to_ZpfX.map_ref(&target), |x| Zpf_to_Zp.any_preimage(*x))
-            .lift_to(6, &ZpeX, &target, |x| Zpe_to_Zpf.any_preimage(*x));
+            .lift_to(3, &ZpfX, &ZpeX_to_ZpfX.map_ref(&target), |_, _, x| {
+                Zpf_to_Zp.any_preimage(*x)
+            })
+            .lift_to(6, &ZpeX, &target, |_, _, x| Zpe_to_Zpf.any_preimage(*x));
         let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
         assert_el_eq!(&ZpeX, &g, &actual_g);
         assert_el_eq!(&ZpeX, &h, &actual_h);
@@ -416,7 +441,9 @@ fn test_hensel_lift() {
     let target = ZpeX.mul_ref(&g, &h);
     let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
     {
-        let lifted = lifter.clone().lift_to(6, &ZpeX, &target, |x| mod_p.any_preimage(*x));
+        let lifted = lifter
+            .clone()
+            .lift_to(6, &ZpeX, &target, |_, _, x| mod_p.any_preimage(*x));
         let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
         assert_el_eq!(&ZpeX, &g, &actual_g);
         assert_el_eq!(&ZpeX, &h, &actual_h);
