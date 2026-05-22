@@ -1,11 +1,7 @@
 use std::cmp::min;
 use std::marker::PhantomData;
 
-use crate::algorithms::convolution::ntt::NTTConvolution;
 use crate::algorithms::convolution::*;
-use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2_zn;
-use crate::homomorphism::*;
-use crate::ring_impls::zn::*;
 
 pub struct LengthExtendedConvolution<C> {
     base_convolution: C,
@@ -32,61 +28,6 @@ impl<C> LengthExtendedConvolution<C> {
     }
 
     fn chunk_len(&self) -> usize { self.base_max_len / 2 }
-}
-
-impl<R> LengthExtendedConvolution<NTTConvolution<R::Ring, R::Ring, Identity<R>>>
-where
-    R: RingStore,
-    R::Ring: ZnRing,
-{
-    /// Constructs a [`LengthExtendedConvolution`], which will use a suitable, NTT-based convolution
-    /// over the given ring.
-    ///
-    /// If the given ring doesn't support NTT-based convolutions of length at least
-    /// `abort_if_ntt_len_le`, then `Err(())` will be returned. Note that this, in particular,
-    /// includes the case that the characteristic of the base ring is even (and no power-of-two
-    /// primitive roots of unity exist at all).
-    pub fn for_zn(ring: R, abort_if_ntt_len_le: usize) -> Result<Self, ()> {
-        if ZZbig.is_even(&ring.characteristic(ZZbig).unwrap()) {
-            return Err(());
-        }
-        let mut log2_len = ZZi64.abs_log2_ceil(&abort_if_ntt_len_le.try_into().unwrap()).unwrap();
-        if get_prim_root_of_unity_pow2_zn(&ring, log2_len).is_none() {
-            return Err(());
-        }
-        for _ in 0..20 {
-            if get_prim_root_of_unity_pow2_zn(&ring, log2_len + 1).is_some() {
-                log2_len += 1;
-            } else {
-                break;
-            }
-        }
-        let base_convolution = NTTConvolution::new_with_hom(ring.into_identity(), Global);
-        return Ok(Self::new(base_convolution, 1 << log2_len));
-    }
-}
-
-impl<R> LengthExtendedConvolution<NTTConvolution<R::Ring, BaseRingBase<R>, Inclusion<R>>>
-where
-    R: RingStore,
-    R::Ring: RingExtension,
-    BaseRingBase<R>: ZnRing,
-{
-    /// Constructs a [`LengthExtendedConvolution`], which will use a suitable, NTT-based convolution
-    /// over the base ring of the given.
-    ///
-    /// If the given ring doesn't support NTT-based convolutions of length at least
-    /// `abort_if_ntt_len_le`, then `Err(())` will be returned. Note that this, in particular,
-    /// includes the case that the characteristic of the base ring is even (and no power-of-two
-    /// primitive roots of unity exist at all).
-    pub fn for_zn_extension(ring: R, abort_if_ntt_len_le: usize) -> Result<Self, ()> {
-        let ring_incl = ring.into_inclusion();
-        let result = LengthExtendedConvolution::for_zn(ring_incl.domain().clone(), abort_if_ntt_len_le)?;
-        Ok(Self::new(
-            result.base_convolution.change_ring(ring_incl),
-            result.base_max_len,
-        ))
-    }
 }
 
 impl<R, C> ConvolutionAlgorithm<R> for LengthExtendedConvolution<C>
@@ -264,53 +205,16 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
-#[cfg(test)]
-use crate::ring_impls::extension::galois_field::GaloisField;
+use crate::algorithms::convolution::ntt::NTTConvolution;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_64b::Zn64B;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::Zn;
 
 #[test]
 fn test_convolution() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537);
-    let base_convolution = NTTConvolution::new(ring);
+    let ring = Zn64B::new(65537);
+    let base_convolution = NTTConvolution::for_zn(ring);
     for l in [2, 3, 4, 8] {
         super::generic_tests::test_convolution(LengthExtendedConvolution::new(&base_convolution, l), &ring, ring.one());
     }
-}
-
-#[test]
-fn test_for_zn() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Zn64B::new(257);
-    let convolution = LengthExtendedConvolution::for_zn(&field, 64).unwrap();
-    assert_eq!(256, convolution.base_max_len);
-    super::generic_tests::test_convolution(convolution, &field, field.one());
-
-    let ring = Zn::<{ 17 * 5 }>::RING;
-    let convolution = LengthExtendedConvolution::for_zn(&ring, 4).unwrap();
-    assert_eq!(4, convolution.base_max_len);
-    super::generic_tests::test_convolution(convolution, &ring, ring.one());
-
-    assert!(LengthExtendedConvolution::for_zn(&ring, 8).is_err());
-}
-
-#[test]
-fn test_for_zn_extension() {
-    feanor_tracing::DelayedLogger::init_test();
-    let galois_field = GaloisField::new(257, 2);
-    let convolution = LengthExtendedConvolution::for_zn_extension(&galois_field, 64).unwrap();
-    assert_eq!(256, convolution.base_max_len);
-    super::generic_tests::test_convolution(convolution, &galois_field, galois_field.one());
-
-    let base_ring = Zn::<{ 17 * 5 }>::RING;
-    let ring = FreeAlgebraImpl::new(base_ring, 2, [2]);
-    let convolution = LengthExtendedConvolution::for_zn_extension(&ring, 4).unwrap();
-    assert_eq!(4, convolution.base_max_len);
-    super::generic_tests::test_convolution(convolution, &ring, ring.one());
-
-    assert!(LengthExtendedConvolution::for_zn_extension(&ring, 8).is_err());
 }

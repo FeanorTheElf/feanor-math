@@ -10,7 +10,7 @@ use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::integer::poly_power_decomposition_integer_monic;
 use crate::algorithms::poly_gcd::{make_monic, make_primitive, unmake_monic};
-use crate::algorithms::primelist::large_prime_fields;
+use crate::algorithms::primelist::prime_fields_for_local_computation;
 use crate::iters::{clone_slice, powerset};
 use crate::prelude::*;
 use crate::ring_impls::as_field::AsField;
@@ -302,21 +302,23 @@ where
         |poly| {
             let poly = poly.clone();
             let bound = ln_factor_max_coeff(ZZX, &poly);
-            large_prime_fields().take(PROBABILISTIC_REPETITIONS).map(move |Fp| {
-                let FpX = DensePolyRing::new(Fp, "X");
-                let f_mod_p = FpX
-                    .lifted_hom(ZZX, FpX.base_ring().can_hom(ZZX.base_ring()).unwrap())
-                    .map_ref(&poly);
-                let factorization = FactorPolyField::factor_poly(&FpX, &f_mod_p).0;
-                let factor_count = factorization.iter().map(|(_, e)| *e).sum::<usize>();
-                let prime_f64 = *FpX.base_ring().modulus() as f64;
-                let max_lift_degree = (bound / prime_f64.ln()).ceil() as usize + 1;
-                return PolyFactorizationInQuotient {
-                    factor_count,
-                    max_lift_degree,
-                    state: (FpX, factorization),
-                };
-            })
+            prime_fields_for_local_computation()
+                .take(PROBABILISTIC_REPETITIONS)
+                .map(move |Fp| {
+                    let FpX = DensePolyRing::new(Fp, "X");
+                    let f_mod_p = FpX
+                        .lifted_hom(ZZX, FpX.base_ring().can_hom(ZZX.base_ring()).unwrap())
+                        .map_ref(&poly);
+                    let factorization = FactorPolyField::factor_poly(&FpX, &f_mod_p).0;
+                    let factor_count = factorization.iter().map(|(_, e)| *e).sum::<usize>();
+                    let prime_f64 = *FpX.base_ring().modulus() as f64;
+                    let max_lift_degree = (bound / prime_f64.ln()).ceil() as usize + 1;
+                    return PolyFactorizationInQuotient {
+                        factor_count,
+                        max_lift_degree,
+                        state: (FpX, factorization),
+                    };
+                })
         },
         |(FpX, factorization)| {
             if factorization.iter().any(|(_, e)| *e > 1) {

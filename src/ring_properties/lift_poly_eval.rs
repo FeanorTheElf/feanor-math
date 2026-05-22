@@ -661,7 +661,7 @@ macro_rules! impl_eval_poly_locally_for_integer {
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut prime_it = $crate::algorithms::primelist::large_prime_fields();
+                let mut prime_it = $crate::algorithms::primelist::prime_fields_for_local_computation();
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::ring_impls::zn::ZnRingStore::modulus(&Fp) as f64).ln();

@@ -9,7 +9,7 @@ use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::algorithms::convolution::DynConvolution;
+use crate::algorithms::convolution::*;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
 use crate::prelude::*;
@@ -307,6 +307,19 @@ where
     }
 
     fn is_approximate(&self) -> bool { false }
+}
+
+impl<I: RingStore> DefaultConvolutionRing for ZnGBBase<I>
+where
+    I: Clone,
+    I::Ring: IntegerRing,
+{
+    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    where
+        S: RingStore<Ring = Self> + 'conv,
+    {
+        generic_impls::create_default_convolution(self_, max_len, 1)
+    }
 }
 
 impl<I: RingStore> Clone for ZnGBBase<I>

@@ -86,8 +86,13 @@ where
     R: RingStore,
     R::Ring: DivisibilityRing,
 {
-    /// Creates an [`CooleyTukeyRadix3FFT`] for a prime field, assuming it has a characteristic
-    /// congruent to 1 modulo `3^lo32_n`.
+    /// Creates an [`CooleyTukeyRadix3FFT`] for a prime field, assuming it has a `3^log3_n`-th
+    /// primitive root of unity.
+    ///
+    /// # Performance
+    ///
+    /// This function will factor the modulus `n` of the ring, which in some cases is a very
+    /// computationally demanding task.
     #[stability::unstable(feature = "enable")]
     pub fn for_zn(ring: R, log3_n: usize) -> Option<Self>
     where

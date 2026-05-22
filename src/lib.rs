@@ -22,6 +22,7 @@
 #![feature(fn_traits)]
 #![feature(iter_advance_by)]
 #![feature(ptr_metadata)]
+#![feature(const_slice_make_iter)]
 #![feature(mapped_lock_guards)]
 #![feature(unboxed_closures)]
 #![feature(ptr_alignment_type)]

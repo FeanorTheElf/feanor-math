@@ -9,7 +9,7 @@ use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::power_decomposition_lift::*;
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_root::poly_root;
-use crate::algorithms::primelist::large_prime_fields;
+use crate::algorithms::primelist::prime_fields_for_local_computation;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_impls::zn::zn_big::ZnGB;
@@ -108,7 +108,7 @@ where
     assert!(ZZ.is_one(ZZX.lc(lhs).unwrap()));
     assert!(ZZ.is_one(ZZX.lc(rhs).unwrap()));
 
-    let gcds_modulo_p = large_prime_fields().take(attempts).map(|Fp| {
+    let gcds_modulo_p = prime_fields_for_local_computation().take(attempts).map(|Fp| {
         let FpX = DensePolyRing::new(Fp, "X");
         let ZZX_to_FpX = FpX.lifted_hom(&ZZX, Fp.can_hom(ZZ).unwrap());
         let lhs = ZZX_to_FpX.map_ref(lhs);
@@ -208,7 +208,7 @@ where
     }
     assert!(!ZZX.is_zero(poly));
     let ZZ = ZZX.base_ring();
-    large_prime_fields()
+    prime_fields_for_local_computation()
         .filter(|Fp| !ZZ.divides(ZZX.lc(poly).unwrap(), &int_cast(*Fp.modulus(), ZZ, ZZi64)))
         .take(BEST_EFFORT_SQUAREFREE_CHECKS)
         .all(|Fp| {
@@ -278,7 +278,7 @@ where
     let ZZ = ZZX.base_ring();
     assert!(ZZ.is_one(ZZX.lc(poly).unwrap()));
 
-    let power_decompositions_modulo_p = large_prime_fields().take(attempts).map(|Fp| {
+    let power_decompositions_modulo_p = prime_fields_for_local_computation().take(attempts).map(|Fp| {
         let FpX = DensePolyRing::new(Fp, "X");
         let ZZX_to_FpX = FpX.lifted_hom(&ZZX, Fp.can_hom(ZZ).unwrap());
         let poly = ZZX_to_FpX.map_ref(poly);

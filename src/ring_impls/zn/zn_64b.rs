@@ -1,7 +1,5 @@
-use std::alloc::Global;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
@@ -744,11 +742,11 @@ impl StrassenHint for Zn64BBase {
 }
 
 impl DefaultConvolutionRing for Zn64BBase {
-    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(6, Global)))
+        generic_impls::create_default_convolution(self_, max_len, 1)
     }
 }
 
@@ -850,7 +848,7 @@ impl HashableElRing for Zn64BBase {
 /// let ring = Zn64B::new(1073872897);
 /// let fastmul_ring = ZnFastmul::new(ring).unwrap();
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
-/// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
+/// let fft = CooleyTuckeyFFT::for_fp_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15))
 ///     .map(|i| ring.int_hom().map(i))

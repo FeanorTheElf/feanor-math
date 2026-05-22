@@ -92,9 +92,12 @@ pub trait FromModulusCreateableZnRing: Sized + ZnRing + Clone {
 }
 
 pub mod generic_impls {
+    use std::alloc::Global;
     use std::marker::PhantomData;
+    use std::sync::Arc;
 
-    use crate::algorithms::convolution::DynConvolution;
+    use crate::algorithms::convolution::rns::{RNSConvolution, RNSConvolutionZn};
+    use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution};
     use crate::algorithms::int_bisect;
     use crate::ring_impls::extension::galois_field::*;
     use crate::ring_impls::primitive_int::StaticRingBase;
@@ -102,9 +105,30 @@ pub mod generic_impls {
     use crate::ring_properties::divisibility::DivisibilityRingStore;
     use crate::ring_properties::integer::{IntegerRing, IntegerRingStore};
 
+    #[stability::unstable(feature = "enable")]
+    pub fn create_default_convolution<'a, S>(
+        _self_: S,
+        max_len: Option<usize>,
+        log2_karatsuba_threshold: usize,
+    ) -> DynConvolution<'a, S::Ring>
+    where
+        S: 'a + RingStore,
+        S::Ring: ZnRing + CanHomFrom<BigIntRingBase>,
+    {
+        const LOG2_NTT_THRESHOLD: usize = 4;
+        if max_len.is_none() || max_len.unwrap() >= (1 << LOG2_NTT_THRESHOLD) {
+            return Arc::new(TypeErasedConvolution::new(
+                RNSConvolutionZn::from(RNSConvolution::new()),
+            ));
+        }
+        return Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(
+            log2_karatsuba_threshold,
+            Global,
+        )));
+    }
+
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very
     /// large, but allow for efficient estimation of their approximate size.
-
     pub struct BigIntToZnHom<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>
     where
         I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,

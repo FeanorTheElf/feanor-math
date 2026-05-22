@@ -1,16 +1,18 @@
 use std::alloc::{Allocator, Global};
 use std::cmp::{max, min};
 use std::marker::PhantomData;
+use std::sync::Mutex;
 
 use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::ConvolutionAlgorithm;
 use super::ntt::NTTConvolution;
-use crate::algorithms::miller_rabin::is_prime;
+use crate::algorithms::primelist::LARGE_NTT_FRIENDLY_PRIMES;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BFastmul, Zn64BFastmulBase};
+use crate::ring_impls::zn::zn_rns::ZnRNS;
 use crate::ring_impls::zn::*;
 use crate::seq::*;
 
@@ -26,19 +28,18 @@ pub struct RNSConvolution<
     I = BigIntRing,
     C = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>,
     A = Global,
-    CreateC = CreateNTTConvolution,
+    ConvIter = NTTConvIter,
 > where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
     integer_ring: I,
     rns_rings: FrozenMap<usize, Box<zn_rns::ZnRNS<Zn64B, I, A>>>,
     convolutions: FrozenMap<usize, Box<C>>,
-    create_convolution: CreateC,
-    required_root_of_unity_log2: usize,
+    further_convolutions: Mutex<ConvIter>,
     allocator: A,
 }
 
@@ -49,15 +50,15 @@ pub struct RNSConvolutionZn<
     I = BigIntRing,
     C = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>,
     A = Global,
-    CreateC = CreateNTTConvolution,
+    ConvIter = NTTConvIter,
 > where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
-    base: RNSConvolution<I, C, A, CreateC>,
+    base: RNSConvolution<I, C, A, ConvIter>,
 }
 
 /// A prepared convolution operand for a [`RNSConvolution`].
@@ -73,115 +74,104 @@ where
     len_hint: Option<usize>,
 }
 
-/// Function that creates an [`NTTConvolution`] when given a suitable modulus.
 #[stability::unstable(feature = "enable")]
-pub struct CreateNTTConvolution<A = Global>
+pub struct NTTConvIter<A = Global>
 where
     A: Send + Sync + Allocator + Clone,
 {
+    primes: std::slice::Iter<'static, (i64, i64)>,
     allocator: A,
 }
 
-impl<I, C, A, CreateC> From<RNSConvolutionZn<I, C, A, CreateC>> for RNSConvolution<I, C, A, CreateC>
+impl<I, C, A, ConvIter> From<RNSConvolutionZn<I, C, A, ConvIter>> for RNSConvolution<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
-    fn from(value: RNSConvolutionZn<I, C, A, CreateC>) -> Self { value.base }
+    fn from(value: RNSConvolutionZn<I, C, A, ConvIter>) -> Self { value.base }
 }
 
-impl<'a, I, C, A, CreateC> From<&'a RNSConvolutionZn<I, C, A, CreateC>> for &'a RNSConvolution<I, C, A, CreateC>
+impl<'a, I, C, A, ConvIter> From<&'a RNSConvolutionZn<I, C, A, ConvIter>> for &'a RNSConvolution<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
-    fn from(value: &'a RNSConvolutionZn<I, C, A, CreateC>) -> Self { &value.base }
+    fn from(value: &'a RNSConvolutionZn<I, C, A, ConvIter>) -> Self { &value.base }
 }
 
-impl<I, C, A, CreateC> From<RNSConvolution<I, C, A, CreateC>> for RNSConvolutionZn<I, C, A, CreateC>
+impl<I, C, A, ConvIter> From<RNSConvolution<I, C, A, ConvIter>> for RNSConvolutionZn<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
-    fn from(value: RNSConvolution<I, C, A, CreateC>) -> Self { RNSConvolutionZn { base: value } }
+    fn from(value: RNSConvolution<I, C, A, ConvIter>) -> Self { RNSConvolutionZn { base: value } }
 }
 
-impl<'a, I, C, A, CreateC> From<&'a RNSConvolution<I, C, A, CreateC>> for &'a RNSConvolutionZn<I, C, A, CreateC>
+impl<'a, I, C, A, ConvIter> From<&'a RNSConvolution<I, C, A, ConvIter>> for &'a RNSConvolutionZn<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
-    fn from(value: &'a RNSConvolution<I, C, A, CreateC>) -> Self { unsafe { std::mem::transmute(value) } }
+    fn from(value: &'a RNSConvolution<I, C, A, ConvIter>) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
-impl CreateNTTConvolution<Global> {
-    /// Creates a new [`CreateNTTConvolution`].
+impl NTTConvIter {
+    /// Creates a new [`NTTConvIter`].
     #[stability::unstable(feature = "enable")]
-    pub const fn new() -> Self { Self { allocator: Global } }
+    pub const fn new() -> Self {
+        Self {
+            allocator: Global,
+            primes: LARGE_NTT_FRIENDLY_PRIMES.iter(),
+        }
+    }
 }
 
-impl<A> FnOnce<(Zn64B,)> for CreateNTTConvolution<A>
+impl<A> Iterator for NTTConvIter<A>
 where
     A: Send + Sync + Allocator + Clone,
 {
-    type Output = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>, A>;
+    type Item = (
+        Zn64B,
+        NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>,
+    );
 
-    extern "rust-call" fn call_once(self, args: (Zn64B,)) -> Self::Output { self.call(args) }
-}
-
-impl<A> FnMut<(Zn64B,)> for CreateNTTConvolution<A>
-where
-    A: Send + Sync + Allocator + Clone,
-{
-    extern "rust-call" fn call_mut(&mut self, args: (Zn64B,)) -> Self::Output { self.call(args) }
-}
-
-impl<A> Fn<(Zn64B,)> for CreateNTTConvolution<A>
-where
-    A: Send + Sync + Allocator + Clone,
-{
-    extern "rust-call" fn call(&self, args: (Zn64B,)) -> Self::Output {
-        let ring = args.0;
-        let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
-        let hom = ring.into_can_hom(ring_fastmul).ok().unwrap();
-        NTTConvolution::new_with_hom(hom, self.allocator.clone())
+    fn next(&mut self) -> Option<Self::Item> {
+        let (p, rou) = self.primes.next()?;
+        let Zp = Zn64B::new(*p as u64);
+        let Zp_fastmul = Zn64BFastmul::new(Zp).unwrap();
+        let rou = Zp_fastmul.coerce(&ZZi64, *rou);
+        return Some((
+            Zp,
+            NTTConvolution::new_with_hom(Zp.into_can_hom(Zp_fastmul).ok().unwrap(), rou, 32, Global),
+        ));
     }
 }
 
 impl RNSConvolution {
-    /// Creates a new [`RNSConvolution`] that can compute convolutions of sequences with output
-    /// length `<= 2^max_log2_n`. As base convolution, the [`NTTConvolution`] is used.
+    /// Creates a new [`RNSConvolution`]. As base convolution, the [`NTTConvolution`] is used.
     #[stability::unstable(feature = "enable")]
-    pub fn new(max_log2_n: usize) -> Self {
-        Self::new_with_convolution(
-            max_log2_n,
-            usize::MAX,
-            ZZbig,
-            Global,
-            CreateNTTConvolution { allocator: Global },
-        )
-    }
+    pub fn new() -> Self { Self::new_with_convolution(ZZbig, Global, NTTConvIter::new()) }
 }
 
-impl<I, C, A, CreateC> RNSConvolution<I, C, A, CreateC>
+impl<I, C, A, ConvIter> RNSConvolution<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
     /// Creates a new [`RNSConvolution`] with all the given configuration parameters.
     ///
@@ -197,73 +187,54 @@ where
     ///    to be created; the modulus of the given [`Zn`] always satisfies the constraints defined
     ///    by `max_prime_size_log2` and `required_root_of_unity_log2`
     #[stability::unstable(feature = "enable")]
-    pub fn new_with_convolution(
-        required_root_of_unity_log2: usize,
-        mut max_prime_size_log2: usize,
-        integer_ring: I,
-        allocator: A,
-        create_convolution: CreateC,
-    ) -> Self {
-        max_prime_size_log2 = min(max_prime_size_log2, 57);
+    pub fn new_with_convolution(integer_ring: I, allocator: A, mut conv_iter: ConvIter) -> Self {
+        let (initial_ring, initial_conv) = conv_iter.next().unwrap();
         let result = Self {
             integer_ring,
-            create_convolution,
+            further_convolutions: Mutex::new(conv_iter),
             convolutions: FrozenMap::new(),
             rns_rings: FrozenMap::new(),
-            required_root_of_unity_log2,
             allocator,
         };
         let initial_ring = zn_rns::ZnRNS::new_with_alloc(
-            vec![Zn64B::new(
-                Self::sample_next_prime(required_root_of_unity_log2, (1 << max_prime_size_log2) + 1).unwrap() as u64,
-            )],
+            vec![initial_ring],
             result.integer_ring.clone(),
             result.allocator.clone(),
         );
         _ = result.rns_rings.insert(1, Box::new(initial_ring));
+        _ = result.convolutions.insert(0, Box::new(initial_conv));
         return result;
-    }
-
-    fn sample_next_prime(required_root_of_unity_log2: usize, current: i64) -> Option<i64> {
-        let mut k = ZZi64
-            .checked_div(&(current - 1), &(1 << required_root_of_unity_log2))
-            .unwrap();
-        while k > 0 {
-            k -= 1;
-            let candidate = (k << required_root_of_unity_log2) + 1;
-            if is_prime(ZZi64, &candidate, 10) {
-                return Some(candidate);
-            }
-        }
-        return None;
     }
 
     fn get_rns_ring(&self, moduli_count: usize) -> &zn_rns::ZnRNS<Zn64B, I, A> {
         if let Some(ring) = self.rns_rings.get(&moduli_count) {
             return ring;
         }
-        for i in (1..moduli_count).rev() {
-            if let Some(prev_ring) = self.rns_rings.get(&i) {
-                let next_ring = zn_rns::ZnRNS::new_with_alloc(
-                    prev_ring
-                        .as_iter()
-                        .cloned()
-                        .chain([Zn64B::new(
-                            Self::sample_next_prime(
-                                self.required_root_of_unity_log2,
-                                *prev_ring.at(prev_ring.len() - 1).modulus(),
-                            )
-                            .unwrap() as u64,
-                        )])
-                        .collect(),
-                    self.integer_ring.clone(),
-                    self.allocator.clone(),
-                );
-                _ = self.rns_rings.insert(i + 1, Box::new(next_ring));
-                return self.get_rns_ring(moduli_count);
-            }
+
+        let mut further_convolutions = self.further_convolutions.lock().unwrap();
+        if let Some(ring) = self.rns_rings.get(&moduli_count) {
+            return ring;
         }
-        unreachable!()
+
+        let mut current = (1..moduli_count)
+            .rev()
+            .find(|i| self.rns_rings.get(i).is_some())
+            .unwrap();
+
+        while current < moduli_count {
+            let (next_component, next_conv) = further_convolutions.next().unwrap();
+            let new_moduli: Vec<_> = {
+                let prev_ring = self.rns_rings.get(&current).unwrap();
+                prev_ring.as_iter().cloned().chain([next_component]).collect()
+            };
+            let next_ring = ZnRNS::new_with_alloc(new_moduli, self.integer_ring.clone(), self.allocator.clone());
+            let _ = self.rns_rings.insert(current + 1, Box::new(next_ring));
+            let _ = self.convolutions.insert(current, Box::new(next_conv));
+            current += 1;
+        }
+
+        drop(further_convolutions);
+        self.rns_rings.get(&moduli_count).unwrap()
     }
 
     fn get_rns_factor(&self, i: usize) -> &Zn64B {
@@ -271,14 +242,7 @@ where
         return rns_ring.at(rns_ring.len() - 1);
     }
 
-    fn get_convolution(&self, i: usize) -> &C {
-        if let Some(conv) = self.convolutions.get(&i) {
-            conv
-        } else {
-            self.convolutions
-                .insert(i, Box::new((self.create_convolution)(*self.get_rns_factor(i))))
-        }
-    }
+    fn get_convolution(&self, i: usize) -> &C { self.convolutions.get(&i).unwrap() }
 
     /// "width" refers to the number of RNS factors we need
     fn compute_required_width(&self, input_size_log2: usize, lhs_rhs_min_len: usize, inner_prod_len: usize) -> usize {
@@ -555,13 +519,13 @@ where
     }
 }
 
-impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, CreateC>
+impl<R, I, C, A, ConvIter> ConvolutionAlgorithm<R> for RNSConvolution<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
     R: ?Sized + IntegerRing,
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
@@ -627,13 +591,13 @@ where
     }
 }
 
-impl<R, I, C, A, CreateC> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, CreateC>
+impl<R, I, C, A, ConvIter> ConvolutionAlgorithm<R> for RNSConvolutionZn<I, C, A, ConvIter>
 where
     I: RingStore + Clone,
     I::Ring: IntegerRing,
     C: ConvolutionAlgorithm<Zn64BBase>,
     A: Send + Sync + Allocator + Clone,
-    CreateC: Send + Sync + Fn(Zn64B) -> C,
+    ConvIter: Send + Iterator<Item = (Zn64B, C)>,
     R: ?Sized + ZnRing + CanHomFrom<I::Ring>,
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R, C>;
@@ -726,7 +690,7 @@ use crate::algorithms::convolution::KaratsubaAlgorithm;
 fn test_convolution_integer() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with_convolution(7, usize::MAX, ZZbig, Global, NTTConvolution::new);
+    let convolution = RNSConvolution::new();
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -735,13 +699,7 @@ fn test_convolution_integer() {
 fn test_convolution_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Zn64B::new((1 << 57) + 1);
-    let convolution = RNSConvolutionZn::from(RNSConvolution::new_with_convolution(
-        7,
-        usize::MAX,
-        ZZbig,
-        Global,
-        NTTConvolution::new,
-    ));
+    let convolution = RNSConvolutionZn::from(RNSConvolution::new());
 
     super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
 }
@@ -750,7 +708,7 @@ fn test_convolution_zn() {
 fn test_convolution_sum() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new_with_convolution(7, 20, ZZbig, Global, NTTConvolution::new);
+    let convolution = RNSConvolution::new();
 
     let data = (0..40usize)
         .map(|i| {

@@ -1,7 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use extension_impl::FreeAlgebraImplBase;
 use feanor_serde::newtype_struct::*;
@@ -22,7 +21,6 @@ use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
-use crate::ring_impls::extension::galois_field::extlen::LengthExtendedConvolution;
 use crate::ring_impls::extension::*;
 use crate::ring_impls::poly::PolyRing;
 use crate::ring_impls::poly::dense_poly::DensePolyRingBase;
@@ -484,23 +482,6 @@ where
     <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
 {
     fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
-}
-
-impl<Impl> DefaultConvolutionRing for GaloisFieldBase<Impl>
-where
-    Impl: RingStore,
-    Impl::Ring: Field + FreeAlgebra + FiniteRing,
-    <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
-{
-    default fn create_default_convolution<'conv, S>(self_: S, _: Option<usize>) -> DynConvolution<'conv, Self>
-    where
-        S: RingStore<Ring = Self> + 'conv,
-        Self: 'conv,
-    {
-        LengthExtendedConvolution::for_zn_extension(self_, 64)
-            .map(|x| Arc::new(TypeErasedConvolution::new(x)) as DynConvolution<'conv, _>)
-            .unwrap_or_else(|_| Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(0, Global))))
-    }
 }
 
 impl<Impl> Debug for GaloisFieldBase<Impl>

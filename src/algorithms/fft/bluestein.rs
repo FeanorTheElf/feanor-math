@@ -145,8 +145,13 @@ where
     /// Creates an [`BluesteinFFT`] for a prime field, assuming it has suitable roots of
     /// unity.
     ///
-    /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
-    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `>= 2n`.
+    /// Concretely, this requires that the given ring has an `n`-th primitive root of unity, and a
+    /// `m`-th primitive root of unity, where `m` is the smallest power of two `>= 2n`.
+    ///
+    /// # Performance
+    ///
+    /// This function will factor the modulus `n` of the ring, which in some cases is a very
+    /// computationally demanding task.
     pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
     where
         R::Ring: ZnRing,
@@ -244,13 +249,18 @@ where
     /// Creates an [`BluesteinFFT`] for the given prime fields, assuming they have suitable
     /// roots of unity.
     ///
-    /// Concretely, this requires that the characteristic `p` is congruent to 1 modulo
-    /// `2^log2_m n`, where `2^log2_m` is the smallest power of two that is `>= 2n`.
+    /// Concretely, this requires that the given ring has an `n`-th primitive root of unity, and a
+    /// `m`-th primitive root of unity, where `m` is the smallest power of two `>= 2n`.
     ///
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like
     /// [`Zn64BFastmul`] to precompute some data for better performance.
+    ///
+    /// # Performance
+    ///
+    /// This function will factor the modulus `n` of the ring, which in some cases is a very
+    /// computationally demanding task.
     ///
     /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
     pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>

@@ -552,7 +552,7 @@ where
     }
     let K = KX.base_ring();
 
-    let gcds_modulo_p = large_prime_fields()
+    let gcds_modulo_p = prime_fields_for_local_computation()
         .filter_map(|Fp| {
             let residue_fields = ResidueFieldsAtPrime::new(K, Fp).ok()?;
             let poly_mod_p = |poly| {
@@ -726,7 +726,7 @@ where
     let poly = KX.normalize(poly.clone()).0;
     let K = KX.base_ring();
 
-    let power_decompositions_modulo_p = large_prime_fields()
+    let power_decompositions_modulo_p = prime_fields_for_local_computation()
         .filter_map(|Fp| {
             let residue_fields = ResidueFieldsAtPrime::new(K, Fp).ok()?;
             let poly_mod_p = residue_fields

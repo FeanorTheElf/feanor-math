@@ -1,16 +1,12 @@
-use std::alloc::Global;
 use std::fmt::Debug;
 use std::marker::PhantomData;
-use std::sync::Arc;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{zn_big, *};
-use crate::algorithms::convolution::{
-    DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution,
-};
+use crate::algorithms::convolution::*;
 use crate::algorithms::euclid::const_extended_euclid;
 use crate::algorithms::matmul::StrassenHint;
 use crate::iters::multi_cartesian_product;
@@ -498,11 +494,11 @@ impl StrassenHint for Zn64MBase {
 }
 
 impl DefaultConvolutionRing for Zn64MBase {
-    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(6, Global)))
+        generic_impls::create_default_convolution(self_, max_len, 1)
     }
 }
 

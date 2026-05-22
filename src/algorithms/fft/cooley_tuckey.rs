@@ -207,8 +207,13 @@ where
         Self::new_with_pows_with_hom(ring.into_identity(), root_of_unity_pow, log2_n)
     }
 
-    /// Creates an [`CooleyTuckeyFFT`] for a prime field, assuming it has a characteristic
-    /// congruent to 1 modulo `2^log2_n`.
+    /// Creates an [`CooleyTuckeyFFT`] for a prime field, assuming it has a `2^log2_n`-th primitive
+    /// root of unity.
+    ///
+    /// # Performance
+    ///
+    /// This function will factor the modulus `n` of the ring, which in some cases is a very
+    /// computationally demanding task.
     pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
     where
         R::Ring: ZnRing,
@@ -277,13 +282,18 @@ where
         Self::create(hom, root_of_unity_pow, log2_n, Global)
     }
 
-    /// Creates an [`CooleyTuckeyFFT`] for the given ring `Z/nZ`, assuming it has primitive
-    /// `2^log2_n`-th roots of unity.
+    /// Creates an [`CooleyTuckeyFFT`] for a prime field, assuming it has a `2^log2_n`-th primitive
+    /// root of unity.
     ///
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like
     /// [`Zn64BFastmul`] to precompute some data for better performance.
+    ///
+    /// # Performance
+    ///
+    /// This function will factor the modulus `n` of the ring, which in some cases is a very
+    /// computationally demanding task.
     ///
     /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
     pub fn for_zn_with_hom(hom: H, log2_n: usize) -> Option<Self>
