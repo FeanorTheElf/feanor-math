@@ -168,3 +168,78 @@ where
     }
     return (result, KX.coefficient_at(f, 0).clone());
 }
+
+#[cfg(test)]
+use crate::ring_impls::as_field::AsField;
+#[cfg(test)]
+use crate::ring_impls::as_field::AsFieldBase;
+#[cfg(test)]
+use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
+#[cfg(test)]
+use crate::ring_impls::extension::number_field::NumberField;
+#[cfg(test)]
+use crate::ring_impls::extension::number_field::NumberFieldBase;
+#[cfg(test)]
+use crate::ring_impls::rational::RationalField;
+#[cfg(test)]
+use crate::wrapper::RingElementWrapper;
+
+#[cfg(test)]
+fn test_field() -> NumberField<AsField<FreeAlgebraImpl<RationalField<BigIntRing>, [El<RationalField<BigIntRing>>; 1]>>>
+{
+    let QQ = RationalField::new(ZZbig);
+    let neg_one = QQ.neg_one();
+    NumberField::from(NumberFieldBase::create(AsField::from(
+        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(QQ, 4, [neg_one])).unwrap(),
+    )))
+}
+
+#[test]
+fn test_poly_factor_number_field() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = test_field();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let zeta = RingElementWrapper::new(
+        &poly_ring,
+        poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
+    );
+    let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
+        [
+            X - &zeta,
+            X + &zeta,
+            X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
+            X.pow_ref(3) - zeta.pow_ref(3) * X + zeta.pow_ref(2),
+        ]
+    });
+    let assert_correct_factorization = |powers: [usize; 4]| {
+        let input = poly_ring.prod(
+            powers
+                .iter()
+                .enumerate()
+                .map(|(i, e)| poly_ring.pow(irred_polys[i].clone(), *e)),
+        );
+        let (actual, _) = poly_factor_extfield(&poly_ring, &input);
+        assert_eq!(powers.iter().filter(|e| **e != 0).count(), actual.len());
+        for (f, e) in actual {
+            if let Some((idx, _)) = irred_polys
+                .iter()
+                .enumerate()
+                .filter(|(_, g)| poly_ring.eq_el(&f, *g))
+                .next()
+            {
+                assert_eq!(powers[idx], e);
+            } else {
+                panic!(
+                    "factorization yielded {}, which is not an expected irreducible factor",
+                    poly_ring.formatted_el(&f)
+                )
+            }
+        }
+    };
+
+    assert_correct_factorization([1, 0, 0, 0]);
+    assert_correct_factorization([1, 0, 1, 0]);
+    assert_correct_factorization([1, 1, 0, 1]);
+    assert_correct_factorization([1, 0, 2, 0]);
+    assert_correct_factorization([0, 4, 0, 0]);
+}

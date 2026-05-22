@@ -294,6 +294,7 @@ where
     let outer_span = Span::current();
     let result = (0..attempts)
         .into_par_iter()
+        .panic_fuse()
         .map(|_| {
             span!(parent: &outer_span, Level::TRACE, "try_curve").in_scope(|| {
                 let mut rng = oorandom::Rand64::new(

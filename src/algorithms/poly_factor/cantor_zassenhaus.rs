@@ -5,7 +5,6 @@ use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::homomorphism::*;
-use crate::iters::{clone_slice, powerset};
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
@@ -516,6 +515,8 @@ where
 
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static::Fp;
+#[cfg(test)]
+use crate::iters::{clone_slice, powerset};
 
 #[test]
 fn test_distinct_degree_factorization() {

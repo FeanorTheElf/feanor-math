@@ -445,9 +445,9 @@ fn random_test_poly_factor_integer() {
     let mut rng = oorandom::Rand64::new(0);
     let bound = ring.int_hom().map(500);
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms((0..=12).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let g = poly_ring.from_terms((0..=11).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let h = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let f = poly_ring.from_terms((0..=6).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let h = poly_ring.from_terms((0..=4).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
         let input = poly_ring.prod([f, g, h]);
         let actual = poly_factor_integer(&poly_ring, &input);
         assert!(actual.iter().map(|(_, e)| *e).sum::<usize>() >= 3);

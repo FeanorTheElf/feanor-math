@@ -548,24 +548,27 @@ where
         let reduced_to_zero = AtomicUsize::new(0);
 
         let outer_span = Span::current();
-        spolys_to_reduce.into_par_iter().for_each(|spoly: &SPoly<_, _>| {
-            span!(parent: &outer_span, Level::TRACE, "reduce_spoly").in_scope(|| {
-                let mut f = spoly.poly(ring, &basis, order);
+        spolys_to_reduce
+            .into_par_iter()
+            .panic_fuse()
+            .for_each(|spoly: &SPoly<_, _>| {
+                span!(parent: &outer_span, Level::TRACE, "reduce_spoly").in_scope(|| {
+                    let mut f = spoly.poly(ring, &basis, order);
 
-                reduce_poly(
-                    ring,
-                    &mut f,
-                    || reducers.iter().chain(new_polys.iter()).map(|(f, lmf)| (f, lmf)),
-                    order,
-                );
+                    reduce_poly(
+                        ring,
+                        &mut f,
+                        || reducers.iter().chain(new_polys.iter()).map(|(f, lmf)| (f, lmf)),
+                        order,
+                    );
 
-                if !ring.is_zero(&f) {
-                    _ = new_polys.push(Box::new(expand_lm(ring, f, order)));
-                } else {
-                    _ = reduced_to_zero.fetch_add(1, Ordering::Relaxed);
-                }
-            })
-        });
+                    if !ring.is_zero(&f) {
+                        _ = new_polys.push(Box::new(expand_lm(ring, f, order)));
+                    } else {
+                        _ = reduced_to_zero.fetch_add(1, Ordering::Relaxed);
+                    }
+                })
+            });
 
         event!(
             Level::TRACE,

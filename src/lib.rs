@@ -39,6 +39,7 @@
 extern crate test;
 
 pub mod prelude;
+
 /// Contains the traits [`ring::RingBase`] and [`ring::RingStore`], which are the foundation of the
 /// ring framework in this library.
 #[macro_use]
@@ -46,6 +47,8 @@ pub mod ring;
 /// A collection of various more complicated ring traits and implementations, in particular
 /// arbitrary-precision integer rings, the integer quotients `Z/nZ` or polynomial rings.
 pub mod ring_impls;
+/// Collection of traits that represent special properties of rings, like
+/// [`ring_properties::field::Field`] and [`ring_properties::pid::PrincipalIdealRing`].
 pub mod ring_properties;
 
 pub mod algorithms;
@@ -75,20 +78,6 @@ pub mod matrix;
 pub mod seq;
 /// Contains the struct [`wrapper::RingElementWrapper`] that contains an element together with its
 /// ring, and thus can provide ring operations without explicit access to the ring.
-///
-/// Using this is for example necessary if you want to use elements of a
-/// [`crate::ring::HashableElRing`]-ring as elements in a [`std::collections::HashSet`].
-/// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::wrapper::*;
-/// # use feanor_math::integer::*;
-/// # use std::collections::HashSet;
-///
-/// let mut set = HashSet::new();
-/// set.insert(RingElementWrapper::new(ZZbig, ZZbig.int_hom().map(3)));
-/// assert!(set.contains(&RingElementWrapper::new(ZZbig, ZZbig.int_hom().map(3))));
-/// ```
 pub mod wrapper;
 
 const PROBABILISTIC_REPETITIONS: usize = 30;

@@ -15,6 +15,7 @@ use crate::algorithms::convolution::{
 };
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_factor::integer::poly_factor_integer;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
@@ -833,22 +834,25 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn factor_poly<P>(_poly_ring: P, _poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        unimplemented!()
-    }
-
-    fn is_irred<P>(_poly_ring: P, _poly: &El<P>) -> bool
-    where
-        P: RingStore + Copy,
-        P::Ring: PolyRing + EuclideanRing,
-        BaseRingStore<P>: RingStore<Ring = Self>,
-    {
-        unimplemented!()
+        let (ZZX, [integer_poly]) = make_poly_integral(&poly_ring, [poly]);
+        let result = poly_factor_integer(&ZZX, &integer_poly)
+            .into_iter()
+            .map(|(f, e)| {
+                (
+                    poly_ring
+                        .normalize(poly_ring.lifted_hom(&ZZX, poly_ring.base_ring().inclusion()).map(f))
+                        .0,
+                    e,
+                )
+            })
+            .collect();
+        return (result, poly_ring.lc(poly).unwrap().clone());
     }
 }
 
@@ -974,15 +978,16 @@ fn test_factor_rational_poly() {
     let poly_ring = DensePolyRing::new(&QQ, "X");
     let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
     let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(
+    let (mut actual, unit) = <_ as FactorPolyField>::factor_poly(
         &poly_ring,
         &poly_ring.prod([f.clone(), f.clone(), g.clone()].into_iter()),
     );
     assert_eq!(2, actual.len());
-    assert_el_eq!(poly_ring, f, actual[0].0);
-    assert_eq!(2, actual[0].1);
-    assert_el_eq!(poly_ring, g, actual[1].0);
-    assert_eq!(1, actual[1].1);
+    actual.sort_unstable_by_key(|(_, e)| *e);
+    assert_el_eq!(poly_ring, g, actual[0].0);
+    assert_eq!(1, actual[0].1);
+    assert_el_eq!(poly_ring, f, actual[1].0);
+    assert_eq!(2, actual[1].1);
     assert_el_eq!(QQ, QQ.one(), unit);
 
     let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);

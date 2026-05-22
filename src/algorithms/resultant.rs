@@ -100,6 +100,7 @@ where
     let outer_span = Span::current();
     let resultants = (0..count)
         .into_par_iter()
+        .panic_fuse()
         .map(|i| {
             span!(parent: &outer_span, Level::TRACE, "resultant_mod_prime").in_scope(|| {
                 let embedding = LiftPolyEvalRingReductionMap::new(base_ring.get_ring(), work_locally_ref, i);

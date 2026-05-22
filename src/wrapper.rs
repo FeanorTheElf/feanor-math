@@ -44,6 +44,19 @@ use crate::ring::HashableElRing;
 ///     (x.clone() + x.clone() * x).unwrap()
 /// );
 /// ```
+/// [`RingElementWrapper`] can also be used to store elements of a
+/// [`crate::ring::HashableElRing`]-ring as elements in a [`std::collections::HashSet`].
+/// ```rust
+/// # use feanor_math::ring::*;
+/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::wrapper::*;
+/// # use feanor_math::integer::*;
+/// # use std::collections::HashSet;
+///
+/// let mut set = HashSet::new();
+/// set.insert(RingElementWrapper::new(ZZbig, ZZbig.int_hom().map(3)));
+/// assert!(set.contains(&RingElementWrapper::new(ZZbig, ZZbig.int_hom().map(3))));
+/// ```
 pub struct RingElementWrapper<R>
 where
     R: RingStore,

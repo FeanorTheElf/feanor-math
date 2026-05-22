@@ -1,8 +1,6 @@
-use crate::algorithms::cyclotomic::is_prim_root_of_unity_pow2;
-use crate::ring::RingStore;
+
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::zn::zn_64b::Zn64B;
-use crate::ring_properties::integer::ZZi64;
 
 /// List of large primes that are `= 1 mod 2^32`, plus the representative of a `2^32`-th primitive
 /// root of unity.
@@ -1044,6 +1042,13 @@ pub fn prime_fields_for_local_computation() -> impl Iterator<Item = AsField<Zn64
         .chain(LARGE_PRIMES.iter())
         .map(|p| AsField::from(AsFieldBase::promise_is_perfect_field(Zn64B::new(*p as u64))))
 }
+
+#[cfg(test)]
+use crate::ring_properties::integer::ZZi64;
+#[cfg(test)]
+use crate::algorithms::cyclotomic::is_prim_root_of_unity_pow2;
+#[cfg(test)]
+use crate::prelude::*;
 
 #[test]
 fn test_are_primitive_roots_of_unity() {

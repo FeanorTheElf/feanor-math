@@ -10,6 +10,7 @@ use super::extension_impl::FreeAlgebraImpl;
 use super::{Field, FreeAlgebra};
 use crate::algorithms::convolution::*;
 use crate::algorithms::newton;
+use crate::algorithms::poly_factor::extension::poly_factor_extfield;
 use crate::algorithms::poly_gcd::number_field::{poly_gcd_number_field, poly_power_decomposition_number_field};
 use crate::algorithms::poly_gcd::*;
 use crate::delegate::*;
@@ -513,22 +514,13 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn factor_poly<P>(_poly_ring: P, _poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
+    fn factor_poly<P>(poly_ring: P, poly: &El<P>) -> (Vec<(El<P>, usize)>, Self::Element)
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + EuclideanRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        unimplemented!()
-    }
-
-    fn is_irred<P>(_poly_ring: P, _poly: &El<P>) -> bool
-    where
-        P: RingStore + Copy,
-        P::Ring: PolyRing + EuclideanRing,
-        BaseRingStore<P>: RingStore<Ring = Self>,
-    {
-        unimplemented!()
+        poly_factor_extfield(poly_ring, poly)
     }
 }
 
