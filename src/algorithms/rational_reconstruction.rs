@@ -126,12 +126,13 @@ use crate::ring_properties::divisibility::DivisibilityRingStore;
 #[test]
 fn test_rational_reconstruction() {
     feanor_tracing::DelayedLogger::init_test();
+    let ZZi32 = StaticRing::<i32>::RING;
     let n = 57517;
     let Zn = zn_64b::Zn64B::new(n as u64);
     let ab_bound = (n as f64 / 2.0).sqrt().floor() as i32;
     for a in -ab_bound..ab_bound {
         for b in 1..ab_bound {
-            if a * b <= n / 2 && StaticRing::<i32>::RING.ideal_gen(&b, &a) == 1 {
+            if a * b <= n / 2 && ZZi32.ideal_gen(&b, &a) == 1 && ZZi32.ideal_gen(&b, &n) == 1 {
                 let x = Zn.checked_div(&Zn.int_hom().map(a), &Zn.int_hom().map(b)).unwrap();
                 assert_eq!((a as i64, b as i64), balanced_rational_reconstruction(Zn, x));
             }
