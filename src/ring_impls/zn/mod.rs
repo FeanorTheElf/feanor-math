@@ -96,7 +96,6 @@ pub mod generic_impls {
     use std::marker::PhantomData;
     use std::sync::Arc;
 
-    use crate::algorithms::convolution::rns::{RNSConvolution, RNSConvolutionZn};
     use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution};
     use crate::algorithms::int_bisect;
     use crate::ring_impls::extension::galois_field::*;
@@ -108,7 +107,7 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn create_default_convolution<'a, S>(
         _self_: S,
-        max_len: Option<usize>,
+        _max_len: Option<usize>,
         log2_karatsuba_threshold: usize,
     ) -> DynConvolution<'a, S::Ring>
     where
