@@ -138,7 +138,7 @@ where
     P::Ring: PolyRing + DivisibilityRing,
     BaseRingStore<P>: RingStore<Ring = Complex64Base>,
 {
-    let mut rng = Rand64::new(1);
+    let mut rng = Rand64::new(0);
     let CC = Complex64::RING;
     assert!(
         poly_ring

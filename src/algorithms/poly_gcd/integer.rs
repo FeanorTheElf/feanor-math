@@ -114,10 +114,7 @@ where
         let lhs = ZZX_to_FpX.map_ref(lhs);
         let rhs = ZZX_to_FpX.map_ref(rhs);
         let gcd = PolyTFracGCDRing::gcd(&FpX, &lhs, &rhs);
-        return (
-            PolyGCDSignature::new(FpX.degree(&gcd).unwrap()),
-            (FpX, lhs, rhs, gcd),
-        );
+        return (PolyGCDSignature::new(FpX.degree(&gcd).unwrap()), (FpX, lhs, rhs, gcd));
     });
     poly_gcd_from_quotients(
         gcds_modulo_p,
@@ -403,7 +400,7 @@ fn random_test_poly_power_decomposition_integer() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZbig;
     let poly_ring = DensePolyRing::new(ring, "X");
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     let bound = ring.int_hom().map(500);
     let mut random_poly_of_deg =
         |deg: usize| poly_ring.from_terms((0..=deg).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
@@ -503,7 +500,7 @@ fn random_test_poly_gcd_integer() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZbig;
     let poly_ring = dense_poly::DensePolyRing::new(ring, "X");
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     let bound = ring.int_hom().map(500);
     for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
         let f = poly_ring.from_terms((0..=16).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));

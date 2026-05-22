@@ -10,6 +10,7 @@ use super::extension_impl::FreeAlgebraImpl;
 use super::{Field, FreeAlgebra};
 use crate::algorithms::convolution::*;
 use crate::algorithms::newton;
+use crate::algorithms::poly_gcd::number_field::{poly_gcd_number_field, poly_power_decomposition_number_field};
 use crate::algorithms::poly_gcd::*;
 use crate::delegate::*;
 use crate::prelude::*;
@@ -485,40 +486,22 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn gcd<P>(_poly_ring: P, _lhs: &El<P>, _rhs: &El<P>) -> El<P>
+    fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        unimplemented!()
+        poly_gcd_number_field(poly_ring, lhs, rhs)
     }
 
-    fn power_decomposition<P>(_poly_ring: P, _poly: &El<P>) -> Vec<(El<P>, usize)>
+    fn power_decomposition<P>(poly_ring: P, poly: &El<P>) -> Vec<(El<P>, usize)>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingStore<P>: RingStore<Ring = Self>,
     {
-        unimplemented!()
-    }
-
-    fn is_squarefree<P>(_poly_ring: P, _poly: &El<P>) -> bool
-    where
-        P: RingStore + Copy,
-        P::Ring: PolyRing + DivisibilityRing,
-        BaseRingStore<P>: RingStore<Ring = Self>,
-    {
-        unimplemented!()
-    }
-
-    fn squarefree_part<P>(_poly_ring: P, _poly: &El<P>) -> El<P>
-    where
-        P: RingStore + Copy,
-        P::Ring: PolyRing + DivisibilityRing,
-        BaseRingStore<P>: RingStore<Ring = Self>,
-    {
-        unimplemented!()
+        poly_power_decomposition_number_field(poly_ring, poly)
     }
 }
 
@@ -584,8 +567,6 @@ where
 }
 
 #[cfg(test)]
-use crate::RANDOM_TEST_INSTANCE_COUNT;
-#[cfg(test)]
 use crate::iters::multi_cartesian_product;
 
 #[test]
@@ -619,97 +600,4 @@ fn test_adjoin_root() {
     let [f] = QQX.with_wrapped_indeterminate(|X| [2 * X.pow_ref(3) - 1]);
     let (K, a) = NumberField::adjoin_root(&QQX, &f);
     assert_el_eq!(&K, K.zero(), K.sub(K.mul(K.int_hom().map(2), K.pow(a, 3)), K.one()));
-}
-
-#[test]
-fn test_poly_gcd_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(ZZ, "X");
-
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
-    let K = NumberField::new(&ZZX, &f);
-    let KY = DensePolyRing::new(&K, "Y");
-
-    let i = RingElementWrapper::new(&KY, KY.inclusion().map(K.canonical_gen()));
-    let [g, h, expected] = KY.with_wrapped_indeterminate(|Y| {
-        [
-            (Y.pow_ref(3) + 1) * (Y - &i),
-            (Y.pow_ref(4) + 2) * (Y.pow_ref(2) + 1),
-            Y - i,
-        ]
-    });
-    assert_el_eq!(&KY, &expected, <_ as PolyTFracGCDRing>::gcd(&KY, &g, &h));
-
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 20 * X.pow_ref(2) + 16]);
-    let K = NumberField::new(&ZZX, &f);
-    let KY = DensePolyRing::new(&K, "Y");
-
-    let [sqrt3, sqrt7] = K.with_wrapped_generator(|a| [a.pow_ref(3) / 8 - 2 * a, a.pow_ref(3) / 8 - 3 * a]);
-    assert_el_eq!(&K, K.int_hom().map(3), K.pow(sqrt3.clone(), 2));
-    assert_el_eq!(&K, K.int_hom().map(7), K.pow(sqrt7.clone(), 2));
-
-    let half = RingElementWrapper::new(&KY, KY.inclusion().map(K.invert(&K.int_hom().map(2)).unwrap()));
-    let sqrt3 = RingElementWrapper::new(&KY, KY.inclusion().map(sqrt3));
-    let sqrt7 = RingElementWrapper::new(&KY, KY.inclusion().map(sqrt7));
-    let [g, h, expected] = KY.with_wrapped_indeterminate(|Y| {
-        [
-            Y.pow_ref(2) - &sqrt3 * Y - 1,
-            Y.pow_ref(2) + &sqrt7 * Y + 1,
-            Y - (sqrt3 - sqrt7) * half,
-        ]
-    });
-    let actual = <_ as PolyTFracGCDRing>::gcd(&KY, &g, &h);
-    assert_el_eq!(&KY, &expected, &actual);
-}
-
-#[test]
-fn random_test_poly_gcd_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-
-    // use tracing_subscriber::Layer;
-    // use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-    // use tracing_subscriber::util::SubscriberInitExt;
-    // let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
-    // let filtered_chrome_layer =
-    // chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata|
-    //     !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::eea",
-    // "feanor_math::algorithms::sqr_mul"].contains(&metadata.target()) ));
-    // tracing_subscriber::registry().with(filtered_chrome_layer).init();
-
-    let ZZ = ZZbig;
-    let QQ = RationalField::new(ZZ);
-    let ZZX = DensePolyRing::new(ZZ, "X");
-    let mut rng = oorandom::Rand64::new(1);
-    let bound = QQ.base_ring().int_hom().map(1000);
-    let rank = 6;
-
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let genpoly = ZZX.from_terms(
-            (0..rank)
-                .map(|i| (ZZ.get_uniformly_random(&bound, || rng.rand_u64()), i))
-                .chain([(ZZ.one(), rank)].into_iter()),
-        );
-
-        let K = NumberField::new(&ZZX, &genpoly);
-        let KY = DensePolyRing::new(&K, "Y");
-
-        let mut random_element_K = || {
-            K.from_canonical_basis((0..K.rank()).map(|_| {
-                QQ.inclusion()
-                    .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
-            }))
-        };
-        let f = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
-        let g = KY.from_terms((0..=5).map(|i| (random_element_K(), i)));
-        let h = KY.from_terms((0..=4).map(|i| (random_element_K(), i)));
-        let lhs = KY.mul_ref(&f, &h);
-        let rhs = KY.mul_ref(&g, &h);
-
-        let gcd = <_ as PolyTFracGCDRing>::gcd(&KY, &lhs, &rhs);
-
-        assert!(KY.divides(&lhs, &gcd));
-        assert!(KY.divides(&rhs, &gcd));
-        assert!(KY.divides(&gcd, &h));
-    }
 }

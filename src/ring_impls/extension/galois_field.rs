@@ -286,12 +286,7 @@ where
             &allocator,
             &convolution_algorithm,
         ));
-        let mut rng = oorandom::Rand64::new(
-            poly_ring
-                .base_ring()
-                .integer_ring()
-                .default_hash(poly_ring.base_ring().modulus()) as u128,
-        );
+        let mut rng = oorandom::Rand64::new(0);
         let modulus = find_small_irreducible_poly(&poly_ring, degree, &convolution_algorithm, &mut rng);
         let mut modulus_vec = SparseMapVector::new(degree, base_field.clone());
         for (c, i) in poly_ring.terms(&modulus) {
@@ -331,12 +326,7 @@ where
             &allocator,
             convolution_algorithm,
         ));
-        let mut rng = oorandom::Rand64::new(
-            poly_ring
-                .base_ring()
-                .integer_ring()
-                .default_hash(poly_ring.base_ring().modulus()) as u128,
-        );
+        let mut rng = oorandom::Rand64::new(0);
         let modulus = find_small_irreducible_poly(&poly_ring, degree, convolution_algorithm, &mut rng);
         let mut modulus_vec = SparseMapVector::new(degree, base_ring.clone());
         for (c, i) in poly_ring.terms(&modulus) {

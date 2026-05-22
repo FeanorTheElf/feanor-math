@@ -177,7 +177,7 @@ where
     let power = ZZbig.checked_div(&order, n)?;
     let n_factorization = factor(ZZbig, n.clone());
 
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZbig);
     for _ in 0..PROBABILISTIC_REPETITIONS {
         if is_prim_root_of_unity_with_factorization(&ring, &current, n, &n_factorization) {
@@ -219,7 +219,7 @@ where
         let power = ZZ.checked_div(&order, &n)?;
         let scale = ring.coerce(ZZ, ZZ.checked_div(ring.modulus(), &pe).unwrap());
 
-        let mut rng = oorandom::Rand64::new(1);
+        let mut rng = oorandom::Rand64::new(0);
         let base = ring.mul_ref_snd(ring.random_element(|| rng.rand_u64()), &scale);
         let mut current = ring.pow_gen(base, &power, ZZ);
         let one_mod_p = ring.pow_gen(current.clone(), &n, ZZ);
@@ -267,7 +267,7 @@ where
     let order = ZZbig.sub(ring.size(&ZZbig).unwrap(), ZZbig.one());
     let power = ZZbig.checked_div(&order, &ZZbig.power_of_two(log2_n))?;
 
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     let mut current = ring.pow_gen(ring.random_element(|| rng.rand_u64()), &power, ZZbig);
     for _ in 0..PROBABILISTIC_REPETITIONS {
         if is_prim_root_of_unity_pow2(&ring, &current, log2_n) {
@@ -306,7 +306,7 @@ where
         let power = ZZ.checked_div(&order, &ZZ.power_of_two(log2_n))?;
         let scale = ring.coerce(ZZ, ZZ.checked_div(ring.modulus(), &pe).unwrap());
 
-        let mut rng = oorandom::Rand64::new(1);
+        let mut rng = oorandom::Rand64::new(0);
         let mut current = ring.pow_gen(
             ring.mul_ref_snd(ring.random_element(|| rng.rand_u64()), &scale),
             &power,

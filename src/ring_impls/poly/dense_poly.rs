@@ -1153,7 +1153,7 @@ fn test_expensive_prod() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = GaloisField::new(17, 2048);
     let poly_ring = DensePolyRing::new(&ring, "X");
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     let a = ring.random_element(|| rng.rand_u64());
 
     let start = Instant::now();

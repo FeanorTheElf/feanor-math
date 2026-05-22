@@ -289,7 +289,7 @@ where
     let power_ref = &power;
 
     let base_rng_value = rng();
-    let rng_seed = AtomicU64::new(1);
+    let rng_seed = AtomicU64::new(0);
 
     let outer_span = Span::current();
     let result = (0..attempts)

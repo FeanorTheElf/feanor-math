@@ -271,7 +271,7 @@ where
     assert!(mod_f_ring.rank() % d == 0);
     assert!(mod_f_ring.rank() > d);
 
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(&q) as u128);
+    let mut rng = oorandom::Rand64::new(0);
     // we raise `T` to the power `(q^d - 1)/2 = (q - 1)/2 * (1 + q + ... + q^(d - 1))`
     let exp = ZZ.half_exact(ZZ.sub(q.clone(), ZZ.one()));
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
@@ -362,7 +362,7 @@ where
     let e = ZZ.abs_log2_ceil(&q).unwrap();
     assert_el_eq!(ZZ, ZZ.power_of_two(e), q);
 
-    let mut rng = oorandom::Rand64::new((ZZ.default_hash(&q) as u128) | ((seed as u128) << u64::BITS));
+    let mut rng = oorandom::Rand64::new(seed as u128);
     let zeta3 = get_prim_root_of_unity(&Fq, &ZZ.int_hom().map(3)).unwrap();
     let exp = if (d * e) % 2 == 0 {
         ZZ.checked_div(&ZZ.sub(ZZ.power_of_two(d * e), ZZ.one()), &ZZ.int_hom().map(3))

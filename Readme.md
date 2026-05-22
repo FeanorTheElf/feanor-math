@@ -195,7 +195,7 @@ fn fermat_is_prime(n: i64) -> bool {
     let Zn = ZnGB::new(ZZi64, n); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     for _ in 0..6 {
         let a = Zn.random_element(|| rng.rand_u64());
         let a_n = Zn.pow(a.clone(), n as usize);
@@ -236,7 +236,7 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
     let Zn = ZnGB::new(&ZZ, n.clone()); // the ring Z/nZ
 
     // check for 6 random a whether a^n == a mod n
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
     for _ in 0..6 {
         let a = Zn.random_element(|| rng.rand_u64());
         // use a generic square-and-multiply powering function that works with any implementation

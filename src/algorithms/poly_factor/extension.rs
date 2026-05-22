@@ -2,6 +2,7 @@ use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::poly_factor::FactorPolyField;
+use crate::algorithms::poly_factor::integer::ProbablyNotSquarefree;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
@@ -15,9 +16,6 @@ use crate::ring_properties::lift_poly_eval::InterpolationBaseRing;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::EuclideanRing;
 use crate::ring_properties::specialization::FiniteRingSpecializable;
-
-#[stability::unstable(feature = "enable")]
-pub struct ProbablyNotSquarefree;
 
 /// Factors a polynomial with coefficients in a field `K` that is a simple, finite-degree
 /// field extension of a base field that supports polynomial factorization.
@@ -89,7 +87,7 @@ where
             || ZZbig.is_geq(&characteristic, &int_cast(bound.try_into().unwrap(), ZZbig, ZZi64))
     );
 
-    let mut rng = oorandom::Rand64::new(1);
+    let mut rng = oorandom::Rand64::new(0);
 
     for _ in 0..attempts {
         let k = StaticRing::<i32>::RING.get_uniformly_random(&bound.try_into().unwrap(), || rng.rand_u64());

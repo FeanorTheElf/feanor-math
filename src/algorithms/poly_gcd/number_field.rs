@@ -26,7 +26,6 @@ use crate::ring_impls::zn::*;
 use crate::seq::{VectorFn, VectorView};
 
 const HOPE_FOR_SQUAREFREE_ATTEMPTS: usize = 1;
-const BEST_EFFORT_SQUAREFREE_CHECKS: usize = 3;
 
 #[derive(Debug, Copy, Clone)]
 enum QuotientAtError {
@@ -416,6 +415,17 @@ impl NumberFieldFactorizationLift {
             .factorization()
             .map(|f| self.power_factor_lifters[0].poly_ring().degree(f).unwrap())
             .collect::<Vec<_>>();
+        debug_assert!(
+            self.power_factor_lifters
+                .iter()
+                .all(|lifter| lifter.factorization().count() == factor_count)
+        );
+        debug_assert!(self.power_factor_lifters.iter().all(|lifter| {
+            lifter
+                .factorization()
+                .zip(&factor_degrees)
+                .all(|(fi, d)| lifter.poly_ring().degree(fi).unwrap() == *d)
+        }));
         return (0..factor_count)
             .map(|i| {
                 KX.from_terms((0..=factor_degrees[i]).map(|j| {
@@ -633,7 +643,7 @@ where
 }
 
 struct PolyPowerDecompositionLift {
-    factorizaton_lift: NumberFieldFactorizationLift,
+    factorization_lift: NumberFieldFactorizationLift,
     exponents: Vec<usize>,
 }
 
@@ -659,7 +669,7 @@ impl PolyPowerDecompositionLift {
         }
         return Ok(Self {
             exponents: exponents.unwrap(),
-            factorizaton_lift: NumberFieldFactorizationLift::new(&residue_fields, factorizations).unwrap(),
+            factorization_lift: NumberFieldFactorizationLift::new(&residue_fields, factorizations).unwrap(),
         });
     }
 
@@ -678,9 +688,9 @@ impl PolyPowerDecompositionLift {
         I: RingStore,
         I::Ring: IntegerRing,
     {
-        self.factorizaton_lift
+        self.factorization_lift
             .lift_main_factorization(KX, target, lift_to_degree);
-        let reconstructed_factorization = self.factorizaton_lift.reconstruct_main_factorization(KX);
+        let reconstructed_factorization = self.factorization_lift.reconstruct_main_factorization(KX);
         assert_eq!(self.exponents.len(), reconstructed_factorization.len());
         if KX.eq_el(&KX.prod(reconstructed_factorization.iter().cloned()), target) {
             return reconstructed_factorization
@@ -694,7 +704,7 @@ impl PolyPowerDecompositionLift {
     }
 }
 
-/// Computes the power decomposition of polynomials `f, g in K[X]` over a number field `K`.
+/// Computes the power decomposition of a polynomials `f in K[X]` over a number field `K`.
 ///
 /// Use this when implementing [`PolyTFracGCDRing`] for number fields; Otherwise, compute power
 /// decompositions through [`PolyTFracGCDRing::poly_power_decomposition()`].
@@ -760,10 +770,12 @@ use crate::ring_impls::extension::number_field::*;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<FreeAlgebraImpl<RationalField<BigIntRing>, [El<RationalField<BigIntRing>>; 1]>>> {
+fn test_field() -> NumberField<AsField<FreeAlgebraImpl<RationalField<BigIntRing>, [El<RationalField<BigIntRing>>; 1]>>>
+{
     let QQ = RationalField::new(ZZbig);
+    let neg_one = QQ.neg_one();
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(QQ, 4, [QQ.one()])).unwrap(),
+        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(QQ, 4, [neg_one])).unwrap(),
     )))
 }
 
@@ -830,12 +842,14 @@ fn random_test_poly_power_decomposition_number_field() {
     feanor_tracing::DelayedLogger::init_test();
     let field = test_field();
     let poly_ring = DensePolyRing::new(field, "X");
-    let mut rng = oorandom::Rand64::new(1);
+    let field = poly_ring.base_ring();
+    let QQ = field.base_ring();
+    let mut rng = oorandom::Rand64::new(0);
     let bound = ZZbig.int_hom().map(500);
     let mut random_poly_of_deg = |deg: usize| {
         poly_ring.from_terms((0..=deg).map(|i| {
             (
-                ring.from_canonical_basis((0..ring.rank()).map(|_| {
+                field.from_canonical_basis((0..field.rank()).map(|_| {
                     QQ.inclusion()
                         .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
                 })),
@@ -934,15 +948,17 @@ fn test_poly_power_decomposition_number_field_degenerate_reduction() {
     feanor_tracing::DelayedLogger::init_test();
     let field = test_field();
     let poly_ring = DensePolyRing::new(field, "X");
-    let ring = poly_ring.base_ring();
+    let field = poly_ring.base_ring();
+    let QQ = field.base_ring();
     let f = poly_ring.from_terms([
         (
-            ring.inclusion()
+            field
+                .inclusion()
                 .compose(QQ.inclusion())
                 .map(ZZbig.prod(LARGE_PRIMES[..6].iter().map(|x| int_cast(*x, ZZbig, ZZi64)))),
             2,
         ),
-        (ring.one(), 0),
+        (field.one(), 0),
     ]);
     let power_decomposition = poly_power_decomposition_number_field(&poly_ring, &f);
     assert_eq!(1, power_decomposition.len());
@@ -954,13 +970,14 @@ fn random_test_poly_gcd_number_field() {
     feanor_tracing::DelayedLogger::init_test();
     let field = test_field();
     let poly_ring = DensePolyRing::new(field, "X");
-    let ring = poly_ring.base_ring();
-    let mut rng = oorandom::Rand64::new(1);
+    let field = poly_ring.base_ring();
+    let QQ = field.base_ring();
+    let mut rng = oorandom::Rand64::new(0);
     let bound = ZZbig.int_hom().map(500);
     let mut random_poly_of_deg = |deg: usize| {
         poly_ring.from_terms((0..=deg).map(|i| {
             (
-                ring.from_canonical_basis((0..ring.rank()).map(|_| {
+                field.from_canonical_basis((0..field.rank()).map(|_| {
                     QQ.inclusion()
                         .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
                 })),

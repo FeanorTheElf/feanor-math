@@ -4,8 +4,7 @@ use tracing::instrument;
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring::HashableElRingStore;
-use crate::ring_impls::zn::{ZnRingStore, choose_zn_impl, *};
+use crate::ring_impls::zn::*;
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 
@@ -177,7 +176,7 @@ where
         return false;
     }
 
-    let mut rng = oorandom::Rand64::new(ZZ.default_hash(n) as u128);
+    let mut rng = oorandom::Rand64::new(0);
     let mut n_minus_one = ZZ.sub_ref_fst(n, ZZ.one());
     let s = ZZ.abs_lowest_set_bit(&n_minus_one).unwrap();
     ZZ.euclidean_div_pow_2(&mut n_minus_one, s as usize);
