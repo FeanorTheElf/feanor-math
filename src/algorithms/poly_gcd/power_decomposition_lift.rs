@@ -21,7 +21,6 @@ pub struct PolyPowerDecompositionSignature {
 }
 
 impl PolyPowerDecompositionSignature {
-
     #[stability::unstable(feature = "enable")]
     pub fn from_decomposition<P>(poly_ring: P, decomposition: &[(El<P>, usize)]) -> Self
     where

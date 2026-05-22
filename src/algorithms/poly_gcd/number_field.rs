@@ -38,9 +38,10 @@ pub type ResidueField = GaloisField<AsField<FreeAlgebraImpl<AsField<Zn64B>, Vec<
 pub type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
 
 #[stability::unstable(feature = "enable")]
-pub struct ResidueFieldsAtPrime {
-    FqXs: Vec<ResidueFieldPolyRing>,
-}
+pub type ResidueRing = FreeAlgebraImpl<ZnGB<BigIntRing>, Vec<El<ZnGB<BigIntRing>>>>;
+
+#[stability::unstable(feature = "enable")]
+pub type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
 
 fn QQ_to_Zpe_hom<'a, R, I, F>(
     QQ: R,
@@ -83,14 +84,11 @@ where
     BaseRingBase<R>: ZnRing + CanHomFrom<I::Ring>,
 {
     let mod_p = QQ_to_Zpe_hom(number_field.base_ring().clone(), galois_ring.base_ring().clone(), error);
-    LambdaHom::new(number_field, galois_ring, move |K, GR, x| {
-        GR.from_canonical_basis_extended(K.wrt_canonical_basis(x).iter().map(|c| mod_p.map(c)))
-    })
+    galois_ring.into_lifted_hom(number_field, mod_p).ok().unwrap()
 }
 
 #[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn quotient_at<K, I>(number_field: K, Fp: AsField<Zn64B>) -> Result<ResidueFieldsAtPrime, QuotientAtError>
+pub struct ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
     K::Ring: FreeAlgebra + Field,
@@ -98,81 +96,14 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    let QQ = number_field.base_ring();
-    let FpX = DensePolyRing::new(Fp, "X");
-    let Fp = FpX.base_ring();
-    let error = AtomicBool::new(false);
-    let generating_poly = number_field.generating_poly(&FpX, QQ_to_Zpe_hom(QQ, Fp, &error));
-    if error.load(std::sync::atomic::Ordering::Relaxed) {
-        return Err(QuotientAtError::ReductionNotWellDefined);
-    }
-
-    let generating_poly_factorization = FactorPolyField::factor_poly(&FpX, &generating_poly).0;
-    if generating_poly_factorization.iter().any(|(_, e)| *e > 1) {
-        return Err(QuotientAtError::Ramified);
-    }
-
-    return Ok(ResidueFieldsAtPrime {
-        FqXs: generating_poly_factorization
-            .into_iter()
-            .map(|(f, _)| {
-                let degree = FpX.degree(&f).unwrap();
-                let modulus = (0..degree)
-                    .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
-                    .collect::<Vec<_>>();
-                let Fq = GaloisField::create(FreeAlgebraImpl::new(Fp.clone(), degree, modulus).as_field().unwrap());
-                let FqX = DensePolyRing::new(Fq, "X");
-                return FqX;
-            })
-            .collect(),
-    });
-}
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn poly_in_quotients<'b, P, I>(
-    KX: P,
-    poly: &El<P>,
-    residue_fields: &'b ResidueFieldsAtPrime,
-) -> Result<Vec<El<ResidueFieldPolyRing>>, ()>
-where
-    P: RingStore + Copy,
-    P::Ring: PolyRing,
-    BaseRingBase<P>: Field + FreeAlgebra,
-    BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
-    I: RingStore,
-    I::Ring: IntegerRing,
-{
-    let mut result = Vec::new();
-    let K = KX.base_ring();
-    let Fp = residue_fields.FqXs[0].base_ring().base_ring();
-    assert!(Fp.get_ring() == residue_fields.FqXs[0].base_ring().base_ring().get_ring());
-
-    for FqX in &residue_fields.FqXs {
-        let Fq = FqX.base_ring();
-        let error = AtomicBool::new(false);
-        let poly_mod_p = FqX.lifted_hom(KX, K_to_GR_hom(K, Fq, &error)).map_ref(poly);
-        if error.load(std::sync::atomic::Ordering::Relaxed) {
-            return Err(());
-        }
-        result.push(poly_mod_p);
-    }
-    return Ok(result);
-}
-
-#[stability::unstable(feature = "enable")]
-pub type ResidueRing = FreeAlgebraImpl<ZnGB<BigIntRing>, Vec<El<ZnGB<BigIntRing>>>>;
-
-#[stability::unstable(feature = "enable")]
-pub type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
-
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn reconstruct_number_field_el<K, I>(
     number_field: K,
-    residue_rings: &[&ResidueRingPolyRing],
-    residue_values: &[El<ResidueRing>],
-) -> El<K>
+    residue_rings: Vec<&'a ResidueRingPolyRing>,
+    ZpeX: DensePolyRing<ZnGB<BigIntRing>>,
+    unit_vectors: Vec<El<DensePolyRing<ZnGB<BigIntRing>>>>,
+    complete_product: El<DensePolyRing<ZnGB<BigIntRing>>>,
+}
+
+impl<'a, K, I> ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
     K::Ring: FreeAlgebra + Field,
@@ -180,87 +111,335 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    assert_eq!(residue_rings.len(), residue_values.len());
-    let QQ = number_field.base_ring();
-    let ZZ = QQ.base_ring();
-    let GR = residue_rings[0].base_ring();
-    let Zpe = GR.base_ring();
-    let ZpeX = DensePolyRing::new(Zpe, "X");
-    assert!(
-        residue_rings
-            .iter()
-            .all(|GRX| GRX.base_ring().base_ring().get_ring() == Zpe.get_ring())
-    );
-
-    // compute data necessary for inverse CRT
-    let mut unit_vectors = (0..residue_rings.len()).map(|_| ZpeX.zero()).collect::<Vec<_>>();
-    product_except_one(
-        &ZpeX,
-        residue_rings
-            .as_fn()
-            .map_fn(|GRX| GRX.base_ring().generating_poly(&ZpeX, Zpe.identity())),
-        &mut unit_vectors,
-    );
-    let complete_product = ZpeX.mul_ref_fst(
-        &unit_vectors[0],
-        residue_rings[0].base_ring().generating_poly(&ZpeX, Zpe.identity()),
-    );
-    let error = AtomicBool::new(false);
-    debug_assert_el_eq!(
-        &ZpeX,
-        &complete_product,
-        &number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, Zpe, &error))
-    );
-    debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
-    for (i, GRX) in residue_rings.iter().enumerate() {
-        let inv_normalization_factor = ZpeX.evaluate(
-            unit_vectors.at(i),
-            &GRX.base_ring().canonical_gen(),
-            GRX.base_ring().inclusion(),
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn new(number_field: K, residue_rings: Vec<&'a ResidueRingPolyRing>) -> Self {
+        let QQ = number_field.base_ring();
+        let ZpeX = DensePolyRing::new(residue_rings[0].base_ring().base_ring().clone(), "X");
+        let Zpe = ZpeX.base_ring();
+        assert!(
+            residue_rings
+                .iter()
+                .all(|GRX| GRX.base_ring().base_ring().get_ring() == Zpe.get_ring())
         );
-        let normalization_factor = GRX.base_ring().invert(&inv_normalization_factor).unwrap();
-        let lifted_normalization_factor = GRX.base_ring().poly_repr(&ZpeX, &normalization_factor, Zpe.identity());
-        let unreduced_new_unit_vector = ZpeX.mul(
-            std::mem::replace(&mut unit_vectors[i], ZpeX.zero()),
-            lifted_normalization_factor,
-        );
-        unit_vectors[i] = ZpeX.div_rem_monic(unreduced_new_unit_vector, &complete_product).1;
-    }
 
-    // now apply inverse CRT to get the value over ZpeX
-    let combined = <_ as RingStore>::sum(
-        &ZpeX,
-        residue_rings.iter().enumerate().map(|(i, GRX)| {
-            let unreduced_result = ZpeX.mul_ref_snd(
-                GRX.base_ring().poly_repr(&ZpeX, &residue_values[i], Zpe.identity()),
-                &unit_vectors[i],
-            );
-            ZpeX.div_rem_monic(unreduced_result, &complete_product).1
-        }),
-    );
-    for (i, GRX) in residue_rings.iter().enumerate() {
+        let mut unit_vectors = (0..residue_rings.len()).map(|_| ZpeX.zero()).collect::<Vec<_>>();
+        product_except_one(
+            &ZpeX,
+            residue_rings
+                .as_fn()
+                .map_fn(|GRX| GRX.base_ring().generating_poly(&ZpeX, Zpe.identity())),
+            &mut unit_vectors,
+        );
+        let complete_product = ZpeX.mul_ref_fst(
+            &unit_vectors[0],
+            residue_rings[0].base_ring().generating_poly(&ZpeX, Zpe.identity()),
+        );
+        let error = AtomicBool::new(false);
         debug_assert_el_eq!(
-            GRX.base_ring(),
-            &residue_values[i],
-            &ZpeX.evaluate(&combined, &GRX.base_ring().canonical_gen(), GRX.base_ring().inclusion())
+            &ZpeX,
+            &complete_product,
+            &number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, Zpe, &error))
         );
+        debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
+        for (i, GRX) in residue_rings.iter().enumerate() {
+            let inv_normalization_factor = ZpeX.evaluate(
+                unit_vectors.at(i),
+                &GRX.base_ring().canonical_gen(),
+                GRX.base_ring().inclusion(),
+            );
+            let normalization_factor = GRX.base_ring().invert(&inv_normalization_factor).unwrap();
+            let lifted_normalization_factor = GRX.base_ring().poly_repr(&ZpeX, &normalization_factor, Zpe.identity());
+            let unreduced_new_unit_vector = ZpeX.mul(
+                std::mem::replace(&mut unit_vectors[i], ZpeX.zero()),
+                lifted_normalization_factor,
+            );
+            unit_vectors[i] = ZpeX.div_rem_monic(unreduced_new_unit_vector, &complete_product).1;
+        }
+        return Self {
+            number_field,
+            residue_rings,
+            ZpeX,
+            unit_vectors,
+            complete_product,
+        };
     }
-    // now lift the polynomial modulo `p^e` to the rationals
-    let result = number_field.from_canonical_basis((0..number_field.rank()).map(|i| {
-        let (num, den) = balanced_rational_reconstruction(Zpe, ZpeX.coefficient_at(&combined, i).clone());
-        return QQ.div(
-            &QQ.inclusion().map(int_cast(num, ZZ, Zpe.integer_ring())),
-            &QQ.inclusion().map(int_cast(den, ZZ, Zpe.integer_ring())),
+
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn reconstruct(&self, residue_values: &[El<ResidueRing>]) -> El<K> {
+        assert_eq!(self.residue_rings.len(), residue_values.len());
+        let Zpe = self.ZpeX.base_ring();
+        let QQ = self.number_field.base_ring();
+        let ZZ = QQ.base_ring();
+        let combined = <_ as RingStore>::sum(
+            &self.ZpeX,
+            self.residue_rings.iter().enumerate().map(|(i, GRX)| {
+                let unreduced_result = self.ZpeX.mul_ref_snd(
+                    GRX.base_ring()
+                        .poly_repr(&self.ZpeX, &residue_values[i], Zpe.identity()),
+                    &self.unit_vectors[i],
+                );
+                self.ZpeX.div_rem_monic(unreduced_result, &self.complete_product).1
+            }),
         );
-    }));
-    return result;
+        for (i, GRX) in self.residue_rings.iter().enumerate() {
+            debug_assert_el_eq!(
+                GRX.base_ring(),
+                &residue_values[i],
+                &self
+                    .ZpeX
+                    .evaluate(&combined, &GRX.base_ring().canonical_gen(), GRX.base_ring().inclusion())
+            );
+        }
+        // now lift the polynomial modulo `p^e` to the rationals
+        let result = self
+            .number_field
+            .from_canonical_basis((0..self.number_field.rank()).map(|i| {
+                let (num, den) = balanced_rational_reconstruction(Zpe, self.ZpeX.coefficient_at(&combined, i).clone());
+                return QQ.div(
+                    &QQ.inclusion().map(int_cast(num, ZZ, Zpe.integer_ring())),
+                    &QQ.inclusion().map(int_cast(den, ZZ, Zpe.integer_ring())),
+                );
+            }));
+        return result;
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct ResidueFieldsAtPrime {
+    FqXs: Vec<ResidueFieldPolyRing>,
+}
+
+impl ResidueFieldsAtPrime {
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn new<K, I>(number_field: K, Fp: AsField<Zn64B>) -> Result<Self, QuotientAtError>
+    where
+        K: RingStore,
+        K::Ring: FreeAlgebra + Field,
+        BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Ring: IntegerRing,
+    {
+        let QQ = number_field.base_ring();
+        let FpX = DensePolyRing::new(Fp, "X");
+        let Fp = FpX.base_ring();
+        let error = AtomicBool::new(false);
+        let generating_poly = number_field.generating_poly(&FpX, QQ_to_Zpe_hom(QQ, Fp, &error));
+        if error.load(std::sync::atomic::Ordering::Relaxed) {
+            return Err(QuotientAtError::ReductionNotWellDefined);
+        }
+
+        let generating_poly_factorization = FactorPolyField::factor_poly(&FpX, &generating_poly).0;
+        if generating_poly_factorization.iter().any(|(_, e)| *e > 1) {
+            return Err(QuotientAtError::Ramified);
+        }
+
+        return Ok(ResidueFieldsAtPrime {
+            FqXs: generating_poly_factorization
+                .into_iter()
+                .map(|(f, _)| {
+                    let degree = FpX.degree(&f).unwrap();
+                    let modulus = (0..degree)
+                        .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
+                        .collect::<Vec<_>>();
+                    let Fq = GaloisField::create(FreeAlgebraImpl::new(Fp.clone(), degree, modulus).as_field().unwrap());
+                    let FqX = DensePolyRing::new(Fq, "X");
+                    return FqX;
+                })
+                .collect(),
+        });
+    }
+}
+
+#[stability::unstable(feature = "enable")]
+pub struct ResidueRingsAtPrimePower {
+    lifter: HenselLift<DensePolyRing<ZnGB<BigIntRing>>>,
+    prime: El<BigIntRing>,
+}
+
+impl ResidueRingsAtPrimePower {
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn new(residue_fields: &ResidueFieldsAtPrime) -> Self {
+        let Fp = residue_fields.FqXs[0].base_ring().base_ring().clone();
+        let FpX = DensePolyRing::new(Fp, "X");
+        let Zp = ZnGB::new(ZZbig, int_cast(*Fp.modulus(), ZZbig, ZZi64));
+        let ZpX = DensePolyRing::new(Zp.clone(), "X");
+        let gen_poly_factorization = residue_fields
+            .FqXs
+            .iter()
+            .map(|FqX| FqX.base_ring().generating_poly(&FpX, FpX.base_ring().identity()))
+            .collect::<Vec<_>>();
+        let gen_poly_lifter = HenselLift::new(FpX, gen_poly_factorization).unwrap();
+        return Self {
+            lifter: gen_poly_lifter.change_ring(ZpX, ZnReductionMap::new(&Fp, &Zp).unwrap()),
+            prime: Zp.modulus().clone(),
+        };
+    }
+
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn lift_genpoly_factorization<K, I>(&mut self, number_field: K, lift_to_degree: usize)
+    where
+        K: RingStore,
+        K::Ring: Field + FreeAlgebra,
+        BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Ring: IntegerRing,
+    {
+        let QQ = number_field.base_ring();
+        let Zpe = ZnGB::new(ZZbig, ZZbig.pow(self.prime.clone(), lift_to_degree));
+        let ZpeX = DensePolyRing::new(Zpe.clone(), "X");
+
+        let error = AtomicBool::new(false);
+        let target_mod_pe = number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, &Zpe, &error));
+        debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
+
+        take_mut::take(&mut self.lifter, |lifter| {
+            lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |old_base_ring, Zpe, x| {
+                Zpe.get_ring()
+                    .from_int_promise_reduced(old_base_ring.smallest_positive_lift(x.clone()))
+            })
+        });
+    }
+
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn ZpeX(&self) -> &DensePolyRing<ZnGB<BigIntRing>> { self.lifter.poly_ring() }
+
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn create_residue_rings(&self) -> Vec<ResidueRingPolyRing> {
+        self.lifter
+            .factorization()
+            .map(|f| {
+                let GR = FreeAlgebraImpl::new(
+                    self.ZpeX().base_ring().clone(),
+                    self.ZpeX().degree(f).unwrap(),
+                    (0..self.ZpeX().degree(f).unwrap())
+                        .map(|i| self.ZpeX().base_ring().negate(self.ZpeX().coefficient_at(f, i).clone()))
+                        .collect(),
+                );
+                let GRX = DensePolyRing::new(GR, "X");
+                return GRX;
+            })
+            .collect::<Vec<_>>()
+    }
+}
+
+struct NumberFieldFactorizationLift {
+    gen_poly_lift: ResidueRingsAtPrimePower,
+    power_factor_lifters: Vec<HenselLift<ResidueRingPolyRing>>,
+}
+
+impl NumberFieldFactorizationLift {
+    #[instrument(skip_all, level = "trace")]
+    fn new(residue_fields: ResidueFieldsAtPrime, factorizations: Vec<Vec<El<ResidueFieldPolyRing>>>) -> Self {
+        assert_eq!(residue_fields.FqXs.len(), factorizations.len());
+        let mut lifters = Vec::new();
+        let gen_poly_lift = ResidueRingsAtPrimePower::new(&residue_fields);
+        let residue_rings = gen_poly_lift.create_residue_rings();
+        debug_assert_eq!(residue_fields.FqXs.len(), residue_rings.len());
+        for ((factorization, FqX), GRX) in factorizations.into_iter().zip(residue_fields.FqXs).zip(residue_rings) {
+            let Fq = FqX.base_ring();
+            let GR = GRX.base_ring().clone();
+            lifters.push(
+                HenselLift::new(&FqX, factorization).unwrap().change_ring(
+                    GRX,
+                    GR.lifted_hom(Fq, ZnReductionMap::new(Fq.base_ring(), GR.base_ring()).unwrap())
+                        .unwrap(),
+                ),
+            );
+        }
+        return Self {
+            gen_poly_lift,
+            power_factor_lifters: lifters,
+        };
+    }
+
+    #[instrument(skip_all, level = "trace")]
+    fn lift_main_factorization<P, I>(&mut self, KX: P, target: &El<P>, lift_to_degree: usize)
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing,
+        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Ring: IntegerRing,
+    {
+        let K = KX.base_ring();
+        self.gen_poly_lift.lift_genpoly_factorization(K, lift_to_degree);
+        let new_residue_rings = self.gen_poly_lift.create_residue_rings();
+        for (lifter, GRX) in self.power_factor_lifters.iter_mut().zip(new_residue_rings) {
+            let error = AtomicBool::new(false);
+            let target_mod_pe = GRX
+                .lifted_hom(KX, K_to_GR_hom(K, GRX.base_ring(), &error))
+                .map_ref(target);
+            debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
+            let hom = GRX.base_ring().base_ring().clone().into_can_hom(ZZbig).unwrap();
+            take_mut::take(lifter, |lifter| {
+                lifter.lift_to(lift_to_degree, GRX, &target_mod_pe, |old_base_ring, GR, x| {
+                    GR.from_canonical_basis(
+                        old_base_ring
+                            .wrt_canonical_basis(x)
+                            .iter()
+                            .map(|c| hom.map(old_base_ring.base_ring().smallest_lift(c))),
+                    )
+                })
+            });
+        }
+    }
+
+    fn reconstruct_main_factorization<P, I>(&self, KX: P) -> Vec<El<P>>
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing,
+        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Ring: IntegerRing,
+    {
+        let residue_rings = self
+            .power_factor_lifters
+            .iter()
+            .map(|lifter| lifter.poly_ring())
+            .collect::<Vec<_>>();
+        let reconstruct_number_field_el = ReconstructNumberFieldEl::new(KX.base_ring(), residue_rings);
+
+        let factor_count = self.power_factor_lifters[0].factorization().count();
+        let factor_degrees = self.power_factor_lifters[0]
+            .factorization()
+            .map(|f| self.power_factor_lifters[0].poly_ring().degree(f).unwrap())
+            .collect::<Vec<_>>();
+        return (0..factor_count)
+            .map(|i| {
+                KX.from_terms((0..=factor_degrees[i]).map(|j| {
+                    (
+                        reconstruct_number_field_el.reconstruct(
+                            &self
+                                .power_factor_lifters
+                                .iter()
+                                .map(|lifter| {
+                                    lifter
+                                        .poly_ring()
+                                        .coefficient_at(lifter.factorization().nth(i).unwrap(), j)
+                                        .clone()
+                                })
+                                .collect::<Vec<_>>(),
+                        ),
+                        j,
+                    )
+                }))
+            })
+            .collect::<Vec<_>>();
+    }
 }
 
 struct PolyPowerDecompositionLift {
-    gen_poly_lifter: HenselLift<DensePolyRing<ZnGB<BigIntRing>>>,
-    power_factor_lifters: Vec<HenselLift<ResidueRingPolyRing>>,
+    factorizaton_lift: NumberFieldFactorizationLift,
     exponents: Vec<usize>,
-    prime: El<BigIntRing>,
 }
 
 impl PolyPowerDecompositionLift {
@@ -269,23 +448,11 @@ impl PolyPowerDecompositionLift {
         residue_fields: ResidueFieldsAtPrime,
         power_decompositions: Vec<Vec<(El<ResidueFieldPolyRing>, usize)>>,
     ) -> Result<Self, BadPrime> {
-        let Fp = residue_fields.FqXs[0].base_ring().base_ring().clone();
-        let FpX = DensePolyRing::new(Fp, "X");
-        let Zp = ZnGB::new(ZZbig, int_cast(*Fp.modulus(), ZZbig, ZZi64));
-        let ZpX = DensePolyRing::new(Zp.clone(), "X");
-        let hom = ZnReductionMap::new(&Fp, &Zp).unwrap();
-        let gen_poly_factorization = residue_fields
-            .FqXs
-            .iter()
-            .map(|FqX| FqX.base_ring().generating_poly(&FpX, FpX.base_ring().identity()))
-            .collect::<Vec<_>>();
-        let gen_poly_lifter = HenselLift::new(FpX, gen_poly_factorization).unwrap();
         let mut exponents = None;
-        let mut lifters = Vec::new();
-        for (mut power_decomposition, FqX) in power_decompositions.into_iter().zip(residue_fields.FqXs) {
-            let Fq = FqX.base_ring().clone();
-            power_decomposition.sort_unstable_by_key(|(_, e)| *e);
-            let expected_exponents = power_decomposition.iter().map(|(_, e)| *e).collect::<Vec<_>>();
+        let mut factorizations = Vec::new();
+        for (mut power_decomp, FqX) in power_decompositions.into_iter().zip(&residue_fields.FqXs) {
+            power_decomp.sort_unstable_by_key(|(_, e)| *e);
+            let expected_exponents = power_decomp.iter().map(|(_, e)| *e).collect::<Vec<_>>();
             if let Some(exponents) = &exponents {
                 if &expected_exponents != exponents {
                     return Err(BadPrime);
@@ -293,30 +460,11 @@ impl PolyPowerDecompositionLift {
             } else {
                 exponents = Some(expected_exponents);
             }
-            let factors = power_decomposition
-                .into_iter()
-                .map(|(f, i)| FqX.pow(f, i))
-                .collect::<Vec<_>>();
-            let modulus = Fq.generating_poly(&ZpX, &hom);
-            let GR = FreeAlgebraImpl::new(
-                Zp.clone(),
-                Fq.rank(),
-                (0..Fq.rank())
-                    .map(|i| Zp.negate(ZpX.coefficient_at(&modulus, i).clone()))
-                    .collect::<Vec<_>>(),
-            );
-            let GRX = DensePolyRing::new(GR.clone(), "X");
-            lifters.push(
-                HenselLift::new(FqX, factors)
-                    .unwrap()
-                    .change_ring(GRX, GR.lifted_hom(Fq, &hom).unwrap()),
-            );
+            factorizations.push(power_decomp.into_iter().map(|(f, i)| FqX.pow(f, i)).collect());
         }
         return Ok(Self {
             exponents: exponents.unwrap(),
-            gen_poly_lifter: gen_poly_lifter.change_ring(ZpX, hom),
-            power_factor_lifters: lifters,
-            prime: Zp.modulus().clone(),
+            factorizaton_lift: NumberFieldFactorizationLift::new(residue_fields, factorizations),
         });
     }
 
@@ -335,90 +483,12 @@ impl PolyPowerDecompositionLift {
         I: RingStore,
         I::Ring: IntegerRing,
     {
-        let Zpe = ZnGB::new(ZZbig, ZZbig.pow(self.prime.clone(), lift_to_degree));
-        let ZpeX = DensePolyRing::new(Zpe.clone(), "X");
-        let K = KX.base_ring();
-        let QQ = K.base_ring();
-        let error = AtomicBool::new(false);
-        {
-            let lifter = &mut self.gen_poly_lifter;
-            let target_mod_pe = K.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, &Zpe, &error));
-            let mod_pe = Zpe.can_hom(&ZZbig).unwrap();
-            take_mut::take(lifter, |lifter| {
-                lifter.lift_to(lift_to_degree, ZpeX.clone(), &target_mod_pe, |old_base_ring, _, x| {
-                    mod_pe.map(old_base_ring.smallest_lift(x.clone()))
-                })
-            });
-        }
-        for (lifter, modulus) in self
-            .power_factor_lifters
-            .iter_mut()
-            .zip(self.gen_poly_lifter.factorization())
-        {
-            let old_ring = lifter.poly_ring();
-            let old_base_ring = old_ring.base_ring();
-            let GR = FreeAlgebraImpl::new(
-                Zpe.clone(),
-                old_base_ring.rank(),
-                (0..old_base_ring.rank())
-                    .map(|i| Zpe.negate(ZpeX.coefficient_at(modulus, i).clone()))
-                    .collect(),
-            );
-            let GRX = DensePolyRing::new(GR, "X");
-            let target_mod_pe = GRX
-                .lifted_hom(KX, K_to_GR_hom(K, GRX.base_ring(), &error))
-                .map_ref(target);
-            let hom = GRX.base_ring().base_ring().clone().into_can_hom(ZZbig).unwrap();
-            take_mut::take(lifter, |lifter| {
-                lifter.lift_to(lift_to_degree, GRX, &target_mod_pe, |old_base_ring, GR, x| {
-                    GR.from_canonical_basis(
-                        old_base_ring
-                            .wrt_canonical_basis(x)
-                            .iter()
-                            .map(|c| hom.map(old_base_ring.base_ring().smallest_lift(c))),
-                    )
-                })
-            });
-        }
-        debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
-
-        let residue_rings = self
-            .power_factor_lifters
-            .iter()
-            .map(|lifter| lifter.poly_ring())
-            .collect::<Vec<_>>();
-        let factor_count = self.power_factor_lifters[0].factorization().count();
-        let factor_degrees = self.power_factor_lifters[0]
-            .factorization()
-            .map(|f| self.power_factor_lifters[0].poly_ring().degree(f).unwrap())
-            .collect::<Vec<_>>();
-        let lifted_factorization = (0..factor_count)
-            .map(|i| {
-                KX.from_terms((0..=factor_degrees[i]).map(|j| {
-                    (
-                        reconstruct_number_field_el(
-                            KX.base_ring(),
-                            &residue_rings,
-                            &self
-                                .power_factor_lifters
-                                .iter()
-                                .map(|lifter| {
-                                    lifter
-                                        .poly_ring()
-                                        .coefficient_at(lifter.factorization().nth(i).unwrap(), j)
-                                        .clone()
-                                })
-                                .collect::<Vec<_>>(),
-                        ),
-                        j,
-                    )
-                }))
-            })
-            .collect::<Vec<_>>();
-
-        assert_eq!(self.exponents.len(), lifted_factorization.len());
-        if KX.eq_el(&KX.prod(lifted_factorization.iter().cloned()), target) {
-            return lifted_factorization
+        self.factorizaton_lift
+            .lift_main_factorization(KX, target, lift_to_degree);
+        let reconstructed_factorization = self.factorizaton_lift.reconstruct_main_factorization(KX);
+        assert_eq!(self.exponents.len(), reconstructed_factorization.len());
+        if KX.eq_el(&KX.prod(reconstructed_factorization.iter().cloned()), target) {
+            return reconstructed_factorization
                 .into_iter()
                 .zip(self.exponents.iter())
                 .map(|(f, i)| poly_root(KX, &f, *i).map(|f| (f, *i)).ok_or(LiftUnsuccessful))
@@ -447,8 +517,23 @@ where
 
     let power_decompositions_modulo_p = large_prime_fields()
         .filter_map(|Fp| {
-            let residue_fields = quotient_at(K, Fp).ok()?;
-            let poly_mod_p = poly_in_quotients(KX, &poly, &residue_fields).ok()?;
+            let residue_fields = ResidueFieldsAtPrime::new(K, Fp).ok()?;
+            let poly_mod_p = residue_fields
+                .FqXs
+                .iter()
+                .map(|FqX| {
+                    let error = AtomicBool::new(false);
+                    let result = FqX
+                        .lifted_hom(KX, K_to_GR_hom(K, FqX.base_ring(), &error))
+                        .map_ref(&poly);
+                    if error.load(std::sync::atomic::Ordering::Relaxed) {
+                        Err(())
+                    } else {
+                        Ok(result)
+                    }
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .ok()?;
             let power_decompositions = poly_mod_p
                 .into_iter()
                 .zip(&residue_fields.FqXs)

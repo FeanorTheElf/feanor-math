@@ -12,7 +12,7 @@ pub struct NotSquarefree;
 #[stability::unstable(feature = "enable")]
 pub enum NotLiftable {
     NotSquarefree,
-    BadPrime
+    BadPrime,
 }
 
 #[stability::unstable(feature = "enable")]
