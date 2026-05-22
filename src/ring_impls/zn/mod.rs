@@ -115,16 +115,10 @@ pub mod generic_impls {
         S: 'a + RingStore,
         S::Ring: ZnRing + CanHomFrom<BigIntRingBase>,
     {
-        const LOG2_NTT_THRESHOLD: usize = 4;
-        if max_len.is_none() || max_len.unwrap() >= (1 << LOG2_NTT_THRESHOLD) {
-            return Arc::new(TypeErasedConvolution::new(
-                RNSConvolutionZn::from(RNSConvolution::new()),
-            ));
-        }
-        return Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(
+        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(
             log2_karatsuba_threshold,
             Global,
-        )));
+        )))
     }
 
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very

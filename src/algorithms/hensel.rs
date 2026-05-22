@@ -5,7 +5,7 @@ use std::sync::Arc;
 use tracing::instrument;
 
 use crate::algorithms::convolution::ntt::NTTConvolution;
-use crate::algorithms::convolution::{DynConvolution, TypeErasedConvolution};
+use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution};
 use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::homomorphism::*;
 use crate::prelude::*;
