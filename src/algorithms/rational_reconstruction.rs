@@ -39,7 +39,7 @@ where
     // at the beginning, `|v[1]| >> |v[0]|` (and similar for `u`), thus we estimate
     // the size reduction coefficient `round(<u, v>/<u, u>)` by `round(v[1]/u[1])`,
     // until `|v[0]| ~ |v[1]|`; note also that always `|v[1]| < |u[1]|`
-    while ZZ.abs_cmp(&v[1], &v[0]) == Ordering::Greater {
+    while ZZ.abs_cmp(&v[1], &v[0]) == Ordering::Greater && !ZZ.is_zero(&u[1]) {
         let (q, r) = ZZ.euclidean_div_rem(v[1].clone(), &u[1]);
         v[1] = r;
         ZZ.sub_assign(&mut v[0], ZZ.mul_ref_fst(&u[0], q));

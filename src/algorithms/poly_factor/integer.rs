@@ -437,7 +437,12 @@ fn test_poly_factor_integer() {
 
 #[test]
 fn random_test_poly_factor_integer() {
-    feanor_tracing::DelayedLogger::init_test();
+    // feanor_tracing::DelayedLogger::init_test();
+
+    let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+    let filtered_chrome_layer = tracing_subscriber::Layer::with_filter(chrome_layer, tracing_subscriber::filter::filter_fn(|_metadata| true));
+    tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt::with(tracing_subscriber::registry(), filtered_chrome_layer));
+
     let ring = ZZbig;
     let poly_ring = DensePolyRing::new(ring, "X");
     let mut rng = oorandom::Rand64::new(0);
