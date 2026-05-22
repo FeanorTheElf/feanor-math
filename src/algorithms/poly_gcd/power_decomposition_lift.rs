@@ -7,6 +7,8 @@ use crate::ring_impls::poly::*;
 const FRACTION_TO_ATTEMPT_LIFT: f64 = 0.51;
 const RAMP_UP_LIFT_TO: f64 = 4.0;
 
+/// The polynomial behaves badly modulo the current prime. One example is that the prime splits into
+/// multiple prime ideals and the power decomposition looks different modulo different prime ideals.
 #[stability::unstable(feature = "enable")]
 #[derive(Debug)]
 pub struct BadPrime;
@@ -72,8 +74,19 @@ impl PartialEq for PolyPowerDecompositionSignature {
 /// High-level approach of deriving the power decomposition of a polynomial by
 /// computing it in quotients, and trying to lift the result.
 ///
-/// Parameters of this function are analogeous to
-/// [`crate::algorithms::poly_gcd::gcd_lift::poly_gcd_from_quotients()`].
+/// This function doesn't handle any arithmetic, but encodes the
+/// high-level strategy:
+///  - The iterator yields `(signature(power_decomposition(poly mod p)), state_of(p))` for various
+///    different prime ideals p.
+///  - If the results seem to indicate that some of the power decompositions in the quotient
+///    actually represent the global power decomposition, `start_lift` is called for the state
+///    associated to a suitable prime `p`.
+///  - afterwards, `proceed_with_lift(state_of(p), e)` is called, and should attempt to lift the
+///    gcd-factorization to `R/p^e`; if that gives rise to a global power decomposition, it returns
+///    "success", otherwise it returns "lift unsucessful".
+///  - `proceed_with_lift` may later be called on the same state for larger values of `e`, if this
+///    is deemed sensible, so it can be advantageous to store the current lift and continue from
+///    there.
 #[stability::unstable(feature = "enable")]
 pub fn poly_power_decomposition_from_quotients<I, F_start, F_proc, State, OngoingLift, R>(
     gcd_in_quotients: I,

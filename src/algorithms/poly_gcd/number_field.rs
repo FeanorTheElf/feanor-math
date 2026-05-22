@@ -1,16 +1,17 @@
+use std::mem::swap;
 use std::sync::atomic::AtomicBool;
 
 use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
-use crate::algorithms::hensel::HenselLift;
+use crate::algorithms::hensel::{FactorsNotCoprimeError, HenselLift};
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::poly_factor::FactorPolyField;
-use crate::algorithms::poly_gcd::gcd_lift::LiftUnsuccessful;
+use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::power_decomposition_lift::*;
 use crate::algorithms::poly_gcd::*;
 use crate::algorithms::poly_root::poly_root;
-use crate::algorithms::primelist::large_prime_fields;
+use crate::algorithms::primelist::*;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::homomorphism::{CanHomFrom, LambdaHom};
 use crate::ring_impls::as_field::*;
@@ -24,6 +25,9 @@ use crate::ring_impls::zn::zn_big::ZnGB;
 use crate::ring_impls::zn::*;
 use crate::seq::{VectorFn, VectorView};
 
+const HOPE_FOR_SQUAREFREE_ATTEMPTS: usize = 1;
+const BEST_EFFORT_SQUAREFREE_CHECKS: usize = 3;
+
 #[derive(Debug, Copy, Clone)]
 enum QuotientAtError {
     Ramified,
@@ -34,6 +38,19 @@ type ResidueField = GaloisField<AsField<FreeAlgebraImpl<AsField<Zn64B>, Vec<El<A
 type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
 type ResidueRing = FreeAlgebraImpl<ZnGB<BigIntRing>, Vec<El<ZnGB<BigIntRing>>>>;
 type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
+
+fn check_error<F, R>(f: F) -> Result<R, ()>
+where
+    F: FnOnce(&AtomicBool) -> R,
+{
+    let error = AtomicBool::new(false);
+    let result = f(&error);
+    if error.load(std::sync::atomic::Ordering::Relaxed) {
+        return Err(());
+    } else {
+        return Ok(result);
+    }
+}
 
 fn QQ_to_Zpe_hom<'a, R, I, F>(
     QQ: R,
@@ -125,13 +142,14 @@ where
             &unit_vectors[0],
             residue_rings[0].base_ring().generating_poly(&ZpeX, Zpe.identity()),
         );
-        let error = AtomicBool::new(false);
-        debug_assert_el_eq!(
-            &ZpeX,
-            &complete_product,
-            &number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, Zpe, &error))
-        );
-        debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
+        check_error(|error| {
+            debug_assert_el_eq!(
+                &ZpeX,
+                &complete_product,
+                &number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, Zpe, &error))
+            )
+        })
+        .unwrap();
         for (i, GRX) in residue_rings.iter().enumerate() {
             let inv_normalization_factor = ZpeX.evaluate(
                 unit_vectors.at(i),
@@ -212,11 +230,8 @@ impl ResidueFieldsAtPrime {
         let QQ = number_field.base_ring();
         let FpX = DensePolyRing::new(Fp, "X");
         let Fp = FpX.base_ring();
-        let error = AtomicBool::new(false);
-        let generating_poly = number_field.generating_poly(&FpX, QQ_to_Zpe_hom(QQ, Fp, &error));
-        if error.load(std::sync::atomic::Ordering::Relaxed) {
-            return Err(QuotientAtError::ReductionNotWellDefined);
-        }
+        let generating_poly = check_error(|error| number_field.generating_poly(&FpX, QQ_to_Zpe_hom(QQ, Fp, &error)))
+            .map_err(|_| QuotientAtError::ReductionNotWellDefined)?;
 
         let generating_poly_factorization = FactorPolyField::factor_poly(&FpX, &generating_poly).0;
         if generating_poly_factorization.iter().any(|(_, e)| *e > 1) {
@@ -277,9 +292,8 @@ impl ResidueRingsAtPrimePower {
         let Zpe = ZnGB::new(ZZbig, ZZbig.pow(self.prime.clone(), lift_to_degree));
         let ZpeX = DensePolyRing::new(Zpe.clone(), "X");
 
-        let error = AtomicBool::new(false);
-        let target_mod_pe = number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, &Zpe, &error));
-        debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
+        let target_mod_pe =
+            check_error(|error| number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, &Zpe, &error))).unwrap();
 
         take_mut::take(&mut self.lifter, |lifter| {
             lifter.lift_to(lift_to_degree, ZpeX, &target_mod_pe, |old_base_ring, Zpe, x| {
@@ -317,27 +331,35 @@ struct NumberFieldFactorizationLift {
 
 impl NumberFieldFactorizationLift {
     #[instrument(skip_all, level = "trace")]
-    fn new(residue_fields: ResidueFieldsAtPrime, factorizations: Vec<Vec<El<ResidueFieldPolyRing>>>) -> Self {
+    fn new(
+        residue_fields: &ResidueFieldsAtPrime,
+        factorizations: Vec<Vec<El<ResidueFieldPolyRing>>>,
+    ) -> Result<Self, FactorsNotCoprimeError> {
         assert_eq!(residue_fields.FqXs.len(), factorizations.len());
         let mut lifters = Vec::new();
-        let gen_poly_lift = ResidueRingsAtPrimePower::new(&residue_fields);
+        for (factorization, FqX) in factorizations.into_iter().zip(&residue_fields.FqXs) {
+            lifters.push(HenselLift::new(FqX, factorization)?);
+        }
+        let gen_poly_lift = ResidueRingsAtPrimePower::new(residue_fields);
         let residue_rings = gen_poly_lift.create_residue_rings();
         debug_assert_eq!(residue_fields.FqXs.len(), residue_rings.len());
-        for ((factorization, FqX), GRX) in factorizations.into_iter().zip(residue_fields.FqXs).zip(residue_rings) {
-            let Fq = FqX.base_ring();
-            let GR = GRX.base_ring().clone();
-            lifters.push(
-                HenselLift::new(&FqX, factorization).unwrap().change_ring(
+        let lifters = lifters
+            .into_iter()
+            .zip(residue_fields.FqXs.iter().zip(residue_rings))
+            .map(|(lifter, (FqX, GRX))| {
+                let Fq = FqX.base_ring();
+                let GR = GRX.base_ring().clone();
+                lifter.change_ring(
                     GRX,
                     GR.lifted_hom(Fq, ZnReductionMap::new(Fq.base_ring(), GR.base_ring()).unwrap())
                         .unwrap(),
-                ),
-            );
-        }
-        return Self {
+                )
+            })
+            .collect::<Vec<_>>();
+        return Ok(Self {
             gen_poly_lift,
             power_factor_lifters: lifters,
-        };
+        });
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -354,11 +376,11 @@ impl NumberFieldFactorizationLift {
         self.gen_poly_lift.lift_genpoly_factorization(K, lift_to_degree);
         let new_residue_rings = self.gen_poly_lift.create_residue_rings();
         for (lifter, GRX) in self.power_factor_lifters.iter_mut().zip(new_residue_rings) {
-            let error = AtomicBool::new(false);
-            let target_mod_pe = GRX
-                .lifted_hom(KX, K_to_GR_hom(K, GRX.base_ring(), &error))
-                .map_ref(target);
-            debug_assert!(!error.load(std::sync::atomic::Ordering::Relaxed));
+            let target_mod_pe = check_error(|error| {
+                GRX.lifted_hom(KX, K_to_GR_hom(K, GRX.base_ring(), &error))
+                    .map_ref(target)
+            })
+            .unwrap();
             let hom = GRX.base_ring().base_ring().clone().into_can_hom(ZZbig).unwrap();
             take_mut::take(lifter, |lifter| {
                 lifter.lift_to(lift_to_degree, GRX, &target_mod_pe, |old_base_ring, GR, x| {
@@ -418,6 +440,198 @@ impl NumberFieldFactorizationLift {
     }
 }
 
+struct PolyGCDFactorizationLift {
+    factorization_lift: NumberFieldFactorizationLift,
+    is_lhs: bool,
+}
+
+impl PolyGCDFactorizationLift {
+    #[instrument(skip_all, level = "trace")]
+    fn new(
+        residue_fields: ResidueFieldsAtPrime,
+        lhs: &[El<ResidueFieldPolyRing>],
+        rhs: &[El<ResidueFieldPolyRing>],
+        gcd: Vec<El<ResidueFieldPolyRing>>,
+    ) -> Result<Self, NotLiftable> {
+        let mut factorizations = Vec::new();
+        let mut gcd_deg = None;
+        for ((lhs, gcd), FqX) in lhs.into_iter().zip(gcd.iter().cloned()).zip(&residue_fields.FqXs) {
+            if let Some(gcd_deg) = gcd_deg {
+                if FqX.degree(&gcd).unwrap() != gcd_deg {
+                    return Err(NotLiftable::BadPrime);
+                }
+            } else {
+                gcd_deg = Some(FqX.degree(&gcd).unwrap());
+            }
+            factorizations.push(vec![FqX.checked_div(&lhs, &gcd).unwrap(), gcd]);
+        }
+        if let Ok(factorization_lift) = NumberFieldFactorizationLift::new(&residue_fields, factorizations) {
+            return Ok(Self {
+                is_lhs: true,
+                factorization_lift,
+            });
+        }
+        let mut factorizations = Vec::new();
+        for ((rhs, gcd), FqX) in rhs.into_iter().zip(gcd.iter().cloned()).zip(&residue_fields.FqXs) {
+            factorizations.push(vec![FqX.checked_div(&rhs, &gcd).unwrap(), gcd]);
+        }
+        return Ok(Self {
+            is_lhs: true,
+            factorization_lift: NumberFieldFactorizationLift::new(&residue_fields, factorizations)
+                .map_err(|_| NotLiftable::NotSquarefree)?,
+        });
+    }
+
+    #[instrument(skip_all, level = "trace")]
+    fn lift_gcd_factorization<P, I>(
+        &mut self,
+        KX: P,
+        lhs: &El<P>,
+        rhs: &El<P>,
+        lift_to_degree: usize,
+    ) -> Result<El<P>, LiftUnsuccessful>
+    where
+        P: RingStore + Copy,
+        P::Ring: PolyRing + DivisibilityRing,
+        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
+        I: RingStore,
+        I::Ring: IntegerRing,
+    {
+        let target = if self.is_lhs { lhs } else { rhs };
+        self.factorization_lift
+            .lift_main_factorization(KX, target, lift_to_degree);
+        let [target_over_gcd, gcd] = self
+            .factorization_lift
+            .reconstruct_main_factorization(KX)
+            .try_into()
+            .ok()
+            .unwrap();
+        if KX.eq_el(&KX.mul_ref(&target_over_gcd, &gcd), target) {
+            if (self.is_lhs && KX.divides(rhs, &gcd)) || (!self.is_lhs && KX.divides(lhs, &gcd)) {
+                return Ok(gcd);
+            } else {
+                return Err(LiftUnsuccessful);
+            }
+        } else {
+            return Err(LiftUnsuccessful);
+        }
+    }
+}
+
+/// Tries to compute the gcd of monic polynomials `f, g in Z[X]`.
+///
+/// This will fail if `lhs/d, d` and `rhs/d, d` are both not pairwise coprime, where `d = gcd(lhs,
+/// rhs)`. It can, in theory, also fail in other settings, but the probability is very low for
+/// larger values of `attempts`.
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn poly_gcd_number_field_squarefree<P, I>(KX: P, lhs: &El<P>, rhs: &El<P>, attempts: usize) -> PolyGCDResult<El<P>>
+where
+    P: RingStore + Copy,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRingBase<P>: Field + FreeAlgebra,
+    BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
+    I: RingStore,
+    I::Ring: IntegerRing,
+{
+    if KX.is_zero(lhs) {
+        return PolyGCDResult::FoundGCD(rhs.clone());
+    } else if KX.is_zero(rhs) {
+        return PolyGCDResult::FoundGCD(lhs.clone());
+    }
+    let K = KX.base_ring();
+
+    let gcds_modulo_p = large_prime_fields()
+        .filter_map(|Fp| {
+            let residue_fields = ResidueFieldsAtPrime::new(K, Fp).ok()?;
+            let poly_mod_p = |poly| {
+                residue_fields
+                    .FqXs
+                    .iter()
+                    .map(|FqX| {
+                        check_error(|error| {
+                            FqX.lifted_hom(KX, K_to_GR_hom(K, FqX.base_ring(), &error))
+                                .map_ref(poly)
+                        })
+                    })
+                    .collect::<Result<Vec<_>, _>>()
+            };
+            let lhs_mod_p = poly_mod_p(lhs).ok()?;
+            let rhs_mod_p = poly_mod_p(rhs).ok()?;
+            let gcd = lhs_mod_p
+                .iter()
+                .zip(rhs_mod_p.iter())
+                .zip(&residue_fields.FqXs)
+                .map(|((l, r), FqX)| PolyTFracGCDRing::gcd(FqX, l, r))
+                .collect::<Vec<_>>();
+            let gcd_deg = gcd
+                .iter()
+                .zip(&residue_fields.FqXs)
+                .map(|(gcd, FqX)| FqX.degree(gcd).unwrap())
+                .min()
+                .unwrap();
+            return Some((
+                PolyGCDSignature::new(gcd_deg),
+                (residue_fields, lhs_mod_p, rhs_mod_p, gcd),
+            ));
+        })
+        .take(attempts);
+    poly_gcd_from_quotients(
+        gcds_modulo_p,
+        |(residue_fields, lhs, rhs, gcd)| PolyGCDFactorizationLift::new(residue_fields, &lhs, &rhs, gcd),
+        |gcd_factorization_lift, lift_to_degree| {
+            gcd_factorization_lift.lift_gcd_factorization(KX, lhs, rhs, lift_to_degree)
+        },
+    )
+}
+
+/// Computes the gcd of monic polynomials `f, g in K[X]` over a number field `K`.
+///
+/// Use this when implementing [`PolyTFracGCDRing`] for number fields; Otherwise, compute power
+/// decompositions through [`PolyTFracGCDRing::gcd()`].
+///
+/// [`PolyTFracGCDRing`]: crate::algorithms::poly_gcd::PolyTFracGCDRing
+/// [`PolyTFracGCDRing::gcd()`]: crate::algorithms::poly_gcd::PolyTFracGCDRing::gcd()
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn poly_gcd_number_field<P, I>(KX: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
+where
+    P: RingStore + Copy,
+    P::Ring: PolyRing + DivisibilityRing,
+    BaseRingBase<P>: Field + FreeAlgebra,
+    BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
+    I: RingStore,
+    I::Ring: IntegerRing,
+{
+    let mut lhs = KX.normalize(lhs.clone()).0;
+    let mut rhs = KX.normalize(rhs.clone()).0;
+    match poly_gcd_number_field_squarefree(KX, &lhs, &rhs, HOPE_FOR_SQUAREFREE_ATTEMPTS) {
+        PolyGCDResult::TrivialGCD => return KX.one(),
+        PolyGCDResult::FoundGCD(res) => return res,
+        _ => {}
+    }
+
+    if KX.degree(&lhs).unwrap() > KX.degree(&rhs).unwrap() {
+        swap(&mut lhs, &mut rhs);
+    }
+    let lhs_power_decomposition = poly_power_decomposition_number_field(KX, &lhs);
+    let mut result = KX.one();
+    for (fi, i) in &lhs_power_decomposition {
+        for _ in 0..*i {
+            match poly_gcd_number_field_squarefree(KX, &fi, &rhs, PROBABILISTIC_REPETITIONS) {
+                PolyGCDResult::TrivialGCD => break,
+                PolyGCDResult::FoundGCD(gcd_i) => {
+                    rhs = KX.checked_div(&rhs, &gcd_i).unwrap();
+                    KX.mul_assign(&mut result, gcd_i);
+                }
+                _ => unreachable!(),
+            }
+        }
+    }
+    return result;
+}
+
 struct PolyPowerDecompositionLift {
     factorizaton_lift: NumberFieldFactorizationLift,
     exponents: Vec<usize>,
@@ -445,7 +659,7 @@ impl PolyPowerDecompositionLift {
         }
         return Ok(Self {
             exponents: exponents.unwrap(),
-            factorizaton_lift: NumberFieldFactorizationLift::new(residue_fields, factorizations),
+            factorizaton_lift: NumberFieldFactorizationLift::new(&residue_fields, factorizations).unwrap(),
         });
     }
 
@@ -509,15 +723,10 @@ where
                 .FqXs
                 .iter()
                 .map(|FqX| {
-                    let error = AtomicBool::new(false);
-                    let result = FqX
-                        .lifted_hom(KX, K_to_GR_hom(K, FqX.base_ring(), &error))
-                        .map_ref(&poly);
-                    if error.load(std::sync::atomic::Ordering::Relaxed) {
-                        Err(())
-                    } else {
-                        Ok(result)
-                    }
+                    check_error(|error| {
+                        FqX.lifted_hom(KX, K_to_GR_hom(K, FqX.base_ring(), &error))
+                            .map_ref(&poly)
+                    })
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .ok()?;
@@ -550,14 +759,19 @@ use crate::ring_impls::extension::number_field::*;
 #[cfg(test)]
 use crate::wrapper::RingElementWrapper;
 
+#[cfg(test)]
+fn test_field() -> NumberField<AsField<FreeAlgebraImpl<RationalField<BigIntRing>, [El<RationalField<BigIntRing>>; 1]>>> {
+    let QQ = RationalField::new(ZZbig);
+    NumberField::from(NumberFieldBase::create(AsField::from(
+        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(QQ, 4, [QQ.one()])).unwrap(),
+    )))
+}
+
 #[test]
 fn test_poly_power_decomposition_number_field() {
     feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZbig);
-    let ring = NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(&QQ, 4, [QQ.one()])).unwrap(),
-    )));
-    let poly_ring = DensePolyRing::new(ring, "X");
+    let field = test_field();
+    let poly_ring = DensePolyRing::new(field, "X");
     let zeta = RingElementWrapper::new(
         &poly_ring,
         poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
@@ -614,12 +828,8 @@ fn test_poly_power_decomposition_number_field() {
 #[test]
 fn random_test_poly_power_decomposition_number_field() {
     feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZbig);
-    let ring = NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(&QQ, 4, [QQ.one()])).unwrap(),
-    )));
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let ring = poly_ring.base_ring();
+    let field = test_field();
+    let poly_ring = DensePolyRing::new(field, "X");
     let mut rng = oorandom::Rand64::new(1);
     let bound = ZZbig.int_hom().map(500);
     let mut random_poly_of_deg = |deg: usize| {
@@ -668,5 +878,107 @@ fn random_test_poly_power_decomposition_number_field() {
                 &make_primitive(&poly_ring, &g).0
             )
         );
+    }
+}
+
+#[test]
+fn test_poly_gcd_number_field() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = test_field();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let zeta = RingElementWrapper::new(
+        &poly_ring,
+        poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
+    );
+    let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
+        [
+            X - &zeta,
+            X + &zeta,
+            X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
+            &zeta * X.pow_ref(3) - X + 1,
+        ]
+    });
+    let poly = |powers: [usize; 4]| {
+        poly_ring.prod(
+            powers
+                .iter()
+                .zip(irred_polys.iter())
+                .map(|(e, f)| poly_ring.pow(f.clone(), *e)),
+        )
+    };
+
+    assert_el_eq!(
+        &poly_ring,
+        poly_ring.normalize(poly([1, 0, 0, 0])).0,
+        poly_gcd_number_field(&poly_ring, &poly([1, 0, 1, 0]), &poly([1, 0, 0, 1]))
+    );
+    assert_el_eq!(
+        &poly_ring,
+        poly_ring.normalize(poly([1, 0, 1, 0])).0,
+        poly_gcd_number_field(&poly_ring, &poly([1, 1, 1, 0]), &poly([1, 0, 1, 1]))
+    );
+    assert_el_eq!(
+        &poly_ring,
+        poly_ring.normalize(poly([1, 0, 2, 0])).0,
+        poly_gcd_number_field(&poly_ring, &poly([1, 1, 3, 0]), &poly([3, 0, 2, 0]))
+    );
+    assert_el_eq!(
+        &poly_ring,
+        poly_ring.normalize(poly([1, 0, 0, 5])).0,
+        poly_gcd_number_field(&poly_ring, &poly([2, 1, 3, 5]), &poly([1, 0, 0, 7]))
+    );
+}
+
+#[test]
+fn test_poly_power_decomposition_number_field_degenerate_reduction() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = test_field();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let ring = poly_ring.base_ring();
+    let f = poly_ring.from_terms([
+        (
+            ring.inclusion()
+                .compose(QQ.inclusion())
+                .map(ZZbig.prod(LARGE_PRIMES[..6].iter().map(|x| int_cast(*x, ZZbig, ZZi64)))),
+            2,
+        ),
+        (ring.one(), 0),
+    ]);
+    let power_decomposition = poly_power_decomposition_number_field(&poly_ring, &f);
+    assert_eq!(1, power_decomposition.len());
+    assert_el_eq!(&poly_ring, poly_ring.normalize(f).0, power_decomposition[0].0);
+}
+
+#[test]
+fn random_test_poly_gcd_number_field() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = test_field();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let ring = poly_ring.base_ring();
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = ZZbig.int_hom().map(500);
+    let mut random_poly_of_deg = |deg: usize| {
+        poly_ring.from_terms((0..=deg).map(|i| {
+            (
+                ring.from_canonical_basis((0..ring.rank()).map(|_| {
+                    QQ.inclusion()
+                        .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
+                })),
+                i,
+            )
+        }))
+    };
+
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let f = random_poly_of_deg(14);
+        let g = random_poly_of_deg(12);
+        let h = random_poly_of_deg(10);
+        let lhs = poly_ring.mul_ref(&f, &h);
+        let rhs = poly_ring.mul_ref(&g, &h);
+        let gcd = make_primitive(&poly_ring, &poly_gcd_number_field(&poly_ring, &lhs, &rhs)).0;
+
+        assert!(poly_ring.divides(&lhs, &gcd));
+        assert!(poly_ring.divides(&rhs, &gcd));
+        assert!(poly_ring.divides(&gcd, &make_primitive(&poly_ring, &h).0));
     }
 }

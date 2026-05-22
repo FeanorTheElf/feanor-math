@@ -115,9 +115,7 @@ where
         let rhs = ZZX_to_FpX.map_ref(rhs);
         let gcd = PolyTFracGCDRing::gcd(&FpX, &lhs, &rhs);
         return (
-            PolyGCDSignature {
-                gcd_deg: FpX.degree(&gcd).unwrap(),
-            },
+            PolyGCDSignature::new(FpX.degree(&gcd).unwrap()),
             (FpX, lhs, rhs, gcd),
         );
     });
@@ -401,6 +399,61 @@ fn test_poly_power_decomposition_integer() {
 }
 
 #[test]
+fn random_test_poly_power_decomposition_integer() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZZbig;
+    let poly_ring = DensePolyRing::new(ring, "X");
+    let mut rng = oorandom::Rand64::new(1);
+    let bound = ring.int_hom().map(500);
+    let mut random_poly_of_deg =
+        |deg: usize| poly_ring.from_terms((0..=deg).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let f = random_poly_of_deg(5);
+        let g = random_poly_of_deg(3);
+        let h = random_poly_of_deg(2);
+        let poly = make_primitive(
+            &poly_ring,
+            &poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone())),
+        )
+        .0;
+
+        let mut power_decomp = poly_power_decomposition_integer(&poly_ring, &poly);
+        for (f, _k) in &mut power_decomp {
+            *f = make_primitive(&poly_ring, &f).0;
+        }
+
+        assert_el_eq!(
+            &poly_ring,
+            &poly,
+            poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly.clone(), *k)))
+        );
+        assert!(
+            poly_ring.divides(
+                &poly_ring.prod(
+                    power_decomp
+                        .iter()
+                        .filter(|(_, k)| k % 3 == 0)
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
+                ),
+                &make_primitive(&poly_ring, &h).0
+            )
+        );
+        assert!(
+            poly_ring.divides(
+                &poly_ring.prod(
+                    power_decomp
+                        .iter()
+                        .filter(|(_, k)| k % 2 == 0)
+                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
+                ),
+                &make_primitive(&poly_ring, &g).0
+            )
+        );
+    }
+}
+
+#[test]
 fn test_poly_gcd_integer() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZbig;
@@ -463,60 +516,5 @@ fn random_test_poly_gcd_integer() {
         assert!(poly_ring.divides(&lhs, &gcd));
         assert!(poly_ring.divides(&rhs, &gcd));
         assert!(poly_ring.divides(&gcd, &make_primitive(&poly_ring, &h).0));
-    }
-}
-
-#[test]
-fn random_test_poly_power_decomposition_integer() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZbig;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let mut rng = oorandom::Rand64::new(1);
-    let bound = ring.int_hom().map(500);
-    let mut random_poly_of_deg =
-        |deg: usize| poly_ring.from_terms((0..=deg).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = random_poly_of_deg(5);
-        let g = random_poly_of_deg(3);
-        let h = random_poly_of_deg(2);
-        let poly = make_primitive(
-            &poly_ring,
-            &poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone())),
-        )
-        .0;
-
-        let mut power_decomp = poly_power_decomposition_integer(&poly_ring, &poly);
-        for (f, _k) in &mut power_decomp {
-            *f = make_primitive(&poly_ring, &f).0;
-        }
-
-        assert_el_eq!(
-            &poly_ring,
-            &poly,
-            poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly.clone(), *k)))
-        );
-        assert!(
-            poly_ring.divides(
-                &poly_ring.prod(
-                    power_decomp
-                        .iter()
-                        .filter(|(_, k)| k % 3 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
-                ),
-                &make_primitive(&poly_ring, &h).0
-            )
-        );
-        assert!(
-            poly_ring.divides(
-                &poly_ring.prod(
-                    power_decomp
-                        .iter()
-                        .filter(|(_, k)| k % 2 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
-                ),
-                &make_primitive(&poly_ring, &g).0
-            )
-        );
     }
 }
