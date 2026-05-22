@@ -1,4 +1,4 @@
-use std::cmp::Ordering;
+use std::cmp::{Ordering, min};
 use std::collections::BinaryHeap;
 use std::convert::identity;
 
@@ -25,13 +25,20 @@ use crate::ring_impls::zn::{ZnReductionMap, ZnRing, ZnRingStore};
 #[stability::unstable(feature = "enable")]
 pub struct ProbablyNotSquarefree;
 
+/// Current Hensel lifting didn't yield the correct result. Since for factorizations, factors modulo
+/// `p^e` are combined until one retrieves a factor of the original polynomial, this can only happen
+/// when the the polynomial itself is not retrieved from its value modulo `p^e`, in other words if
+/// `p^e` is of similar size as some coefficients of the polynomial.
+#[stability::unstable(feature = "enable")]
+pub struct LiftUnsuccessful;
+
 #[instrument(skip_all, level = "trace")]
 fn combine_local_factors_local<P>(
     ZZX: P,
     ZpeX: &DensePolyRing<ZnGB<BigIntRing>>,
     poly: &El<P>,
     local_factors: &[&El<DensePolyRing<ZnGB<BigIntRing>>>],
-) -> Vec<El<P>>
+) -> Result<Vec<El<P>>, LiftUnsuccessful>
 where
     P: RingStore,
     P::Ring: PolyRing + DivisibilityRing,
@@ -70,12 +77,12 @@ where
         })
         .filter_map(identity)
         .next()
-        .unwrap();
+        .ok_or(LiftUnsuccessful)?;
         current = new;
         result.push(factor);
         ungrouped_factors.retain(|j| !factor_group.contains(j));
     }
-    return result;
+    return Ok(result);
 }
 
 struct PolyFactorizationLift {
@@ -102,7 +109,12 @@ impl PolyFactorizationLift {
     }
 
     #[instrument(skip_all, level = "trace")]
-    fn lift_factorization_to<P>(&mut self, poly_ring: P, target: &El<P>, lift_to_degree: usize) -> Vec<El<P>>
+    fn lift_factorization_to<P>(
+        &mut self,
+        poly_ring: P,
+        target: &El<P>,
+        lift_to_degree: usize,
+    ) -> Result<Vec<El<P>>, LiftUnsuccessful>
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
@@ -149,40 +161,61 @@ where
 pub enum PolyFactorizationResult<T> {
     /// The factorization was found
     FoundFactorization(T),
-    /// The polynomial is irreducible, thus its own factorization
-    Irreducible,
     /// The polynomial was found to be not squarefree modulo multiple prime ideals. This usually
     /// means that it it not squarefree globally.
     ProbablyNotSquarefree,
 }
 
+#[stability::unstable(feature = "enable")]
+pub struct PolyFactorizationInQuotient<State> {
+    /// The degree such that lifting the local factorization to modulus `p^max_lift_degree` is
+    /// provably enough to derive the complete factorization of the polynomial
+    pub max_lift_degree: usize,
+    /// Number of factors of `poly mod p`
+    pub factor_count: usize,
+    /// State that can later be used to lift the factorization of `poly mod p` to higher powers of
+    /// `p`
+    pub state: State,
+}
+
 const MIN_QUOTIENT_FACTORIZATIONS_BEFORE_LIFT: usize = 4;
 const NON_SQUAREFREE_COUNT_ABORT: usize = 3;
+const RAMP_UP_LIFT_TO: f64 = 2.0;
+const BEGIN_LIFT_UP_TO_LOGFRACTION: f64 = 4.0;
 
 /// High-level approach of deriving the factorization of a polynomial by
 /// computing it in quotients, and trying to lift the result.
 ///
 /// This function doesn't handle any arithmetic, but encodes the
 /// high-level strategy:
-///  - The iterator yields `(factor_count(poly mod p), state_of(p))` for various different prime
-///    ideals p.
-///  - If the results seem to indicate that factorizations in the quotient actually represent the
-///    global factorization, `start_lift` is called for the state associated to a suitable prime
-///    `p`.
-///  - afterwards, `proceed_with_lift(state_of(p), e)` is called, and should attempt to lift the
-///    factorization to `R/p^e`. `e` is chosen so that this will always yield the full factorization
-///    of the polynomial in question
+///  - `create_factorizations` is given a polynomial and produces an iterator over different primes
+///    `p` together with information about the factorization of `poly mod p`.
+///  - this function will consider multiple elements in the output of `create_factorization` and
+///    choose one (or more) for lifting. In that case, it will first call `start_lift` with the
+///    corresponding state.
+///  - `start_lift` may fail if the factorization of the polynomial modulo the prime is not suitable
+///    for lifting (e.g. the factors are not squarefree).
+///  - if it doesn't fail, `start_lift` produces `lift` object. The function will then call
+///    `proceed_with_lift(lift, e)`, which will actually lift the factorization of `poly mod p` to
+///    `R/p^e`. The output of `proceed_with_lift(lift, e)` should then be a (potentially incomplete)
+///    factorization of `poly`. Note that if `e = max_lift_degree` as returned by
+///    `create_factorization`, the output of `proceed_with_lift(lift, e)` is assumed to be the
+///    complete factorization of `poly`.
+///  - Note that `proceed_with_lift(lift, e)` may be called multiple times with increasing `e`. It
+///    may be advantageous if state from intermediate lifts is preserved.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_factorization_from_quotients<I, F_start, F_lift, State, OngoingLift, R>(
-    gcd_in_quotients: I,
+pub fn poly_factorization_from_quotients<T, I, F_quotients, F_start, F_lift, State, OngoingLift>(
+    poly: T,
+    mut create_factorizations: F_quotients,
     mut start_lift: F_start,
     mut proceed_with_lift: F_lift,
-) -> PolyFactorizationResult<R>
+) -> PolyFactorizationResult<Vec<T>>
 where
-    I: Iterator<Item = (usize, State)>,
+    F_quotients: FnMut(&T) -> I,
+    I: Iterator<Item = PolyFactorizationInQuotient<State>>,
     F_start: FnMut(State) -> Result<OngoingLift, NotLiftable>,
-    F_lift: FnMut(OngoingLift) -> R,
+    F_lift: FnMut(&mut OngoingLift, &T, usize) -> Result<Vec<T>, LiftUnsuccessful>,
 {
     struct CmpByKey<T>(i64, T);
 
@@ -200,54 +233,91 @@ where
         fn cmp(&self, other: &Self) -> Ordering { self.0.cmp(&other.0) }
     }
 
-    let mut min_factor_count = usize::MAX;
-    let mut found = BinaryHeap::new();
-    let mut found_non_squarefree = 0;
-    for (factor_count, state) in gcd_in_quotients {
-        if factor_count == 1 {
-            return PolyFactorizationResult::Irreducible;
-        } else if factor_count < min_factor_count {
-            min_factor_count = factor_count;
-        }
-        found.push(CmpByKey(-(factor_count as i64), state));
-        if found.len() >= MIN_QUOTIENT_FACTORIZATIONS_BEFORE_LIFT {
-            match start_lift(found.pop().unwrap().1) {
-                Ok(lift) => return PolyFactorizationResult::FoundFactorization(proceed_with_lift(lift)),
-                Err(NotLiftable::NotSquarefree) => {
-                    if found_non_squarefree + 1 >= NON_SQUAREFREE_COUNT_ABORT {
-                        return PolyFactorizationResult::ProbablyNotSquarefree;
-                    } else {
-                        found_non_squarefree += 1;
+    let mut result = Vec::new();
+    let mut open = Vec::new();
+    open.push(poly);
+
+    'factor_open: while let Some(poly) = open.pop() {
+        let mut candidates_for_lift = BinaryHeap::new();
+        let mut ongoing_lifts = Vec::new();
+        let mut found_non_squarefree = 0;
+        for factorization_in_quotient in create_factorizations(&poly) {
+            if factorization_in_quotient.factor_count == 1 {
+                result.push(poly);
+                continue 'factor_open;
+            }
+            candidates_for_lift.push(CmpByKey(
+                -(factorization_in_quotient.factor_count as i64),
+                factorization_in_quotient,
+            ));
+            if candidates_for_lift.len() >= MIN_QUOTIENT_FACTORIZATIONS_BEFORE_LIFT {
+                let candidate = candidates_for_lift.pop().unwrap().1;
+                let start_with_lift_attempt =
+                    ((candidate.max_lift_degree as f64).ln() / RAMP_UP_LIFT_TO.ln() / BEGIN_LIFT_UP_TO_LOGFRACTION)
+                        .ceil() as i32;
+                match start_lift(candidate.state) {
+                    Ok(lift) => ongoing_lifts.push((candidate.max_lift_degree, start_with_lift_attempt, lift)),
+                    Err(NotLiftable::NotSquarefree) => {
+                        if found_non_squarefree + 1 >= NON_SQUAREFREE_COUNT_ABORT {
+                            return PolyFactorizationResult::ProbablyNotSquarefree;
+                        } else {
+                            found_non_squarefree += 1;
+                        }
+                    }
+                    Err(NotLiftable::BadPrime) => {}
+                }
+                for (max_deg, lift_attempt, ongoing_lift) in &mut ongoing_lifts {
+                    *lift_attempt += 1;
+                    let lift_to_deg = min(*max_deg, RAMP_UP_LIFT_TO.powi(*lift_attempt).ceil() as usize);
+                    let lift_result = proceed_with_lift(ongoing_lift, &poly, lift_to_deg);
+                    if let Ok(lift_result) = lift_result {
+                        if lift_to_deg == *max_deg {
+                            result.extend(lift_result);
+                            continue 'factor_open;
+                        } else if lift_result.len() > 1 {
+                            open.extend(lift_result);
+                            continue 'factor_open;
+                        }
                     }
                 }
-                Err(NotLiftable::BadPrime) => {}
             }
         }
+        unreachable!()
     }
-    unreachable!()
+    return PolyFactorizationResult::FoundFactorization(result);
 }
 
 #[instrument(skip_all, level = "trace")]
-fn poly_factor_integer_squarefree_monic<P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
+fn poly_factor_integer_squarefree_monic<P>(ZZX: P, f: El<P>) -> Vec<El<P>>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
     <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
     let ZZ = ZZX.base_ring();
-    assert!(ZZ.is_one(ZZX.lc(f).unwrap()));
-    let bound = ln_factor_max_coeff(ZZX, f);
+    assert!(ZZ.is_one(ZZX.lc(&f).unwrap()));
 
     let result = poly_factorization_from_quotients(
-        large_prime_fields().take(PROBABILISTIC_REPETITIONS).map(|Fp| {
-            let FpX = DensePolyRing::new(Fp, "X");
-            let f_mod_p = FpX
-                .lifted_hom(ZZX, FpX.base_ring().can_hom(ZZX.base_ring()).unwrap())
-                .map_ref(f);
-            let factorization = FactorPolyField::factor_poly(&FpX, &f_mod_p).0;
-            let factor_count = factorization.iter().map(|(_, e)| *e).sum::<usize>();
-            return (factor_count, (FpX, factorization));
-        }),
+        f,
+        |poly| {
+            let poly = poly.clone();
+            let bound = ln_factor_max_coeff(ZZX, &poly);
+            large_prime_fields().take(PROBABILISTIC_REPETITIONS).map(move |Fp| {
+                let FpX = DensePolyRing::new(Fp, "X");
+                let f_mod_p = FpX
+                    .lifted_hom(ZZX, FpX.base_ring().can_hom(ZZX.base_ring()).unwrap())
+                    .map_ref(&poly);
+                let factorization = FactorPolyField::factor_poly(&FpX, &f_mod_p).0;
+                let factor_count = factorization.iter().map(|(_, e)| *e).sum::<usize>();
+                let prime_f64 = *FpX.base_ring().modulus() as f64;
+                let max_lift_degree = (bound / prime_f64.ln()).ceil() as usize + 1;
+                return PolyFactorizationInQuotient {
+                    factor_count,
+                    max_lift_degree,
+                    state: (FpX, factorization),
+                };
+            })
+        },
         |(FpX, factorization)| {
             if factorization.iter().any(|(_, e)| *e > 1) {
                 Err(NotLiftable::NotSquarefree)
@@ -256,15 +326,10 @@ where
                     .map_err(|_| NotLiftable::NotSquarefree)
             }
         },
-        |mut lift| {
-            let prime_f64 = ZZbig.to_float_approx(&lift.prime);
-            let e = (bound / prime_f64.ln()).ceil() as usize + 1;
-            lift.lift_factorization_to(ZZX, f, e)
-        },
+        |lift, target, lift_to_degree| lift.lift_factorization_to(ZZX, target, lift_to_degree),
     );
     match result {
         PolyFactorizationResult::FoundFactorization(result) => result,
-        PolyFactorizationResult::Irreducible => vec![f.clone()],
         PolyFactorizationResult::ProbablyNotSquarefree => unreachable!(),
     }
 }
@@ -297,7 +362,7 @@ where
     let mut result = Vec::new();
     let mut current = f.clone();
     for (factor, _k) in power_decomposition {
-        let factorization = poly_factor_integer_squarefree_monic(&ZZX, &factor);
+        let factorization = poly_factor_integer_squarefree_monic(&ZZX, factor);
         for irred_factor in factorization.into_iter() {
             let mut power = 0;
             while let Some(quo) = ZZX.checked_div(&current, &irred_factor) {
