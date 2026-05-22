@@ -5,6 +5,7 @@ use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::homomorphism::*;
+use crate::iters::{clone_slice, powerset};
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
@@ -636,7 +637,9 @@ fn test_cantor_zassenhaus_even_extension_field() {
     let h = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
     let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1)).0;
     assert!(
-        ring.eq_el(&factor, &f1) || ring.eq_el(&factor, &f2) || ring.eq_el(&factor, &f3) || ring.eq_el(&factor, &f4)
+        powerset([&f1, &f2, &f3, &f4].into_iter(), clone_slice)
+            .filter(|factors| factors.len() > 0 && factors.len() < 4)
+            .any(|factors| ring.eq_el(&factor, &ring.prod(factors.iter().copied().cloned())))
     );
 
     let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 3, [1, 1, 0])
