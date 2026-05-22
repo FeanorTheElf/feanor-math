@@ -13,14 +13,14 @@ pub mod cyclotomic;
 pub mod discrete_log;
 /// Contains an implementation of Lenstra's ECM factoring algorithm.
 pub mod ec_factor;
-/// Contains multiple variants of the Extended Euclidean Algorithm.
-pub mod eea;
 /// Contains an implementation of the Sieve of Erathostenes, for enumerating
 /// prime number up to a certain bound.
 pub mod eratosthenes;
+/// Contains multiple variants of the Extended Euclidean Algorithm.
+pub mod euclid;
 /// Contains basic algorithms for implementing operations on ring extensions. Unless
 /// you are implementing your own extension ring type, you should use the operations
-/// through [`crate::rings::extension::FreeAlgebra`] instead.
+/// through [`crate::ring_impls::extension::FreeAlgebra`] instead.
 pub mod extension_ops;
 /// Contains [`fft::FFTAlgorithm`], an abstraction for algorithms
 /// for computing FFTs over various rings, together with different implementations.
@@ -52,7 +52,7 @@ pub mod matmul;
 /// Contains an implementation of the Miller-Rabin probabilistic primality test.
 pub mod miller_rabin;
 /// Contains algorithms for computing the Galois group and Galois closure of a
-/// [`crate::rings::extension::number_field::NumberField`].
+/// [`crate::ring_impls::extension::number_field::NumberField`].
 // pub mod galois;
 /// Contains an implementation of the Newton-Raphson method for approximating roots of
 /// polynomials (and more generally, "well-behaved" functions).

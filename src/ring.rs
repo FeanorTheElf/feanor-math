@@ -77,7 +77,10 @@ pub enum EnvBindingStrength {
     Strongest,
 }
 
-/// Basic trait for objects that have a ring structure. This trait is
+/// Basic trait for objects that define a ring structure. Rings are assumed
+/// to be commutative, unital and noetherian.
+///
+///  This trait is
 /// implementor-facing, so designed to be used for implementing new
 /// rings.
 ///
@@ -254,18 +257,6 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
         self.add(summand, self.mul_ref(lhs, rhs))
     }
 
-    /// Returns whether the ring is commutative, i.e. `a * b = b * a` for all elements `a, b`.
-    /// Note that addition is assumed to be always commutative.
-    fn is_commutative(&self) -> bool;
-
-    /// Returns whether the ring is noetherian, i.e. every ideal is finitely generated.
-    ///
-    /// Rings for which this is not the case are a exceptional situation in computer
-    /// algebra, since they are usually "very large" and hard to work with. Examples for
-    /// non-noetherian rings could be the polynomial ring in infinitely many variables
-    /// `Z[X1, X2, X3, ...]` or the ring of algebraic integers.
-    fn is_noetherian(&self) -> bool;
-
     /// Returns whether this ring computes with approximations to elements.
     /// This would usually be the case for rings that are based on `f32` or
     /// `f64`, to represent real or complex numbers.
@@ -273,12 +264,12 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     /// Note that these rings cannot provide implementations for [`RingBase::eq_el()`],
     /// [`RingBase::is_zero()`] etc, and hence are of limited use in this crate.
     /// Currently, the only way how approximate rings are used is a complex-valued
-    /// fast Fourier transform, via [`crate::rings::float_complex::Complex64`].
+    /// fast Fourier transform, via [`crate::ring_impls::float_complex::Complex64`].
     fn is_approximate(&self) -> bool;
 
     /// Writes a human-readable representation of `value` to `out`.
     ///
-    /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of
+    /// Used by [`RingStore::formatted_el()`], [`RingStore::println()`] and the implementations of
     /// [`std::fmt::Debug`] and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
     fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.fmt_el_within(value, out, EnvBindingStrength::Weakest)
@@ -287,9 +278,9 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     /// Writes a human-readable representation of `value` to `out`, taking into account the possible
     /// context to place parenthesis as needed.
     ///
-    /// See also [`RingBase::dbg()`] and [`EnvBindingStrength`].
+    /// See also [`RingBase::fmt_el()`] and [`EnvBindingStrength`].
     ///
-    /// Used by [`RingStore::format()`], [`RingStore::println()`] and the implementations of
+    /// Used by [`RingStore::formatted_el()`], [`RingStore::println()`] and the implementations of
     /// [`std::fmt::Debug`] and [`std::fmt::Display`] of [`crate::wrapper::RingElementWrapper`].
     fn fmt_el_within<'a>(
         &self,
@@ -386,14 +377,8 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     }
 
     fn mul_ref_fst(&self, lhs: &Self::Element, mut rhs: Self::Element) -> Self::Element {
-        if self.is_commutative() {
-            self.mul_assign_ref(&mut rhs, lhs);
-            return rhs;
-        } else {
-            let mut result = lhs.clone();
-            self.mul_assign(&mut result, rhs);
-            return result;
-        }
+        self.mul_assign_ref(&mut rhs, lhs);
+        return rhs;
     }
 
     fn mul_ref_snd(&self, mut lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
@@ -648,8 +633,6 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     delegate! { RingBase, fn is_zero(&self, value: &El<Self>) -> bool }
     delegate! { RingBase, fn is_one(&self, value: &El<Self>) -> bool }
     delegate! { RingBase, fn is_neg_one(&self, value: &El<Self>) -> bool }
-    delegate! { RingBase, fn is_commutative(&self) -> bool }
-    delegate! { RingBase, fn is_noetherian(&self) -> bool }
     delegate! { RingBase, fn negate(&self, value: El<Self>) -> El<Self> }
     delegate! { RingBase, fn sub_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
     delegate! { RingBase, fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
@@ -851,7 +834,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
 
     /// Returns an object that represents the given ring element and implements
     /// [`std::fmt::Display`], to use as formatting parameter. As opposed to
-    /// [`RingStore::format()`], this function takes an additional argument to
+    /// [`RingStore::formatted_el()`], this function takes an additional argument to
     /// specify the context the result is printed in, which is used to determine
     /// whether to put the value in parenthesis or not.
     ///
@@ -931,7 +914,7 @@ where
 impl<R: RingStore> RingExtensionStore for R where R::Ring: RingExtension {}
 
 /// Wrapper around a ring and one of its elements that implements [`std::fmt::Display`]
-/// and will print the element. Used by [`RingStore::format()`].
+/// and will print the element. Used by [`RingStore::formatted_el()`].
 pub struct RingElementDisplayWrapper<'a, R: RingBase + ?Sized> {
     ring: &'a R,
     element: &'a R::Element,
@@ -1252,7 +1235,6 @@ fn test_ring_rc_lifetimes() {
     {
         ring_ref = Some(ring.get_ring());
     }
-    assert!(ring.get_ring().is_commutative());
     assert!(ring_ref.is_some());
 }
 
@@ -1281,10 +1263,6 @@ fn test_internal_wrappings_dont_matter() {
         fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
 
         fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
-
-        fn is_commutative(&self) -> bool { true }
-
-        fn is_noetherian(&self) -> bool { true }
 
         fn from_int(&self, value: i32) -> Self::Element { value }
 
@@ -1319,10 +1297,6 @@ fn test_internal_wrappings_dont_matter() {
         fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
 
         fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
-
-        fn is_commutative(&self) -> bool { true }
-
-        fn is_noetherian(&self) -> bool { true }
 
         fn from_int(&self, value: i32) -> Self::Element { value }
 
@@ -1543,8 +1517,7 @@ pub mod generic_tests {
                         ring.formatted_el_within(a, EnvBindingStrength::Sum)
                     );
                 }
-
-                if ring.is_commutative() {
+                {
                     let ab = ring.mul_ref(a, b);
                     let ba = ring.mul_ref(b, a);
                     assert!(

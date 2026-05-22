@@ -100,7 +100,7 @@ where
 
 /// The ring `Z/nZ` for composite `n` implemented using the residue number system (RNS),
 /// i.e. storing values by storing their value modulo every factor of `n`.
-/// For details, see [`ZnBase`].
+/// For details, see [`ZnRNSBase`].
 pub type ZnRNS<C, J, A = Global> = RingValue<ZnRNSBase<C, J, A>>;
 
 pub struct ZnRNSEl<C: RingStore, A: Allocator + Send + Sync + Clone>
@@ -206,7 +206,7 @@ where
 {
     /// Given values `ai` for each component ring `Z/miZ`, computes the unique element in this
     /// ring `Z/nZ` that is congruent to `ai` modulo `mi`. The "opposite" function is
-    /// [`Zn::get_congruence()`].
+    /// [`ZnRNS::get_congruence()`].
     pub fn from_congruence<I>(&self, el: I) -> ZnRNSEl<C, A>
     where
         I: IntoIterator<Item = El<C>>,
@@ -384,9 +384,6 @@ where
             .zip(value.data.iter())
             .all(|(i, x)| self.components[i].is_neg_one(x))
     }
-
-    fn is_commutative(&self) -> bool { true }
-    fn is_noetherian(&self) -> bool { true }
 
     fn fmt_el_within<'a>(
         &self,
@@ -705,7 +702,7 @@ where
     J::Ring: IntegerRing,
     <C::Ring as ZnRing>::IntegerRingBase: IntegerRing + CanIsoFromTo<J::Ring>,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut data = Vec::with_capacity_in(self.len(), self.element_allocator.clone());
         for i in 0..self.len() {
             data.push(self.at(i).checked_div(lhs.data.at(i), rhs.data.at(i))?);

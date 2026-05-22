@@ -115,7 +115,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     ///
     /// Although the [`ConvolutionAlgorithm::PreparedConvolutionOperand`] does not have any explicit
     /// reference to the list of values it was created for, passing it to
-    /// [`ConvolutionAlgorithm::compute_convolution_prepared()`] with another list of values
+    /// [`ConvolutionAlgorithm::compute_convolution()`] with another list of values
     /// will give erroneous results.
     ///
     /// # Length-dependence when preparing a convolution
@@ -317,7 +317,7 @@ impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for UnimplementedConvolution 
 }
 
 /// Implementation of convolutions that uses Karatsuba's algorithm
-/// with a threshold defined by [`KaratsubaHint`].
+/// with a fixed threshold.
 #[derive(Clone, Copy, Debug)]
 pub struct KaratsubaAlgorithm<A: Allocator + Send + Sync = Global> {
     allocator: A,

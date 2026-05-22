@@ -7,7 +7,7 @@ use tracing::instrument;
 
 use crate::algorithms;
 use crate::algorithms::convolution::ConvolutionAlgorithm;
-use crate::algorithms::eea::eea;
+use crate::algorithms::euclid::general_extended_euclid;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::prelude::*;
 use crate::ring_impls::poly::*;
@@ -20,7 +20,7 @@ use crate::seq::{VectorViewMut, *};
 /// coefficients, thus giving improved performance in the case that most coefficients are
 /// zero.
 ///
-/// Unless polynomials are very sparse, [`crate::rings::poly::dense_poly::DensePolyRing`] will
+/// Unless polynomials are very sparse, [`crate::ring_impls::poly::dense_poly::DensePolyRing`] will
 /// provide better performance.
 ///
 /// # Example
@@ -185,13 +185,6 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
             }
         }
         return true;
-    }
-
-    fn is_commutative(&self) -> bool { self.base_ring.is_commutative() }
-
-    fn is_noetherian(&self) -> bool {
-        // by Hilbert's basis theorem
-        self.base_ring.is_noetherian()
     }
 
     fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut Formatter<'a>, env: EnvBindingStrength) -> Result {
@@ -482,11 +475,11 @@ where
     R: RingStore,
     R::Ring: DivisibilityRing + Domain,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
             let lc = rhs.data.at(d);
             let mut lhs_copy = lhs.clone();
-            let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_left_div(&x, lc))?;
+            let quo = self.poly_div(&mut lhs_copy, rhs, |x| self.base_ring().checked_div(&x, lc))?;
             if self.is_zero(&lhs_copy) { Some(quo) } else { None }
         } else if self.is_zero(lhs) {
             Some(self.zero())
@@ -523,7 +516,7 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        eea(lhs.clone(), rhs.clone(), RingRef::from(self))
+        general_extended_euclid(lhs.clone(), rhs.clone(), RingRef::from(self))
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {

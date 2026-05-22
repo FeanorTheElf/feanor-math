@@ -7,13 +7,13 @@ use crate::ring_properties::divisibility::*;
 /// A principal ideal ring currently must be commutative, since otherwise we would
 /// have to distinguish left-, right-and two-sided ideals.
 pub trait PrincipalIdealRing: DivisibilityRing {
-    /// Similar to [`DivisibilityRing::checked_left_div()`] this computes a "quotient" `q`
+    /// Similar to [`DivisibilityRing::checked_div()`] this computes a "quotient" `q`
     /// of `lhs` and `rhs`, if it exists. However, we impose the additional constraint
     /// that this quotient be minimal, i.e. there is no `q'` with `q' | q` properly and
     /// `q' * rhs = lhs`.
     ///
     /// In domains, this is always satisfied, i.e. this function behaves exactly like
-    /// [`DivisibilityRing::checked_left_div()`]. However, if there are zero-divisors, weird
+    /// [`DivisibilityRing::checked_div()`]. However, if there are zero-divisors, weird
     /// things can happen. For example in `Z/6Z`, `checked_div(4, 4)` may return `4`, however
     /// this is not minimal since `1 | 4` and `1 * 4 = 4`.
     ///
@@ -60,7 +60,6 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// Returns `(A, d)`.
     #[stability::unstable(feature = "enable")]
     fn create_elimination_matrix(&self, a: &Self::Element, b: &Self::Element) -> ([Self::Element; 4], Self::Element) {
-        assert!(self.is_commutative());
         let old_gcd = self.ideal_gen(a, b);
         let new_a = self.checked_div_min(a, &old_gcd).unwrap();
         let new_b = self.checked_div_min(b, &old_gcd).unwrap();
@@ -68,7 +67,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
         debug_assert!(self.is_unit(&gcd_new));
 
         let subtract_factor = self
-            .checked_left_div(&self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)), &gcd_new)
+            .checked_div(&self.sub(self.mul_ref(b, &new_a), self.mul_ref(a, &new_b)), &gcd_new)
             .unwrap();
         // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a
         // subtraction step, we are done
@@ -228,8 +227,6 @@ pub mod generic_tests {
     where
         R::Ring: EuclideanRing,
     {
-        assert!(ring.is_commutative());
-        assert!(ring.is_noetherian());
         let elements = edge_case_elements.collect::<Vec<_>>();
         for a in &elements {
             for b in &elements {
@@ -250,8 +247,6 @@ pub mod generic_tests {
     where
         R::Ring: PrincipalIdealRing,
     {
-        assert!(ring.is_commutative());
-        assert!(ring.is_noetherian());
         let elements = edge_case_elements.collect::<Vec<_>>();
 
         let expected_unit = ring.checked_div_min(&ring.zero(), &ring.zero()).unwrap();

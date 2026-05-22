@@ -267,7 +267,7 @@ where
     }
 }
 
-/// Necessary to potentially implement [`crate::rings::zn::ZnRing`].
+/// Necessary to potentially implement [`crate::ring_impls::zn::ZnRing`].
 impl<R: RingStore, S: IntegerRing + ?Sized> CanHomFrom<S> for AsFieldBase<R>
 where
     R::Ring: DivisibilityRing + CanHomFrom<S>,
@@ -289,7 +289,7 @@ where
         if self.is_zero(lhs) && self.is_zero(rhs) {
             Some(self.one())
         } else {
-            self.checked_left_div(lhs, rhs)
+            self.checked_div(lhs, rhs)
         }
     }
 
@@ -348,7 +348,7 @@ where
 {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+        (self.checked_div(&lhs, rhs).unwrap(), self.zero())
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
@@ -366,7 +366,7 @@ where
     R::Ring: DivisibilityRing,
 {
     fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        FieldEl(self.get_delegate().checked_left_div(&lhs.0, &rhs.0).unwrap())
+        FieldEl(self.get_delegate().checked_div(&lhs.0, &rhs.0).unwrap())
     }
 }
 
@@ -464,10 +464,11 @@ where
 /// `AsFieldBase<RingStore<Type = S>>: CanHomFrom<R>`.
 ///
 /// This has to be a macro, as a blanket implementation would unfortunately cause conflicting impls.
-/// Usually, whenever a ring naturally might be a ring (e.g. like [`crate::rings::zn::zn_64b::Zn`]
-/// or [`crate::rings::extension::extension_impl::FreeAlgebraImpl`], which even provide a function
-/// like [`crate::rings::zn::ZnRingStore::as_field()`]), you might use this macro to implement
-/// [`CanHomFrom`] that simplify conversion from and to the field wrapper.
+/// Usually, whenever a ring naturally might be a ring (e.g. like
+/// [`crate::ring_impls::zn::zn_64b::Zn64B`]
+/// or [`crate::ring_impls::extension::extension_impl::FreeAlgebraImpl`], which even provide a
+/// function like [`crate::ring_impls::zn::ZnRingStore::as_field()`]), you might use this macro to
+/// implement [`CanHomFrom`] that simplify conversion from and to the field wrapper.
 ///
 /// # Example
 /// ```rust

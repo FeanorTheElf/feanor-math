@@ -407,10 +407,6 @@ where
             && (1..self.rank()).all(|i| self.base_ring.is_zero(&value.values[i]))
     }
 
-    fn is_commutative(&self) -> bool { self.base_ring().is_commutative() }
-
-    fn is_noetherian(&self) -> bool { self.base_ring().is_noetherian() }
-
     fn is_approximate(&self) -> bool { self.base_ring().get_ring().is_approximate() }
 
     fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
@@ -547,7 +543,7 @@ where
     A: Allocator + Clone + Send + Sync,
     C: ConvolutionAlgorithm<R::Ring>,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let mut mul_matrix: OwnedMatrix<_, _> =
             create_multiplication_matrix(RingRef::from(self), rhs, self.allocator().clone());
         let mut lhs_matrix: OwnedMatrix<_, _> =
@@ -582,7 +578,7 @@ where
             .map(|c| RingRef::from(self).inclusion().map(c))
     }
 
-    default fn invert(&self, el: &Self::Element) -> Option<Self::Element> { self.checked_left_div(&self.one(), el) }
+    default fn invert(&self, el: &Self::Element) -> Option<Self::Element> { self.checked_div(&self.one(), el) }
 
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
 }

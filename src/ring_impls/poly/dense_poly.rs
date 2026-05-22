@@ -8,8 +8,8 @@ use serde::de::DeserializeSeed;
 use serde::{Deserializer, Serialize, Serializer};
 use tracing::instrument;
 
-use crate::algorithms;
 use crate::algorithms::convolution::*;
+use crate::algorithms::euclid::general_extended_euclid;
 use crate::algorithms::interpolate::interpolate;
 use crate::algorithms::poly_div::{FAST_POLY_DIV_THRESHOLD, fast_poly_div_rem, poly_div_rem, poly_rem};
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
@@ -216,13 +216,6 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
             }
         }
         return true;
-    }
-
-    fn is_commutative(&self) -> bool { self.base_ring.is_commutative() }
-
-    fn is_noetherian(&self) -> bool {
-        // by Hilbert's basis theorem
-        self.base_ring.is_noetherian()
     }
 
     fn fmt_el_within<'a>(
@@ -818,14 +811,14 @@ where
     R::Ring: DivisibilityRing + Domain,
     C: ConvolutionAlgorithm<R::Ring>,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if let Some(d) = self.degree(rhs) {
             if d == 0 {
                 let rhs = self.coefficient_at(rhs, 0);
                 return RingRef::from(self)
                     .try_from_terms(
                         self.terms(lhs)
-                            .map(|(c, i)| self.base_ring().checked_left_div(c, rhs).map(|c| (c, i)).ok_or(())),
+                            .map(|(c, i)| self.base_ring().checked_div(c, rhs).map(|c| (c, i)).ok_or(())),
                     )
                     .ok();
             } else {
@@ -837,7 +830,7 @@ where
                     .ok()?
                 } else {
                     fast_poly_div_rem(RingRef::from(self), lhs.clone(), rhs, |x| {
-                        self.base_ring().checked_left_div(x, lc).ok_or(())
+                        self.base_ring().checked_div(x, lc).ok_or(())
                     })
                     .ok()?
                 };
@@ -850,14 +843,14 @@ where
         }
     }
 
-    fn divides_left(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+    fn divides(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
         if let Some(d) = self.degree(rhs) {
             if d == 0 {
                 true
             } else {
                 let lc = &rhs.data[d];
                 if let Ok((_, rem)) = fast_poly_div_rem(RingRef::from(self), lhs.clone(), rhs, |x| {
-                    self.base_ring().checked_left_div(&x, lc).ok_or(())
+                    self.base_ring().checked_div(&x, lc).ok_or(())
                 }) {
                     if self.is_zero(&rem) { true } else { false }
                 } else {
@@ -912,7 +905,8 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(lhs.clone(), rhs.clone(), &RingRef::from(self))
+        // TODO: add to PolyTFracGCDRing
+        general_extended_euclid(lhs.clone(), rhs.clone(), &RingRef::from(self))
     }
 
     fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {

@@ -150,10 +150,6 @@ impl RingBase for Complex64Base {
         ))
     }
 
-    fn is_commutative(&self) -> bool { true }
-
-    fn is_noetherian(&self) -> bool { true }
-
     fn is_approximate(&self) -> bool { true }
 
     fn fmt_el_within<'a>(
@@ -186,7 +182,7 @@ impl_eq_based_self_iso! { Complex64Base }
 impl Domain for Complex64Base {}
 
 impl DivisibilityRing for Complex64Base {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let abs_sqr = self.abs(*rhs) * self.abs(*rhs);
         let Complex64El(res_re, res_im) = self.mul(*lhs, self.conjugate(*rhs));
         return Some(Complex64El(res_re / abs_sqr, res_im / abs_sqr));
@@ -197,7 +193,7 @@ impl DivisibilityRing for Complex64Base {
 
 impl PrincipalIdealRing for Complex64Base {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -220,9 +216,7 @@ impl EuclideanRing for Complex64Base {
 }
 
 impl Field for Complex64Base {
-    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.checked_left_div(lhs, rhs).unwrap()
-    }
+    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element { self.checked_div(lhs, rhs).unwrap() }
 }
 
 impl RingExtension for Complex64Base {

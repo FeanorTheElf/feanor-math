@@ -40,9 +40,6 @@ where
     TR: TransformTarget<R::Ring>,
     V: AsPointerToSlice<El<R>>,
 {
-    // otherwise we might not terminate...
-    assert!(ring.is_noetherian());
-    assert!(ring.is_commutative());
     let (row_count, col_count) = (A.row_count(), A.col_count());
 
     event!(Level::TRACE, n = row_count, m = col_count);
@@ -132,7 +129,7 @@ where
     for i in 0..min(lhs.row_count(), lhs.col_count()) {
         let pivot = lhs.at(i, i);
         for j in 0..rhs.col_count() {
-            if let Some(quo) = ring.checked_left_div(rhs.at(i, j), pivot) {
+            if let Some(quo) = ring.checked_div(rhs.at(i, j), pivot) {
                 solution_unique &= ring.is_zero(&ring.annihilator(&pivot));
                 *out.at_mut(i, j) = quo;
             } else {

@@ -106,7 +106,7 @@ where
     ) {
         let ring = new_hom.codomain();
         let root_of_unity = new_hom.map_ref(&self.root_of_unity_twiddle);
-        assert!(ring.is_commutative());
+
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_general(&ring, &root_of_unity, self.len()));
 
         return (
@@ -161,7 +161,6 @@ where
     {
         let ring = hom.codomain();
 
-        assert!(ring.is_commutative());
         assert!(
             ring.get_ring().is_approximate()
                 || is_prim_root_of_unity_general(
@@ -568,7 +567,7 @@ const BENCH_N2: usize = 601;
 fn bench_factor_fft(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(1602564097);
-    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
+    let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * 31 * 601).unwrap());
     let fft = GeneralCooleyTukeyFFT::new_with_hom(

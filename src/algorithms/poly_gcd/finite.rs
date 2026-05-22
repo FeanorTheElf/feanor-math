@@ -1,8 +1,8 @@
 use std::cmp::max;
+use std::mem::swap;
 
 use tracing::instrument;
 
-use crate::algorithms::eea::partial_eea_poly;
 use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::strassen::{dispatch_strassen_impl, strassen_mem_size};
 use crate::matrix::*;
@@ -80,6 +80,68 @@ where
         let result = poly_ring.checked_div(poly, &square_part).unwrap();
         return poly_ring.normalize(result).0;
     }
+}
+
+/// Computes `[s, t, s', t']` such that `x := s * a + t * b` and `x' := s' * a + t' * b`
+/// are the current pair of values during the Euclidean Algorithm when, for the first
+/// time, we find `deg(x') <= target_deg`.
+///
+/// In particular, we have `deg(x) > target_deg` and `deg(x') <= target_deg`, except if `a, b`
+/// already both have degree `<= target_deg`.
+///
+/// The degrees of `s, t, s', t'` are bounded as
+/// ```text
+///   deg(s) <= deg(b) - deg(x)
+///   deg(t) <= deg(a) - deg(x)
+///   deg(s') <= deg(b) - deg(x')
+///   deg(t') <= deg(a) - deg(x')
+/// ```
+/// except if either `a` or `b` already have degree `<= target_deg` (i.e. no steps in
+/// the Euclidean algorithm are performed), in which case only the two bounds involving
+/// the larger one of `deg(a)` resp. `deg(b)` hold.
+///
+/// The proof of this is similar to the one outlined in [`partial_eea_int()`], but simpler, because
+/// the degree-valuation is non-Archimedean.
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn partial_eea_poly<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> ([El<P>; 4], [El<P>; 2])
+where
+    P: RingStore + Copy,
+    P::Ring: PolyRing + EuclideanRing,
+{
+    if ring.is_zero(&lhs) || ring.is_zero(&rhs) {
+        return ([ring.one(), ring.zero(), ring.zero(), ring.one()], [lhs, rhs]);
+    }
+    let (mut a, mut b) = (lhs.clone(), rhs.clone());
+    let (mut sa, mut ta) = (ring.one(), ring.zero());
+    let (mut sb, mut tb) = (ring.zero(), ring.one());
+
+    if ring.degree(&a).unwrap() < ring.degree(&b).unwrap() {
+        swap(&mut a, &mut b);
+        swap(&mut sa, &mut sb);
+        swap(&mut ta, &mut tb);
+    }
+
+    while ring.degree(&b).unwrap_or(0) > target_deg {
+        debug_assert!(ring.eq_el(&a, &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))));
+        debug_assert!(ring.eq_el(&b, &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))));
+
+        let (quo, rem) = ring.euclidean_div_rem(a, &b);
+        let tb_new = ring.sub(ta, ring.mul_ref(&quo, &tb));
+        let sb_new = ring.sub(sa, ring.mul_ref_snd(quo, &sb));
+        let b_new = rem;
+
+        ta = tb;
+        sa = sb;
+        a = b;
+        tb = tb_new;
+        sb = sb_new;
+        b = b_new;
+
+        debug_assert!(ring.degree(&sb).unwrap() <= ring.degree(&rhs).unwrap() - ring.degree(&b).unwrap_or(0));
+        debug_assert!(ring.degree(&tb).unwrap() <= ring.degree(&lhs).unwrap() - ring.degree(&b).unwrap_or(0));
+    }
+    return ([sa, ta, sb, tb], [a, b]);
 }
 
 const FAST_POLY_EEA_THRESHOLD: usize = 32;
@@ -225,15 +287,75 @@ where
 #[cfg(test)]
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
-use crate::ring_impls::zn::zn_64b;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::ring_impls::zn::*;
+
+#[test]
+fn test_partial_eea_poly() {
+    feanor_tracing::DelayedLogger::init_test();
+    let field = Zn64B::new(65537).as_field().ok().unwrap();
+    let poly_ring = DensePolyRing::new(field, "X");
+    let test_on_input = |a: &El<DensePolyRing<_>>, b: &El<DensePolyRing<_>>, deg| {
+        let ([s, t, s_, t_], [x, x_]) = partial_eea_poly(&poly_ring, a.clone(), b.clone(), deg);
+        assert_el_eq!(
+            &poly_ring,
+            poly_ring.add(poly_ring.mul_ref(&s, a), poly_ring.mul_ref(&t, b)),
+            &x
+        );
+        assert_el_eq!(
+            &poly_ring,
+            poly_ring.add(poly_ring.mul_ref(&s_, a), poly_ring.mul_ref(&t_, b)),
+            &x_
+        );
+        let a_deg = poly_ring.degree(a).unwrap_or(0);
+        let b_deg = poly_ring.degree(b).unwrap_or(0);
+        if a_deg <= deg && b_deg <= deg {
+            assert!(poly_ring.degree(&x).unwrap_or(0) <= deg);
+            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
+        } else if a_deg <= deg || b_deg <= deg {
+            assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
+            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
+            if a_deg >= b_deg {
+                assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
+                assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
+            } else {
+                assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
+                assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
+            }
+        } else {
+            assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
+            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
+            assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
+            assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
+            assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
+            assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
+        }
+    };
+
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
+        [
+            X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
+            X.pow_ref(10) + X.pow_ref(6) + 1,
+        ]
+    });
+    for deg in (0..10).rev() {
+        test_on_input(&f, &g, deg);
+        test_on_input(&g, &f, deg);
+    }
+
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(5) - 1, X.pow_ref(10) - 1]);
+    for deg in (0..5).rev() {
+        test_on_input(&f, &g, deg);
+        test_on_input(&g, &f, deg);
+    }
+}
 
 #[test]
 fn test_fast_poly_eea() {
     feanor_tracing::DelayedLogger::init_test();
 
-    let field = zn_64b::Zn64B::new(2).as_field().ok().unwrap();
+    let field = Zn64B::new(2).as_field().ok().unwrap();
     let poly_ring = DensePolyRing::new(field, "X");
 
     let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(96) + X.pow_ref(55), X.pow_ref(54)]);

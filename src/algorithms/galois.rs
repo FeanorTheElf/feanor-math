@@ -6,12 +6,12 @@ use tracing::instrument;
 
 use crate::function::no_error;
 use crate::homomorphism::*;
-use crate::rings::extension::number_field::*;
-use crate::rings::extension::*;
+use crate::ring_impls::extension::number_field::*;
+use crate::ring_impls::extension::*;
 use crate::ring_impls::primitive_int::*;
-use crate::rings::poly::dense_poly::DensePolyRing;
-use crate::rings::poly::*;
-use crate::rings::rational::*;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
+use crate::ring_impls::poly::*;
+use crate::ring_impls::rational::*;
 use crate::prelude::*;
 use crate::seq::VectorFn;
 use super::splitting_field::extend_number_field_promise_is_irreducible;

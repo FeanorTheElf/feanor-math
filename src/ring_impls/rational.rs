@@ -339,10 +339,6 @@ where
 
     fn is_approximate(&self) -> bool { false }
 
-    fn is_commutative(&self) -> bool { true }
-
-    fn is_noetherian(&self) -> bool { true }
-
     fn characteristic<J: RingStore + Copy>(&self, ZZ: J) -> Option<El<J>>
     where
         J::Ring: IntegerRing,
@@ -579,7 +575,7 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             Some(self.zero())
         } else if self.is_zero(rhs) {
@@ -626,7 +622,7 @@ where
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.one());
         }
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -653,7 +649,7 @@ where
 
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+        (self.checked_div(&lhs, rhs).unwrap(), self.zero())
     }
 }
 

@@ -445,8 +445,8 @@ where
 ///
 /// The algorithm proceeds F4-style, i.e. reduces multiple S-polynomials before adding them to the
 /// basis. When using a fast polynomial ring implementation (e.g.
-/// [`crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl`]), this makes the
-/// algorithm as efficient as standard F4. Furthermore, the behavior can be modified by passing
+/// [`crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl`]), this makes
+/// the algorithm as efficient as standard F4. Furthermore, the behavior can be modified by passing
 /// custom functions for `sort_spolys` and `abort_early_if`.
 ///
 /// - `sort_spolys` should permute the given list of S-polynomials w.r.t. the given basis; this can

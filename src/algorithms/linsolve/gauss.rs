@@ -49,7 +49,7 @@ pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<u
         V: AsPointerToSlice<El<R>>
 {
     assert!(ring.is_noetherian());
-    assert!(ring.is_commutative());
+    
     let n = A.row_count();
     let m = A.col_count();
 
@@ -146,9 +146,9 @@ pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<u
 }
 
 #[cfg(test)]
-use crate::rings::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_64b::Zn64B;
 #[cfg(test)]
-use crate::rings::zn::zn_static::Fp;
+use crate::ring_impls::zn::zn_static::Fp;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 

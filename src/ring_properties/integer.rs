@@ -48,10 +48,6 @@ pub const ZZi64: StaticRing<i64> = StaticRing::RING;
 /// As an additional requirement, the euclidean division (i.e.
 /// [`EuclideanRing::euclidean_div_rem()`] and [`IntegerRing::euclidean_div_pow_2()`]) are
 /// additionally expected to round towards zero.
-///
-/// Currently [`IntegerRing`] is a subtrait of the unstable traits [`IntegerPolyGCDRing`] and,
-/// [`LiftPolyEvalRing`] so it is at the moment impossible to implement [`IntegerRing`] for a
-/// custom ring type without enabling unstable features. Sorry.
 pub trait IntegerRing:
     Domain + EuclideanRing + OrderedRing + HashableElRing + LiftPolyEvalRing + PolyTFracGCDRing
 {

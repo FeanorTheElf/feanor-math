@@ -617,9 +617,6 @@ where
         value.data[0].1.data.deg == 0 && self.base_ring().is_neg_one(&value.data[0].0)
     }
 
-    fn is_commutative(&self) -> bool { self.base_ring().is_commutative() }
-    fn is_noetherian(&self) -> bool { self.base_ring().is_noetherian() }
-
     fn fmt_el(&self, value: &Self::Element, out: &mut std::fmt::Formatter) -> std::fmt::Result {
         self.fmt_el_within(value, out, EnvBindingStrength::Weakest)
     }

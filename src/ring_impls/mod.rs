@@ -9,7 +9,8 @@ pub mod rust_bigint;
 
 /// Contains the trait [`zn::ZnRing`] for all rings that represent a
 /// quotient `Z/nZ` of the integers `Z`. Furthermore, it provides four different
-/// implementions, in [`zn::zn_static`], [`zn::zn_big`], [`zn::zn_64`] and [`zn::zn_rns`].
+/// implementions, in [`zn::zn_static`], [`zn::zn_big`], [`zn::zn_64b`], [`zn::zn_64m`] and
+/// [`zn::zn_rns`].
 pub mod zn;
 
 /// Contains the trait [`poly::PolyRing`] for all rings that represent a
@@ -17,7 +18,7 @@ pub mod zn;
 /// two different implementations, in [`poly::dense_poly`] and [`poly::sparse_poly`].
 pub mod poly;
 
-/// Contains the wrapper [`field::AsField`] that can be used to create a ring
+/// Contains the wrapper [`as_field::AsField`] that can be used to create a ring
 /// implementing [`crate::ring_properties::field::Field`] from rings that are fields, but do not
 /// implement the trait (e.g. because being a field for them might be only determinable at runtime).
 pub mod as_field;

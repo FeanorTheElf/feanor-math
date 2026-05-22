@@ -10,7 +10,7 @@ use crate::ring_properties::specialization::FiniteRingSpecializable;
 /// Note that a trivial implementation is possible for every ring of characteristic 0, since
 /// these already have infinitely many points whose pairwise differences are non-zero-divisors.
 /// Such an implementation can be added to new types using the macro
-/// [`impl_interpolation_base_ring_char_zero!`].
+/// [`crate::impl_interpolation_base_ring_char_zero!`].
 pub trait InterpolationBaseRing: DivisibilityRing {
     /// The type of the extension ring we can switch to to get more points.
     ///
@@ -127,32 +127,17 @@ where
 /// The standard use case is the evaluation of a multivariate polynomial `f(X1, ..., Xm)`
 /// over this ring. The trait is designed to enable the following approach:
 ///  - Given ring elements `a1, ..., am`, compute an upper bound `B` on `|f(a1, ..., am)|`. The
-///    values `|ai|` are given by [`LiftPolyEvalRing::pseudo_norm()`].
-///  - Get a sufficient number of prime ideals, using [`LiftPolyEvalRing::local_computation()`]
+///    values `|ai|` are given by [`LiftPolyEvalRing::ln_pseudo_norm()`].
+///  - Get a sufficient number of prime ideals, using [`LiftPolyEvalRing::init_reduce_lift()`]
 ///  - Compute `f(a1 mod pi, ..., am mod pi) mod pi` for each prime `pi` within the ring given by
-///    [`LiftPolyEvalRing::local_ring_at()`]. The reductions `ai mod pj` are given by
+///    [`LiftPolyEvalRing::quotient_ring_at()`]. The reductions `ai mod pj` are given by
 ///    [`LiftPolyEvalRing::reduce()`].
 ///  - Recombine the results to an element of `R` by using [`LiftPolyEvalRing::lift_combine()`].
 ///
-/// # Relationship with [`crate::reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`]
-///
-/// There are generally two ways of computing something via a reduce-modulo-primes-then-lift
-/// approach. Either one can take many different prime ideals, or one can take a large power
-/// of a single/a small amount of prime ideals.
-///
-/// This trait is for the former approach, which is especially suitable when the computation to
-/// perform can be written as a polynomial evaluation. In particular, this applicable to
-/// determinants, resultant, and (with some caveats) solving linear systems.
-///
-/// On the other hand, when factoring polynomials or computing their gcds, it is common to instead
-/// rely on Hensel lifting to compute the result modulo a large power of a single prime, or very
-/// few primes. This approach is formalized by
-/// [`crate::reduce_lift::poly_factor_gcd::PolyLiftFactorsDomain`].
-///
 /// # Type-level recursion in feanor-math
 ///
-/// [`LiftPolyEvalRing`] and [`PolyLiftFactorsDomain`] are the two traits in feanor-math which
-/// use type-level recursion with blanket implementations. The idea is simple: If our ring is an
+/// [`LiftPolyEvalRing`] uses type-level recursion with blanket implementations. The idea is simple:
+/// If our ring is an
 /// [`LiftPolyEvalRing`], whose quotients are again [`LiftPolyEvalRing`], whose quotients are
 /// again [`LiftPolyEvalRing`] and so on, ending with a finite field. Then, for all kinds of
 /// operations which are actually just polynomial evaluations (resultants, determinants,
@@ -409,7 +394,7 @@ pub trait LiftPolyEvalRing: RingBase + FiniteRingSpecializable {
     /// to each of the given local rings under the map [`LiftPolyEvalRing::reduce()`].
     ///
     /// The result should have pseudo-norm bounded by the bound given when the computation
-    /// was initialized, via [`LiftPolyEvalRing::local_computation()`].
+    /// was initialized, via [`LiftPolyEvalRing::init_reduce_lift()`].
     fn lift_combine<'ring>(
         &self,
         computation: &Self::LocalComputationData<'ring>,
@@ -535,7 +520,7 @@ where
     }
 }
 
-/// Generates an implementation of [`crate::reduce_lift::poly_eval::InterpolationBaseRing`]
+/// Generates an implementation of [`crate::ring_properties::lift_poly_eval::InterpolationBaseRing`]
 /// for a ring of characteristic zero. Not that in this case, the only sensible implementation
 /// is trivial, since the ring itself has enough elements for any interpolation task.
 ///
@@ -646,7 +631,7 @@ macro_rules! impl_interpolation_base_ring_char_zero {
 ///
 /// This uses a default implementation, where the prime ideals are given by the largest prime
 /// numbers such that the corresponding residue field can be implemented using
-/// [`crate::rings::zn::zn_64b::Zn`]. This should be suitable in almost all scenarios.
+/// [`crate::ring_impls::zn::zn_64b::Zn64B`]. This should be suitable in almost all scenarios.
 ///
 /// The syntax is the same as for other impl-macros, see e.g.
 /// [`crate::impl_interpolation_base_ring_char_zero!`].
@@ -676,14 +661,14 @@ macro_rules! impl_eval_poly_locally_for_integer {
             fn init_reduce_lift<'ring>(&'ring self, ln_valuation_bound: f64) -> Self::LocalComputationData<'ring> {
                 let mut primes = Vec::new();
                 let mut ln_current = 0.;
-                let mut prime_it = $crate::algorithms::primelist::LARGE_PRIMES.iter().copied().map(|p| $crate::ring_impls::zn::zn_64b::Zn64B::new(p as u64));
+                let mut prime_it = $crate::algorithms::primelist::large_prime_fields();
                 while ln_current < ln_valuation_bound + 1. {
                     let Fp = prime_it.next().unwrap();
                     ln_current += (*$crate::ring_impls::zn::ZnRingStore::modulus(&Fp) as f64).ln();
                     primes.push(Fp);
                 }
                 return $crate::ring_impls::zn::zn_rns::ZnRNS::new(
-                    primes.into_iter().map(|Fp| $crate::ring_impls::as_field::AsField::from($crate::ring_impls::as_field::AsFieldBase::promise_is_perfect_field(Fp))).collect(),
+                    primes.into_iter().collect(),
                     RingRef::from(self)
                 );
             }

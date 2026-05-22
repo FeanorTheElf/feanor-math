@@ -36,7 +36,7 @@ use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 ///
 /// This implementation is optimized for use with large integer
 /// rings. If the moduli are small, consider using specialized implementations
-/// (like [`crate::rings::zn::zn_64b::Zn`]), which will be much faster.
+/// (like [`crate::ring_impls::zn::zn_64b::Zn64B`]), which will be much faster.
 ///
 /// # Example
 /// ```rust
@@ -87,7 +87,7 @@ where
 }
 
 /// Ring representing `Z/nZ`, computing the modular reductions
-/// via a Barett-reduction algorithm. For details, see [`ZnBase`].
+/// via a Barett-reduction algorithm. For details, see [`ZnGBBase`].
 pub type ZnGB<I> = RingValue<ZnGBBase<I>>;
 
 impl<I: RingStore> ZnGB<I>
@@ -281,9 +281,6 @@ where
             )
     }
 
-    fn is_commutative(&self) -> bool { true }
-    fn is_noetherian(&self) -> bool { true }
-
     fn fmt_el_within<'a>(
         &self,
         value: &Self::Element,
@@ -428,8 +425,8 @@ impl<I: RingStore> DivisibilityRing for ZnGBBase<I>
 where
     I::Ring: IntegerRing,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::from(self), lhs, rhs)
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        super::generic_impls::checked_div(RingRef::from(self), lhs, rhs)
     }
 
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }

@@ -44,21 +44,6 @@ pub mod power_decomposition_lift;
 ///     ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, X.pow_ref(2) - 1, X - 1]);
 /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
 /// ```
-///
-/// # Implementation notes
-///
-/// Efficient implementations for polynomial gcds are often quite complicated, since the standard
-/// euclidean algorithm is only efficient over finite fields, where no coefficient explosion
-/// happens. The general idea for other rings/fields is to reduce it to the finite case, by
-/// considering the situation modulo a finite-index ideal. The requirements for this approach are
-/// defined by the trait [`PolyLiftFactorsDomain`], and there is a blanket impl `R: PolyTFracGCDRing
-/// where R: PolyLiftFactorsDomain`.
-///
-/// Note that this blanket impl used
-/// [`crate::ring_properties::specialization::FiniteRingSpecializable`] to use the
-/// standard algorithm whenever the corresponding ring is actually finite. In other words, despite
-/// the fact that the blanket implementation for `PolyLiftFactorsDomain`s also applies to finite
-/// fields, the local implementation is not actually used in these cases.
 pub trait PolyTFracGCDRing {
     /// Computes the square-free part of a polynomial `f`, which is the largest-degree squarefree
     /// polynomial `d` such that `d | a f` for some non-zero-divisor `a` of this ring.

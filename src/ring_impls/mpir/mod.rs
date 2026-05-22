@@ -11,9 +11,9 @@ use crate::algorithms::bigint_ops::deserialize_bigint_from_bytes;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::primitive_int::*;
+use crate::ring_impls::rust_bigint::*;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializableElementRing};
 use crate::ring_properties::specialization::*;
-use crate::rings::rust_bigint::*;
 use crate::{
     algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
 };
@@ -445,7 +445,7 @@ impl SerializableElementRing for MPZBase {
 }
 
 impl DivisibilityRing for MPZBase {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) {
             if self.is_zero(lhs) {
                 return Some(self.zero());
@@ -483,7 +483,7 @@ impl PrincipalIdealRing for MPZBase {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.one());
         }
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 }
 

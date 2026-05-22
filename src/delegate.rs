@@ -403,10 +403,6 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.get_delegate().is_neg_one(self.delegate_ref(value))
     }
 
-    default fn is_commutative(&self) -> bool { self.get_delegate().is_commutative() }
-
-    default fn is_noetherian(&self) -> bool { self.get_delegate().is_noetherian() }
-
     default fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
         self.get_delegate().fmt_el(self.delegate_ref(value), out)
     }
@@ -541,9 +537,9 @@ where
 {
     type PreparedDivisorData = <R::Base as DivisibilityRing>::PreparedDivisorData;
 
-    default fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    default fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         self.get_delegate()
-            .checked_left_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
+            .checked_div(self.delegate_ref(lhs), self.delegate_ref(rhs))
             .map(|x| self.rev_delegate(x))
     }
 
@@ -561,25 +557,25 @@ where
         self.get_delegate().prepare_divisor(self.delegate_ref(x))
     }
 
-    default fn checked_left_div_prepared(
+    default fn checked_div_prepared(
         &self,
         lhs: &Self::Element,
         rhs: &Self::Element,
         rhs_prep: &Self::PreparedDivisorData,
     ) -> Option<Self::Element> {
         self.get_delegate()
-            .checked_left_div_prepared(self.delegate_ref(lhs), self.delegate_ref(rhs), rhs_prep)
+            .checked_div_prepared(self.delegate_ref(lhs), self.delegate_ref(rhs), rhs_prep)
             .map(|res| self.rev_delegate(res))
     }
 
-    default fn divides_left_prepared(
+    default fn divides_prepared(
         &self,
         lhs: &Self::Element,
         rhs: &Self::Element,
         rhs_prep: &Self::PreparedDivisorData,
     ) -> bool {
         self.get_delegate()
-            .divides_left_prepared(self.delegate_ref(lhs), self.delegate_ref(rhs), rhs_prep)
+            .divides_prepared(self.delegate_ref(lhs), self.delegate_ref(rhs), rhs_prep)
     }
 }
 

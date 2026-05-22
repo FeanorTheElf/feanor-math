@@ -4,6 +4,7 @@ use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::int_factor::factor;
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::prelude::*;
 use crate::ring_impls::poly::sparse_poly::SparsePolyRing;
 use crate::ring_impls::poly::*;
@@ -12,7 +13,6 @@ use crate::ring_impls::zn::{ZnRing, ZnRingStore};
 use crate::ring_properties::divisibility::{DivisibilityRingStore, Domain};
 use crate::ring_properties::field::Field;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
-use crate::{PROBABILISTIC_REPETITIONS, algorithms};
 
 /// Computes the `n`-th cyclotomic polynomial.
 ///
@@ -56,7 +56,7 @@ where
     let mut current = P.sub(P.indeterminate(), P.one());
     let ZZ = StaticRing::<i128>::RING;
     let mut power_of_x = 1;
-    for (p, e) in algorithms::int_factor::factor(&ZZ, n as i128) {
+    for (p, e) in factor(&ZZ, n as i128) {
         power_of_x *= ZZ.pow(p, e - 1) as usize;
         current = P
             .checked_div(
@@ -102,7 +102,7 @@ pub fn cyclotomic_polynomial_cache(
 /// Panics if the characteristic of the ring is not coprime to `n = 2^log2_n`, in which case
 /// `Phi_n(X)` is ramified and there is no sensible notion of primitive roots of unity.
 ///
-/// See also [`is_root_of_unity()`], [`is_prim_root_of_unity()`],
+/// See also [`is_prim_root_of_unity()`],
 /// [`is_prim_root_of_unity_general()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
@@ -122,8 +122,7 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
 ///
-/// See also [`is_prim_root_of_unity_pow2()`], [`is_root_of_unity()`],
-/// [`is_prim_root_of_unity_general()`].
+/// See also [`is_prim_root_of_unity_pow2()`], [`is_prim_root_of_unity_general()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity<R>(ring: R, el: &El<R>, n: &El<BigIntRing>) -> bool
 where
@@ -144,7 +143,7 @@ where
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
 ///
-/// See also [`is_prim_root_of_unity_pow2()`], [`is_root_of_unity()`], [`is_prim_root_of_unity()`].
+/// See also [`is_prim_root_of_unity_pow2()`], [`is_prim_root_of_unity()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_general<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
     let characteristic = ring.characteristic(ZZbig).unwrap();

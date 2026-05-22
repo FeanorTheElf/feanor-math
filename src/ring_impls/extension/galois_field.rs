@@ -57,8 +57,8 @@ use crate::ring_properties::serialization::*;
 /// assert_eq!(5, F25.characteristic(&ZZi64).unwrap());
 /// assert_eq!(2, F25.rank());
 /// ```
-/// More configurations are possible using [`GaloisField::new_with_convolution()`] or
-/// [`GaloisField::create()`].
+/// More configurations are possible using [`GaloisFieldBase::new_with_convolution()`],
+/// [`GaloisFieldBase::new_with_base_field()`] or [`GaloisField::create()`].
 ///
 /// We also support conversion to and from a plain [`super::extension_impl::FreeAlgebraImpl`]
 /// representation.
@@ -141,7 +141,7 @@ pub type GaloisFieldBaseOver<R, C = DynConvolution<'static, <R as RingStore>::Ri
     GaloisFieldBase<AsField<FreeAlgebraImpl<R, SparseMapVector<R>, C, A>>>;
 
 /// The default implementation of a finite field extension of a prime field,
-/// based on [`Zn`].
+/// based on [`Zn64B`].
 pub type DefaultGaloisFieldImpl = AsField<
     FreeAlgebraImpl<
         AsField<Zn64B>,
@@ -162,8 +162,8 @@ impl GaloisFieldBase {
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
     ///
     /// If you need more options for configuration, consider using
-    /// [`GaloisField::new_with_base_field()`], [`GaloisField::new_with_convolution()`] or the
-    /// most general [`GaloisField::create()`].
+    /// [`GaloisFieldBase::new_with_base_field()`], [`GaloisFieldBase::new_with_convolution()`] or
+    /// the most general [`GaloisFieldBase::create()`].
     ///
     /// # Example
     /// ```rust
@@ -205,7 +205,7 @@ where
     /// Creates a new instance of the finite/galois field that is the unique
     /// field extension of the given base field and the given degree.
     ///
-    /// If you need to specify more options, consider using [`GaloisField::new_with_convolution()`]
+    /// See also [`GaloisFieldBase::new_with_convolution()`]
     /// or the most general [`GaloisField::create()`].
     ///
     /// # Example
@@ -375,7 +375,7 @@ where
     /// galois ring will be the coefficient-wise shortest lift of the generating polynomial of this
     /// galois field.
     ///
-    /// For more configuration options, use [`GaloisFieldBase::galois_ring_with()`].
+    /// For more configuration options, use [`GaloisFieldBase::galois_ring_with_convolution()`].
     pub fn galois_ring(
         &self,
         e: usize,
@@ -397,6 +397,14 @@ where
     Impl::Ring: Field + FreeAlgebra + FiniteRing,
     <BaseRingStore<Impl> as RingStore>::Ring: ZnRing + Field,
 {
+    /// Most generic function to create a finite/galois field.
+    ///
+    /// It allows specifying all associated data. Note also that the passed implementation
+    /// must indeed be a field, and this is not checked at runtime. Passing a non-field
+    /// is impossible, unless [`AsFieldBase::promise_is_field()`] is used.
+    #[stability::unstable(feature = "enable")]
+    pub fn create(base: Impl) -> Self { GaloisFieldBase { base } }
+
     /// Creates the galois ring `GR(p, e, degree)`, mirroring the structure of this galois field.
     ///
     /// A galois ring is similar to a galois field, but not a field anymore since it has prime power
@@ -452,11 +460,9 @@ where
 {
     /// Most generic function to create a finite/galois field.
     ///
-    /// It allows specifying all associated data. Note also that the passed implementation
-    /// must indeed be a field, and this is not checked at runtime. Passing a non-field
-    /// is impossible, unless [`AsFieldBase::promise_is_field()`] is used.
+    /// For details, see [`GaloisFieldBase::create()`]
     #[stability::unstable(feature = "enable")]
-    pub fn create(base: Impl) -> Self { RingValue::from(GaloisFieldBase { base }) }
+    pub fn create(base: Impl) -> Self { RingValue::from(GaloisFieldBase::create(base)) }
 }
 
 impl<Impl> Clone for GaloisFieldBase<Impl>
@@ -594,7 +600,7 @@ where
         if self.is_zero(lhs) && self.is_zero(rhs) {
             Some(self.one())
         } else {
-            self.checked_left_div(lhs, rhs)
+            self.checked_div(lhs, rhs)
         }
     }
 

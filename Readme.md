@@ -466,20 +466,20 @@ let h = ring.add(ring.mul_ref(&x, &x), ring.add_ref(&ring.mul_ref(&x, &ring.int_
 assert_el_eq!(ring, h, ring.mul(f, g));
 ```
 
-## `RingBase` vs `RingStore`
+## [`RingBase`] vs [`RingStore`]
 
-The trait `RingBase` is designed to provide a simple way of defining a ring structure.
+The trait [`RingBase`] is designed to provide a simple way of defining a ring structure.
 As such, it provides a basic interface with all ring operations, like addition, multiplication and equality testing.
 In many cases, variants of the basic operations are defined to make use of move-semantics and memory reuse.
 However, they usually have default implementations, to simplify creating new rings.
 
-On the other hand, a `RingStore` is any kind of object that gives access to an underlying `RingBase` object.
-The trait comes with default implementations for all ring operations, that just delegate calls to the underlying `RingBase` object.
+On the other hand, a [`RingStore`] is any kind of object that gives access to an underlying [`RingBase`] object.
+The trait comes with default implementations for all ring operations, that just delegate calls to the underlying [`RingBase`] object.
 In normal circumstances, this trait should not be implemented for custom types.
 
 The main power of this separation becomes apparent when we start nesting rings.
 Say we have a ring type that builds on an underlying ring type, for example a polynomial ring `PolyRing<R>` over a base ring `R`.
-In this case, `PolyRing` implements `RingBase`, but the underlying ring `R` is constrained to be `RingStore`.
+In this case, [`PolyRing`] implements [`RingBase`], but the underlying ring `R` is constrained to be [`RingStore`].
 As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` can all be used equivalently, which provides a lot of flexibility, but still works both with expensive-to-clone rings and zero-sized rings.
 
 ## Conventions and best practices
@@ -520,28 +520,30 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 
  - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like [`Zn64B`] or [`StaticRing`].
  - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example working over rationals is currently somewhat slow.
- - If you extensively use rings whose elements require dynamic memory allocation, be careful to use a custom allocator, e.g. one from [`feanor-mempool`](https://github.com/FeanorTheElf/feanor-mempool).
  - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
  - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`SparsePolyRing`] vs [`DensePolyRing`], [`KaratsubaAlgorithm`] vs [`NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
 
+[`RingStore`]: crate::ring::RingStore
+[`RingBase`]: crate::ring::RingBase
 [`IntegerRing`]: crate::ring_properties::integer::IntegerRing
 [`StaticRing`]: crate::ring_impls::primitive_int::StaticRing
-[`RustBigintRing`]: crate::rings::rust_bigint::RustBigintRing
-[`MPZ`]: crate::rings::mpir::MPZ
-[`ZnRing`]: crate::rings::zn::ZnRing
-[`Zn`]: crate::rings::zn::zn_static::Zn
-[`ZnGBBase`]: crate::rings::zn::zn_big::ZnGBBase
-[`Zn64B`]: crate::rings::zn::zn_64b::Zn64B
-[`ZnRNS`]: crate::rings::zn::zn_rns::ZnRNS
-[`PolyRing`]: crate::rings::poly::PolyRing
-[`DensePolyRing`]: crate::rings::poly::dense_poly::DensePolyRing
-[`SparsePolyRing`]: crate::rings::poly::sparse_poly::SparsePolyRing
-[`FreeAlgebra`]: crate::rings::extension::FreeAlgebra
-[`FreeAlgebraImpl`]: crate::rings::extension::extension_impl::FreeAlgebraImpl
-[`MultivariatePolyRing`]: crate::rings::multivariate::MultivariatePolyRing
-[`MultivariatePolyRingImpl`]: crate::rings::multivariate::multivariate_impl::MultivariatePolyRingImpl
-[`GaloisField`]: crate::rings::extension::galois_field::GaloisField
-[`NumberField`]: crate::rings::extension::number_field::NumberField
+[`RustBigintRing`]: crate::ring_impls::rust_bigint::RustBigintRing
+[`MPZ`]: crate::ring_impls::mpir::MPZ
+[`ZnRing`]: crate::ring_impls::zn::ZnRing
+[`Zn`]: crate::ring_impls::zn::zn_static::Zn
+[`ZnGBBase`]: crate::ring_impls::zn::zn_big::ZnGBBase
+[`Zn64B`]: crate::ring_impls::zn::zn_64b::Zn64B
+[`Zn64M`]: crate::ring_impls::zn::zn_64m::Zn64M
+[`ZnRNS`]: crate::ring_impls::zn::zn_rns::ZnRNS
+[`PolyRing`]: crate::ring_impls::poly::PolyRing
+[`DensePolyRing`]: crate::ring_impls::poly::dense_poly::DensePolyRing
+[`SparsePolyRing`]: crate::ring_impls::poly::sparse_poly::SparsePolyRing
+[`FreeAlgebra`]: crate::ring_impls::extension::FreeAlgebra
+[`FreeAlgebraImpl`]: crate::ring_impls::extension::extension_impl::FreeAlgebraImpl
+[`MultivariatePolyRing`]: crate::ring_impls::multivariate::MultivariatePolyRing
+[`MultivariatePolyRingImpl`]: crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl
+[`GaloisField`]: crate::ring_impls::extension::galois_field::GaloisField
+[`NumberField`]: crate::ring_impls::extension::number_field::NumberField
 [`CanIsoFromTo`]: crate::homomorphism::CanIsoFromTo
 [`ConvolutionAlgorithm`]: crate::algorithms::convolution::ConvolutionAlgorithm
 [`FactorPolyField`]: crate::algorithms::poly_factor::FactorPolyField

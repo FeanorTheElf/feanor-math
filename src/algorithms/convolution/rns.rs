@@ -10,7 +10,7 @@ use super::ntt::NTTConvolution;
 use crate::algorithms::miller_rabin::is_prime;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring_impls::zn::zn_64b::{Zn64B, Zn64BBase, ZnFastmul, ZnFastmulBase};
+use crate::ring_impls::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BFastmul, Zn64BFastmulBase};
 use crate::ring_impls::zn::*;
 use crate::seq::*;
 
@@ -24,7 +24,7 @@ use crate::seq::*;
 #[stability::unstable(feature = "enable")]
 pub struct RNSConvolution<
     I = BigIntRing,
-    C = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>>,
+    C = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>,
     A = Global,
     CreateC = CreateNTTConvolution,
 > where
@@ -47,7 +47,7 @@ pub struct RNSConvolution<
 #[repr(transparent)]
 pub struct RNSConvolutionZn<
     I = BigIntRing,
-    C = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>>,
+    C = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>,
     A = Global,
     CreateC = CreateNTTConvolution,
 > where
@@ -62,7 +62,7 @@ pub struct RNSConvolutionZn<
 
 /// A prepared convolution operand for a [`RNSConvolution`].
 #[stability::unstable(feature = "enable")]
-pub struct PreparedConvolutionOperand<R, C = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>>>
+pub struct PreparedConvolutionOperand<R, C = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>>
 where
     R: ?Sized + RingBase,
     C: ConvolutionAlgorithm<Zn64BBase>,
@@ -136,7 +136,7 @@ impl<A> FnOnce<(Zn64B,)> for CreateNTTConvolution<A>
 where
     A: Send + Sync + Allocator + Clone,
 {
-    type Output = NTTConvolution<Zn64BBase, ZnFastmulBase, CanHom<ZnFastmul, Zn64B>, A>;
+    type Output = NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>, A>;
 
     extern "rust-call" fn call_once(self, args: (Zn64B,)) -> Self::Output { self.call(args) }
 }
@@ -154,7 +154,7 @@ where
 {
     extern "rust-call" fn call(&self, args: (Zn64B,)) -> Self::Output {
         let ring = args.0;
-        let ring_fastmul = ZnFastmul::new(ring).unwrap();
+        let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
         let hom = ring.into_can_hom(ring_fastmul).ok().unwrap();
         NTTConvolution::new_with_hom(hom, self.allocator.clone())
     }

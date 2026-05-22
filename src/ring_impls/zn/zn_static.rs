@@ -77,10 +77,6 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnSBase<N, IS_FIELD> {
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
 
-    fn is_commutative(&self) -> bool { true }
-
-    fn is_noetherian(&self) -> bool { true }
-
     fn fmt_el_within<'a>(
         &self,
         value: &Self::Element,
@@ -124,7 +120,7 @@ impl<const N: u64, const IS_FIELD: bool> CanIsoFromTo<ZnSBase<N, IS_FIELD>> for 
 }
 
 impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnSBase<N, IS_FIELD> {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         let (s, _, d) = ZZi64.extended_ideal_gen(&((*rhs).try_into().unwrap()), &(N as i64));
         let mut rhs_inv = ((s % (N as i64)) + (N as i64)) as u64;
         if rhs_inv >= N {
@@ -159,7 +155,7 @@ impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnSBase<N, IS_FI
 impl<const N: u64> EuclideanRing for ZnSBase<N, true> {
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+        (self.checked_div(&lhs, rhs).unwrap(), self.zero())
     }
 
     fn euclidean_deg(&self, val: &Self::Element) -> Option<usize> { if self.is_zero(val) { Some(0) } else { Some(1) } }
@@ -298,12 +294,21 @@ impl<const N: u64, const IS_FIELD: bool> RingValue<ZnSBase<N, IS_FIELD>> {
 }
 
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
-/// at compile time. For details, see [`ZnBase`].
+/// at compile time. For details, see [`ZnSBase`].
+///
+/// When the modulus is not known at compile-time, consider using [`Zn64B`].
+///
+/// [`Zn64B`]: crate::ring_impls::zn::zn_64b::Zn64B
 #[stability::unstable(feature = "enable")]
 pub type Zn<const N: u64> = RingValue<ZnSBase<N, false>>;
 
 /// Ring that implements arithmetic in `Z/nZ` for a small `n` known
-/// at compile time. For details, see [`ZnBase`].
+/// at compile time. For details, see [`ZnSBase`].
+///
+/// When the modulus is not known at compile-time, consider using [`Zn64B`] and
+/// converting it into a field using [`ZnRingStore::as_field()`].
+///
+/// [`Zn64B`]: crate::ring_impls::zn::zn_64b::Zn64B
 #[stability::unstable(feature = "enable")]
 pub type Fp<const P: u64> = RingValue<ZnSBase<P, true>>;
 

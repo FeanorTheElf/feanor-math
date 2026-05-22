@@ -11,7 +11,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use tracing::instrument;
 
 use crate::algorithms::bigint_ops::*;
-use crate::algorithms::eea::{eea, gcd, partial_eea_int};
+use crate::algorithms::euclid::{general_euclid, general_extended_euclid, partial_extended_euclid_int};
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
@@ -48,7 +48,7 @@ pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 /// Arbitrary-precision integer implementation.
 ///
 /// This is a not-too-well optimized implementation, written in pure Rust.
-/// If you need very high performance, consider using [`crate::rings::mpir::MPZ`]
+/// If you need very high performance, consider using [`crate::ring_impls::mpir::MPZ`]
 /// (requires an installation of mpir and activating the feature "mpir").
 #[derive(Copy, Clone)]
 pub struct RustBigintRingBase<A: Allocator + Send + Sync + Clone = Global> {
@@ -218,9 +218,6 @@ impl<A: Allocator + Send + Sync + Clone> RingBase for RustBigintRingBase<A> {
         value.0 == true && effective_length(&value.1) == 1 && value.1[0] == 1
     }
 
-    fn is_commutative(&self) -> bool { true }
-    fn is_noetherian(&self) -> bool { true }
-
     fn fmt_el_within<'a>(
         &self,
         value: &Self::Element,
@@ -317,7 +314,7 @@ impl<A: Allocator + Send + Sync + Clone> OrderedRing for RustBigintRingBase<A> {
 }
 
 impl<A: Allocator + Send + Sync + Clone> DivisibilityRing for RustBigintRingBase<A> {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(rhs) && self.is_zero(lhs) {
             return Some(self.zero());
         } else if self.is_zero(rhs) {
@@ -343,7 +340,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.one());
         }
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 
     #[instrument(skip_all, level = "trace")]
@@ -413,7 +410,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
                 // by the bound given by `partial_eea_int()`, we find that `b_new < 2**32`
                 // and also `|transform[2]|, |transform[3]| <= a / (a_new - b_new) < 2**64 / 2**31 = 2**33`;
                 // thus we decreased the size of at least one new value from >= 2**47 to at most 3 * 2**33
-                let (transform, _) = partial_eea_int(ZZi64, a_head, b_head, &(1 << 32));
+                let (transform, _) = partial_extended_euclid_int(ZZi64, a_head, b_head, &(1 << 32));
 
                 let apply_transform = |[a, b]: [&mut RustBigint<A>; 2]| {
                     let new_b = from_i64.fma_map(&b, &transform[3], from_i64.mul_ref_map(&a, &transform[2]));
@@ -465,7 +462,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
         sa = self.fma(&quo, &sb, sa);
         ta = self.fma(&quo, &tb, ta);
 
-        let (s_final, t_final, d) = eea(a as i64, b as i64, ZZi64);
+        let (s_final, t_final, d) = general_extended_euclid(a as i64, b as i64, ZZi64);
         return (
             from_i64.fma_map(&sb, &t_final, from_i64.mul_map(sa, s_final)),
             from_i64.fma_map(&tb, &t_final, from_i64.mul_map(ta, s_final)),
@@ -520,7 +517,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
                 let b_head = get_abs_head_bits(&b, shift);
                 debug_assert!(b_head.abs() >= (1 << 47));
 
-                let (transform, _) = partial_eea_int(ZZi64, a_head, b_head, &(1 << 32));
+                let (transform, _) = partial_extended_euclid_int(ZZi64, a_head, b_head, &(1 << 32));
 
                 let new_b = from_i64.fma_map(&b, &transform[3], from_i64.mul_ref_map(&a, &transform[2]));
                 a = from_i64.fma_map(&b, &transform[1], from_i64.mul_map(a, transform[0]));
@@ -551,7 +548,7 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBa
         debug_assert!(a <= i64::MAX as u64);
 
         self.negate_inplace(&mut quo);
-        let d = gcd(a as i64, b as i64, ZZi64);
+        let d = general_euclid(a as i64, b as i64, ZZi64);
         return from_i64.map(d);
     }
 }

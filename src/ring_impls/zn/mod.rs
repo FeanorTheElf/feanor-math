@@ -4,21 +4,22 @@ use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::as_field::AsFieldBase;
 
-/// This module contains [`zn_64::Zn`], the new, heavily optimized implementation of `Z/nZ`
-/// for moduli `n` of size slightly smaller than 64 bits.
+/// This module contains [`zn_64b::Zn64B`], the new, heavily optimized implementation of `Z/nZ`
+/// for moduli `n` of size slightly smaller than 64 bits, based on Barett reduction.
 pub mod zn_64b;
-/// This module contains [`zn_big::Zn`], a general-purpose implementation of
+/// This module contains [`zn_64m::Zn64M`], the new, heavily optimized implementation of `Z/nZ`
+/// for moduli `n` of size slightly smaller than 64 bits, based on Montgomery reduction.
+pub mod zn_64m;
+/// This module contains [`zn_big::ZnGB`], a general-purpose implementation of
 /// Barett reduction. It is relatively slow when instantiated with small fixed-size
 /// integer type.
 pub mod zn_big;
-/// This module contains [`zn_rns::Zn`], a residue number system (RNS) implementation of
+/// This module contains [`zn_rns::ZnRNS`], a residue number system (RNS) implementation of
 /// `Z/nZ` for highly composite `n`.
 pub mod zn_rns;
 /// This module contains [`zn_static::Zn`], an implementation of `Z/nZ` for a small `n`
 /// that is known at compile-time.
 pub mod zn_static;
-
-pub mod zn_64m;
 
 /// Trait for all rings that represent a quotient of the integers `Z/nZ` for some integer `n`.
 pub trait ZnRing: PrincipalIdealRing + FiniteRing + CanHomFrom<Self::IntegerRingBase> {
@@ -224,7 +225,7 @@ pub mod generic_impls {
 
     /// Generates a uniformly random element of `Z/nZ` using the randomness of `rng`.
     /// Designed to be used when implementing
-    /// [`crate::rings::finite::FiniteRing::random_element()`].
+    /// [`crate::ring_impls::finite::FiniteRing::random_element()`].
     #[stability::unstable(feature = "enable")]
     pub fn random_element<R: ZnRing, G: FnMut() -> u64>(ring: &R, rng: G) -> R::Element {
         ring.map_in(
@@ -235,9 +236,9 @@ pub mod generic_impls {
     }
 
     /// Computes the checked division in `Z/nZ`. Designed to be used when implementing
-    /// [`crate::ring_properties::divisibility::DivisibilityRing::checked_left_div()`].
+    /// [`crate::ring_properties::divisibility::DivisibilityRing::checked_div()`].
     #[stability::unstable(feature = "enable")]
-    pub fn checked_left_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>) -> Option<El<R>>
+    pub fn checked_div<R: ZnRingStore>(ring: R, lhs: &El<R>, rhs: &El<R>) -> Option<El<R>>
     where
         R::Ring: ZnRing,
     {
@@ -263,7 +264,6 @@ pub mod generic_impls {
         if ring.is_zero(lhs) && ring.is_zero(rhs) {
             return Some(ring.one());
         }
-        assert!(ring.is_noetherian());
         let int_ring = ring.integer_ring();
         let rhs_ann = int_ring
             .checked_div(

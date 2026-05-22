@@ -257,7 +257,7 @@ where
     /// If this ring is a field, returns a wrapper around this ring that implements
     /// [`crate::ring_properties::field::FieldStore`].
     ///
-    /// For details, see [`crate::rings::field::AsField`].
+    /// For details, see [`crate::ring_impls::as_field::AsField`].
     fn as_field(self) -> Result<AsField<Self>, Self>
     where
         Self::Ring: DivisibilityRing,

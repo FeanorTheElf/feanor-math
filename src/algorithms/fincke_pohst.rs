@@ -21,7 +21,7 @@ use crate::ring_properties::ordered::OrderedRingStore;
 /// closest vectors, this can be used to speed up the remaining computation once a solution
 /// has been found.
 ///
-/// Note that using [`crate::rings::float_real::Real64`] for `RR` will result in a computation
+/// Note that using [`crate::ring_impls::float_real::Real64`] for `RR` will result in a computation
 /// with floating point numbers, and thus points of squared distance roughly `radius_sqr` may
 /// not be selected accurately.
 #[stability::unstable(feature = "enable")]

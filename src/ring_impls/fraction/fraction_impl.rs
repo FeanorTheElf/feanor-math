@@ -41,10 +41,7 @@ where
     R::Ring: Domain,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(base_ring: R) -> Self {
-        assert!(base_ring.get_ring().is_commutative());
-        RingValue::from(FractionFieldImplBase { base_ring })
-    }
+    pub fn new(base_ring: R) -> Self { RingValue::from(FractionFieldImplBase { base_ring }) }
 }
 
 impl<R> FractionFieldImplBase<R>
@@ -203,14 +200,6 @@ where
 
     fn is_approximate(&self) -> bool { self.base_ring.get_ring().is_approximate() }
 
-    fn is_commutative(&self) -> bool {
-        // we currently enforce this, see assertion in construction; I'm not
-        // sure if fraction field even works for noncommutative rings
-        true
-    }
-
-    fn is_noetherian(&self) -> bool { true }
-
     fn from_int(&self, value: i32) -> Self::Element { self.from(self.base_ring.int_hom().map(value)) }
 
     fn fmt_el_within<'a>(
@@ -274,7 +263,7 @@ where
     R: RingStore,
     R::Ring: Domain,
 {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             Some(self.zero())
         } else if self.is_zero(rhs) {
@@ -347,7 +336,7 @@ where
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.one());
         }
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -374,7 +363,7 @@ where
 
     fn euclidean_div_rem(&self, lhs: Self::Element, rhs: &Self::Element) -> (Self::Element, Self::Element) {
         assert!(!self.is_zero(rhs));
-        (self.checked_left_div(&lhs, rhs).unwrap(), self.zero())
+        (self.checked_div(&lhs, rhs).unwrap(), self.zero())
     }
 }
 

@@ -4,7 +4,6 @@ use std::mem::swap;
 use tracing::instrument;
 
 use crate::prelude::*;
-use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_properties::integer::IntegerRing;
 use crate::ring_properties::ordered::OrderedRingStore;
 
@@ -14,15 +13,14 @@ use crate::ring_properties::ordered::OrderedRingStore;
 /// In most cases, prefer [`PrincipalIdealRing::extended_ideal_gen()`].
 ///
 /// The gcd `d` is only unique up to units, and `s, t` are not unique at all.
-/// No guarantees are given on which of these solutions is returned. For integers,
-/// see [`signed_eea()`] which gives more guarantees.
+/// No guarantees are given on which of these solutions is returned.
 ///
 /// Note that this function always uses the euclidean algorithm to compute these values.
 /// In most cases, it is instead recommended to use [`PrincipalIdealRing::extended_ideal_gen()`],
-/// which uses a ring-specific algorithm to compute the Bezout identity (which will of
-/// course be [`eea()`] in some cases).
+/// which uses a ring-specific algorithm to compute the Bezout identity (which can often be
+/// more efficient than [`general_extended_euclid()`]).
 #[instrument(skip_all, level = "trace")]
-pub fn eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
+pub fn general_extended_euclid<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 where
     R: RingStore,
     R::Ring: EuclideanRing,
@@ -53,7 +51,7 @@ where
 
 /// The same as [`eea()`], but defined as const-fn and only for `i128`.
 #[stability::unstable(feature = "enable")]
-pub const fn const_eea(a: i128, b: i128) -> (i128, i128, i128) {
+pub const fn const_extended_euclid(a: i128, b: i128) -> (i128, i128, i128) {
     let (mut a, mut b) = (a, b);
 
     let (mut sa, mut ta) = (1, 0);
@@ -80,7 +78,7 @@ pub const fn const_eea(a: i128, b: i128) -> (i128, i128, i128) {
 /// For details, see [`eea()`].
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn half_eea<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
+pub fn half_extended_euclid<R>(a: El<R>, b: El<R>, ring: R) -> (El<R>, El<R>)
 where
     R: RingStore,
     R::Ring: EuclideanRing,
@@ -112,7 +110,7 @@ where
 /// a ring-specific algorithm to compute the gcd (which will of course be [`gcd()`] in some cases).
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
+pub fn general_euclid<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 where
     R: RingStore,
     R::Ring: EuclideanRing,
@@ -126,68 +124,6 @@ where
         b = r;
     }
     return a;
-}
-
-/// Computes `[s, t, s', t']` such that `x := s * a + t * b` and `x' := s' * a + t' * b`
-/// are the current pair of values during the Euclidean Algorithm when, for the first
-/// time, we find `deg(x') <= target_deg`.
-///
-/// In particular, we have `deg(x) > target_deg` and `deg(x') <= target_deg`, except if `a, b`
-/// already both have degree `<= target_deg`.
-///
-/// The degrees of `s, t, s', t'` are bounded as
-/// ```text
-///   deg(s) <= deg(b) - deg(x)
-///   deg(t) <= deg(a) - deg(x)
-///   deg(s') <= deg(b) - deg(x')
-///   deg(t') <= deg(a) - deg(x')
-/// ```
-/// except if either `a` or `b` already have degree `<= target_deg` (i.e. no steps in
-/// the Euclidean algorithm are performed), in which case only the two bounds involving
-/// the larger one of `deg(a)` resp. `deg(b)` hold.
-///
-/// The proof of this is similar to the one outlined in [`partial_eea_int()`], but simpler, because
-/// the degree-valuation is non-Archimedean.
-#[stability::unstable(feature = "enable")]
-#[instrument(skip_all, level = "trace")]
-pub fn partial_eea_poly<P>(ring: P, lhs: El<P>, rhs: El<P>, target_deg: usize) -> ([El<P>; 4], [El<P>; 2])
-where
-    P: RingStore + Copy,
-    P::Ring: PolyRing + EuclideanRing,
-{
-    if ring.is_zero(&lhs) || ring.is_zero(&rhs) {
-        return ([ring.one(), ring.zero(), ring.zero(), ring.one()], [lhs, rhs]);
-    }
-    let (mut a, mut b) = (lhs.clone(), rhs.clone());
-    let (mut sa, mut ta) = (ring.one(), ring.zero());
-    let (mut sb, mut tb) = (ring.zero(), ring.one());
-
-    if ring.degree(&a).unwrap() < ring.degree(&b).unwrap() {
-        swap(&mut a, &mut b);
-        swap(&mut sa, &mut sb);
-        swap(&mut ta, &mut tb);
-    }
-
-    while ring.degree(&b).unwrap_or(0) > target_deg {
-        debug_assert!(ring.eq_el(&a, &ring.add(ring.mul_ref(&sa, &lhs), ring.mul_ref(&ta, &rhs))));
-        debug_assert!(ring.eq_el(&b, &ring.add(ring.mul_ref(&sb, &lhs), ring.mul_ref(&tb, &rhs))));
-
-        let (quo, rem) = ring.euclidean_div_rem(a, &b);
-        let tb_new = ring.sub(ta, ring.mul_ref(&quo, &tb));
-        let sb_new = ring.sub(sa, ring.mul_ref_snd(quo, &sb));
-        let b_new = rem;
-
-        ta = tb;
-        sa = sb;
-        a = b;
-        tb = tb_new;
-        sb = sb_new;
-        b = b_new;
-
-        debug_assert!(ring.degree(&sb).unwrap() <= ring.degree(&rhs).unwrap() - ring.degree(&b).unwrap_or(0));
-        debug_assert!(ring.degree(&tb).unwrap() <= ring.degree(&lhs).unwrap() - ring.degree(&b).unwrap_or(0));
-    }
-    return ([sa, ta, sb, tb], [a, b]);
 }
 
 /// Computes `[s, t, s', t']` such that `x := s * a + t * b` and `x' := s' * a + t' * b`
@@ -229,7 +165,7 @@ where
 ///  - unfortunately, it does not apply to `i = 0`
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn partial_eea_int<R>(ring: R, lhs: El<R>, rhs: El<R>, target_size: &El<R>) -> ([El<R>; 4], [El<R>; 2])
+pub fn partial_extended_euclid_int<R>(ring: R, lhs: El<R>, rhs: El<R>, target_size: &El<R>) -> ([El<R>; 4], [El<R>; 2])
 where
     R: RingStore + Copy,
     R::Ring: IntegerRing,
@@ -272,92 +208,25 @@ where
     return ([sa, ta, sb, tb], [a, b]);
 }
 
-#[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::*;
-#[cfg(test)]
-use crate::ring_impls::zn::*;
-
 #[test]
 fn test_gcd() {
     feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(3, gcd(15, 6, &ZZi64).abs());
-    assert_eq!(3, gcd(6, 15, &ZZi64).abs());
+    assert_eq!(3, general_euclid(15, 6, &ZZi64).abs());
+    assert_eq!(3, general_euclid(6, 15, &ZZi64).abs());
 
-    assert_eq!(7, gcd(0, 7, &ZZi64).abs());
-    assert_eq!(7, gcd(7, 0, &ZZi64).abs());
-    assert_eq!(0, gcd(0, 0, &ZZi64).abs());
+    assert_eq!(7, general_euclid(0, 7, &ZZi64).abs());
+    assert_eq!(7, general_euclid(7, 0, &ZZi64).abs());
+    assert_eq!(0, general_euclid(0, 0, &ZZi64).abs());
 
-    assert_eq!(1, gcd(9, 1, &ZZi64).abs());
-    assert_eq!(1, gcd(1, 9, &ZZi64).abs());
+    assert_eq!(1, general_euclid(9, 1, &ZZi64).abs());
+    assert_eq!(1, general_euclid(1, 9, &ZZi64).abs());
 
-    assert_eq!(1, gcd(13, 300, &ZZi64).abs());
-    assert_eq!(1, gcd(300, 13, &ZZi64).abs());
+    assert_eq!(1, general_euclid(13, 300, &ZZi64).abs());
+    assert_eq!(1, general_euclid(300, 13, &ZZi64).abs());
 
-    assert_eq!(3, gcd(-15, 6, &ZZi64).abs());
-    assert_eq!(3, gcd(6, -15, &ZZi64).abs());
-    assert_eq!(3, gcd(-6, -15, &ZZi64).abs());
-}
-
-#[test]
-fn test_partial_eea_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Zn64B::new(65537).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let test_on_input = |a: &El<DensePolyRing<_>>, b: &El<DensePolyRing<_>>, deg| {
-        let ([s, t, s_, t_], [x, x_]) = partial_eea_poly(&poly_ring, a.clone(), b.clone(), deg);
-        assert_el_eq!(
-            &poly_ring,
-            poly_ring.add(poly_ring.mul_ref(&s, a), poly_ring.mul_ref(&t, b)),
-            &x
-        );
-        assert_el_eq!(
-            &poly_ring,
-            poly_ring.add(poly_ring.mul_ref(&s_, a), poly_ring.mul_ref(&t_, b)),
-            &x_
-        );
-        let a_deg = poly_ring.degree(a).unwrap_or(0);
-        let b_deg = poly_ring.degree(b).unwrap_or(0);
-        if a_deg <= deg && b_deg <= deg {
-            assert!(poly_ring.degree(&x).unwrap_or(0) <= deg);
-            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-        } else if a_deg <= deg || b_deg <= deg {
-            assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
-            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-            if a_deg >= b_deg {
-                assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
-                assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
-            } else {
-                assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
-                assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
-            }
-        } else {
-            assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
-            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-            assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
-            assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
-        }
-    };
-
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
-            X.pow_ref(10) + X.pow_ref(6) + 1,
-        ]
-    });
-    for deg in (0..10).rev() {
-        test_on_input(&f, &g, deg);
-        test_on_input(&g, &f, deg);
-    }
-
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(5) - 1, X.pow_ref(10) - 1]);
-    for deg in (0..5).rev() {
-        test_on_input(&f, &g, deg);
-        test_on_input(&g, &f, deg);
-    }
+    assert_eq!(3, general_euclid(-15, 6, &ZZi64).abs());
+    assert_eq!(3, general_euclid(6, -15, &ZZi64).abs());
+    assert_eq!(3, general_euclid(-6, -15, &ZZi64).abs());
 }
 
 #[test]
@@ -366,7 +235,7 @@ fn test_partial_int() {
     let test_on_input = |a: i64, b: i64, size: i64| {
         assert!(a != 0);
         assert!(b != 0);
-        let ([s, t, s_, t_], [x, x_]) = partial_eea_int(ZZi64, a, b, &size);
+        let ([s, t, s_, t_], [x, x_]) = partial_extended_euclid_int(ZZi64, a, b, &size);
         assert_eq!(x, s * a + t * b);
         assert_eq!(x_, s_ * a + t_ * b);
         if a.abs() <= size && b.abs() <= size {

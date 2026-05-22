@@ -341,10 +341,7 @@ where
     R::Ring: HashableElRing + DivisibilityRing,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(ring: R) -> Self {
-        assert!(ring.is_commutative());
-        return Self(ring);
-    }
+    pub fn new(ring: R) -> Self { return Self(ring); }
 
     #[stability::unstable(feature = "enable")]
     pub fn underlying_ring(&self) -> &R { &self.0 }

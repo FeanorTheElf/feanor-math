@@ -11,7 +11,7 @@ use super::{zn_big, *};
 use crate::algorithms::convolution::{
     DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution,
 };
-use crate::algorithms::eea::const_eea;
+use crate::algorithms::euclid::const_extended_euclid;
 use crate::algorithms::matmul::StrassenHint;
 use crate::iters::multi_cartesian_product;
 use crate::ring_impls::extension::FreeAlgebraStore;
@@ -45,7 +45,7 @@ impl Zn64MBase {
         Self {
             modulus: modulus as i64,
             modulus_times_three: modulus * 3,
-            n_inv_mod_R: const_eea(modulus as i128, 1 << 64).0 as u64,
+            n_inv_mod_R: const_extended_euclid(modulus as i128, 1 << 64).0 as u64,
             R_sqr_mod_n: ((((1 << 64) % modulus as i128) * (1 << 64) % modulus as i128) % modulus as i128) as u64,
         }
     }
@@ -175,9 +175,6 @@ impl RingBase for Zn64MBase {
         }
         return reduced == 0 || reduced == self.modulus_u64();
     }
-
-    fn is_commutative(&self) -> bool { true }
-    fn is_noetherian(&self) -> bool { true }
 
     fn fmt_el_within<'a>(
         &self,
@@ -389,8 +386,8 @@ impl CanIsoFromTo<zn_64b::Zn64BBase> for Zn64MBase {
 impl DivisibilityRing for Zn64MBase {
     type PreparedDivisorData = ();
 
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        super::generic_impls::checked_left_div(RingRef::from(self), lhs, rhs)
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+        super::generic_impls::checked_div(RingRef::from(self), lhs, rhs)
     }
 
     fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }

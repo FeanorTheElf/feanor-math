@@ -8,7 +8,7 @@ use serde::de::{DeserializeOwned, DeserializeSeed};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
-use crate::algorithms::eea::eea;
+use crate::algorithms::euclid::{general_euclid, general_extended_euclid};
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
 use crate::homomorphism::*;
@@ -121,7 +121,7 @@ specialize_int_cast! {
 impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
     type PreparedDivisorData = PrimitiveIntPreparedDivisorData<T>;
 
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.zero());
         } else if self.is_zero(rhs) {
@@ -161,7 +161,7 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         };
     }
 
-    fn checked_left_div_prepared(
+    fn checked_div_prepared(
         &self,
         lhs: &Self::Element,
         rhs: &Self::Element,
@@ -170,7 +170,7 @@ impl<T: PrimitiveInt> DivisibilityRing for StaticRingBase<T> {
         // currently prepared division is not implemented for i128, as using Barett-reduction here
         // requires 256-bit arithmetic, and I saw no need to make that effort
         if TypeId::of::<T>() == TypeId::of::<i128>() {
-            return self.checked_left_div(lhs, &rhs);
+            return self.checked_div(lhs, &rhs);
         }
         if *rhs == T::from(0) {
             if *lhs == T::from(0) { Some(T::from(0)) } else { None }
@@ -209,7 +209,7 @@ impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
         if self.is_zero(lhs) && self.is_zero(rhs) {
             return Some(self.one());
         }
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -217,7 +217,11 @@ impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        eea(*lhs, *rhs, StaticRing::<T>::RING)
+        general_extended_euclid(*lhs, *rhs, StaticRing::<T>::RING)
+    }
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        general_euclid(*lhs, *rhs, StaticRing::<T>::RING)
     }
 }
 
@@ -393,9 +397,6 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
     fn from_int(&self, value: i32) -> Self::Element { T::try_from(value).map_err(|_| ()).unwrap() }
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
-
-    fn is_commutative(&self) -> bool { true }
-    fn is_noetherian(&self) -> bool { true }
 
     fn fmt_el_within<'a>(
         &self,
@@ -643,13 +644,13 @@ fn test_prepared_div() {
                 if y == 0 {
                     assert!(
                         div_x
-                            .checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
+                            .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
                             .is_some()
                     );
                 } else {
                     assert!(
                         div_x
-                            .checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
+                            .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
                             .is_none()
                     );
                 }
@@ -659,13 +660,13 @@ fn test_prepared_div() {
                 assert_eq!(
                     y / x,
                     div_x
-                        .checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
+                        .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
                         .unwrap()
                 );
             } else {
                 assert!(
                     div_x
-                        .checked_left_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
+                        .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
                         .is_none()
                 );
             }

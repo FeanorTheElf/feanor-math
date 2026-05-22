@@ -109,7 +109,7 @@ use crate::ring_properties::specialization::*;
 ///
 /// # Why not relative number fields?
 ///
-/// Same as [`crate::rings::extension::galois_field::GaloisFieldBase`], this type represents
+/// Same as [`crate::ring_impls::extension::galois_field::GaloisFieldBase`], this type represents
 /// number fields globally, i.e. always in the form `Q[X]/(f(X))`. By the primitive element
 /// theorem, each number field can be written in this form. However, it might be more natural
 /// in some applications to write it as an extension of a smaller number field, say `L =
@@ -135,7 +135,7 @@ use crate::ring_properties::specialization::*;
 ///
 /// # Choice of blanket implementations of [`CanHomFrom`]
 ///
-/// This is done analogously to [`crate::rings::extension::galois_field::GaloisFieldBase`], see
+/// This is done analogously to [`crate::ring_impls::extension::galois_field::GaloisFieldBase`], see
 /// the description there.
 pub struct NumberFieldBase<Impl = DefaultNumberFieldImpl, I = BigIntRing>
 where
@@ -197,7 +197,7 @@ impl NumberFieldBase {
     /// `None` is returned.
     ///
     /// If the given polynomial is not integral or not monic, consider using
-    /// [`NumberField::try_adjoin_root()`] instead.
+    /// [`NumberFieldBase::try_adjoin_root()`] instead.
     pub fn try_new<P>(poly_ring: P, generating_poly: &El<P>) -> Option<Self>
     where
         P: RingStore,

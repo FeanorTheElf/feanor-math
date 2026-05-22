@@ -87,6 +87,10 @@ where
 }
 
 /// Tries to compute the gcd of monic polynomials `f, g in Z[X]`.
+///
+/// This will fail if `lhs/d, d` and `rhs/d, d` are both not pairwise coprime, where `d = gcd(lhs,
+/// rhs)`. It can, in theory, also fail in other settings, but the probability is very low for
+/// larger values of `attempts`.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn poly_gcd_integer_monic<P>(ZZX: P, lhs: &El<P>, rhs: &El<P>, attempts: usize) -> PolyGCDResult<El<P>>
@@ -144,7 +148,13 @@ where
     )
 }
 
-/// Tries to compute the gcd of monic polynomials `f, g in Z[X]`.
+/// Computes the gcd of monic polynomials `f, g in Z[X]`.
+///
+/// Use this when implementing [`PolyTFracGCDRing`] for integer
+/// rings; Otherwise, compute power decompositions through [`PolyTFracGCDRing::gcd()`].
+///
+/// [`PolyTFracGCDRing`]: crate::algorithms::poly_gcd::PolyTFracGCDRing
+/// [`PolyTFracGCDRing::gcd()`]: crate::algorithms::poly_gcd::PolyTFracGCDRing::gcd()
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn poly_gcd_integer<P>(ZZX: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
@@ -260,7 +270,7 @@ where
     }
 }
 
-/// Tries to compute the power decomposition of monic polynomials `f, g in Z[X]`.
+/// Computes the power decomposition of monic polynomials `f, g in Z[X]`.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn poly_power_decomposition_integer_monic<P>(ZZX: P, poly: &El<P>, attempts: usize) -> Vec<(El<P>, usize)>
@@ -310,7 +320,14 @@ where
     .unwrap()
 }
 
-/// Tries to compute the power decomposition of polynomials `f, g in Z[X]`.
+/// Computes the power decomposition of polynomials `f, g in Z[X]` over the integers.
+///
+/// Use this when implementing [`PolyTFracGCDRing`] for integer
+/// rings; Otherwise, compute power decompositions through
+/// [`PolyTFracGCDRing::poly_power_decomposition()`].
+///
+/// [`PolyTFracGCDRing`]: crate::algorithms::poly_gcd::PolyTFracGCDRing
+/// [`PolyTFracGCDRing::poly_power_decomposition()`]: crate::algorithms::poly_gcd::PolyTFracGCDRing::poly_power_decomposition()
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn poly_power_decomposition_integer<P>(ZZX: P, poly: &El<P>) -> Vec<(El<P>, usize)>

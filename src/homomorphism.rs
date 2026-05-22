@@ -302,7 +302,7 @@ where
 /// assert!(Zn_rns.can_iso(&Zn_rns).is_some());
 /// ```
 /// Most notably, reduction homomorphisms are currently not available.
-/// You can use [`crate::rings::zn::ZnReductionMap`] instead.
+/// You can use [`crate::ring_impls::zn::ZnReductionMap`] instead.
 /// ```rust
 /// # use feanor_math::ring::*;
 /// # use feanor_math::primitive_int::*;
@@ -317,7 +317,7 @@ where
 /// assert_el_eq!(Z3, Z3.one(), mod_3.map(Z9.int_hom().map(4)));
 /// ```
 /// Additionally, there are the projections `Z -> Z/nZ`.
-/// They are all implemented, even though [`crate::rings::zn::ZnRing`] currently
+/// They are all implemented, even though [`crate::ring_impls::zn::ZnRing`] currently
 /// only requires the projection from the "associated" integer ring.
 /// ```rust
 /// # use feanor_math::ring::*;

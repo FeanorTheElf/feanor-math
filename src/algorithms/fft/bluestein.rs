@@ -170,10 +170,12 @@ where
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like
-    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// [`Zn64BFastmul`] to precompute some data for better performance.
     ///
     /// Do not use this for approximate rings, as computing the powers of `root_of_unity`
     /// will incur avoidable precision loss.
+    ///
+    /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
     pub fn new_with_hom(
         hom: H,
         root_of_unity_2n: R_twiddle::Element,
@@ -220,7 +222,9 @@ where
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like
-    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// [`Zn64BFastmul`] to precompute some data for better performance.
+    ///
+    /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
     pub fn new_with_pows_with_hom<F, G>(
         hom: H,
         mut root_of_unity_2n_pows: F,
@@ -246,7 +250,9 @@ where
     /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
     /// precomputed will be stored as elements of `R`, while the main FFT computations will be
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like
-    /// [`zn_64::ZnFastmul`] to precompute some data for better performance.
+    /// [`Zn64BFastmul`] to precompute some data for better performance.
+    ///
+    /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
     pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>
     where
         R_twiddle: ZnRing,
@@ -279,7 +285,6 @@ where
         let m = m_fft_table.len();
         assert!(m >= 2 * n);
         assert!(n % 2 == 1);
-        assert!(hom.codomain().is_commutative());
         assert!(
             hom.domain().get_ring().is_approximate()
                 || is_prim_root_of_unity_general(hom.domain(), &root_of_unity_n_pows(1), n)
@@ -522,7 +527,7 @@ fn test_fft_base() {
 fn test_fft_fastmul() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(241);
-    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
+    let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
     let fft = BluesteinFFT::new_with_hom(
         ring.can_hom(&fastmul_ring).unwrap(),
         fastmul_ring.int_hom().map(36),
@@ -578,7 +583,7 @@ const BENCH_SIZE: usize = 1009;
 fn bench_bluestein(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(18597889);
-    let fastmul_ring = zn_64b::ZnFastmul::new(ring).unwrap();
+    let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * BENCH_SIZE).unwrap());
     let fft = BluesteinFFT::new_with_hom(

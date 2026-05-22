@@ -102,10 +102,6 @@ impl RingBase for Real64Base {
         }
     }
 
-    fn is_commutative(&self) -> bool { true }
-
-    fn is_noetherian(&self) -> bool { true }
-
     fn is_approximate(&self) -> bool { true }
 
     fn fmt_el_within<'a>(
@@ -130,7 +126,7 @@ impl_eq_based_self_iso! { Real64Base }
 impl Domain for Real64Base {}
 
 impl DivisibilityRing for Real64Base {
-    fn checked_left_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
+    fn checked_div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         assert!(*rhs != 0.0);
         return Some(*lhs / *rhs);
     }
@@ -140,7 +136,7 @@ impl DivisibilityRing for Real64Base {
 
 impl PrincipalIdealRing for Real64Base {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
-        self.checked_left_div(lhs, rhs)
+        self.checked_div(lhs, rhs)
     }
 
     fn extended_ideal_gen(
@@ -180,9 +176,7 @@ impl DefaultConvolutionRing for Real64Base {
 }
 
 impl Field for Real64Base {
-    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.checked_left_div(lhs, rhs).unwrap()
-    }
+    fn div(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element { self.checked_div(lhs, rhs).unwrap() }
 }
 
 impl OrderedRing for Real64Base {

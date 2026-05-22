@@ -203,7 +203,6 @@ where
             ));
             new_hom.map_ref(root_of_unity)
         };
-        assert!(ring.is_commutative());
         assert!(ring.get_ring().is_approximate() || is_prim_root_of_unity_general(&ring, &root_of_unity, self.len()));
 
         return (
@@ -584,7 +583,7 @@ fn test_radix3_butterflies() {
     feanor_tracing::DelayedLogger::init_test();
     let log3_n = 3;
     let ring = Zn64B::new(109);
-    let ring_fastmul = ZnFastmul::new(ring).unwrap();
+    let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
     let int_hom = ring.int_hom();
     let i = |x| int_hom.map(x);
     let zeta = i(97);
@@ -634,7 +633,7 @@ fn test_radix3_inv_fft() {
     feanor_tracing::DelayedLogger::init_test();
     let log3_n = 3;
     let ring = Zn64B::new(109);
-    let ring_fastmul = ZnFastmul::new(ring).unwrap();
+    let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
     let zeta = ring.int_hom().map(97);
     let fft = CooleyTukeyRadix3FFT::new_with_hom(
         ring.into_can_hom(ring_fastmul).ok().unwrap(),

@@ -24,24 +24,16 @@ use crate::ring_impls::zn::zn_big::ZnGB;
 use crate::ring_impls::zn::*;
 use crate::seq::{VectorFn, VectorView};
 
-#[stability::unstable(feature = "enable")]
 #[derive(Debug, Copy, Clone)]
-pub enum QuotientAtError {
+enum QuotientAtError {
     Ramified,
     ReductionNotWellDefined,
 }
 
-#[stability::unstable(feature = "enable")]
-pub type ResidueField = GaloisField<AsField<FreeAlgebraImpl<AsField<Zn64B>, Vec<El<AsField<Zn64B>>>>>>;
-
-#[stability::unstable(feature = "enable")]
-pub type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
-
-#[stability::unstable(feature = "enable")]
-pub type ResidueRing = FreeAlgebraImpl<ZnGB<BigIntRing>, Vec<El<ZnGB<BigIntRing>>>>;
-
-#[stability::unstable(feature = "enable")]
-pub type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
+type ResidueField = GaloisField<AsField<FreeAlgebraImpl<AsField<Zn64B>, Vec<El<AsField<Zn64B>>>>>>;
+type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
+type ResidueRing = FreeAlgebraImpl<ZnGB<BigIntRing>, Vec<El<ZnGB<BigIntRing>>>>;
+type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
 
 fn QQ_to_Zpe_hom<'a, R, I, F>(
     QQ: R,
@@ -87,8 +79,7 @@ where
     galois_ring.into_lifted_hom(number_field, mod_p).ok().unwrap()
 }
 
-#[stability::unstable(feature = "enable")]
-pub struct ReconstructNumberFieldEl<'a, K, I>
+struct ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
     K::Ring: FreeAlgebra + Field,
@@ -111,9 +102,8 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn new(number_field: K, residue_rings: Vec<&'a ResidueRingPolyRing>) -> Self {
+    fn new(number_field: K, residue_rings: Vec<&'a ResidueRingPolyRing>) -> Self {
         let QQ = number_field.base_ring();
         let ZpeX = DensePolyRing::new(residue_rings[0].base_ring().base_ring().clone(), "X");
         let Zpe = ZpeX.base_ring();
@@ -165,9 +155,8 @@ where
         };
     }
 
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn reconstruct(&self, residue_values: &[El<ResidueRing>]) -> El<K> {
+    fn reconstruct(&self, residue_values: &[El<ResidueRing>]) -> El<K> {
         assert_eq!(self.residue_rings.len(), residue_values.len());
         let Zpe = self.ZpeX.base_ring();
         let QQ = self.number_field.base_ring();
@@ -206,15 +195,13 @@ where
     }
 }
 
-#[stability::unstable(feature = "enable")]
-pub struct ResidueFieldsAtPrime {
+struct ResidueFieldsAtPrime {
     FqXs: Vec<ResidueFieldPolyRing>,
 }
 
 impl ResidueFieldsAtPrime {
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn new<K, I>(number_field: K, Fp: AsField<Zn64B>) -> Result<Self, QuotientAtError>
+    fn new<K, I>(number_field: K, Fp: AsField<Zn64B>) -> Result<Self, QuotientAtError>
     where
         K: RingStore,
         K::Ring: FreeAlgebra + Field,
@@ -253,16 +240,14 @@ impl ResidueFieldsAtPrime {
     }
 }
 
-#[stability::unstable(feature = "enable")]
-pub struct ResidueRingsAtPrimePower {
+struct ResidueRingsAtPrimePower {
     lifter: HenselLift<DensePolyRing<ZnGB<BigIntRing>>>,
     prime: El<BigIntRing>,
 }
 
 impl ResidueRingsAtPrimePower {
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn new(residue_fields: &ResidueFieldsAtPrime) -> Self {
+    fn new(residue_fields: &ResidueFieldsAtPrime) -> Self {
         let Fp = residue_fields.FqXs[0].base_ring().base_ring().clone();
         let FpX = DensePolyRing::new(Fp, "X");
         let Zp = ZnGB::new(ZZbig, int_cast(*Fp.modulus(), ZZbig, ZZi64));
@@ -279,9 +264,8 @@ impl ResidueRingsAtPrimePower {
         };
     }
 
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn lift_genpoly_factorization<K, I>(&mut self, number_field: K, lift_to_degree: usize)
+    fn lift_genpoly_factorization<K, I>(&mut self, number_field: K, lift_to_degree: usize)
     where
         K: RingStore,
         K::Ring: Field + FreeAlgebra,
@@ -305,13 +289,10 @@ impl ResidueRingsAtPrimePower {
         });
     }
 
-    #[stability::unstable(feature = "enable")]
-    #[instrument(skip_all, level = "trace")]
-    pub fn ZpeX(&self) -> &DensePolyRing<ZnGB<BigIntRing>> { self.lifter.poly_ring() }
+    fn ZpeX(&self) -> &DensePolyRing<ZnGB<BigIntRing>> { self.lifter.poly_ring() }
 
-    #[stability::unstable(feature = "enable")]
     #[instrument(skip_all, level = "trace")]
-    pub fn create_residue_rings(&self) -> Vec<ResidueRingPolyRing> {
+    fn create_residue_rings(&self) -> Vec<ResidueRingPolyRing> {
         self.lifter
             .factorization()
             .map(|f| {
@@ -499,7 +480,13 @@ impl PolyPowerDecompositionLift {
     }
 }
 
-/// Computes the power decomposition of polynomials `f, g in K[X]`.
+/// Computes the power decomposition of polynomials `f, g in K[X]` over a number field `K`.
+///
+/// Use this when implementing [`PolyTFracGCDRing`] for number fields; Otherwise, compute power
+/// decompositions through [`PolyTFracGCDRing::poly_power_decomposition()`].
+///
+/// [`PolyTFracGCDRing`]: crate::algorithms::poly_gcd::PolyTFracGCDRing
+/// [`PolyTFracGCDRing::poly_power_decomposition()`]: crate::algorithms::poly_gcd::PolyTFracGCDRing::poly_power_decomposition()
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn poly_power_decomposition_number_field<P, I>(KX: P, poly: &El<P>) -> Vec<(El<P>, usize)>
