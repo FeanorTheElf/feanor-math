@@ -5,7 +5,7 @@ use std::convert::identity;
 use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
-use crate::algorithms::hensel::HenselLift;
+use crate::algorithms::hensel::{HenselLift, create_power_p_poly_ring};
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::integer::poly_power_decomposition_integer_monic;
@@ -120,7 +120,7 @@ impl PolyFactorizationLift {
         P::Ring: PolyRing + DivisibilityRing,
         BaseRingBase<P>: IntegerRing,
     {
-        let ZpeX = DensePolyRing::new(ZnGB::new(ZZbig, ZZbig.pow(self.prime.clone(), lift_to_degree)), "X");
+        let ZpeX = create_power_p_poly_ring(self.prime.clone(), lift_to_degree);
         let target_mod_pe = ZpeX
             .lifted_hom(&poly_ring, ZpeX.base_ring().can_hom(poly_ring.base_ring()).unwrap())
             .map_ref(target);

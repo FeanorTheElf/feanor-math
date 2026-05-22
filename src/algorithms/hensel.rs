@@ -1,10 +1,19 @@
+use std::alloc::Global;
 use std::marker::PhantomData;
+use std::sync::Arc;
 
 use tracing::instrument;
 
+use crate::algorithms::convolution::ntt::NTTConvolution;
+use crate::algorithms::convolution::{DynConvolution, TypeErasedConvolution};
+use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::homomorphism::*;
 use crate::prelude::*;
+use crate::ring_impls::poly::dense_poly::{DensePolyRing, DensePolyRingBase};
 use crate::ring_impls::poly::*;
+use crate::ring_impls::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_big::ZnGB;
+use crate::ring_impls::zn::*;
 
 #[derive(Debug)]
 pub struct FactorsNotCoprimeError;
@@ -396,12 +405,52 @@ impl<P: ?Sized + PolyRing> Clone for HenselLiftableBarrettReducer<P> {
     }
 }
 
-#[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
-#[cfg(test)]
-use crate::ring_impls::zn::*;
+/// Creates the ring `Z/p^eZ` for a potentially large prime p and large power.
+/// Furthermore, chooses a suitable convolution with the polynomial ring.
+///
+/// This function assumes that `prime` is indeed a prime, and may panic or produce
+/// wrong results otherwise.
+#[instrument(skip_all, level = "trace")]
+#[stability::unstable(feature = "enable")]
+pub fn create_power_p_poly_ring(prime: El<BigIntRing>, power: usize) -> DensePolyRing<ZnGB<BigIntRing>> {
+    let dividing_power_of_two = ZZbig
+        .abs_lowest_set_bit(&ZZbig.sub_ref_fst(&prime, ZZbig.one()))
+        .unwrap();
+    let Zpe = ZnGB::new(ZZbig, ZZbig.pow(prime.clone(), power));
+    if dividing_power_of_two >= 10 {
+        let n = 1 << (dividing_power_of_two - 1);
+        let mut rou = if ZZbig.abs_log2_ceil(&prime).unwrap() <= 57 {
+            let Fp = Zn64B::new(int_cast(prime, ZZi64, ZZbig) as u64).as_field().unwrap();
+            let rou = get_prim_root_of_unity_pow2(&Fp, dividing_power_of_two).unwrap();
+            debug_assert!(Fp.is_neg_one(&Fp.pow(rou, n)));
+            Zpe.get_ring()
+                .from_int_promise_reduced(int_cast(Fp.smallest_positive_lift(rou), ZZbig, ZZi64))
+        } else {
+            let Fp = ZnGB::new(ZZbig, prime).as_field().unwrap();
+            let rou = get_prim_root_of_unity_pow2(&Fp, dividing_power_of_two).unwrap();
+            debug_assert!(Fp.is_neg_one(&Fp.pow(rou.clone(), n)));
+            Zpe.get_ring().from_int_promise_reduced(Fp.smallest_positive_lift(rou))
+        };
+        let one_over_n = Zpe.invert(&Zpe.coerce(&ZZi64, n as i64)).unwrap();
+        let one_minus_one_over_n = Zpe.sub_ref_snd(Zpe.one(), &one_over_n);
+        let mut e = 1;
+        while e < power {
+            rou = Zpe.sub(
+                Zpe.mul_ref(&rou, &one_minus_one_over_n),
+                Zpe.mul_ref_snd(Zpe.invert(&Zpe.pow(rou, n - 1)).unwrap(), &one_over_n),
+            );
+            e *= 2;
+        }
+        let convolution: DynConvolution<_> = Arc::new(TypeErasedConvolution::new(NTTConvolution::new(
+            Zpe.clone(),
+            rou,
+            dividing_power_of_two,
+        )));
+        return DensePolyRing::from(DensePolyRingBase::new_with_convolution(Zpe, "X", Global, convolution));
+    } else {
+        return DensePolyRing::new(Zpe, "X");
+    }
+}
 
 #[test]
 fn test_hensel_lift() {

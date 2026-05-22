@@ -4,7 +4,7 @@ use std::mem::swap;
 use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
-use crate::algorithms::hensel::HenselLift;
+use crate::algorithms::hensel::{HenselLift, create_power_p_poly_ring};
 use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::power_decomposition_lift::*;
 use crate::algorithms::poly_gcd::*;
@@ -59,7 +59,7 @@ where
     P::Ring: PolyRing,
     BaseRingBase<P>: IntegerRing,
 {
-    let ZpeX = DensePolyRing::new(ZnGB::new(ZZbig, ZZbig.pow(prime.clone(), lift_to_degree)), "X");
+    let ZpeX = create_power_p_poly_ring(prime.clone(), lift_to_degree);
     let Zpe = ZpeX.base_ring().clone();
     let target_mod_pe = ZpeX
         .lifted_hom(ZZX, ZpeX.base_ring().can_hom(ZZX.base_ring()).unwrap())
@@ -233,7 +233,7 @@ where
     P::Ring: PolyRing,
     BaseRingBase<P>: IntegerRing,
 {
-    let ZpeX = DensePolyRing::new(ZnGB::new(ZZbig, ZZbig.pow(prime.clone(), lift_to_degree)), "X");
+    let ZpeX = create_power_p_poly_ring(prime.clone(), lift_to_degree);
     let Zpe = ZpeX.base_ring().clone();
     let target_mod_pe = ZpeX
         .lifted_hom(ZZX, ZpeX.base_ring().can_hom(ZZX.base_ring()).unwrap())
