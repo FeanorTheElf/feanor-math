@@ -79,17 +79,17 @@ where
     let mut found_non_squarefree = 0;
     let mut attempts = 0;
     for (signature, state) in gcd_in_quotients {
-        attempts += 1;
         if signature.gcd_deg == 0 {
             return PolyGCDResult::TrivialGCD;
         } else if signature.gcd_deg < expected_gcd_deg {
-            attempts = 1;
+            attempts = 0;
             expected_gcd_deg = signature.gcd_deg;
             queued_lifts.clear();
             ongoing_lifts.clear();
         } else if signature.gcd_deg > expected_gcd_deg {
             continue;
         }
+        attempts += 1;
         queued_lifts.push(state);
         if ongoing_lifts.len() + queued_lifts.len() >= (attempts as f64 * FRACTION_TO_ATTEMPT_LIFT).ceil() as usize {
             if let Some(state) = queued_lifts.pop() {

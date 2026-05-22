@@ -236,8 +236,8 @@ where
                 debug_assert!(P.degree(&delta).is_none() || P.degree(&delta).unwrap() < deg_delta_bound);
                 let mut delta_g = P.mul_ref(&t, &delta);
                 let mut delta_h = P.mul_ref(&s, &delta);
-                delta_g = g.div_rem_poly(&P, delta_g).1;
-                delta_h = h.div_rem_poly(&P, delta_h).1;
+                delta_g = g.poly_div_barett(&P, delta_g).1;
+                delta_h = h.poly_div_barett(&P, delta_h).1;
                 g.lift(&P, delta_g, 2 * current_e);
                 h.lift(&P, delta_h, 2 * current_e);
                 debug_assert!(P.degree(&g.poly).unwrap() == deg_g);
@@ -251,8 +251,8 @@ where
                 P.mul_assign(&mut t, P.sub_ref_snd(P.int_hom().map(2), &bezout_value));
                 assert!(P.degree(&s).is_none() || P.degree(&s).unwrap() < deg_h + deg_delta_bound);
                 assert!(P.degree(&t).is_none() || P.degree(&t).unwrap() < deg_g + deg_delta_bound);
-                s = h.div_rem_poly(&P, s).1;
-                t = g.div_rem_poly(&P, t).1;
+                s = h.poly_div_barett(&P, s).1;
+                t = g.poly_div_barett(&P, t).1;
                 debug_assert!(P.degree(&s).is_none() || P.degree(&s).unwrap() < deg_h);
                 debug_assert!(P.degree(&t).is_none() || P.degree(&t).unwrap() < deg_g);
 
@@ -302,7 +302,7 @@ struct HenselLiftableBarrettReducer<P: ?Sized + PolyRing> {
 
 impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
     #[instrument(skip_all, level = "trace")]
-    fn div_rem_poly<S>(&self, poly_ring: S, poly: El<S>) -> (El<S>, El<S>)
+    fn poly_div_barett<S>(&self, poly_ring: S, poly: El<S>) -> (El<S>, El<S>)
     where
         S: RingStore<Ring = P>,
     {
@@ -370,7 +370,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
         self.e = new_e;
         let new_f = poly_ring.add_ref(&self.poly, &delta_poly);
         let delta_quo = self
-            .div_rem_poly(
+            .poly_div_barett(
                 poly_ring,
                 poly_ring.add(
                     poly_ring.from_terms([(poly_ring.base_ring().one(), self.n)]),

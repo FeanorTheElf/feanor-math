@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::collections::BinaryHeap;
 use std::convert::identity;
 
 use tracing::instrument;
@@ -154,7 +156,7 @@ pub enum PolyFactorizationResult<T> {
     ProbablyNotSquarefree,
 }
 
-const FOUND_WITH_CURRENT_FACTOR_COUNT_NUM_BEFORE_LIFT: usize = 3;
+const MIN_QUOTIENT_FACTORIZATIONS_BEFORE_LIFT: usize = 4;
 const NON_SQUAREFREE_COUNT_ABORT: usize = 3;
 
 /// High-level approach of deriving the factorization of a polynomial by
@@ -182,21 +184,34 @@ where
     F_start: FnMut(State) -> Result<OngoingLift, NotLiftable>,
     F_lift: FnMut(OngoingLift) -> R,
 {
-    let mut expected_factor_count = usize::MAX;
-    let mut found_with_current_factor_count = 0;
+    struct CmpByKey<T>(i64, T);
+
+    impl<T> PartialEq for CmpByKey<T> {
+        fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
+    }
+
+    impl<T> PartialOrd for CmpByKey<T> {
+        fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+    }
+
+    impl<T> Eq for CmpByKey<T> {}
+
+    impl<T> Ord for CmpByKey<T> {
+        fn cmp(&self, other: &Self) -> Ordering { self.0.cmp(&other.0) }
+    }
+
+    let mut min_factor_count = usize::MAX;
+    let mut found = BinaryHeap::new();
     let mut found_non_squarefree = 0;
     for (factor_count, state) in gcd_in_quotients {
         if factor_count == 1 {
             return PolyFactorizationResult::Irreducible;
-        } else if factor_count < expected_factor_count {
-            expected_factor_count = factor_count;
-            found_with_current_factor_count = 0;
-        } else if factor_count > expected_factor_count {
-            continue;
+        } else if factor_count < min_factor_count {
+            min_factor_count = factor_count;
         }
-        found_with_current_factor_count += 1;
-        if found_with_current_factor_count >= FOUND_WITH_CURRENT_FACTOR_COUNT_NUM_BEFORE_LIFT {
-            match start_lift(state) {
+        found.push(CmpByKey(-(factor_count as i64), state));
+        if found.len() >= MIN_QUOTIENT_FACTORIZATIONS_BEFORE_LIFT {
+            match start_lift(found.pop().unwrap().1) {
                 Ok(lift) => return PolyFactorizationResult::FoundFactorization(proceed_with_lift(lift)),
                 Err(NotLiftable::NotSquarefree) => {
                     if found_non_squarefree + 1 >= NON_SQUAREFREE_COUNT_ABORT {
@@ -212,9 +227,10 @@ where
     unreachable!()
 }
 
-fn poly_factor_integer_squarefree_monic<'a, P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
+#[instrument(skip_all, level = "trace")]
+fn poly_factor_integer_squarefree_monic<P>(ZZX: P, f: &El<P>) -> Vec<El<P>>
 where
-    P: 'a + RingStore + Copy,
+    P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
     <BaseRingStore<P> as RingStore>::Ring: IntegerRing,
 {
@@ -228,15 +244,18 @@ where
             let f_mod_p = FpX
                 .lifted_hom(ZZX, FpX.base_ring().can_hom(ZZX.base_ring()).unwrap())
                 .map_ref(f);
-            let factorization = FactorPolyField::factor_poly(&FpX, &f_mod_p)
-                .0
-                .into_iter()
-                .inspect(|(_, e)| debug_assert_eq!(1, *e))
-                .map(|(f, _)| FpX.normalize(f).0)
-                .collect::<Vec<_>>();
-            return (factorization.len(), (FpX, factorization));
+            let factorization = FactorPolyField::factor_poly(&FpX, &f_mod_p).0;
+            let factor_count = factorization.iter().map(|(_, e)| *e).sum::<usize>();
+            return (factor_count, (FpX, factorization));
         }),
-        |(FpX, factorization)| PolyFactorizationLift::new(FpX, factorization).map_err(|_| NotLiftable::NotSquarefree),
+        |(FpX, factorization)| {
+            if factorization.iter().any(|(_, e)| *e > 1) {
+                Err(NotLiftable::NotSquarefree)
+            } else {
+                PolyFactorizationLift::new(FpX, factorization.into_iter().map(|(f, _)| f).collect())
+                    .map_err(|_| NotLiftable::NotSquarefree)
+            }
+        },
         |mut lift| {
             let prime_f64 = ZZbig.to_float_approx(&lift.prime);
             let e = (bound / prime_f64.ln()).ceil() as usize + 1;
@@ -280,17 +299,9 @@ where
     for (factor, _k) in power_decomposition {
         let factorization = poly_factor_integer_squarefree_monic(&ZZX, &factor);
         for irred_factor in factorization.into_iter() {
-            let irred_factor_lc = ZZX.lc(&irred_factor).unwrap();
             let mut power = 0;
-            while let Some(quo) = ZZX.checked_div(
-                &ZZX.inclusion().mul_ref_map(
-                    &current,
-                    &ZZX.base_ring().pow(irred_factor_lc.clone(), ZZX.degree(&f).unwrap()),
-                ),
-                &irred_factor,
-            ) {
+            while let Some(quo) = ZZX.checked_div(&current, &irred_factor) {
                 current = quo;
-                _ = ZZX.balance_poly(&mut current);
                 power += 1;
             }
             assert!(power >= 1);
@@ -306,6 +317,9 @@ where
         .map(|(f, e)| (make_primitive(ZZX, &unmake_monic(ZZX, &f, &lc_f, &lc_f)).0, e))
         .collect();
 }
+
+#[cfg(test)]
+use crate::RANDOM_TEST_INSTANCE_COUNT;
 
 #[test]
 fn test_poly_factor_integer() {
@@ -352,4 +366,26 @@ fn test_poly_factor_integer() {
     assert_correct_factorization([1, 1, 0, 1, 1]);
     assert_correct_factorization([1, 0, 2, 0, 2]);
     assert_correct_factorization([0, 4, 0, 0, 0]);
+}
+
+#[test]
+fn random_test_poly_factor_integer() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = ZZbig;
+    let poly_ring = DensePolyRing::new(ring, "X");
+    let mut rng = oorandom::Rand64::new(0);
+    let bound = ring.int_hom().map(500);
+    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+        let f = poly_ring.from_terms((0..=12).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let g = poly_ring.from_terms((0..=11).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let h = poly_ring.from_terms((0..=10).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+        let input = poly_ring.prod([f, g, h]);
+        let actual = poly_factor_integer(&poly_ring, &input);
+        assert!(actual.iter().map(|(_, e)| *e).sum::<usize>() >= 3);
+        assert_el_eq!(
+            &poly_ring,
+            input,
+            poly_ring.prod(actual.into_iter().map(|(f, e)| poly_ring.pow(f, e)))
+        );
+    }
 }
