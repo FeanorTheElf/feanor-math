@@ -97,10 +97,7 @@ impl PolyFactorizationLift {
         factorization: Vec<El<DensePolyRing<AsField<Zn64B>>>>,
     ) -> Result<Self, ProbablyNotSquarefree> {
         let lifter = HenselLift::new(&FpX, factorization).map_err(|_| ProbablyNotSquarefree)?;
-        let ZpX = DensePolyRing::new(
-            ZnGB::new(ZZbig, int_cast(*FpX.base_ring().modulus(), ZZbig, ZZi64)),
-            "X",
-        );
+        let ZpX = create_power_p_poly_ring(int_cast(*FpX.base_ring().modulus(), ZZbig, ZZi64), 1);
         let hom = ZnReductionMap::new(FpX.base_ring(), ZpX.base_ring().clone()).unwrap();
         return Ok(Self {
             prime: ZpX.base_ring().modulus().clone(),
@@ -178,6 +175,22 @@ pub struct PolyFactorizationInQuotient<State> {
     pub state: State,
 }
 
+struct CmpByKey<T>(i64, T);
+
+impl<T> PartialEq for CmpByKey<T> {
+    fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
+}
+
+impl<T> PartialOrd for CmpByKey<T> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
+}
+
+impl<T> Eq for CmpByKey<T> {}
+
+impl<T> Ord for CmpByKey<T> {
+    fn cmp(&self, other: &Self) -> Ordering { self.0.cmp(&other.0) }
+}
+
 const MIN_QUOTIENT_FACTORIZATIONS_BEFORE_LIFT: usize = 4;
 const NON_SQUAREFREE_COUNT_ABORT: usize = 3;
 const RAMP_UP_LIFT_TO: f64 = 2.0;
@@ -217,22 +230,6 @@ where
     F_start: FnMut(State) -> Result<OngoingLift, NotLiftable>,
     F_lift: FnMut(&mut OngoingLift, &T, usize) -> Result<Vec<T>, LiftUnsuccessful>,
 {
-    struct CmpByKey<T>(i64, T);
-
-    impl<T> PartialEq for CmpByKey<T> {
-        fn eq(&self, other: &Self) -> bool { self.0 == other.0 }
-    }
-
-    impl<T> PartialOrd for CmpByKey<T> {
-        fn partial_cmp(&self, other: &Self) -> Option<Ordering> { Some(self.cmp(other)) }
-    }
-
-    impl<T> Eq for CmpByKey<T> {}
-
-    impl<T> Ord for CmpByKey<T> {
-        fn cmp(&self, other: &Self) -> Ordering { self.0.cmp(&other.0) }
-    }
-
     let mut result = Vec::new();
     let mut open = Vec::new();
     open.push(poly);

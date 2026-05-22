@@ -120,9 +120,8 @@ where
         gcds_modulo_p,
         |(FpX, lhs, rhs, gcd)| {
             let prime = int_cast(*FpX.base_ring().modulus(), ZZbig, ZZi64);
-            let new_base_ring = ZnGB::new(ZZbig, prime.clone());
-            let new_poly_ring = DensePolyRing::new(new_base_ring.clone(), "X");
-            let hom = ZnReductionMap::new(FpX.base_ring(), new_base_ring).unwrap();
+            let new_poly_ring = create_power_p_poly_ring(prime.clone(), 1);
+            let hom = ZnReductionMap::new(FpX.base_ring(), new_poly_ring.base_ring().clone()).unwrap();
             let lhs_over_gcd = FpX.checked_div(&lhs, &gcd).unwrap();
             if let Ok(lifter) = HenselLift::new(FpX.clone(), vec![gcd.clone(), lhs_over_gcd]) {
                 return Ok((true, lifter.change_ring(new_poly_ring, hom), prime));
@@ -292,9 +291,8 @@ where
         power_decompositions_modulo_p,
         |(FpX, power_decomposition)| {
             let prime = int_cast(*FpX.base_ring().modulus(), ZZbig, ZZi64);
-            let new_base_ring = ZnGB::new(ZZbig, prime.clone());
-            let new_poly_ring = DensePolyRing::new(new_base_ring.clone(), "X");
-            let hom = ZnReductionMap::new(FpX.base_ring(), new_base_ring).unwrap();
+            let new_poly_ring = create_power_p_poly_ring(prime.clone(), 1);
+            let hom = ZnReductionMap::new(FpX.base_ring(), new_poly_ring.base_ring().clone()).unwrap();
             let exponents = power_decomposition.iter().map(|(_, i)| *i).collect::<Vec<_>>();
             let factorization = power_decomposition
                 .into_iter()
