@@ -31,8 +31,7 @@ pub mod extlen;
 /// # Example
 /// ```rust
 /// # use std::cmp::{min, max};
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::seq::*;
 /// # use feanor_math::algorithms::convolution::*;
 /// struct SchoolbookConvolution;
@@ -74,7 +73,7 @@ pub mod extlen;
 /// let rhs = [2, 3, 4, 5, 6];
 /// let mut expected = [0; 10];
 /// let mut actual = [0; 10];
-/// STANDARD_CONVOLUTION.compute_convolution(
+/// KaratsubaAlgorithm::new(4).compute_convolution(
 ///     &lhs[..],
 ///     None,
 ///     &rhs[..],
@@ -135,16 +134,16 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// # Example
     ///
     /// ```rust
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// # use feanor_math::algorithms::convolution::*;
     /// # use feanor_math::algorithms::convolution::ntt::*;
-    /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
-    /// # use feanor_math::rings::finite::*;
+    /// # use feanor_math::ring_impls::zn::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
+    /// # use feanor_math::ring_properties::finite::*;
     /// let ring = Zn64B::new(65537);
-    /// let convolution = NTTConvolution::new(ring);
-    /// let lhs = ring.elements().take(10).collect::<Vec<_>>();
-    /// let rhs = ring.elements().take(10).collect::<Vec<_>>();
+    /// let convolution = NTTConvolution::for_zn(ring);
+    /// let lhs = (0..10).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    /// let rhs = (0..10).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     /// // "standard" use
     /// let mut expected = (0..19).map(|_| ring.zero()).collect::<Vec<_>>();
     /// convolution.compute_convolution(&lhs, None, &rhs, None, &mut expected, ring.get_ring());
@@ -324,9 +323,14 @@ pub struct KaratsubaAlgorithm<A: Allocator + Send + Sync = Global> {
     threshold_log2: usize,
 }
 
+impl KaratsubaAlgorithm {
+    #[stability::unstable(feature = "enable")]
+    pub const fn new(threshold_log2: usize) -> Self { Self::new_with_alloc(threshold_log2, Global) }
+}
+
 impl<A: Allocator + Send + Sync> KaratsubaAlgorithm<A> {
     #[stability::unstable(feature = "enable")]
-    pub const fn new(threshold_log2: usize, allocator: A) -> Self {
+    pub const fn new_with_alloc(threshold_log2: usize, allocator: A) -> Self {
         Self {
             threshold_log2,
             allocator,
@@ -466,7 +470,9 @@ impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
         S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(0, Global)))
+        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new_with_alloc(
+            0, Global,
+        )))
     }
 }
 

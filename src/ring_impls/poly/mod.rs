@@ -119,9 +119,8 @@ pub trait PolyRing: RingExtension {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::poly::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::poly::*;
     /// let ring = dense_poly::DensePolyRing::new(StaticRing::<i32>::RING, "X");
     /// let x = ring.indeterminate();
     /// let poly = ring.add(x.clone(), ring.pow(x, 2));
@@ -217,17 +216,16 @@ where
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::poly::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::poly::*;
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::rings::poly::dense_poly::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::ring_impls::poly::dense_poly::*;
     /// let P = DensePolyRing::new(ZZi64, "X");
     /// let f = P.from_terms([(6, 0), (3, 1)].into_iter());
     /// assert_el_eq!(
     ///     P,
     ///     P.from_terms([(2, 0), (1, 1)].into_iter()),
-    ///     P.normalize(f)
+    ///     P.normalize(f).0
     /// );
     /// ```
     fn normalize(&self, mut f: El<Self>) -> (El<Self>, El<BaseRingStore<Self>>)
@@ -299,9 +297,9 @@ where
     /// use feanor_math::assert_el_eq;
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
-    /// use feanor_math::rings::poly::dense_poly::*;
-    /// use feanor_math::rings::poly::*;
-    /// use feanor_math::rings::zn::zn_64b::*;
+    /// use feanor_math::ring_impls::poly::dense_poly::*;
+    /// use feanor_math::ring_impls::poly::*;
+    /// use feanor_math::ring_impls::zn::zn_64b::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");
     /// let f_version1 = poly_ring.from_terms(
@@ -340,11 +338,10 @@ where
     /// # Example
     /// ```rust
     /// use feanor_math::assert_el_eq;
-    /// use feanor_math::homomorphism::*;
-    /// use feanor_math::ring::*;
-    /// use feanor_math::rings::poly::dense_poly::*;
-    /// use feanor_math::rings::poly::*;
-    /// use feanor_math::rings::zn::zn_64b::*;
+    /// use feanor_math::prelude::*;
+    /// use feanor_math::ring_impls::poly::dense_poly::*;
+    /// use feanor_math::ring_impls::poly::*;
+    /// use feanor_math::ring_impls::zn::zn_64b::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = DensePolyRing::new(base_ring, "X");
     /// let f_version1 = poly_ring.from_terms(

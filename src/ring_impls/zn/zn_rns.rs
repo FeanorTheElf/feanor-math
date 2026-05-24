@@ -26,12 +26,11 @@ use crate::seq::VectorView;
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_rns::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_rns::*;
+
 /// # use feanor_math::seq::*;
 ///
 /// let R = ZnRNS::create_from_primes(vec![17, 19], ZZi64);
@@ -53,16 +52,15 @@ use crate::seq::VectorView;
 /// );
 /// assert!(R.eq_el(&z, &y));
 /// ```
-///
+/// 
 /// # Canonical mappings
 /// This ring has a canonical isomorphism to Barett-reduction based Zn
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_rns::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_rns::*;
+
 /// let R = ZnRNS::create_from_primes(vec![17, 19], ZZbig);
 /// let S = zn_big::ZnGB::new(ZZi64, 17 * 19);
 /// assert!(R.eq_el(&R.int_hom().map(12), &R.coerce(&S, S.int_hom().map(12))));
@@ -73,12 +71,11 @@ use crate::seq::VectorView;
 /// ```
 /// and a canonical homomorphism from any integer ring
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_rns::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_rns::*;
+
 /// let R = ZnRNS::create_from_primes(vec![3, 5, 7], ZZbig);
 /// let S = ZZbig;
 /// assert!(R.eq_el(

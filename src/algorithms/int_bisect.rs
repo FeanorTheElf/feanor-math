@@ -77,17 +77,15 @@ where
 /// ```
 /// These cases can somewhat be avoided by first doing a size estimate.
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::int_bisect::*;
-/// # use feanor_math::primitive_int::*;
 /// let ZZ = ZZi64;
 /// assert_eq!(2, root_floor(&ZZ, 1 << 62, 62));
 /// ```
 /// I some edge cases this is not enough, and so integer overflow can occur.
 /// ```should_panic
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::int_bisect::*;
-/// # use feanor_math::primitive_int::*;
 /// let ZZ = ZZi64;
 /// assert_eq!(26, root_floor(&ZZ, ZZ.pow(5, 26), 26));
 /// ```

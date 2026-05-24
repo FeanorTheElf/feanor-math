@@ -66,7 +66,7 @@ where
 }
 
 #[instrument(skip_all, level = "trace")]
-fn resultant_locally<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<BaseRingStore<P>>
+fn resultant_from_quotients<P>(poly_ring: P, f: &El<P>, g: &El<P>) -> El<BaseRingStore<P>>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing,
@@ -133,11 +133,9 @@ pub trait ComputeResultantRing: RingBase {
     /// # Example
     /// ```rust
     /// use feanor_math::algorithms::resultant::*;
-    /// use feanor_math::assert_el_eq;
-    /// use feanor_math::integer::*;
-    /// use feanor_math::ring::*;
-    /// use feanor_math::rings::poly::dense_poly::DensePolyRing;
-    /// use feanor_math::rings::poly::*;
+    /// use feanor_math::prelude::*;
+    /// use feanor_math::ring_impls::poly::dense_poly::DensePolyRing;
+    /// use feanor_math::ring_impls::poly::*;
     /// let ZZ = ZZbig;
     /// let ZZX = DensePolyRing::new(ZZ, "X");
     /// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1]);
@@ -194,7 +192,7 @@ impl<R: ?Sized + LiftPolyEvalRing + Domain + SelfIso> ComputeResultantRing for R
                 return UnwrapHom::from_delegate_ring(new_poly_ring.base_ring().get_ring()).map(result);
             }
 
-            fn fallback(self) -> Self::Output { resultant_locally(self.ring, &self.f, &self.g) }
+            fn fallback(self) -> Self::Output { resultant_from_quotients(self.ring, &self.f, &self.g) }
         }
         R::specialize(ComputeResultant { ring, f, g })
     }

@@ -38,11 +38,8 @@ use crate::ring_properties::specialization::*;
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::rational::*;
-/// # use feanor_math::homomorphism::Homomorphism;
-/// # use feanor_math::field::FieldStore;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// let ZZ = ZZi64;
 /// let QQ = RationalField::new(ZZ);
 /// let hom = QQ.can_hom(&ZZ).unwrap();
@@ -52,11 +49,8 @@ use crate::ring_properties::specialization::*;
 /// You can also retrieve numerator and denominator.
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::rational::*;
-/// # use feanor_math::homomorphism::Homomorphism;
-/// # use feanor_math::field::FieldStore;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// # let ZZ = ZZi64;
 /// # let QQ = RationalField::new(ZZ);
 /// # let hom = QQ.can_hom(&ZZ).unwrap();
@@ -96,7 +90,7 @@ where
     I: RingStore,
     I::Ring: IntegerRing,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Q") }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "QQ") }
 }
 /// [`RingStore`] corresponding to [`RationalFieldBase`]
 pub type RationalField<I> = RingValue<RationalFieldBase<I>>;
@@ -156,11 +150,8 @@ where
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::rational::*;
-    /// # use feanor_math::homomorphism::Homomorphism;
-    /// # use feanor_math::field::FieldStore;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::rational::*;
     /// # let ZZ = ZZi64;
     /// # let QQ = RationalField::new(ZZ);
     /// assert_el_eq!(
@@ -179,11 +170,8 @@ where
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::rational::*;
-    /// # use feanor_math::homomorphism::Homomorphism;
-    /// # use feanor_math::field::FieldStore;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::rational::*;
     /// # let ZZ = ZZi64;
     /// # let QQ = RationalField::new(ZZ);
     /// assert_el_eq!(

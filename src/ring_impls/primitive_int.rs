@@ -7,7 +7,7 @@ use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNew
 use serde::de::{DeserializeOwned, DeserializeSeed};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, KaratsubaAlgorithm};
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution};
 use crate::algorithms::euclid::{general_euclid, general_extended_euclid};
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
@@ -367,7 +367,7 @@ pub struct StaticRingBase<T> {
 }
 
 impl<T> Debug for StaticRingBase<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Z") }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "ZZ") }
 }
 
 impl<T> PartialEq for StaticRingBase<T> {
@@ -443,7 +443,7 @@ macro_rules! impl_default_convolution_ring {
                 default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
                     where S: RingStore<Ring = Self> + 'conv
                 {
-                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasedConvolution::new(KaratsubaAlgorithm::new($threshold_log2, std::alloc::Global)))
+                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasedConvolution::new($crate::algorithms::convolution::KaratsubaAlgorithm::new($threshold_log2)))
                 }
             }
         )*

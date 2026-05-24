@@ -19,10 +19,10 @@ use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::fft::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// // this ring has a 256-th primitive root of unity
 /// let ring = Zn64B::new(257);
@@ -47,14 +47,13 @@ use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 /// as demonstrated by
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::fft::*;
-/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::divisibility::*;
 /// // this ring has a 4-th primitive root of unity
-/// let ring = zn_64::Zn64B::new(5);
+/// let ring = Zn64B::new(5);
 /// let root_of_unity = ring.int_hom().map(2);
 /// let fft_table = CooleyTuckeyFFT::new(ring, root_of_unity, 2);
 /// let mut data = [ring.one(), ring.one(), ring.zero(), ring.zero()];

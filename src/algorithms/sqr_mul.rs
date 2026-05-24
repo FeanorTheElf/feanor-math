@@ -6,8 +6,8 @@ use crate::ring_properties::ordered::OrderedRingStore;
 ///
 /// # Example
 /// ```rust
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::sqr_mul::generic_abs_square_and_multiply;
-/// # use feanor_math::primitive_int::*;
 /// let mut mul_count = 0;
 /// let mut square_count = 0;
 /// // using + instead of *, we can build any number from repeated additions of 1

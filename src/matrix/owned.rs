@@ -12,8 +12,7 @@ use super::*;
 /// ```rust
 /// #![feature(allocator_api)]
 /// # use std::alloc::*;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::matrix::*;
 /// # use feanor_math::algorithms::linsolve::*;
 /// let mut A = OwnedMatrix::identity(2, 2, StaticRing::<i32>::RING);

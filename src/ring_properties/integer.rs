@@ -69,8 +69,7 @@ pub trait IntegerRing:
     /// # Example
     ///
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::integer::*;
+    /// # use feanor_math::prelude::*;
     /// let ZZ = ZZbig;
     /// let x = ZZ.power_of_two(1023);
     /// assert!(ZZ.to_float_approx(&x) > 2.0f64.powi(1023) * 0.99999);
@@ -78,8 +77,7 @@ pub trait IntegerRing:
     /// ```
     /// If the value is too large for the exponent of a `f64`, infinity is returned.
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::integer::*;
+    /// # use feanor_math::prelude::*;
     /// let ZZ = ZZbig;
     /// let x = ZZ.power_of_two(1024);
     /// assert!(ZZ.to_float_approx(&x).is_infinite());
@@ -101,9 +99,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// assert_eq!(false, StaticRing::<i32>::RING.abs_is_bit_set(&4, 1));
     /// assert_eq!(true, StaticRing::<i32>::RING.abs_is_bit_set(&4, 2));
     /// assert_eq!(true, StaticRing::<i32>::RING.abs_is_bit_set(&-4, 2));
@@ -115,9 +111,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// assert_eq!(None, StaticRing::<i32>::RING.abs_highest_set_bit(&0));
     /// assert_eq!(Some(0), StaticRing::<i32>::RING.abs_highest_set_bit(&-1));
     /// assert_eq!(Some(2), StaticRing::<i32>::RING.abs_highest_set_bit(&4));
@@ -129,9 +123,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
     /// assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&1));
     /// assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
@@ -145,9 +137,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// let mut value = -7;
     /// StaticRing::<i32>::RING.euclidean_div_pow_2(&mut value, 1);
     /// assert_eq!(-3, value);
@@ -166,9 +156,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// assert_eq!(2, StaticRing::<i32>::RING.rounded_div(7, &3));
     /// assert_eq!(-2, StaticRing::<i32>::RING.rounded_div(-7, &3));
     /// assert_eq!(-2, StaticRing::<i32>::RING.rounded_div(7, &-3));
@@ -203,9 +191,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// assert_eq!(3, StaticRing::<i32>::RING.ceil_div(7, &3));
     /// assert_eq!(-2, StaticRing::<i32>::RING.ceil_div(-7, &3));
     /// assert_eq!(-2, StaticRing::<i32>::RING.ceil_div(7, &-3));
@@ -234,9 +220,7 @@ pub trait IntegerRing:
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// assert_eq!(2, StaticRing::<i32>::RING.floor_div(7, &3));
     /// assert_eq!(-3, StaticRing::<i32>::RING.floor_div(-7, &3));
     /// assert_eq!(-3, StaticRing::<i32>::RING.floor_div(7, &-3));
@@ -369,12 +353,8 @@ impl<F: ?Sized + IntegerRing, T: ?Sized + IntegerRing> IntCast<F> for T {
 /// # Example
 ///
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::assert_el_eq;
-/// let ZZi64 = ZZi64;
-/// let ZZbig = ZZbig;
 /// let ZZi8 = StaticRing::<i8>::RING;
 /// assert_eq!(7, int_cast(7, ZZi64, ZZi8));
 /// assert_eq!(65536, int_cast(ZZbig.power_of_two(16), ZZi64, ZZbig));
@@ -396,17 +376,14 @@ where
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::iters::*;
-/// # use feanor_math::primitive_int::*;
 /// // the binomial coefficient is equal to the number of combinations of fixed size
 /// assert_eq!(
 ///     binomial(10, &3, ZZi64) as usize,
 ///     multiset_combinations(&[1; 10], 3, |_| ()).count()
 /// );
 /// ```
-#[stability::unstable(feature = "enable")]
 pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
 where
     I: RingStore + Copy,

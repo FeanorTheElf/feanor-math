@@ -144,7 +144,7 @@ where
 {
     type Item = (
         Zn64B,
-        NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>,
+        NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>, A>,
     );
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -154,7 +154,12 @@ where
         let rou = Zp_fastmul.coerce(&ZZi64, *rou);
         return Some((
             Zp,
-            NTTConvolution::new_with_hom(Zp.into_can_hom(Zp_fastmul).ok().unwrap(), rou, 32, Global),
+            NTTConvolution::new_with_hom(
+                Zp.into_can_hom(Zp_fastmul).ok().unwrap(),
+                rou,
+                32,
+                self.allocator.clone(),
+            ),
         ));
     }
 }
@@ -721,7 +726,7 @@ fn test_convolution_sum() {
         })
         .collect::<Vec<_>>();
     let mut expected = (0..22).map(|_| 0).collect::<Vec<_>>();
-    KaratsubaAlgorithm::new(4, Global).compute_convolution_sum(
+    KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution_sum(
         &data
             .iter()
             .map(|(l, r)| (&l[..], None, &r[..], None))

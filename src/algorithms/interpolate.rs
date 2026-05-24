@@ -28,8 +28,7 @@ use crate::seq::*;
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::interpolate::*;
 /// # use feanor_math::seq::*;
 /// let ring = ZZi64;
@@ -106,13 +105,12 @@ pub enum InterpolationError {
 /// ```rust
 /// # #![feature(allocator_api)]
 /// # use std::alloc::Global;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::seq::*;
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::algorithms::interpolate::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// let ZZX = DensePolyRing::new(ZZi64, "X");
 /// let [expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
 /// let actual = interpolate(&ZZX, [1, 2, 6].copy_els(), [2, 5, 37].copy_els(), Global).unwrap();
@@ -122,13 +120,11 @@ pub enum InterpolationError {
 /// ```rust
 /// # #![feature(allocator_api)]
 /// # use std::alloc::Global;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::StaticRing;
-/// # use feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::seq::*;
 /// # use feanor_math::algorithms::interpolate::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// let ZnX = DensePolyRing::new(ZZi64, "X");
 /// let actual = interpolate(&ZnX, [-2, 0, 2].copy_els(), [1, 0, 1].copy_els(), Global);
 /// assert!(actual.is_err());

@@ -208,10 +208,8 @@ where
 ///
 /// Most integer rings support canonical homomorphisms between them.
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
 /// let R = ZZi64;
 /// let S = ZZbig;
 /// let eight = S.int_hom().map(8);
@@ -246,10 +244,7 @@ where
 ///
 /// All given integer rings have canonical isomorphisms between each other.
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
 /// let Z_i8 = StaticRing::<i8>::RING;
 /// let Z_i32 = StaticRing::<i32>::RING;
 /// let Z_i128 = StaticRing::<i128>::RING;
@@ -282,11 +277,12 @@ where
 /// are implemented for `Z/nZ`.
 /// ```rust
 /// # use feanor_math::prelude::*;
-///
-/// let zn_big_i128 = zn_big::ZnGB::new(ZZ, 17 * 257);
-/// let zn_big_big = zn_big::ZnGB::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
-/// let Zn_std = zn_64::Zn64B::new(17 * 257);
-/// let Zn_rns = zn_rns::ZnRNS::create_from_primes(vec![17, 257], ZZ_big);
+/// # use feanor_math::ring_impls::zn::*;
+/// let ZZ_i128 = StaticRing::<i128>::RING;
+/// let zn_big_i128 = zn_big::ZnGB::new(ZZ_i128, 17 * 257);
+/// let zn_big_big = zn_big::ZnGB::new(ZZbig, int_cast(17 * 257, ZZbig, ZZi64));
+/// let Zn_std = zn_64b::Zn64B::new(17 * 257);
+/// let Zn_rns = zn_rns::ZnRNS::create_from_primes(vec![17, 257], ZZbig);
 ///
 /// assert!(zn_big_i128.can_iso(&zn_big_i128).is_some());
 /// assert!(zn_big_i128.can_iso(&zn_big_big).is_some());
@@ -304,14 +300,12 @@ where
 /// Most notably, reduction homomorphisms are currently not available.
 /// You can use [`crate::ring_impls::zn::ZnReductionMap`] instead.
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::assert_el_eq;
-/// let Z9 = zn_64::Zn64B::new(9);
-/// let Z3 = zn_64::Zn64B::new(3);
+/// let Z9 = zn_64b::Zn64B::new(9);
+/// let Z3 = zn_64b::Zn64B::new(3);
 /// assert!(Z3.can_hom(&Z9).is_none());
 /// let mod_3 = ZnReductionMap::new(&Z9, &Z3).unwrap();
 /// assert_el_eq!(Z3, Z3.one(), mod_3.map(Z9.int_hom().map(4)));
@@ -320,17 +314,15 @@ where
 /// They are all implemented, even though [`crate::ring_impls::zn::ZnRing`] currently
 /// only requires the projection from the "associated" integer ring.
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::ring_impls::zn::*;
 /// let ZZ = StaticRing::<i128>::RING;
 /// let ZZ_big = ZZbig;
 ///
 /// let zn_big_i128 = zn_big::ZnGB::new(ZZ, 17 * 257);
 /// let zn_big_big = zn_big::ZnGB::new(ZZ_big, ZZ_big.int_hom().map(17 * 257));
-/// let Zn_std = zn_64::Zn64B::new(17 * 257);
+/// let Zn_std = zn_64b::Zn64B::new(17 * 257);
 /// let Zn_rns = zn_rns::ZnRNS::create_from_primes(vec![17, 257], ZZ_big);
 ///
 /// assert!(zn_big_i128.can_hom(&ZZ).is_some());
@@ -350,10 +342,8 @@ where
 ///
 /// For the two provided univariate polynomial ring implementations, we have the isomorphisms
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::poly::*;
 ///
 /// let ZZ = StaticRing::<i128>::RING;
 /// let P_dense = dense_poly::DensePolyRing::new(ZZ, "X");
@@ -475,10 +465,9 @@ impl<R: ?Sized + CanIsoFromTo<R>> SelfIso for R {}
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
 /// let from = StaticRing::<i32>::RING;
 /// let to = ZZi64;
 /// let hom = to.can_hom(&from).unwrap();
@@ -681,9 +670,8 @@ where
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
 ///
 /// let from = StaticRing::<i32>::RING;
 /// let to = ZZi64;
@@ -789,10 +777,9 @@ where
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::poly::*;
+/// # use feanor_math::ring_impls::poly::*;
 /// let base = StaticRing::<i32>::RING;
 /// let extension = dense_poly::DensePolyRing::new(base, "X");
 /// let hom = extension.inclusion();
@@ -885,10 +872,9 @@ where
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::ring_impls::zn::*;
 /// let ring = zn_static::F17;
 /// let hom = ring.int_hom();
 /// assert_el_eq!(ring, hom.map(1), hom.map(18));
@@ -1212,14 +1198,14 @@ where
 /// usually better to implement
 /// ```rust
 /// # use std::fmt::Debug;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::delegate::*;
 /// // define `RingConstructor<R: RingStore>`
 /// # struct RingConstructor<R: RingStore>(R);
 /// # impl<R: RingStore> DelegateRing for RingConstructor<R> {
 /// #     type Element = El<R>;
-/// #     type Base = R::Type;
+/// #     type Base = R::Ring;
 /// #     fn get_delegate(&self) -> &Self::Base { self.0.get_ring() }
 /// #     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
 /// #     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
@@ -1237,17 +1223,17 @@ where
 /// #     }
 /// # }
 /// impl<R, S> CanHomFrom<RingConstructor<S>> for RingConstructor<R>
-///     where R: RingStore, S: RingStore, R::Type: CanHomFrom<S::Type>
+///     where R: RingStore, S: RingStore, R::Ring: CanHomFrom<S::Ring>
 /// {
-///     type Homomorphism = <R::Type as CanHomFrom<S::Type>>::Homomorphism;
+///     type Homomorphism = <R::Ring as CanHomFrom<S::Ring>>::Homomorphism;
 ///
-///     fn has_canonical_hom(&self, from: &RingConstructor<S>) -> Option<<R::Type as CanHomFrom<S::Type>>::Homomorphism> {
-///         // delegate to base ring of type `R::Type`
+///     fn has_canonical_hom(&self, from: &RingConstructor<S>) -> Option<<R::Ring as CanHomFrom<S::Ring>>::Homomorphism> {
+///         // delegate to base ring of type `R::Ring`
 /// #       self.get_delegate().has_canonical_hom(from.get_delegate())
 ///     }
 ///
 ///     fn map_in(&self, from: &RingConstructor<S>, el: <RingConstructor<S> as RingBase>::Element, hom: &Self::Homomorphism) -> <Self as RingBase>::Element {
-///         // delegate to base ring of type `R::Type`
+///         // delegate to base ring of type `R::Ring`
 /// #       self.get_delegate().map_in(from.get_delegate(), el, hom)
 ///     }
 /// }
@@ -1258,9 +1244,8 @@ where
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 ///

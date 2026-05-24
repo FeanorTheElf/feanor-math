@@ -21,11 +21,10 @@ use crate::prelude::*;
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// # use feanor_math::homomorphism::Homomorphism;
-/// # use feanor_math::rings::local::*;
+/// # use feanor_math::ring_impls::local::*;
 /// # use feanor_math::algorithms;
 /// # use feanor_math::matrix::SubmatrixMut;
 /// let ZZ = ZZi64;

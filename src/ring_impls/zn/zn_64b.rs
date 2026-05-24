@@ -50,10 +50,10 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// # Examples
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// let zn = Zn64B::new(7);
 /// assert_el_eq!(
 ///     zn,
@@ -64,9 +64,9 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// Too large moduli will give an error.
 /// ```should_panic
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// Zn64B::new((1 << 62) / 9 + 1);
 /// ```
 #[derive(Clone, Copy)]
@@ -794,10 +794,10 @@ impl ZnRing for Zn64BBase {
     ///
     /// # Examples
     /// ```rust
-    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::ring_impls::zn::*;
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let ring = Zn64B::new(7);
     /// assert_el_eq!(
     ///     ring,
@@ -807,10 +807,10 @@ impl ZnRing for Zn64BBase {
     /// ```
     /// Larger values lead to a panic in debug mode, and to a logic error in release mode.
     /// ```should_panic
-    /// # use feanor_math::rings::zn::*;
+    /// # use feanor_math::ring_impls::zn::*;
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let ring = Zn64B::new(7);
     /// ring.get_ring().from_int_promise_reduced(43);
     /// ```
@@ -840,15 +840,15 @@ impl HashableElRing for Zn64BBase {
 /// roots of unity.
 /// ```rust
 /// # #![feature(const_type_name)]
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// let ring = Zn64B::new(1073872897);
-/// let fastmul_ring = ZnFastmul::new(ring).unwrap();
+/// let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
-/// let fft = CooleyTuckeyFFT::for_fp_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
+/// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15))
 ///     .map(|i| ring.int_hom().map(i))

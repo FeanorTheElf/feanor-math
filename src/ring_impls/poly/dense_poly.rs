@@ -31,11 +31,10 @@ use crate::seq::*;
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// let ZZ = StaticRing::<i32>::RING;
 /// let P = DensePolyRing::new(ZZ, "X");
 /// let x_plus_1 = P.add(P.indeterminate(), P.int_hom().map(1));
@@ -48,12 +47,11 @@ use crate::seq::*;
 /// This ring has a [`CanIsoFromTo`] to [`sparse_poly::SparsePolyRingBase`].
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::rings::poly::sparse_poly::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::poly::sparse_poly::*;
 /// let ZZ = StaticRing::<i32>::RING;
 /// let P = DensePolyRing::new(ZZ, "X");
 /// let P2 = SparsePolyRing::new(ZZ, "X");

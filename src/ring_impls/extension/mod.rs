@@ -35,7 +35,7 @@ pub mod conway;
 /// One consequence of this is that `R` is a free `S`-module, with a basis given by the powers
 /// of [`FreeAlgebra::canonical_gen()`], which is where the name "free" comes from.
 ///
-/// The main implementation is [`extension_impl::FreeAlgebraImpl`].
+/// The main implementation is [`FreeAlgebraImpl`].
 ///
 /// # Nontrivial Automorphisms
 ///
@@ -46,37 +46,35 @@ pub mod conway;
 /// # Examples
 ///
 /// One of the most common use cases seems to be the implementation of finite fields (sometimes
-/// called galois fields).
+/// called galois fields). Since they are so common, Galois fields are explicitly modelled by
+/// [`GaloisField`], but can also be manually implemented based on [`FreeAlgebraImpl`].
 /// ```rust
 /// #![feature(allocator_api)]
 /// # use std::alloc::Global;
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::extension::extension_impl::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::extension_impl::*;
+/// # use feanor_math::ring_impls::extension::galois_field::*;
 /// # use feanor_math::algorithms::convolution::*;
-/// # use feanor_math::field::FieldStore;
-/// # use feanor_math::divisibility::*;
-/// # use feanor_math::rings::finite::*;
+/// # use feanor_math::ring_properties::finite::*;
 /// // we have to decide for an implementation of the prime field
 /// let prime_field = zn_static::Fp::<3>::RING;
 /// let galois_field = FreeAlgebraImpl::new(prime_field, 3, [2, 1]);
-/// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 2X + 1 is irreducible modulo 3
+/// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 2X + 1 is
+/// // irreducible modulo 3
 /// let galois_field = galois_field.as_field().ok().unwrap();
 /// assert_eq!(Some(27), galois_field.size(&ZZi64));
-/// for x in galois_field.elements() {
-///     if !galois_field.is_zero(&x) {
-///         let inv_x = galois_field.div(&galois_field.one(), &x);
-///         assert_el_eq!(galois_field, galois_field.one(), galois_field.mul(x, inv_x));
-///     }
-/// }
 /// // since galois fields are so important, an efficient construction is provided by feanor-math
-/// let galois_field_2 = galois_field::GaloisField::new_with_convolution(prime_field, 3, Global, STANDARD_CONVOLUTION);
-/// // note that the generating polynomial might be different, so it is not necessarily the "same" ring
+/// let galois_field_2 = GaloisField::new_with_base_field(prime_field, 3);
+/// // note that the generating polynomial might be different, so it is not
+/// // necessarily the "same" ring
 /// assert!(galois_field_2.can_iso(&galois_field).is_none());
 /// ```
+///
+/// [`FreeAlgebraImpl`]: crate::ring_impls::extension::extension_impl::FreeAlgebraImpl
+/// [`GaloisField`]: crate::ring_impls::extension::galois_field::GaloisField
 pub trait FreeAlgebra: RingExtension {
     /// Type of the canonical-basis representation of a ring element, as returned by
     /// [`FreeAlgebra::wrt_canonical_basis()`].

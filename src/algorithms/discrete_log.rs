@@ -799,9 +799,8 @@ where
 /// This can have unexpected consequences, like
 /// ```
 /// # use feanor_math::algorithms::discrete_log::*;
-/// # use feanor_math::integer::*;
 /// # use feanor_math::group::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// let group = AddGroup::new(ZZi64);
 /// assert_eq!(
 ///     Some(vec![1]),
@@ -825,15 +824,11 @@ where
 /// function (although performance does, of course).
 ///
 /// # Example
-///
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::group::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::StaticRing;
-/// # use feanor_math::rings::zn::zn_64b::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::wrapper::*;
 /// # use feanor_math::algorithms::discrete_log::*;
 /// let ring = Zn64B::new(17);

@@ -106,9 +106,7 @@ where
     let try_radiuses = (-5..=10).map(|i| estimated_radius * 1.5f64.powi(i));
 
     let result = try_radiuses
-        .filter(|R| {
-            taylor_series_term(*R) + f_eval_upper_bound <= R * f_prime_eval_norm
-        })
+        .filter(|R| taylor_series_term(*R) + f_eval_upper_bound <= R * f_prime_eval_norm)
         .min_by(f64::total_cmp)
         .ok_or(PrecisionError)?;
     return Ok(result);
@@ -174,7 +172,7 @@ where
                 ),
             );
             let scale = (rng.rand_u64() % (2 * NEWTON_MAX_SCALE as u64)) as i32 - NEWTON_MAX_SCALE as i32;
-            let starting_point = CC.mul(starting_point_unscaled, CC.from_f64(2f64.powi(scale)));
+            let starting_point = CC.mul(starting_point_unscaled, CC.from_f64(2.0f64.powi(scale)));
             let (point, distance) = newton_with_initial(&poly_ring, f, poly_deg, starting_point).ok()?;
             return Some((point, distance));
         })
@@ -246,14 +244,13 @@ where
     for i in 0..ZZX.degree(&poly).unwrap() {
         let (next_root_initial, _) = find_approximate_complex_root_promise_is_squarefree(&CCX, &remaining_poly, d - i)?;
         let (next_root, distance) = newton_with_initial(&CCX, &f, d, next_root_initial)?;
-        if result
-            .iter()
-            .any(|(prev_root, prev_distance)| if CC.abs(CC.sub(*prev_root, next_root)) <= distance + prev_distance {
+        if result.iter().any(|(prev_root, prev_distance)| {
+            if CC.abs(CC.sub(*prev_root, next_root)) <= distance + prev_distance {
                 true
             } else {
                 false
-            })
-        {
+            }
+        }) {
             return Err(PrecisionError);
         }
         result.push((next_root, distance));
@@ -276,6 +273,7 @@ where
 
 #[cfg(test)]
 use std::f64::consts::PI;
+
 #[cfg(test)]
 use crate::algorithms::cyclotomic::cyclotomic_polynomial;
 #[cfg(test)]

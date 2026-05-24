@@ -33,10 +33,9 @@ use crate::ring_properties::pid::PrincipalIdealRingStore;
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::sparse_poly::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::sparse_poly::*;
 /// # use feanor_math::assert_el_eq;
 ///
 /// let poly_ring = SparsePolyRing::new(ZZi64, "X");

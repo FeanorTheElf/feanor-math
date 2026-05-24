@@ -9,11 +9,11 @@ use crate::ring_impls::poly::*;
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// # use feanor_math::algorithms::poly_gcd::*;
+/// # use feanor_math::algorithms::poly_root::poly_root;
 /// let poly_ring = DensePolyRing::new(ZZi64, "X");
 /// let [f, f_sqrt] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 2 * X + 1, X + 1]);
 /// assert_el_eq!(&poly_ring, f_sqrt, poly_root(&poly_ring, &f, 2).unwrap());

@@ -37,13 +37,12 @@ use crate::ring_properties::specialization::*;
 ///
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::extension::number_field::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::rings::rational::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::number_field::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// let ZZ = ZZbig;
 /// let ZZX = DensePolyRing::new(ZZ, "X");
 /// let [gen_poly] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
@@ -57,14 +56,13 @@ use crate::ring_properties::specialization::*;
 /// provides additional functionality, that is not available for general extensions.
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::extension::number_field::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::rings::rational::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::number_field::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// # use feanor_math::algorithms::poly_factor::*;
-/// # use feanor_math::integer::*;
 /// # let ZZ = ZZbig;
 /// # let ZZX = DensePolyRing::new(ZZ, "X");
 /// # let [gen_poly] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
@@ -80,15 +78,12 @@ use crate::ring_properties::specialization::*;
 /// using [`NumberField::adjoin_root()`].
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::divisibility::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::extension::number_field::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::rings::rational::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::number_field::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// let ZZ = ZZbig;
 /// let QQ = RationalField::new(ZZ);
 /// let QQX = DensePolyRing::new(&QQ, "X");

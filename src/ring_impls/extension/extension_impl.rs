@@ -31,10 +31,9 @@ use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::extension::extension_impl::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::extension_impl::*;
 /// # use feanor_math::assert_el_eq;
 /// let base_ring = ZZi64;
 /// // ring of integers in the 6th cyclotomic number field
@@ -977,17 +976,17 @@ where
     fn has_canonical_hom(&self, from: &FreeAlgebraImplBase<R1, V1, C1, A1>) -> Option<Self::Homomorphism> {
         if self.rank() == from.rank() {
             let hom = self.base_ring.get_ring().has_canonical_hom(from.base_ring.get_ring())?;
-            if (0..self.rank()).all(|i| {
-                (i >= self.x_pow_rank.len() && i >= from.x_pow_rank.len())
-                    || (i >= self.x_pow_rank.len() && from.base_ring().is_zero(from.x_pow_rank.at(i)))
-                    || (i >= from.x_pow_rank.len() && self.base_ring().is_zero(self.x_pow_rank.at(i)))
-                    || self.base_ring.eq_el(
-                        self.x_pow_rank.at(i),
-                        &self
-                            .base_ring
-                            .get_ring()
-                            .map_in_ref(from.base_ring.get_ring(), from.x_pow_rank.at(i), &hom),
-                    )
+            if (0..self.rank()).all(|i| match (i >= self.x_pow_rank().len(), i >= from.x_pow_rank().len()) {
+                (true, true) => true,
+                (true, false) => from.base_ring().is_zero(from.x_pow_rank.at(i)),
+                (false, true) => self.base_ring().is_zero(self.x_pow_rank.at(i)),
+                (false, false) => self.base_ring.eq_el(
+                    self.x_pow_rank.at(i),
+                    &self
+                        .base_ring
+                        .get_ring()
+                        .map_in_ref(from.base_ring.get_ring(), from.x_pow_rank.at(i), &hom),
+                ),
             }) {
                 Some(hom)
             } else {
@@ -1030,18 +1029,17 @@ where
     fn has_canonical_iso(&self, from: &FreeAlgebraImplBase<R1, V1, C1, A1>) -> Option<Self::Isomorphism> {
         if self.rank() == from.rank() {
             let iso = self.base_ring.get_ring().has_canonical_iso(from.base_ring.get_ring())?;
-            if (0..self.rank()).all(|i| {
-                (i >= self.x_pow_rank.len() && i >= from.x_pow_rank.len())
-                    || (i >= self.x_pow_rank.len() && from.base_ring().is_zero(from.x_pow_rank.at(i)))
-                    || (i >= from.x_pow_rank.len() && self.base_ring().is_zero(self.x_pow_rank.at(i)))
-                    || from.base_ring.eq_el(
-                        &self.base_ring.get_ring().map_out(
-                            from.base_ring.get_ring(),
-                            self.x_pow_rank.at(i).clone(),
-                            &iso,
-                        ),
-                        from.x_pow_rank.at(i),
-                    )
+            if (0..self.rank()).all(|i| match (i >= self.x_pow_rank().len(), i >= from.x_pow_rank().len()) {
+                (true, true) => true,
+                (true, false) => from.base_ring().is_zero(from.x_pow_rank.at(i)),
+                (false, true) => self.base_ring().is_zero(self.x_pow_rank.at(i)),
+                (false, false) => from.base_ring.eq_el(
+                    &self
+                        .base_ring
+                        .get_ring()
+                        .map_out(from.base_ring.get_ring(), self.x_pow_rank.at(i).clone(), &iso),
+                    from.x_pow_rank.at(i),
+                ),
             }) {
                 Some(iso)
             } else {

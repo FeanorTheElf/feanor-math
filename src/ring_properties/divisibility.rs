@@ -23,19 +23,15 @@ pub trait DivisibilityRing: RingBase {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::divisibility::*;
+    /// # use feanor_math::prelude::*;
     /// let ZZ = ZZi64;
     /// assert_eq!(Some(3), ZZ.checked_div(&6, &2));
     /// assert_eq!(None, ZZ.checked_div(&6, &4));
     /// ```
     /// In rings that have zero-divisors, there are usually multiple possible results.
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::divisibility::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let ring = Zn64B::new(6);
     /// let four_over_four = ring
     ///     .checked_div(&ring.int_hom().map(4), &ring.int_hom().map(4))
@@ -53,12 +49,10 @@ pub trait DivisibilityRing: RingBase {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::divisibility::*;
+    /// # use feanor_math::prelude::*;
     /// let ZZ = ZZi64;
-    /// assert_eq!(true, ZZ.divides_left(&6, &2));
-    /// assert_eq!(false, ZZ.divides_left(&6, &4));
+    /// assert_eq!(true, ZZ.divides(&6, &2));
+    /// assert_eq!(false, ZZ.divides(&6, &4));
     /// ```
     fn divides(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.checked_div(lhs, rhs).is_some() }
 
@@ -110,9 +104,7 @@ pub trait DivisibilityRing: RingBase {
     /// Assume we want to go through all positive integers `<= 1000` that are divisible by `257`.
     /// The naive way would be the following
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::divisibility::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
     /// let ring = StaticRing::<i128>::RING;
     /// for integer in 0..1000 {
     ///     if ring.divides(&integer, &257) {
@@ -125,9 +117,8 @@ pub trait DivisibilityRing: RingBase {
     /// `(0..10000).step_by(257)`, but for the sake of this example, let's use individual
     /// divisibility checks).
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::divisibility::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_properties::divisibility::PreparedDivisor;
     /// # let ring = StaticRing::<i128>::RING;
     /// let prepared_257 = PreparedDivisor::new(ring.get_ring(), 257);
     /// for integer in 0..1000 {

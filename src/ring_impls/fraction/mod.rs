@@ -21,20 +21,18 @@ pub trait FractionField: Field + RingExtension {
     ///
     /// The return value does not have to be reduced, i.e. `gcd(a, b)` is not
     /// guaranteed to be a unit (for rings that are not
-    /// [`crate::ring_properties::pid::PrincipalIdealRing`], this is not even defined). Hence,
+    /// [`PrincipalIdealRing`], this is not even defined). Hence,
     /// when you want to convert the result to the base ring, use
-    /// [`crate::ring_properties::divisibility::DivisibilityRing::checked_div()`] as follows:
+    /// [`DivisibilityRing::checked_div()`] as follows:
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::divisibility::*;
-    /// # use feanor_math::rings::fraction::*;
-    /// # use feanor_math::rings::rational::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::fraction::*;
+    /// # use feanor_math::ring_impls::rational::*;
     /// fn to_base_ring<R>(ring: R, el: El<R>) -> Option<El<BaseRingStore<R>>>
     /// where
     ///     R: RingStore,
-    ///     R::Type: FractionField,
-    ///     <BaseRingStore<R> as RingStore>::Type: DivisibilityRing,
+    ///     R::Ring: FractionField,
+    ///     <BaseRingStore<R> as RingStore>::Ring: DivisibilityRing,
     /// {
     ///     let (a, b) = ring.as_fraction(el);
     ///     ring.base_ring().checked_div(&a, &b)
@@ -42,6 +40,9 @@ pub trait FractionField: Field + RingExtension {
     /// let QQ = RationalField::new(ZZi64);
     /// assert_eq!(Some(3), to_base_ring(QQ, QQ.from_fraction(6, 2)));
     /// ```
+    ///
+    /// [`PrincipalIdealRing`]: crate::ring_properties::pid::PrincipalIdealRing
+    /// [`DivisibilityRing::checked_div()`]: crate::ring_properties::divisibility::DivisibilityRing::checked_div()
     fn as_fraction(&self, el: Self::Element) -> (El<Self::BaseRing>, El<Self::BaseRing>);
 
     /// Computes `num / den`.

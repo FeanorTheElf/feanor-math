@@ -71,11 +71,9 @@ where
 /// # Example
 ///
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::divisibility::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::rational_reconstruction::*;
 /// let ring = Zn64B::new(100000000);
 /// assert_eq!(

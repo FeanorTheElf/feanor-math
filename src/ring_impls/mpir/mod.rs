@@ -196,7 +196,7 @@ impl MPZBase {
 }
 
 impl Debug for MPZBase {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Z") }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "ZZ") }
 }
 
 impl RingBase for MPZBase {

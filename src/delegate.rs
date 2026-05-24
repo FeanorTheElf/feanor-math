@@ -36,14 +36,14 @@ use crate::ring_properties::specialization::*;
 /// # Example
 ///
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 ///
 /// #[derive(PartialEq, Clone, Debug)]
 /// struct MyI32Ring;
+/// #[derive(Clone, Debug)]
 /// struct MyI32RingEl(i32);
 ///
 /// impl DelegateRing for MyI32Ring {
@@ -77,8 +77,8 @@ use crate::ring_properties::specialization::*;
 /// given by the following.
 /// ```rust
 /// # use std::fmt::Debug;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
+/// # use feanor_math::prelude::*;
+
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 ///
@@ -104,7 +104,7 @@ use crate::ring_properties::specialization::*;
 /// where
 ///     R: RingStore,
 /// {
-///     type Base = R::Type;
+///     type Base = R::Ring;
 ///     type Element = El<R>;
 ///
 ///     fn get_delegate(&self) -> &Self::Base { self.0.get_ring() }
@@ -125,9 +125,7 @@ use crate::ring_properties::specialization::*;
 /// [`DivisibilityRing`] is automatically implemented (but can be specialized):
 /// ```rust
 /// # use std::fmt::Debug;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::divisibility::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// #
@@ -152,7 +150,7 @@ use crate::ring_properties::specialization::*;
 /// # impl<R> DelegateRing for BoringRingWrapper<R>
 /// #     where R: RingStore
 /// # {
-/// #     type Base = R::Type;
+/// #     type Base = R::Ring;
 /// #     type Element = El<R>;
 /// #
 /// #     fn get_delegate(&self) -> &Self::Base {
@@ -166,7 +164,7 @@ use crate::ring_properties::specialization::*;
 /// # }
 /// fn divide_in_wrapped_ring<R>(base_ring: R)
 ///     where R: RingStore,
-///         R::Type: DivisibilityRing
+///         R::Ring: DivisibilityRing
 /// {
 ///     let wrapped_ring = BoringRingWrapper(base_ring);
 ///     assert!(wrapped_ring.checked_div(&wrapped_ring.one(), &wrapped_ring.one()).is_some());
@@ -175,10 +173,10 @@ use crate::ring_properties::specialization::*;
 /// [`FiniteRing`] for example is not automatically implemented:
 /// ```rust,compile_fail
 /// # use std::fmt::Debug;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::finite::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_properties::finite::*;
+
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// #
@@ -227,10 +225,10 @@ use crate::ring_properties::specialization::*;
 /// [`DelegateRingImplFiniteRing`]:
 /// ```rust
 /// # use std::fmt::Debug;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::finite::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_properties::finite::*;
+
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 /// #
@@ -255,7 +253,7 @@ use crate::ring_properties::specialization::*;
 /// # impl<R> DelegateRing for BoringRingWrapper<R>
 /// #     where R: RingStore
 /// # {
-/// #     type Base = R::Type;
+/// #     type Base = R::Ring;
 /// #     type Element = El<R>;
 /// #
 /// #     fn get_delegate(&self) -> &Self::Base {
@@ -273,7 +271,7 @@ use crate::ring_properties::specialization::*;
 ///
 /// fn size_of_wrapped_ring<R>(base_ring: R)
 ///     where R: RingStore,
-///         R::Type: FiniteRing
+///         R::Ring: FiniteRing
 /// {
 ///     let wrapped_ring = BoringRingWrapper(base_ring);
 ///     assert!(wrapped_ring.size(ZZbig).is_some());

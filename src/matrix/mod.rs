@@ -171,8 +171,7 @@ pub mod matrix_compare {
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::matrix::*;
 /// # use feanor_math::assert_matrix_eq;
 /// let lhs = [[0, 0, 0], [0, 0, 0], [0, 0, 0]];

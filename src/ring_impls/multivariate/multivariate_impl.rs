@@ -470,11 +470,16 @@ where
     A: Allocator + Send + Sync + Clone,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("MultivariatePolyRingImplBase")
-            .field("base_ring", &self.base_ring.get_ring())
-            .field("variable_count", &self.variable_count)
-            .field("max_supported_deg", &self.max_supported_deg)
-            .finish()
+        write!(f, "{:?}[", self.base_ring.get_ring())?;
+        for i in 0..self.variable_count {
+            if i == 0 {
+                write!(f, "X{}", i)?;
+            } else {
+                write!(f, ", X{}", i)?;
+            }
+        }
+        write!(f, "]")?;
+        return Ok(());
     }
 }
 

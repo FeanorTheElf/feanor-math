@@ -34,11 +34,10 @@ pub mod power_decomposition_lift;
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::algorithms::poly_gcd::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// let ZZX = DensePolyRing::new(ZZi64, "X");
 /// let [f, g, expected] =
 ///     ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, X.pow_ref(2) - 1, X - 1]);
@@ -54,13 +53,12 @@ pub trait PolyTFracGCDRing {
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// # use feanor_math::algorithms::poly_gcd::*;
-    /// # use feanor_math::rings::poly::*;
-    /// # use feanor_math::rings::poly::dense_poly::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::ring_impls::poly::*;
+    /// # use feanor_math::ring_impls::poly::dense_poly::*;
     /// let ZZX = DensePolyRing::new(ZZi64, "X");
-    /// let [f] = ZZX.with_wrapped_indeterminate(|X| [1 - X.pow_ref(2)]);
+    /// let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 1]);
     /// assert_el_eq!(
     ///     &ZZX,
     ///     &f,
@@ -107,18 +105,24 @@ pub trait PolyTFracGCDRing {
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
+    /// # use feanor_math::prelude::*;
     /// # use feanor_math::algorithms::poly_gcd::*;
-    /// # use feanor_math::rings::poly::*;
-    /// # use feanor_math::rings::poly::dense_poly::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::ring_impls::poly::*;
+    /// # use feanor_math::ring_impls::poly::dense_poly::*;
     /// let ZZX = DensePolyRing::new(ZZi64, "X");
-    /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X + 1, 2 * X.pow_ref(2) - 2, X - 1]);
+    /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [
+    ///     X.pow_ref(2) - 2 * X + 1,
+    ///     2 * X.pow_ref(2) - 2,
+    ///     X - 1
+    /// ]);
     /// // note that `expected` is not the gcd over `ZZ[X]` (which would be `2 X - 2`), but `X - 1`, i.e. the (monic) gcd over `QQ[X]`
     /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
-    ///
     /// // of course, the result does not have to be monic
-    /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [4 * X.pow_ref(2) - 1, 4 * X.pow_ref(2) - 4 * X + 1, - 2 * X + 1]);
+    /// let [f, g, expected] = ZZX.with_wrapped_indeterminate(|X| [
+    ///     4 * X.pow_ref(2) - 1,
+    ///     4 * X.pow_ref(2) - 4 * X + 1,
+    ///     2 * X - 1
+    /// ]);
     /// assert_el_eq!(&ZZX, expected, <_ as PolyTFracGCDRing>::gcd(&ZZX, &f, &g));
     /// ```
     fn gcd<P>(poly_ring: P, lhs: &El<P>, rhs: &El<P>) -> El<P>

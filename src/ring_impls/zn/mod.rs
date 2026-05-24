@@ -114,7 +114,7 @@ pub mod generic_impls {
         S: 'a + RingStore,
         S::Ring: ZnRing + CanHomFrom<BigIntRingBase>,
     {
-        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new(
+        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new_with_alloc(
             log2_karatsuba_threshold,
             Global,
         )))
@@ -372,11 +372,8 @@ pub trait ZnOperation {
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::assert_el_eq;
 ///
 /// let int_value = 4;
@@ -394,7 +391,7 @@ pub trait ZnOperation {
 ///     where
 ///         Self: 'a,
 ///         R: 'a + RingStore,
-///         R::Type: ZnRing,
+///         R::Ring: ZnRing,
 ///     {
 ///         let value = Zn.coerce(
 ///             Zn.integer_ring(),
@@ -525,10 +522,9 @@ where
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::zn::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let Z5 = Zn64B::new(5);
     /// let Z25 = Zn64B::new(25);
     /// let f = ZnReductionMap::new(&Z25, &Z5).unwrap();
@@ -548,10 +544,9 @@ where
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::zn::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let Z5 = Zn64B::new(5);
     /// let Z25 = Zn64B::new(25);
     /// let f = ZnReductionMap::new(&Z25, &Z5).unwrap();

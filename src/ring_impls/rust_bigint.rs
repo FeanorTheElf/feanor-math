@@ -28,9 +28,8 @@ use crate::{impl_eval_poly_locally_for_integer, impl_interpolation_base_ring_cha
 /// behavior through the ring, and not through the elements. For example, to
 /// add integers, use
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::rings::rust_bigint::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::rust_bigint::*;
 /// const ZZ: RustBigintRing = RustBigintRing::RING;
 /// let a: RustBigint = ZZ.add(ZZ.power_of_two(50), ZZ.power_of_two(100));
 /// assert_eq!(
@@ -40,7 +39,8 @@ use crate::{impl_eval_poly_locally_for_integer, impl_interpolation_base_ring_cha
 /// ```
 /// and not
 /// ```compile_fail
-/// assert_eq!("1267650600228230527396610048000", format!("{}", RustBigint::from(2).pow(100) + RustBigint::from(2).pow(50)));
+/// assert_eq!("1267650600228230527396610048000", format!("{}", RustBigint::from(2).pow(100) +
+/// RustBigint::from(2).pow(50)));
 /// ```
 #[derive(Clone, Debug)]
 pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
@@ -132,7 +132,7 @@ impl<A: Allocator + Send + Sync + Clone> RustBigintRingBase<A> {
 }
 
 impl<A: Allocator + Send + Sync + Clone> Debug for RustBigintRingBase<A> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "Z") }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "ZZ") }
 }
 
 impl<A: Allocator + Send + Sync + Clone> PartialEq for RustBigintRingBase<A> {

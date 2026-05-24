@@ -527,17 +527,14 @@ where
 /// # Example
 /// ```rust
 /// # use std::fmt::Debug;
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::delegate::*;
-/// # use feanor_math::reduce_lift::lift_poly_eval::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::ring_properties::lift_poly_eval::*;
 /// # use feanor_math::algorithms::resultant::*;
-/// # use feanor_math::divisibility::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::computation::ComputationController;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::DensePolyRing;
-/// # use feanor_math::pid::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::DensePolyRing;
+/// # use feanor_math::ring_properties::pid::*;
 /// # use feanor_math::impl_interpolation_base_ring_char_zero;
 /// // we wrap a `RingBase` here for simplicity, but in practice a wrapper should
 /// // always store a `RingStore` instead
@@ -557,16 +554,35 @@ where
 /// impl<R: Domain> Domain for MyRingWrapper<R> {}
 /// impl<R: RingBase> CanHomFrom<MyRingWrapper<R>> for MyRingWrapper<R> {
 ///     type Homomorphism = ();
-///     fn has_canonical_hom(&self, from: &Self) -> Option<()> { if self == from { Some(()) } else { None } }
-///     fn map_in(&self, _from: &Self, x: <Self as RingBase>::Element, (): &()) -> <Self as RingBase>::Element { x }
+///     fn has_canonical_hom(&self, from: &Self) -> Option<()> {
+///         if self == from { Some(()) } else { None }
+///     }
+///     fn map_in(
+///         &self,
+///         _from: &Self,
+///         x: <Self as RingBase>::Element,
+///         (): &(),
+///     ) -> <Self as RingBase>::Element {
+///         x
+///     }
 /// }
 /// impl<R: RingBase> CanIsoFromTo<MyRingWrapper<R>> for MyRingWrapper<R> {
 ///     type Isomorphism = ();
-///     fn has_canonical_iso(&self, from: &Self) -> Option<()> { if self == from { Some(()) } else { None } }
-///     fn map_out(&self, _from: &Self, x: <Self as RingBase>::Element, (): &()) -> <Self as RingBase>::Element { x }
+///     fn has_canonical_iso(&self, from: &Self) -> Option<()> {
+///         if self == from { Some(()) } else { None }
+///     }
+///     fn map_out(
+///         &self,
+///         _from: &Self,
+///         x: <Self as RingBase>::Element,
+///         (): &(),
+///     ) -> <Self as RingBase>::Element {
+///         x
+///     }
 /// }
 ///
-/// impl_interpolation_base_ring_char_zero!{ <{ R }> InterpolationBaseRing for MyRingWrapper<R> where R: PrincipalIdealRing + Domain + ComputeResultantRing }
+/// impl_interpolation_base_ring_char_zero! { <{ R }> InterpolationBaseRing for MyRingWrapper<R>
+/// where R: PrincipalIdealRing + Domain + ComputeResultantRing }
 ///
 /// // now we can use `InterpolationBaseRing`-functionality
 /// let ring = MyRingWrapper(ZZi64.into());
@@ -578,15 +594,23 @@ where
 /// // There is a problem here, described in LiftPolyEvalRing::LocalRingBase.
 /// // Short version: we need to manually impl ComputeResultantRing
 /// impl<R: ComputeResultantRing> ComputeResultantRing for MyRingWrapper<R> {
-///     fn resultant_with_controller<P, Controller>(poly_ring: P, f: El<P>, g: El<P>, _: Controller) -> Self::Element
-///         where P: RingStore + Copy,
-///             P::Ring: PolyRing,
-///             BaseRingStore<P>: RingStore<Ring = Self>,
-///             Controller: ComputationController
+///     fn resultant<P>(poly_ring: P, f: El<P>, g: El<P>) -> Self::Element
+///     where
+///         P: RingStore + Copy,
+///         P::Ring: PolyRing,
+///         BaseRingStore<P>: RingStore<Ring = Self>,
 ///     {
-///         let new_poly_ring = DensePolyRing::new(RingRef::new(poly_ring.base_ring().get_ring().get_delegate()), "X");
-///         let hom = new_poly_ring.lifted_hom(&poly_ring, UnwrapHom::new(poly_ring.base_ring().get_ring()));
-///         poly_ring.base_ring().get_ring().rev_delegate(R::resultant(&new_poly_ring, hom.map(f), hom.map(g)))
+///         let new_base_ring = RingRef::from(poly_ring.base_ring().get_ring().get_delegate());
+///         let new_poly_ring = DensePolyRing::new(new_base_ring, "X");
+///         let hom = new_poly_ring.lifted_hom(
+///             &poly_ring,
+///             UnwrapHom::new(poly_ring.base_ring(), new_base_ring),
+///         );
+///         poly_ring.base_ring().get_ring().rev_delegate(R::resultant(
+///             &new_poly_ring,
+///             hom.map(f),
+///             hom.map(g),
+///         ))
 ///     }
 /// }
 /// ```

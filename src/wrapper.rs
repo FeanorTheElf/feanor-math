@@ -13,11 +13,10 @@ use crate::ring::HashableElRing;
 ///
 /// # Examples
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// # use feanor_math::wrapper::*;
-/// # use feanor_math::primitive_int::*;
 /// let ring = DensePolyRing::new(ZZi64, "X");
 /// let x = RingElementWrapper::new(&ring, ring.indeterminate());
 /// println!("The result is: {}", x.clone() + x.clone() * x);
@@ -31,26 +30,23 @@ use crate::ring::HashableElRing;
 /// You can also retrieve the wrapped element
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// # use feanor_math::wrapper::*;
-/// # use feanor_math::primitive_int::*;
 /// let ring = DensePolyRing::new(ZZi64, "X");
-/// let x = RingElementWrapper::new(&ring, ring.indeterminate());
-/// assert_el_eq!(
-///     &ring,
-///     ring.add(ring.mul(x.clone(), x.clone()), x.clone()),
-///     (x.clone() + x.clone() * x).unwrap()
-/// );
+/// let x = ring.indeterminate();
+/// let expected = ring.add(ring.mul(x.clone(), x.clone()), x.clone());
+/// let x = RingElementWrapper::new(&ring, x);
+/// let actual = (x.clone() + x.clone() * x).unwrap();
+/// assert_el_eq!(&ring, expected, actual);
 /// ```
 /// [`RingElementWrapper`] can also be used to store elements of a
 /// [`crate::ring::HashableElRing`]-ring as elements in a [`std::collections::HashSet`].
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::wrapper::*;
-/// # use feanor_math::integer::*;
 /// # use std::collections::HashSet;
 ///
 /// let mut set = HashSet::new();
@@ -195,13 +191,13 @@ impl_trait! { Sub, sub, sub_ref_fst, sub_ref_snd, sub_ref }
 
 impl<R: RingStore> Div<RingElementWrapper<R>> for RingElementWrapper<R>
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = Self;
 
     fn div(self, rhs: RingElementWrapper<R>) -> Self::Output {
         RingElementWrapper {
-            element: self.ring.div(&self.element, &rhs.element),
+            element: self.ring.checked_div(&self.element, &rhs.element).unwrap(),
             ring: self.ring,
         }
     }
@@ -209,13 +205,13 @@ where
 
 impl<'a, 'b, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for &'b RingElementWrapper<R>
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = RingElementWrapper<R>;
 
     fn div(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
         RingElementWrapper {
-            element: self.ring.div(&self.element, &rhs.element),
+            element: self.ring.checked_div(&self.element, &rhs.element).unwrap(),
             ring: self.ring.clone(),
         }
     }
@@ -223,13 +219,13 @@ where
 
 impl<'a, R: RingStore + Clone> Div<RingElementWrapper<R>> for &'a RingElementWrapper<R>
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = RingElementWrapper<R>;
 
     fn div(self, rhs: RingElementWrapper<R>) -> Self::Output {
         RingElementWrapper {
-            element: self.ring.div(&self.element, &rhs.element),
+            element: self.ring.checked_div(&self.element, &rhs.element).unwrap(),
             ring: rhs.ring,
         }
     }
@@ -237,13 +233,13 @@ where
 
 impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for RingElementWrapper<R>
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = RingElementWrapper<R>;
 
     fn div(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
         RingElementWrapper {
-            element: rhs.ring.div(&self.element, &rhs.element),
+            element: rhs.ring.checked_div(&self.element, &rhs.element).unwrap(),
             ring: self.ring,
         }
     }
@@ -321,13 +317,16 @@ impl_trait_int! { Sub, sub }
 
 impl<R: RingStore> Div<i32> for RingElementWrapper<R>
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = Self;
 
     fn div(self, rhs: i32) -> Self::Output {
         RingElementWrapper {
-            element: self.ring.div(&self.element, &self.ring.int_hom().map(rhs)),
+            element: self
+                .ring
+                .checked_div(&self.element, &self.ring.int_hom().map(rhs))
+                .unwrap(),
             ring: self.ring,
         }
     }
@@ -335,13 +334,16 @@ where
 
 impl<R: RingStore> Div<RingElementWrapper<R>> for i32
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = RingElementWrapper<R>;
 
     fn div(self, rhs: RingElementWrapper<R>) -> Self::Output {
         RingElementWrapper {
-            element: rhs.ring.div(&rhs.ring.int_hom().map(self), &rhs.element),
+            element: rhs
+                .ring
+                .checked_div(&rhs.ring.int_hom().map(self), &rhs.element)
+                .unwrap(),
             ring: rhs.ring,
         }
     }
@@ -349,13 +351,16 @@ where
 
 impl<'a, R: RingStore + Clone> Div<i32> for &'a RingElementWrapper<R>
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = RingElementWrapper<R>;
 
     fn div(self, rhs: i32) -> Self::Output {
         RingElementWrapper {
-            element: self.ring.div(&self.element, &self.ring.int_hom().map(rhs)),
+            element: self
+                .ring
+                .checked_div(&self.element, &self.ring.int_hom().map(rhs))
+                .unwrap(),
             ring: self.ring.clone(),
         }
     }
@@ -363,13 +368,16 @@ where
 
 impl<'a, R: RingStore + Clone> Div<&'a RingElementWrapper<R>> for i32
 where
-    R::Ring: Field,
+    R::Ring: DivisibilityRing + Domain,
 {
     type Output = RingElementWrapper<R>;
 
     fn div(self, rhs: &'a RingElementWrapper<R>) -> Self::Output {
         RingElementWrapper {
-            element: rhs.ring.div(&rhs.ring.int_hom().map(self), &rhs.element),
+            element: rhs
+                .ring
+                .checked_div(&rhs.ring.int_hom().map(self), &rhs.element)
+                .unwrap(),
             ring: rhs.ring.clone(),
         }
     }
@@ -377,7 +385,7 @@ where
 
 impl<R: RingStore + Copy> Copy for RingElementWrapper<R> where El<R>: Copy {}
 
-impl<R: RingStore + Clone> Clone for RingElementWrapper<R> {
+impl<R: RingStore> Clone for RingElementWrapper<R> {
     fn clone(&self) -> Self {
         Self {
             ring: self.ring.clone(),

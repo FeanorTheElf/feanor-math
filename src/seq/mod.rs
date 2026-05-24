@@ -203,8 +203,7 @@ pub trait VectorViewSparse<T: ?Sized>: VectorView<T> {
     /// # Example
     /// ```rust
     /// # use feanor_math::seq::*;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
     /// # use feanor_math::seq::sparse::*;
     /// let mut vector = SparseMapVector::new(10, ZZi64);
     /// *vector.at_mut(2) = 100;

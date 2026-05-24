@@ -15,10 +15,10 @@ use crate::ring_properties::ordered::OrderedRingStore;
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::poly::*;
+
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// let poly_ring = DensePolyRing::new(ZZi64, "X");
 /// let f = poly_ring.add(poly_ring.one(), poly_ring.indeterminate());
 /// assert_eq!(
@@ -123,10 +123,9 @@ pub enum EnvBindingStrength {
 /// have the same type. This can easily lead to nasty errors. For example,
 /// consider the following code
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_impls::zn::*;
 /// let Z7 = zn_big::ZnGB::new(ZZi64, 7);
 /// let Z11 = zn_big::ZnGB::new(ZZi64, 11);
 /// assert!(Z11.get_ring() != Z7.get_ring());
@@ -140,46 +139,34 @@ pub enum EnvBindingStrength {
 /// However, swapping elements between rings is well-defined and correct if they are "equal"
 /// as given by `PartialEq` (not just canonically isomorphic)
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::zn::*;
+/// # use feanor_math::prelude::*;
+
+/// # use feanor_math::ring_impls::zn::*;
 /// let Z11_fst = zn_big::ZnGB::new(ZZi64, 7);
 /// let Z11_snd = Z11_fst.clone();
 /// assert!(Z11_fst.get_ring() == Z11_snd.get_ring());
 /// let neg_one = Z11_fst.int_hom().map(-1);
 /// assert!(Z11_snd.is_neg_one(&neg_one));
 /// ```
-///
+/// 
 /// # Example
 ///
 /// An example implementation of a new, very useless ring type that represents
 /// 32-bit integers stored on the heap.
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::integer::*;
-///
-/// #[derive(PartialEq, Debug)]
+/// #[derive(PartialEq, Debug, Clone)]
 /// struct MyRingBase;
 ///
 /// impl RingBase for MyRingBase {
 ///     type Element = Box<i32>;
 ///
-///     fn clone_el(&self, val: &Self::Element) -> Self::Element { val.clone() }
-///
 ///     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs += *rhs; }
-///
 ///     fn negate_inplace(&self, lhs: &mut Self::Element) { **lhs = -**lhs; }
-///
 ///     fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { **lhs *= *rhs; }
-///
 ///     fn from_int(&self, value: i32) -> Self::Element { Box::new(value) }
-///
 ///     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { **lhs == **rhs }
-///
-///     fn is_commutative(&self) -> bool { true }
-///     fn is_noetherian(&self) -> bool { true }
 ///     fn is_approximate(&self) -> bool { false }
 ///
 ///     fn fmt_el_within<'a>(
@@ -194,7 +181,7 @@ pub enum EnvBindingStrength {
 ///     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
 ///     where
 ///         I: RingStore + Copy,
-///         I::Type: IntegerRing,
+///         I::Ring: IntegerRing,
 ///     {
 ///         Some(ZZ.zero())
 ///     }
@@ -455,10 +442,9 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::zn::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let ZZ = StaticRing::<i16>::RING;
     /// assert_eq!(Some(0), ZZi64.characteristic(&ZZ));
     /// assert_eq!(None, Zn64B::new(i16::MAX as u64 + 1).characteristic(&ZZ));
@@ -478,7 +464,7 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # #[macro_use] use feanor_math::delegate;
 ///
 /// trait WeirdRingBase: RingBase {
@@ -487,7 +473,7 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
 ///
 /// trait WeirdRingStore: RingStore
 /// where
-///     Self::Type: WeirdRingBase,
+///     Self::Ring: WeirdRingBase,
 /// {
 ///     delegate! { WeirdRingBase, fn foo(&self) -> El<Self> }
 /// }
@@ -518,8 +504,8 @@ macro_rules! delegate {
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+
 /// # use feanor_math::assert_el_eq;
 ///
 /// assert_el_eq!(StaticRing::<i32>::RING, 3, 3);
@@ -528,9 +514,8 @@ macro_rules! delegate {
 /// ```
 /// If the ring elements are not comparable on their own, this is really useful
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::integer::*;
+/// # use feanor_math::prelude::*;
+
 /// # use feanor_math::assert_el_eq;
 /// // this does not have an equivalent representation with assert_eq!
 /// assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), ZZbig.int_hom().map(3));
@@ -581,8 +566,8 @@ macro_rules! debug_assert_el_eq {
 ///
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+
 /// # use std::sync::Arc;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> { ring.add(a, b) }
 ///
@@ -591,7 +576,7 @@ macro_rules! debug_assert_el_eq {
 /// assert_el_eq!(ring, 7, add_in_ring(&ring, 3, 4));
 /// assert_el_eq!(ring, 7, add_in_ring(Arc::new(ring), 3, 4));
 /// ```
-///
+/// 
 /// # What does this do?
 ///
 /// We need a framework that allows nesting rings, e.g. to provide a polynomial ring
@@ -724,8 +709,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     ///
     /// This is equivalent to
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
     /// # use feanor_math::assert_el_eq;
     /// fn sum<R, I>(ring: R, els: I) -> El<R>
     /// where
@@ -770,8 +754,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     ///
     /// This is equivalent to
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
     /// # use feanor_math::assert_el_eq;
     /// fn prod<R, I>(ring: R, els: I) -> El<R>
     /// where
@@ -821,9 +804,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::integer::*;
+    /// # use feanor_math::prelude::*;
     /// let ring = ZZbig;
     /// let element = ring.int_hom().map(3);
     /// assert_eq!("3", format!("{}", ring.formatted_el(&element)));
@@ -840,12 +821,10 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::integer::*;
-    /// # use feanor_math::rings::poly::dense_poly::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::poly::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::poly::dense_poly::*;
+
+    /// # use feanor_math::ring_impls::poly::*;
     /// let ring = DensePolyRing::new(ZZi64, "X");
     /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1]);
     /// assert_eq!(
@@ -938,8 +917,8 @@ impl<'a, R: RingBase + ?Sized> std::fmt::Debug for RingElementDisplayWrapper<'a,
 /// # Example
 ///
 /// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::galois_field::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let ring = GaloisField::new(3, 1);
 /// fn foo(base_ring: &BaseRingStore<GaloisField>) {}
 /// foo(ring.base_ring());
@@ -951,8 +930,8 @@ pub type BaseRingStore<R> = <<R as RingStore>::Ring as RingExtension>::BaseRing;
 /// # Example
 ///
 /// ```
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::galois_field::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let ring = GaloisField::new(3, 1);
 /// fn foo(base_ring: &BaseRingBase<GaloisField>) {}
 /// foo(ring.base_ring().get_ring());

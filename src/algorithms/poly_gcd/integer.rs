@@ -165,9 +165,17 @@ where
     let lc_lcm = ZZX.base_ring().lcm(ZZX.lc(lhs).unwrap(), ZZX.lc(rhs).unwrap());
     let (mut lhs, _) = make_monic(ZZX, lhs, &lc_lcm);
     let (mut rhs, _) = make_monic(ZZX, rhs, &lc_lcm);
+    let transform_back = |result| {
+        let result = make_primitive(ZZX, &unmake_monic(ZZX, &result, &lc_lcm, &lc_lcm)).0;
+        return if ZZX.base_ring().is_neg(ZZX.lc(&result).unwrap()) {
+            ZZX.negate(result)
+        } else {
+            result
+        };
+    };
     match poly_gcd_integer_monic(ZZX, &lhs, &rhs, HOPE_FOR_SQUAREFREE_ATTEMPTS) {
         PolyGCDResult::TrivialGCD => return ZZX.one(),
-        PolyGCDResult::FoundGCD(res) => return make_primitive(ZZX, &unmake_monic(ZZX, &res, &lc_lcm, &lc_lcm)).0,
+        PolyGCDResult::FoundGCD(res) => return transform_back(res),
         _ => {}
     }
 
@@ -188,7 +196,7 @@ where
             }
         }
     }
-    return make_primitive(ZZX, &unmake_monic(ZZX, &result, &lc_lcm, &lc_lcm)).0;
+    return transform_back(result);
 }
 
 /// Checks whether the given integral polynomial is squarefree modulo a few suitable primes.
@@ -336,6 +344,13 @@ where
     return power_decomposition
         .into_iter()
         .map(|(f, i)| (unmake_monic(&ZZX, &f, &lc_poly, &lc_poly), i))
+        .map(|(f, i)| {
+            if ZZX.base_ring().is_neg(ZZX.lc(&f).unwrap()) {
+                (ZZX.negate(f), i)
+            } else {
+                (f, i)
+            }
+        })
         .collect();
 }
 

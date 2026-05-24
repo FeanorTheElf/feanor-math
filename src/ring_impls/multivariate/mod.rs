@@ -40,10 +40,9 @@ pub trait MultivariatePolyRing: RingExtension {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::multivariate::*;
-    /// # use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::multivariate::*;
+    /// # use feanor_math::ring_impls::multivariate::multivariate_impl::*;
     /// let poly_ring = MultivariatePolyRingImpl::new(ZZi64, 3);
     /// let x_as_monomial = poly_ring.create_monomial([1, 0, 0]);
     /// let x_as_poly = poly_ring.create_term(1, x_as_monomial);
@@ -146,10 +145,9 @@ pub trait MultivariatePolyRing: RingExtension {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::multivariate::*;
-    /// # use feanor_math::rings::multivariate::multivariate_impl::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::multivariate::*;
+    /// # use feanor_math::ring_impls::multivariate::multivariate_impl::*;
     /// let poly_ring = MultivariatePolyRingImpl::new(ZZi64, 2);
     /// let [f, g] =
     ///     poly_ring.with_wrapped_indeterminates(|[X, Y]| [1 + X + X.pow_ref(2) * Y, X.pow_ref(3)]);
@@ -206,20 +204,15 @@ pub trait MultivariatePolyRing: RingExtension {
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::multivariate::*;
-    /// # use feanor_math::rings::multivariate::multivariate_impl::*;
-    /// # use feanor_math::primitive_int::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::multivariate::*;
+    /// # use feanor_math::ring_impls::multivariate::multivariate_impl::*;
     /// # use feanor_math::seq::*;
     /// let poly_ring = MultivariatePolyRingImpl::new(ZZi64, 2);
     /// let [f] = poly_ring.with_wrapped_indeterminates(|[X, Y]| [1 + X + X.pow_ref(2) * Y]);
     /// assert_eq!(
     ///     1 + 5 + 5 * 5 * 8,
-    ///     poly_ring.evaluate(
-    ///         &f,
-    ///         [5, 8].clone_ring_els(ZZi64),
-    ///         &poly_ring.base_ring().identity()
-    ///     )
+    ///     poly_ring.evaluate(&f, [5, 8].clone_els(), &poly_ring.base_ring().identity())
     /// );
     /// ```
     fn evaluate<R, V, H>(&self, f: &Self::Element, value: V, hom: H) -> R::Element
@@ -402,9 +395,9 @@ where
     /// use feanor_math::assert_el_eq;
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
-    /// use feanor_math::rings::multivariate::multivariate_impl::*;
-    /// use feanor_math::rings::multivariate::*;
-    /// use feanor_math::rings::zn::zn_64b::*;
+    /// use feanor_math::ring_impls::multivariate::multivariate_impl::*;
+    /// use feanor_math::ring_impls::multivariate::*;
+    /// use feanor_math::ring_impls::zn::zn_64b::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
     /// let f_version1 = poly_ring.from_terms(
@@ -454,9 +447,9 @@ where
     /// use feanor_math::assert_el_eq;
     /// use feanor_math::homomorphism::*;
     /// use feanor_math::ring::*;
-    /// use feanor_math::rings::multivariate::multivariate_impl::*;
-    /// use feanor_math::rings::multivariate::*;
-    /// use feanor_math::rings::zn::zn_64b::*;
+    /// use feanor_math::ring_impls::multivariate::multivariate_impl::*;
+    /// use feanor_math::ring_impls::multivariate::*;
+    /// use feanor_math::ring_impls::zn::zn_64b::*;
     /// let base_ring = Zn64B::new(7);
     /// let poly_ring = MultivariatePolyRingImpl::new(base_ring, 3);
     /// let f_version1 = poly_ring.from_terms(
@@ -568,10 +561,9 @@ pub trait GradedMonomialOrder: MonomialOrder {}
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::multivariate::*;
-/// # use feanor_math::rings::multivariate::multivariate_impl::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::multivariate::*;
+/// # use feanor_math::ring_impls::multivariate::multivariate_impl::*;
 /// # use std::cmp::Ordering;
 /// let poly_ring = MultivariatePolyRingImpl::new(ZZi64, 3);
 /// let monomials_descending = [

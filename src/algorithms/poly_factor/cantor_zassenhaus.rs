@@ -201,15 +201,12 @@ where
 /// # Example
 ///
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
-/// # use feanor_math::rings::poly::*;
-/// # use feanor_math::rings::poly::dense_poly::*;
-/// # use feanor_math::rings::rational::*;
-/// # use feanor_math::divisibility::*;
-/// # use feanor_math::computation::*;
-/// # use crate::feanor_math::homomorphism::Homomorphism;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
+/// # use feanor_math::ring_impls::poly::*;
+/// # use feanor_math::ring_impls::poly::dense_poly::*;
+/// # use feanor_math::ring_impls::rational::*;
 /// # use feanor_math::algorithms::poly_factor::cantor_zassenhaus::*;
 /// let Fp = Zn64B::new(3).as_field().ok().unwrap();
 /// let FpX = DensePolyRing::new(Fp, "X");
@@ -219,7 +216,7 @@ where
 ///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 1), (Fp.one(), 3)].into_iter()),
 ///     FpX.from_terms([(Fp.one(), 0), (Fp.int_hom().map(2), 2), (Fp.one(), 3)].into_iter())
 /// ].into_iter());
-/// let factorization = distinct_degree_factorization(&FpX, f, DontObserve);
+/// let factorization = distinct_degree_factorization(&FpX, f);
 /// assert_eq!(4, factorization.len());
 /// assert!(FpX.is_unit(&factorization[0]));
 /// assert!(FpX.is_unit(&factorization[1]));

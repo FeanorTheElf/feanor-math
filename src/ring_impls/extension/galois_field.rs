@@ -45,12 +45,10 @@ use crate::ring_properties::serialization::*;
 ///
 /// The easiest way to create a Galois field is by using `new()`:
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::finite::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::extension::galois_field::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_properties::finite::*;
+/// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let F25: GaloisField = GaloisField::new(5, 2);
 /// assert_eq!(5, F25.characteristic(&ZZi64).unwrap());
 /// assert_eq!(2, F25.rank());
@@ -61,14 +59,12 @@ use crate::ring_properties::serialization::*;
 /// We also support conversion to and from a plain [`super::extension_impl::FreeAlgebraImpl`]
 /// representation.
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::extension::extension_impl::*;
-/// # use feanor_math::rings::field::*;
-/// # use feanor_math::rings::finite::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::extension::galois_field::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::extension_impl::*;
+/// # use feanor_math::ring_impls::as_field::*;
+/// # use feanor_math::ring_properties::finite::*;
+/// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let F25: GaloisField = GaloisField::new(5, 2);
 /// let raw_F25: AsField<FreeAlgebraImpl<_, _>> = F25.clone().into().unwrap_self();
 /// assert!(F25.can_iso(&raw_F25).is_some());
@@ -76,23 +72,23 @@ use crate::ring_properties::serialization::*;
 /// The other way is slightly more dangerous, since at some point we either have to check, or assume
 /// that the extension ring is indeed a field.
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::extension::*;
-/// # use feanor_math::rings::extension::extension_impl::*;
-/// # use feanor_math::rings::field::*;
-/// # use feanor_math::rings::finite::*;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::primitive_int::*;
-/// # use feanor_math::rings::extension::galois_field::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::extension::*;
+/// # use feanor_math::ring_impls::extension::extension_impl::*;
+/// # use feanor_math::ring_impls::as_field::*;
+/// # use feanor_math::ring_properties::finite::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let base_ring = Zn64B::new(5).as_field().ok().unwrap();
-/// let raw_F25: FreeAlgebraImpl<_, _> = FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]);
-/// let asfield_F25 = raw_F25.clone().as_field().ok().unwrap();
-/// // alternatively, you can ensure yourself that the ring is a field and use `promise_is_field` to avoid the check at runtime; be careful when doing this!
-/// let asfield_F25 = AsField::from(AsFieldBase::promise_is_field(raw_F25).ok().unwrap());
-/// let F25 = GaloisField::create(asfield_F25);
-/// assert!(F25.can_iso(&raw_F25).is_some());
+/// let F25_raw: FreeAlgebraImpl<_, _> =
+///     FreeAlgebraImpl::new(base_ring, 2, [base_ring.int_hom().map(2)]);
+/// let F25_as_field = F25_raw.clone().as_field().ok().unwrap();
+/// // alternatively, you can ensure yourself that the ring is a field and use `promise_is_field` to
+/// // avoid the check at runtime; be careful when doing this!
+/// let F25_as_field = AsField::from(AsFieldBase::promise_is_field(&F25_raw).ok().unwrap());
+/// let F25 = GaloisField::create(F25_as_field);
+/// assert!(F25.can_iso(&F25_raw).is_some());
 /// ```
 ///
 /// # Choice of blanket implementations of [`CanHomFrom`]
@@ -156,29 +152,66 @@ impl GaloisField {
     pub fn new(p: i64, degree: usize) -> Self { RingValue::from(GaloisFieldBase::new(p, degree)) }
 }
 
+impl<'conv, R> GaloisFieldOver<R, DynConvolution<'conv, R::Ring>, Global>
+where
+    R: RingStore + 'conv,
+    R::Ring: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+{
+    /// Creates a new instance of the finite/galois field that is the unique
+    /// field extension of the given base field and the given degree.
+    ///
+    /// For details, see [`GaloisFieldBase::new_with_base_field()`].
+    pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
+        Self::from(GaloisFieldBase::new_with_base_field(base_field, degree))
+    }
+}
+
+impl<R, A, C> GaloisFieldOver<R, C, A>
+where
+    R: RingStore,
+    R::Ring: ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
+    C: ConvolutionAlgorithm<R::Ring> + Clone,
+    A: Allocator + Clone + Send + Sync,
+{
+    /// Creates a new instance of the finite/galois field that is the unique
+    /// field extension of the given base field and the given degree, and uses the given convolution
+    /// to perform arithmetic operations in the field.
+    ///
+    /// For details, see [`GaloisFieldBase::new_with_convolution()`].
+    pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {
+        Self::from(GaloisFieldBase::new_with_convolution(
+            base_field,
+            degree,
+            allocator,
+            convolution_algorithm,
+        ))
+    }
+}
+
 impl GaloisFieldBase {
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
     ///
     /// If you need more options for configuration, consider using
-    /// [`GaloisFieldBase::new_with_base_field()`], [`GaloisFieldBase::new_with_convolution()`] or
-    /// the most general [`GaloisFieldBase::create()`].
+    /// [`GaloisField::new_with_base_field()`], [`GaloisField::new_with_convolution()`] or
+    /// the most general [`GaloisField::create()`].
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::extension::*;
-    /// # use feanor_math::rings::finite::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::extension::galois_field::*;
+    /// # use feanor_math::prelude::*;
+    /// # use crate::feanor_math::seq::VectorFn;
+    /// # use feanor_math::ring_impls::extension::*;
+    /// # use feanor_math::ring_properties::finite::*;
+    /// # use feanor_math::ring_impls::extension::galois_field::*;
     /// let F25 = GaloisField::new(5, 2);
     /// let generator = F25.canonical_gen();
-    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+    /// let norm = F25.mul_ref_fst(&generator, F25.pow(generator.clone(), 5));
     /// let inclusion = F25.inclusion();
     /// // the norm must be an element of the prime field
     /// assert!(
-    ///     F25.base_ring()
-    ///         .elements()
-    ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
+    ///     F25.wrt_canonical_basis(&norm)
+    ///         .iter()
+    ///         .skip(1)
+    ///         .all(|c| F25.base_ring().is_zero(&c))
     /// );
     /// ```
     ///
@@ -208,22 +241,24 @@ where
     ///
     /// # Example
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::extension::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
-    /// # use feanor_math::rings::finite::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::extension::galois_field::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::extension::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
+    /// # use feanor_math::ring_impls::zn::*;
+    /// # use feanor_math::ring_properties::finite::*;
+    /// # use crate::feanor_math::seq::VectorFn;
+    /// # use feanor_math::ring_impls::extension::galois_field::*;
     /// let F5 = Zn64B::new(5).as_field().ok().unwrap();
     /// let F25 = GaloisField::new_with_base_field(F5, 2);
     /// let generator = F25.canonical_gen();
-    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
+    /// let norm = F25.mul_ref_fst(&generator, F25.pow(generator.clone(), 5));
     /// let inclusion = F25.inclusion();
     /// // the norm must be an element of the prime field
     /// assert!(
-    ///     F25.base_ring()
-    ///         .elements()
-    ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
+    ///     F25.wrt_canonical_basis(&norm)
+    ///         .iter()
+    ///         .skip(1)
+    ///         .all(|c| F25.base_ring().is_zero(&c))
     /// );
     /// ```
     pub fn new_with_base_field(base_field: R, degree: usize) -> Self {
@@ -240,40 +275,38 @@ where
     C: ConvolutionAlgorithm<R::Ring> + Clone,
     A: Allocator + Clone + Send + Sync,
 {
-    /// Creates a new instance of a finite/galois field, as given-degree extension of the
-    /// given base ring. The base ring must have prime characteristic.
+    /// Creates a new instance of the finite/galois field that is the unique
+    /// field extension of the given base field and the given degree, and uses the given convolution
+    /// to perform arithmetic operations in the field.
     ///
-    /// If you need to specify the minimal polynomial used, see also [`GaloisField::create()`].
+    /// See also [`GaloisField::new_with_base_field()`]
+    /// or the most general [`GaloisField::create()`].
     ///
     /// # Example
-    ///
-    /// Sometimes it is useful to have the base ring also be a field. This can e.g. be achieved
-    /// by
     /// ```rust
     /// #![feature(allocator_api)]
     /// # use std::alloc::Global;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::rings::extension::*;
-    /// # use feanor_math::rings::finite::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
-    /// # use feanor_math::rings::zn::*;
-    /// # use feanor_math::algorithms::convolution::*;
-    /// # use feanor_math::rings::extension::galois_field::*;
-    /// let F25 = GaloisField::new_with_convolution(
-    ///     Zn64B::new(5).as_field().ok().unwrap(),
-    ///     2,
-    ///     Global,
-    ///     STANDARD_CONVOLUTION,
-    /// );
-    /// let generator = F25.canonical_gen();
-    /// let norm = F25.mul_ref_fst(&generator, F25.pow(F25.clone_el(&generator), 5));
-    /// let inclusion = F25.inclusion();
+    /// # use std::sync::Arc;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::algorithms::convolution::ntt::NTTConvolution;
+    /// # use feanor_math::ring_impls::extension::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
+    /// # use feanor_math::ring_impls::zn::*;
+    /// # use feanor_math::ring_properties::finite::*;
+    /// # use crate::feanor_math::seq::VectorFn;
+    /// # use feanor_math::ring_impls::extension::galois_field::*;
+    /// let F65537 = Zn64B::new(65537).as_field().ok().unwrap();
+    /// let convolution = Arc::new(NTTConvolution::for_zn(F65537));
+    /// let GF = GaloisField::new_with_convolution(F65537, 2, Global, convolution);
+    /// let generator = GF.canonical_gen();
+    /// let norm = GF.mul_ref_fst(&generator, GF.pow(generator.clone(), 65537));
+    /// let inclusion = GF.inclusion();
     /// // the norm must be an element of the prime field
     /// assert!(
-    ///     F25.base_ring()
-    ///         .elements()
-    ///         .any(|x| { F25.eq_el(&norm, &inclusion.map(x)) })
+    ///     GF.wrt_canonical_basis(&norm)
+    ///         .iter()
+    ///         .skip(1)
+    ///         .all(|c| GF.base_ring().is_zero(&c))
     /// );
     /// ```
     pub fn new_with_convolution(base_field: R, degree: usize, allocator: A, convolution_algorithm: C) -> Self {

@@ -27,11 +27,11 @@ use crate::ring_properties::specialization::FiniteRingSpecializable;
 /// example are implementations of [`ZnRing`] with modulus chosen at runtime.
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::field::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::as_field::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// // 7 is a prime, so this is a field - but must be checked at runtime
 /// let Fp_as_ring = Zn64B::new(7);
 /// // we use `ZnRing::as_field()` to make this a field
@@ -46,15 +46,15 @@ use crate::ring_properties::specialization::FiniteRingSpecializable;
 /// use the functions given by [`DelegateRing`], e.g.
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::homomorphism::*;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::field::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
+
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::as_field::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// fn work_in_Fp<R>(ring: R)
 /// where
 ///     R: RingStore,
-///     R::Type: ZnRing,
+///     R::Ring: ZnRing,
 /// {
 ///     use crate::feanor_math::delegate::DelegateRing;
 ///
@@ -472,11 +472,11 @@ where
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::zn_64b::*;
-/// # use feanor_math::rings::field::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::zn_64b::*;
+/// # use feanor_math::ring_impls::as_field::*;
 /// # use feanor_math::delegate::*;
-/// # use feanor_math::homomorphism::*;
+
 /// # use feanor_math::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 /// // A no-op wrapper around Zn
 /// #[derive(Copy, Clone, Debug)]
@@ -500,16 +500,17 @@ where
 ///     type Element = El<Zn64B>;
 ///
 ///     fn get_delegate(&self) -> &Self::Base { self.base_zn.get_ring() }
-///     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element { el }
-///     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as RingBase>::Element { el }
-///     fn delegate(&self, el: Self::Element) -> <Self::Base as RingBase>::Element { el }
-///     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) -> Self::Element { el }
-/// }
+///     fn delegate_ref<'a>(&self, el: &'a Self::Element) -> &'a <Self::Base as RingBase>::Element {
+/// el }     fn delegate_mut<'a>(&self, el: &'a mut Self::Element) -> &'a mut <Self::Base as
+/// RingBase>::Element { el }     fn delegate(&self, el: Self::Element) -> <Self::Base as
+/// RingBase>::Element { el }     fn rev_delegate(&self, el: <Self::Base as RingBase>::Element) ->
+/// Self::Element { el } }
 ///
 /// impl_field_wrap_unwrap_homs!{ MyPossibleField, MyPossibleField }
 ///
 /// // there is also a generic verision, which looks like
-/// impl_field_wrap_unwrap_isos!{ <{ /* type params here */ }> MyPossibleField, MyPossibleField where /* constraints here */ }
+/// impl_field_wrap_unwrap_isos!{ <{ /* type params here */ }> MyPossibleField, MyPossibleField
+/// where /* constraints here */ }
 ///
 /// let R = RingValue::from(MyPossibleField { base_zn: Zn64B::new(5) });
 /// let R_field = RingValue::from(AsFieldBase::promise_is_perfect_field(R));
@@ -522,10 +523,10 @@ where
 macro_rules! impl_field_wrap_unwrap_homs {
     (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
 
-        impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$self_type_from> for $crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>
+        impl<AsFieldRingStore, $($gen_args)*> $crate::homomorphism::CanHomFrom<$self_type_from> for $crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>
             where AsFieldRingStore: RingStore<Ring = $self_type_to>, $($constraints)*
         {
-            type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
+            type Homomorphism = <$self_type_to as $crate::homomorphism::CanHomFrom<$self_type_from>>::Homomorphism;
 
             fn has_canonical_hom(&self, from: &$self_type_from) -> Option<Self::Homomorphism> {
                 use $crate::delegate::*;
@@ -538,10 +539,10 @@ macro_rules! impl_field_wrap_unwrap_homs {
             }
         }
 
-        impl<AsFieldRingStore, $($gen_args)*> CanHomFrom<$crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>> for $self_type_to
+        impl<AsFieldRingStore, $($gen_args)*> $crate::homomorphism::CanHomFrom<$crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>> for $self_type_to
             where AsFieldRingStore: RingStore<Ring = $self_type_from>, $($constraints)*
         {
-            type Homomorphism = <$self_type_to as CanHomFrom<$self_type_from>>::Homomorphism;
+            type Homomorphism = <$self_type_to as $crate::homomorphism::CanHomFrom<$self_type_from>>::Homomorphism;
 
             fn has_canonical_hom(&self, from: &$crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>) -> Option<Self::Homomorphism> {
                 use $crate::delegate::*;
@@ -568,10 +569,10 @@ macro_rules! impl_field_wrap_unwrap_homs {
 macro_rules! impl_field_wrap_unwrap_isos {
     (<{$($gen_args:tt)*}> $self_type_from:ty, $self_type_to:ty where $($constraints:tt)*) => {
 
-        impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$self_type_from> for $crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>
+        impl<AsFieldRingStore, $($gen_args)*> $crate::homomorphism::CanIsoFromTo<$self_type_from> for $crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>
             where AsFieldRingStore: RingStore<Ring = $self_type_to>, $($constraints)*
         {
-            type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
+            type Isomorphism = <$self_type_to as $crate::homomorphism::CanIsoFromTo<$self_type_from>>::Isomorphism;
 
             fn has_canonical_iso(&self, from: &$self_type_from) -> Option<Self::Isomorphism> {
                 use $crate::delegate::*;
@@ -584,10 +585,10 @@ macro_rules! impl_field_wrap_unwrap_isos {
             }
         }
 
-        impl<AsFieldRingStore, $($gen_args)*> CanIsoFromTo<$crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>> for $self_type_to
+        impl<AsFieldRingStore, $($gen_args)*> $crate::homomorphism::CanIsoFromTo<$crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>> for $self_type_to
             where AsFieldRingStore: RingStore<Ring = $self_type_from>, $($constraints)*
         {
-            type Isomorphism = <$self_type_to as CanIsoFromTo<$self_type_from>>::Isomorphism;
+            type Isomorphism = <$self_type_to as $crate::homomorphism::CanIsoFromTo<$self_type_from>>::Isomorphism;
 
             fn has_canonical_iso(&self, from: &$crate::ring_impls::as_field::AsFieldBase<AsFieldRingStore>) -> Option<Self::Isomorphism> {
                 use $crate::delegate::*;

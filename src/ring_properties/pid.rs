@@ -29,10 +29,9 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// # Example
     /// ```rust
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::pid::*;
-    /// # use feanor_math::homomorphism::*;
-    /// # use feanor_math::rings::zn::zn_64b::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_properties::pid::*;
+    /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// let Z6 = Zn64B::new(6);
     /// assert_el_eq!(
     ///     Z6,
@@ -160,9 +159,8 @@ where
 /// # Example
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-/// # use feanor_math::ring::*;
-/// # use feanor_math::pid::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_properties::pid::*;
 /// let ring = ZZi64;
 /// let (q, r) = ring.euclidean_div_rem(14, &6);
 /// assert_el_eq!(ring, 14, ring.add(ring.mul(q, 6), r));

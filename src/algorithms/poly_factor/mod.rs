@@ -29,41 +29,27 @@ pub trait FactorPolyField: Field + PolyTFracGCDRing {
     ///
     /// # Example - factorization over `QQ`
     /// ```rust
-    /// # use feanor_math::ring::*;
-    /// # use feanor_math::primitive_int::*;
-    /// # use feanor_math::rings::poly::*;
-    /// # use feanor_math::rings::rational::*;
-    /// # use feanor_math::homomorphism::*;
+    /// # use feanor_math::prelude::*;
+    /// # use feanor_math::ring_impls::poly::*;
+    /// # use feanor_math::ring_impls::rational::*;
     /// # use feanor_math::assert_el_eq;
-    /// # use feanor_math::field::*;
     /// # use feanor_math::algorithms::poly_factor::*;
     /// // Unfortunately, the internal gcd computations will *extremely* blow up coefficients;
     /// // If you are unsure, use ZZbig as underlying implementation of ZZ
-    /// let ZZ = StaticRing::<i128>::RING;
+    /// let ZZ = ZZbig;
     /// let QQ = RationalField::new(ZZ);
-    /// let P = dense_poly::DensePolyRing::new(QQ, "X");
-    /// let ZZ_to_QQ = QQ.can_hom(&ZZ).unwrap();
-    /// let fraction = |nom: i128, den: i128| QQ.div(&ZZ_to_QQ.map(nom), &ZZ_to_QQ.map(den));
-    ///
-    /// // f is X^2 + 3/2
-    /// let f = P.from_terms([(fraction(3, 2), 0), (fraction(1, 1), 2)].into_iter());
-    ///
-    /// // g is X^2 + 2/3 X + 1
-    /// let g = P.from_terms(
+    /// let P = dense_poly::DensePolyRing::new(&QQ, "X");
+    /// let ZZ_to_QQ = QQ.int_hom();
+    /// let fraction = |nom, den| QQ.div(&ZZ_to_QQ.map(nom), &ZZ_to_QQ.map(den));
+    /// let [f, g] = P.with_wrapped_indeterminate(|X| {
     ///     [
-    ///         (fraction(1, 1), 0),
-    ///         (fraction(2, 3), 1),
-    ///         (fraction(1, 1), 2),
+    ///         X.pow_ref(2) + 3 * X.pow_ref(0) / 2,
+    ///         X.pow_ref(2) + 2 * X / 3 + 1,
     ///     ]
-    ///     .into_iter(),
-    /// );
+    /// });
     ///
-    /// let fgg = P.prod(
-    ///     [&f, &g, &g, &P.int_hom().map(6)]
-    ///         .iter()
-    ///         .map(|poly| poly.clone()),
-    /// );
-    /// let (factorization, unit) = <RationalFieldBase<_> as FactorPolyField>::factor_poly(&P, &fgg);
+    /// let fgg = P.prod([&f, &g, &g, &P.int_hom().map(6)].into_iter().cloned());
+    /// let (factorization, unit) = FactorPolyField::factor_poly(&P, &fgg);
     /// assert_eq!(2, factorization.len());
     /// if P.eq_el(&f, &factorization[0].0) {
     ///     assert_eq!(1, factorization[0].1);

@@ -86,13 +86,11 @@ Personally, I think it is an amazing project as well.
 The simplest way of using `feanor-math` is by running a provided algorithm on a provided ring.
 For example, we can solve a linear system over a finite field as follows:
 ```rust
-use feanor_math::homomorphism::*;
-use feanor_math::rings::extension::galois_field::*;
+use feanor_math::ring_impls::extension::galois_field::*;
 use feanor_math::assert_el_eq;
-use feanor_math::rings::extension::*;
+use feanor_math::ring_impls::extension::*;
 use feanor_math::matrix::*;
-use feanor_math::ring::*;
-use feanor_math::primitive_int::*;
+use feanor_math::prelude::*;
 use feanor_math::algorithms::linsolve::*;
 
 // create the field F25 and the embedding ZZ -> F25
@@ -122,22 +120,17 @@ assert_el_eq!(&F25, F25.zero(), F25.add_ref(result.at(0, 0), result.at(1, 0)));
 Another example of the above type is solving of equations over supported fields.
 Note that this code currently requires unstable features, i.e. activating the feature `unstable-enable`.
 ```rust
-use feanor_math::homomorphism::*;
-use feanor_math::rings::zn::*;
-use feanor_math::rings::zn::zn_64b::*;
+use feanor_math::prelude::*;
+use feanor_math::ring_impls::zn::*;
+use feanor_math::ring_impls::zn::zn_64b::*;
 use feanor_math::assert_el_eq;
-use feanor_math::ring::*;
-use feanor_math::field::*;
-use feanor_math::primitive_int::*;
 use feanor_math::algorithms::buchberger::*;
-use feanor_math::rings::multivariate::*;
-use feanor_math::rings::multivariate::multivariate_impl::*;
+use feanor_math::ring_impls::multivariate::*;
+use feanor_math::ring_impls::multivariate::multivariate_impl::*;
 use feanor_math::algorithms::poly_factor::*;
-use feanor_math::rings::poly::dense_poly::*;
+use feanor_math::ring_impls::poly::dense_poly::*;
 use feanor_math::seq::*;
-use feanor_math::divisibility::*;
-use feanor_math::pid::*;
-use feanor_math::rings::poly::*;
+use feanor_math::ring_impls::poly::*;
 
 // first, we create multiple rings: the prime field F7, the bivariate polynomial ring F7[X, Y] and the univariate 
 //                                  polynomial ring F7[T]
@@ -150,7 +143,7 @@ let F7T = DensePolyRing::new(&F7, "T");
 let [f1, f2] = F7XY.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - 1, X * Y - 2]);
 
 // now compute a groebner basis
-let groebner_basis_degrevlex = buchberger(&F7XY, vec![F7XY.clone_el(&f1), F7XY.clone_el(&f2)], DegRevLex);
+let groebner_basis_degrevlex = buchberger(&F7XY, vec![f1.clone(), f2.clone()], DegRevLex);
 // if the groebner basis contains a unit, the system is unsolvable
 assert!(groebner_basis_degrevlex.iter().all(|f| F7XY.appearing_indeterminates(f).len() > 0), "system has no solution");
 // now compute a lex-groebner basis; note that it still makes sense to do this on top of the degrevlex groebner
@@ -161,18 +154,18 @@ let mut groebner_basis_lex = buchberger(&F7XY, groebner_basis_degrevlex, Lex);
 groebner_basis_lex.sort_unstable_by(|f, g| Lex.compare(&F7XY, F7XY.LT(f, Lex).unwrap().1, F7XY.LT(g, Lex).unwrap().1).reverse());
 
 // we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`, i.e. the `fi` with `y` "plugged in"
-let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].clone_ring_els(&F7T), F7T.inclusion());
+let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].clone_els(), F7T.inclusion());
 let (poly_in_y_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_y);
 let y = poly_in_y_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
 // we found `y`! now plug in `y` into the `fi(X, Y)`, take their gcd (as univariate polynomials in `X`), and find a root `x`
-let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].clone_ring_els(&F7T), F7T.inclusion())));
+let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].clone_els(), F7T.inclusion())));
 let (poly_in_x_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_x);
 let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
 // check the solution
-assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].clone_ring_els(F7), F7.identity()));
-assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].clone_ring_els(F7), F7.identity()));
+assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].clone_els(), F7.identity()));
+assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f2, [x, y].clone_els(), F7.identity()));
 ```
 A similar approach also works over the rationals.
 
@@ -183,7 +176,8 @@ In particular, a user should be able to write high-performance algorithms that d
 First, we show demonstrate how one could implement the Fermat primality test.
 ```rust
 use feanor_math::prelude::*;
-use feanor_math::algorithms;
+use feanor_math::algorithms::miller_rabin::is_prime;
+use feanor_math::ring_impls::zn::zn_big::*;
 use oorandom;
 
 fn fermat_is_prime(n: i64) -> bool {
@@ -206,25 +200,22 @@ fn fermat_is_prime(n: i64) -> bool {
     return true;
 }
 
-assert!(algorithms::miller_rabin::is_prime(ZZi64, &91, 6) == fermat_is_prime(91));
+assert!(is_prime(ZZi64, &91, 6) == fermat_is_prime(91));
 ```
 If we want to support arbitrary rings of integers - e.g. `ZZbig`, which is a simple
 implementation of arbitrary-precision integers - we could make the function generic as
 
 ```rust
-use feanor_math::homomorphism::*;
-use feanor_math::ring::*;
-use feanor_math::integer::*;
-use feanor_math::integer::*;
-use feanor_math::rings::zn::zn_big::*;
-use feanor_math::rings::zn::*;
-use feanor_math::rings::finite::*;
-use feanor_math::algorithms;
+use feanor_math::prelude::*;
+use feanor_math::ring_impls::zn::zn_big::*;
+use feanor_math::ring_impls::zn::*;
+use feanor_math::ring_properties::finite::*;
+use feanor_math::algorithms::miller_rabin::is_prime;
 
 use oorandom;
 
 fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool 
-    where R: RingStore, R::Type: IntegerRing
+    where R: RingStore, R::Ring: IntegerRing
 {
     // the Fermat primality test is based on the observation that a^n == a mod n if n
     // is a prime; On the other hand, if n is not prime, we hope that there are many
@@ -252,7 +243,7 @@ fn fermat_is_prime<R>(ZZ: R, n: El<R>) -> bool
 // the miller-rabin primality test is implemented in feanor_math::algorithms, so we can
 // check our implementation
 let n = ZZbig.int_hom().map(91);
-assert!(algorithms::miller_rabin::is_prime(ZZbig, &n, 6) == fermat_is_prime(ZZbig, n));
+assert!(is_prime(ZZbig, &n, 6) == fermat_is_prime(ZZbig, n));
 ```
 This function now works with any ring that implements `IntegerRing`, a subtrait of `RingBase`.
 
@@ -261,12 +252,9 @@ This function now works with any ring that implements `IntegerRing`, a subtrait 
 To implement a custom ring, just create a struct and add an `impl PartialEq` and an `impl RingBase` - that's it!
 Assuming we want to provide our own implementation of the finite binary field F2, we could do it as follows.
 ```rust
-use feanor_math::homomorphism::*;
-use feanor_math::integer::*;
-use feanor_math::assert_el_eq;
-use feanor_math::ring::*;
+use feanor_math::prelude::*;
 
-#[derive(PartialEq, Debug)]
+#[derive(PartialEq, Debug, Clone)]
 struct F2Base;
 
 // this is a minimal implementation of `RingBase`. Note that `RingBase` contains many more
@@ -274,10 +262,6 @@ struct F2Base;
 impl RingBase for F2Base {
    
     type Element = u8;
-
-    fn clone_el(&self, val: &Self::Element) -> Self::Element {
-        *val
-    }
 
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         *lhs = (*lhs + rhs) % 2;
@@ -302,13 +286,11 @@ impl RingBase for F2Base {
     }
 
     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
-        where I: RingStore + Copy, I::Type: IntegerRing
+        where I: RingStore + Copy, I::Ring: IntegerRing
     {
         Some(ZZ.int_hom().map(2))
     }
 
-    fn is_commutative(&self) -> bool { true }
-    fn is_noetherian(&self) -> bool { true }
     fn is_approximate(&self) -> bool { false }
 
     fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>, _: EnvBindingStrength) -> std::fmt::Result {
@@ -320,7 +302,6 @@ impl RingBase for F2Base {
 // or `Field`; Also it might be useful to provide canonical homomorphisms by implementing `CanHomFrom`,
 // in particular the self-isomorphisms `F2Base: CanHomFrom<F2Base>` and `F2Base: CanIsoFromTo<F2Base>` 
 // might be useful
-
 pub const F2: RingValue<F2Base> = RingValue::from(F2Base);
 
 assert_el_eq!(F2, F2.int_hom().map(1), F2.add(F2.one(), F2.zero()));
@@ -333,15 +314,13 @@ Classical examples are polynomial rings `R[X]` that exist for any ring `R`.
 Since in that case we are both using and implementing rings, we should use both sides of the framework.
 For example, a simple polynomial ring implementation could look like this.
 ```rust
-use feanor_math::assert_el_eq;
-use feanor_math::ring::*;
-use feanor_math::rings::zn::zn_64b::*;
-use feanor_math::integer::*;
-use feanor_math::homomorphism::*;
-use feanor_math::rings::zn::*;
+use feanor_math::prelude::*;
+use feanor_math::ring_impls::zn::zn_64b::*;
+use feanor_math::ring_impls::zn::*;
 use std::cmp::{min, max};
 use std::fmt::Debug;
 
+#[derive(Clone)]
 pub struct MyPolyRingBase<R: RingStore> {
     base_ring: R
 }
@@ -373,16 +352,12 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
     // the crate does not judge whether this is a good idea)
     type Element = Vec<El<R>>;
 
-    fn clone_el(&self, el: &Self::Element) -> Self::Element {
-        el.iter().map(|x| self.x.clone()).collect()
-    }
-
     fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {
         for i in 0..min(lhs.len(), rhs.len()) {
             self.base_ring.add_assign_ref(&mut lhs[i], &rhs[i]);
         }
         for i in lhs.len()..rhs.len() {
-            lhs.push(self.base_ring.clone_el(&rhs[i]))
+            lhs.push(rhs[i].clone())
         }
     }
 
@@ -422,15 +397,6 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
         return true;
     }
 
-    fn is_commutative(&self) -> bool {
-        self.base_ring.is_commutative()
-    }
-
-    fn is_noetherian(&self) -> bool {
-        // by Hilbert's basis theorem
-        self.base_ring.is_noetherian()
-    }
-
     fn is_approximate(&self) -> bool {
         self.base_ring.get_ring().is_approximate()
     }
@@ -445,13 +411,13 @@ impl<R: RingStore> RingBase for MyPolyRingBase<R> {
     }
 
     fn characteristic<I>(&self, ZZ: I) -> Option<El<I>>
-        where I: RingStore + Copy, I::Type: IntegerRing
+        where I: RingStore + Copy, I::Ring: IntegerRing
     {
         self.base_ring.get_ring().characteristic(ZZ)
     }
 }
 
-// in a real implementation, we definitely should implement also `feanor_math::rings::poly::PolyRing`, and
+// in a real implementation, we definitely should implement also `feanor_math::ring_impls::poly::PolyRing`, and
 // possibly other traits (`CanHomFrom<other polynomial rings>`, `RingExtension`, `DivisibilityRing`, `EuclideanRing`)
 
 let base = Zn64B::new(17);

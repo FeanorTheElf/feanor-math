@@ -452,7 +452,14 @@ where
 {
     let mut expected = (0..512).map(|_| ring.zero()).collect::<Vec<_>>();
     let value: Vec<Zn64BEl> = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-    KaratsubaAlgorithm::new(4, Global).compute_convolution(&value, None, &value, None, &mut expected, ring.get_ring());
+    KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution(
+        &value,
+        None,
+        &value,
+        None,
+        &mut expected,
+        ring.get_ring(),
+    );
 
     let mut i = 1;
     let mut actual = Vec::with_capacity(511);

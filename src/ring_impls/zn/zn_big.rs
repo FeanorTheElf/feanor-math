@@ -40,11 +40,10 @@ use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 ///
 /// # Example
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_big::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_big::*;
 /// let R = ZnGB::new(ZZi64, 257);
 /// let a = R.int_hom().map(16);
 /// assert!(R.eq_el(&R.int_hom().map(-1), &R.mul_ref(&a, &a)));
@@ -52,22 +51,20 @@ use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 /// ```
 /// However, this will panic as `2053^3 > i32::MAX`.
 /// ```rust,should_panic
-/// # use feanor_math::ring::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_big::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_big::*;
 /// let R = ZnGB::new(StaticRing::<i32>::RING, 2053);
 /// ```
 ///
 /// # Canonical mappings
 /// This ring has a canonical homomorphism from any integer ring
 /// ```rust
-/// # use feanor_math::ring::*;
+/// # use feanor_math::prelude::*;
 /// # use feanor_math::homomorphism::*;
-/// # use feanor_math::rings::zn::*;
-/// # use feanor_math::rings::zn::zn_big::*;
-/// # use feanor_math::integer::*;
-/// # use feanor_math::primitive_int::*;
+/// # use feanor_math::ring_impls::zn::*;
+/// # use feanor_math::ring_impls::zn::zn_big::*;
+
 /// let R = ZnGB::new(StaticRing::<i16>::RING, 7);
 /// let S = ZZbig;
 /// assert!(R.eq_el(
