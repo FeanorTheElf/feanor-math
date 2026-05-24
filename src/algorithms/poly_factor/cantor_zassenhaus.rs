@@ -514,9 +514,9 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_static::Fp;
-#[cfg(test)]
 use crate::iters::{clone_slice, powerset};
+#[cfg(test)]
+use crate::ring_impls::zn::zn_static::Fp;
 
 #[test]
 fn test_distinct_degree_factorization() {

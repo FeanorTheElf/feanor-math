@@ -1,4 +1,3 @@
-
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
 use crate::ring_impls::zn::zn_64b::Zn64B;
 
@@ -1044,11 +1043,11 @@ pub fn prime_fields_for_local_computation() -> impl Iterator<Item = AsField<Zn64
 }
 
 #[cfg(test)]
-use crate::ring_properties::integer::ZZi64;
-#[cfg(test)]
 use crate::algorithms::cyclotomic::is_prim_root_of_unity_pow2;
 #[cfg(test)]
 use crate::prelude::*;
+#[cfg(test)]
+use crate::ring_properties::integer::ZZi64;
 
 #[test]
 fn test_are_primitive_roots_of_unity() {
