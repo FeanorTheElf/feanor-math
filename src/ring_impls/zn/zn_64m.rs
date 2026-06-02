@@ -29,7 +29,7 @@ use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap
 pub struct Zn64MBase {
     modulus: i64,
     modulus_times_three: u64,
-    n_inv_mod_R: u64,
+    neg_n_inv_mod_R: u64,
     R_sqr_mod_n: u64,
 }
 
@@ -41,7 +41,7 @@ impl Zn64MBase {
         Self {
             modulus: modulus as i64,
             modulus_times_three: modulus * 3,
-            n_inv_mod_R: const_extended_euclid(modulus as i128, 1 << 64).0 as u64,
+            neg_n_inv_mod_R: 0u64.wrapping_sub(const_extended_euclid(modulus as i128, 1 << 64).0 as u64),
             R_sqr_mod_n: ((((1 << 64) % modulus as i128) * (1 << 64) % modulus as i128) % modulus as i128) as u64,
         }
     }
@@ -54,13 +54,10 @@ impl Zn64MBase {
     /// Assumes that `x` is `<= R * n`, then the result is `< 2 * n` and
     /// congruent to `x * R^-1` modulo `n`.
     fn montgomery_reduce(&self, x: u128) -> u64 {
-        let x_low = (x % (1 << 64)) as u64;
-        let a = x_low.wrapping_mul(self.n_inv_mod_R);
-        let b = a as i128 * self.modulus as i128;
-        let res = (x as i128 - b) / (1 << 64);
-        let res = ((res as i64) + self.modulus) as u64;
-        debug_assert!(res < 2 * self.modulus_u64());
-        return res;
+        let m = (x as u64).wrapping_mul(self.neg_n_inv_mod_R);
+        let t = ((x + (m as u128) * (self.modulus as u128)) >> 64) as u64;
+        debug_assert!(t < 2 * self.modulus_u64());
+        return t;
     }
 
     /// Assumes that `x` is `<= 6 * n`, then the result is
