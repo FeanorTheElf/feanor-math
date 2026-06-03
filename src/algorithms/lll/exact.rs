@@ -169,54 +169,6 @@ where
     return Ok(());
 }
 
-/// LLL-reduces the lattice basis given by the columns of the given matrix.
-///
-/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
-/// are `delta`-LLL-reduced. This means
-///  - (size-reduced) `|<bi,bj*>| < |bj*|^2 / 2` whenever `i > j`
-///  - (Lovasz-condition) `|bk*|^2 >= delta |b(k - 1)*|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)*|^2`
-///
-/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
-///
-/// # Internal computations with floating point numbers
-///
-/// If `disable_float_lll` is not set, this function will first heuristically reduce
-/// the matrix using [`crate::algorithms::lll::float::lll()`]. This can significantly
-/// speed up the whole computation, as it means we have to do less rational arithmetic,
-/// which can be very slow.
-#[stability::unstable(feature = "enable")]
-pub fn lll<S, I, H, V, T>(
-    basis: SubmatrixMut<V, S::Element>,
-    h: H,
-    delta: &RationalFieldEl<I>,
-    disable_float_lll: bool,
-    transform: T,
-) where
-    S: ?Sized + RingBase + CanHomFrom<I::Type>,
-    I: RingStore,
-    I::Type: IntegerRing,
-    H: Homomorphism<S, RationalFieldBase<I>>,
-    V: AsPointerToSlice<S::Element>,
-    T: TransformTarget<S>,
-{
-    let n = basis.col_count();
-    let mut quadratic_form = OwnedMatrix::zero(n, n, h.domain());
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(basis.as_const()).transpose(),
-        TransposableSubmatrix::from(basis.as_const()),
-        TransposableSubmatrixMut::from(quadratic_form.data_mut()),
-        h.domain(),
-    );
-
-    lll_quadratic_form(
-        quadratic_form.data_mut(),
-        &h,
-        delta,
-        disable_float_lll,
-        DuplicateTransforms::new(TransformCols(basis, h.domain().get_ring()), transform),
-    );
-}
-
 struct AdjustLLLState<'a, R, I, H1, H2, V, T>
 where
     R: ?Sized + RingBase,
@@ -314,24 +266,29 @@ where
     }
 }
 
-/// LLL-reduces the lattice basis given by the columns of the given matrix, w.r.t.
-/// the norm induced by the given quadratic form.
+/// Computes a `delta`-LLL-reduced form of the given positive semidefinite
+/// quadratic form.
+/// 
+/// The given quadratic form must be positive semidefinite.
+/// 
+/// More concretely, this function transforms the quadratic form into another quadratic
+/// form `Q` by unimodular operations that are simultaneously applied to rows and columns,
+/// such that
+///  - (size-reduced) `2|ei^T Q ej*| < (ej*^T Q ej*)` whenever `i > j`
+///  - (Lovasz-condition) `(ek*^T Q ek*) >= delta (e(k-1)*^T Q e(k - 1)*) - (ek^T Q e(k-1)*) /
+///    (e(k-1)*^T Q e(k - 1)*)`
 ///
-/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
-/// are `delta`-LLL-reduced. This means
-///  - (size-reduced) `|<bi,bj*>| < |bj*|^2 / 2` whenever `i > j`
-///  - (Lovasz-condition) `|bk*|^2 >= delta |b(k - 1)*|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)*|^2`
-///
-/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
-///
-/// The given quadratic form must be positive definite.
+/// Here the `ei*` refer to the Gram-Schmidt orthogonalization of the unit vectors `ei`
+/// w.r.t. the inner product defined by `Q`.
 ///
 /// # Internal computations with floating point numbers
 ///
 /// If `disable_float_lll` is not set, this function will first heuristically reduce
 /// the matrix using [`crate::algorithms::lll::float::lll_quadratic_form()`].
 /// This can significantly speed up the whole computation, as it means we have to do
-/// less rational arithmetic, which can be very slow.
+/// less rational arithmetic, which can be very slow. Note that, since updates to the
+/// basis are always performed in the ring `S`, there is no danger of incorrect results
+/// (assuming that `S` is an exact ring).
 #[stability::unstable(feature = "enable")]
 pub fn lll_quadratic_form<S, I, H, V, T>(
     mut quadratic_form: SubmatrixMut<V, S::Element>,
@@ -437,6 +394,56 @@ pub fn lll_quadratic_form<S, I, H, V, T>(
             return;
         }
     }
+}
+
+/// LLL-reduces the lattice basis given by the columns of the given matrix.
+///
+/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
+/// are `delta`-LLL-reduced. This means
+///  - (size-reduced) `2|<bi,bj*>| < |bj*|^2` whenever `i > j`
+///  - (Lovasz-condition) `|bk*|^2 >= delta |b(k - 1)*|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)*|^2`
+///
+/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
+///
+/// # Internal computations with floating point numbers
+///
+/// If `disable_float_lll` is not set, this function will first heuristically reduce
+/// the matrix using [`crate::algorithms::lll::float::lll_quadratic_form()`].
+/// This can significantly speed up the whole computation, as it means we have to do
+/// less rational arithmetic, which can be very slow. Note that, since updates to the
+/// basis are always performed in the ring `S`, there is no danger of incorrect results
+/// (assuming that `S` is an exact ring).
+#[stability::unstable(feature = "enable")]
+pub fn lll<S, I, H, V, T>(
+    basis: SubmatrixMut<V, S::Element>,
+    h: H,
+    delta: &RationalFieldEl<I>,
+    disable_float_lll: bool,
+    transform: T,
+) where
+    S: ?Sized + RingBase + CanHomFrom<I::Type>,
+    I: RingStore,
+    I::Type: IntegerRing,
+    H: Homomorphism<S, RationalFieldBase<I>>,
+    V: AsPointerToSlice<S::Element>,
+    T: TransformTarget<S>,
+{
+    let n = basis.col_count();
+    let mut quadratic_form = OwnedMatrix::zero(n, n, h.domain());
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(basis.as_const()).transpose(),
+        TransposableSubmatrix::from(basis.as_const()),
+        TransposableSubmatrixMut::from(quadratic_form.data_mut()),
+        h.domain(),
+    );
+
+    lll_quadratic_form(
+        quadratic_form.data_mut(),
+        &h,
+        delta,
+        disable_float_lll,
+        DuplicateTransforms::new(TransformCols(basis, h.domain().get_ring()), transform),
+    );
 }
 
 #[cfg(test)]
