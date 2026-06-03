@@ -230,6 +230,7 @@ where
     transform: T,
     to_QQ: H1,
     from_ZZ: H2,
+    pass_on_offset: usize,
     quadratic_form: SubmatrixMut<'a, V, R::Element>,
     codomain: PhantomData<R>,
     domain: PhantomData<RationalFieldBase<I>>,
@@ -273,7 +274,7 @@ where
             j,
             &matrix,
         );
-        self.transform.transform(self.to_QQ.domain(), i, j, &matrix);
+        self.transform.transform(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset, &matrix);
     }
 
     fn subtract<S: Copy + RingStore<Type = RationalFieldBase<I>>>(
@@ -302,14 +303,14 @@ where
             dst,
             &factor,
         );
-        self.transform.subtract(self.to_QQ.domain(), src, dst, &factor);
+        self.transform.subtract(self.to_QQ.domain(), src + self.pass_on_offset, dst + self.pass_on_offset, &factor);
     }
 
     fn swap<S: Copy + RingStore<Type = RationalFieldBase<I>>>(&mut self, ring: S, i: usize, j: usize) {
         assert!(ring.get_ring() == self.to_QQ.codomain().get_ring());
         TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
         TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
-        self.transform.swap(self.to_QQ.domain(), i, j);
+        self.transform.swap(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset);
     }
 }
 
@@ -362,8 +363,7 @@ pub fn lll_quadratic_form<S, I, H, V, T>(
         _ = float::lll_quadratic_form(quadratic_form.reborrow(), ring_to_RR, &0.999, &0.51, &mut transform);
     }
 
-    let mut gram_matrix = OwnedMatrix::from_fn(n, n, |i, j| h.map_ref(quadratic_form.at(i, j)));
-    let mut gram_matrix = gram_matrix.data_mut();
+    let mut tmp = OwnedMatrix::zero(n, n, &QQ);
 
     // we have an outer loop which removes all generated zero vectors from
     // `matrix` and `gram_matrix`, thus shrinking these matrices; It will
@@ -371,23 +371,33 @@ pub fn lll_quadratic_form<S, I, H, V, T>(
     // we might not be able to run it on the whole `gram_matrix` (with zero
     // vectors removed), since LDL can handle at most a single vector that is
     // in the Q-span of the previous ones
+    let mut offset = 0;
     'remove_zero_vectors: loop {
-        while gram_matrix.row_count() > 0 && QQ.is_zero(gram_matrix.at(0, 0)) {
-            let n = gram_matrix.col_count();
-            gram_matrix = gram_matrix.submatrix(1..n, 1..n);
+        while quadratic_form.row_count() > 0 && ring.is_zero(quadratic_form.at(0, 0)) {
+            let n = quadratic_form.col_count();
             quadratic_form = quadratic_form.submatrix(1..n, 1..n);
+            offset += 1;
         }
-        let n = gram_matrix.col_count();
-        let mut gso = match ldl(QQ, gram_matrix.reborrow()) {
-            Ok(()) => gram_matrix.reborrow(),
-            Err(valid_cols) => gram_matrix
-                .reborrow()
-                .submatrix(0..(valid_cols + 1), 0..(valid_cols + 1)),
+        let n = quadratic_form.col_count();
+
+        let mut gso = {
+            let mut gram_matrix = tmp.data_mut().submatrix(0..n, 0..n);
+            for i in 0..n {
+                for j in 0..n {
+                    *gram_matrix.at_mut(i, j) = h.map_ref(quadratic_form.at(i, j));
+                }
+            }
+            match ldl(QQ, gram_matrix.reborrow()) {
+                Ok(()) => gram_matrix,
+                Err(valid_cols) => gram_matrix
+                    .submatrix(0..(valid_cols + 1), 0..(valid_cols + 1)),
+            }
         };
 
         let mut transform = AdjustLLLState {
             transform: &mut transform,
             to_QQ: &h,
+            pass_on_offset: offset,
             from_ZZ: ring.can_hom(QQ.base_ring()).unwrap(),
             quadratic_form: quadratic_form.reborrow(),
             codomain: PhantomData,
@@ -423,7 +433,7 @@ pub fn lll_quadratic_form<S, I, H, V, T>(
 
         // if we ran the lll main loop on the whole matrix, we are done now
         let just_lll_reduced_dimension = gso.row_count();
-        if just_lll_reduced_dimension == gram_matrix.row_count() {
+        if just_lll_reduced_dimension == n {
             return;
         }
     }
@@ -587,7 +597,7 @@ fn test_lll_3d() {
     lll(
         reduced_matrix.reborrow(),
         QQ.identity(),
-        &QQ.from_fraction(9, 10),
+        &QQ.from_fraction(999, 1000),
         true,
         &mut (),
     );
