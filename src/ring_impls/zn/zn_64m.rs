@@ -145,6 +145,7 @@ impl RingBase for Zn64MBase {
         debug_assert!(lhs.0 <= self.repr_bound());
         debug_assert!(rhs.0 <= self.repr_bound());
         debug_assert!(summand.0 <= self.repr_bound());
+        // TODO: this might be a bug, I don't think it will end up <= 3n?
         let result = self.montgomery_reduce(lhs.0 as u128 * rhs.0 as u128) + summand.0;
         debug_assert!(result <= self.repr_bound());
         return Zn64MEl(result);
