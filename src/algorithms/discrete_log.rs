@@ -562,12 +562,11 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
 
         let mut identity = OwnedMatrix::identity(n, n, &QQ);
         lll(
-            &QQ,
-            identity.data(),
             dual_basis.data_mut(),
+            QQ.identity(),
             &QQ.div(&ZZ_to_QQ.map(9), &ZZ_to_QQ.map(10)),
-            Global,
             false,
+            &mut ()
         );
 
         let mut result_QQ = rhs;
