@@ -51,9 +51,9 @@ pub mod lll;
 pub mod matmul;
 /// Contains an implementation of the Miller-Rabin probabilistic primality test.
 pub mod miller_rabin;
-/// Contains algorithms for computing the Galois group and Galois closure of a
-/// [`crate::ring_impls::extension::number_field::NumberField`].
-// pub mod galois;
+/// Contains [`multipointeval::multipointeval()`] to efficiently evaluate a polynomial
+/// at multiple points simultaneously.
+pub mod multipointeval;
 /// Contains an implementation of the Newton-Raphson method for approximating roots of
 /// polynomials (and more generally, "well-behaved" functions).
 pub mod newton;
@@ -69,8 +69,12 @@ pub mod poly_factor;
 /// Contains [`poly_gcd::PolyTFracGCDRing`] for rings over which we can compute polynomial gcds and
 /// related operations, modulo multiplication by non-zero divisors.
 pub mod poly_gcd;
+/// Contains [`poly_root::poly_root()`] to compute the `n`-th root of a polynomial over a domain.
 pub mod poly_root;
+/// Contains precomputed lists of primes for various purposes, primarily for reduce-and-lift
+/// algorithms.
 pub mod primelist;
+/// Contains [`qr::QRDecompositionField`] for different variants of QR decompositions over fields.
 pub mod qr;
 /// Contains algorithms for rational reconstruction, i.e. find a small rational number `x`
 /// from its reduction modulo some `n` (coprime to the denominator of `x`).

@@ -48,8 +48,10 @@ pub struct RustBigint<A: Allocator = Global>(bool, Vec<u64, A>);
 /// Arbitrary-precision integer implementation.
 ///
 /// This is a not-too-well optimized implementation, written in pure Rust.
-/// If you need very high performance, consider using [`crate::ring_impls::mpir::MPZ`]
+/// If you need very high performance, consider using [`MPZ`]
 /// (requires an installation of mpir and activating the feature "mpir").
+///
+/// [`MPZ`]: crate::ring_impls::mpir::MPZ
 #[derive(Copy, Clone)]
 pub struct RustBigintRingBase<A: Allocator + Send + Sync + Clone = Global> {
     allocator: A,

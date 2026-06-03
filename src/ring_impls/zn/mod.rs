@@ -17,6 +17,7 @@ pub mod zn_big;
 /// This module contains [`zn_rns::ZnRNS`], a residue number system (RNS) implementation of
 /// `Z/nZ` for highly composite `n`.
 pub mod zn_rns;
+
 /// This module contains [`zn_static::Zn`], an implementation of `Z/nZ` for a small `n`
 /// that is known at compile-time.
 pub mod zn_static;

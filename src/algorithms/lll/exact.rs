@@ -1,9 +1,10 @@
-use std::alloc::Allocator;
+use std::array::from_fn;
+use std::marker::PhantomData;
 
-use crate::algorithms::lll::float::lll_quadratic_form;
+use crate::algorithms::lll::float;
 use crate::algorithms::matmul::*;
-use crate::homomorphism::*;
-use crate::matrix::transform::{TransformCols, TransformTarget};
+use crate::homomorphism::CanHomFrom;
+use crate::matrix::transform::{DuplicateTransforms, TransformCols, TransformRows, TransformTarget};
 use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring_impls::approx_real::float::Real64;
@@ -59,6 +60,7 @@ fn size_reduce<R, I, V, T>(
 ///     where gamma^2 = |b_i*|^2 / |b'_i*|^2
 ///   mu' = gamma^2 mu
 /// ```
+#[instrument(skip_all, level = "trace")]
 #[instrument(skip_all, level = "trace")]
 fn swap_gso_cols<R, V>(ring: R, mut gso: SubmatrixMut<V, El<R>>, i: usize, j: usize)
 where
@@ -135,6 +137,9 @@ where
 ///
 /// `D` is returned on the diagonal of the matrix, and `L^T` is returned in
 /// the upper triangle of the matrix.
+///
+/// Note that we require special behavior on singular matrices, and thus cannot
+/// use [`crate::algorithms::qr::QRDecompositionField::ldl_decomposition()`].
 #[instrument(skip_all, level = "trace")]
 fn ldl<R, V>(ring: R, mut matrix: SubmatrixMut<V, El<R>>) -> Result<(), usize>
 where
@@ -167,82 +172,170 @@ where
     return Ok(());
 }
 
-/// LLL-reduces the lattice basis given by the columns of the given matrix, w.r.t.
-/// the norm induced by the given quadratic form.
+struct AdjustLLLState<'a, R, I, H1, H2, V, T>
+where
+    R: ?Sized + RingBase,
+    I: RingStore,
+    I::Ring: IntegerRing,
+    H1: Homomorphism<R, RationalFieldBase<I>>,
+    H2: Homomorphism<I::Ring, R>,
+    V: AsPointerToSlice<R::Element>,
+    T: TransformTarget<R>,
+{
+    transform: T,
+    to_QQ: H1,
+    from_ZZ: H2,
+    pass_on_offset: usize,
+    quadratic_form: SubmatrixMut<'a, V, R::Element>,
+    codomain: PhantomData<R>,
+    domain: PhantomData<RationalFieldBase<I>>,
+}
+
+impl<'a, R, I, H1, H2, V, T> TransformTarget<RationalFieldBase<I>> for AdjustLLLState<'a, R, I, H1, H2, V, T>
+where
+    R: ?Sized + RingBase,
+    I: RingStore,
+    I::Ring: IntegerRing,
+    H1: Homomorphism<R, RationalFieldBase<I>>,
+    H2: Homomorphism<I::Ring, R>,
+    V: AsPointerToSlice<R::Element>,
+    T: TransformTarget<R>,
+{
+    fn transform<S: Copy + RingStore<Ring = RationalFieldBase<I>>>(
+        &mut self,
+        ring: S,
+        i: usize,
+        j: usize,
+        transform: &[RationalFieldEl<I>; 4],
+    ) {
+        assert!(ring.get_ring() == self.to_QQ.codomain().get_ring());
+        let QQ = self.to_QQ.codomain();
+        let ZZ = QQ.base_ring();
+        let matrix = from_fn(|k| {
+            self.from_ZZ.map(
+                ZZ.checked_div(QQ.get_ring().num(&transform[k]), QQ.get_ring().den(&transform[k]))
+                    .unwrap(),
+            )
+        });
+        TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).transform(
+            self.to_QQ.domain(),
+            i,
+            j,
+            &matrix,
+        );
+        TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).transform(
+            self.to_QQ.domain(),
+            i,
+            j,
+            &matrix,
+        );
+        self.transform.transform(
+            self.to_QQ.domain(),
+            i + self.pass_on_offset,
+            j + self.pass_on_offset,
+            &matrix,
+        );
+    }
+
+    fn subtract<S: Copy + RingStore<Ring = RationalFieldBase<I>>>(
+        &mut self,
+        ring: S,
+        src: usize,
+        dst: usize,
+        factor: &<RationalFieldBase<I> as RingBase>::Element,
+    ) {
+        assert!(ring.get_ring() == self.to_QQ.codomain().get_ring());
+        let QQ = self.to_QQ.codomain();
+        let ZZ = QQ.base_ring();
+        let factor = self.from_ZZ.map(
+            ZZ.checked_div(QQ.get_ring().num(factor), QQ.get_ring().den(factor))
+                .unwrap(),
+        );
+        TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).subtract(
+            self.to_QQ.domain(),
+            src,
+            dst,
+            &factor,
+        );
+        TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).subtract(
+            self.to_QQ.domain(),
+            src,
+            dst,
+            &factor,
+        );
+        self.transform.subtract(
+            self.to_QQ.domain(),
+            src + self.pass_on_offset,
+            dst + self.pass_on_offset,
+            &factor,
+        );
+    }
+
+    fn swap<S: Copy + RingStore<Ring = RationalFieldBase<I>>>(&mut self, ring: S, i: usize, j: usize) {
+        assert!(ring.get_ring() == self.to_QQ.codomain().get_ring());
+        TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
+        TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
+        self.transform
+            .swap(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset);
+    }
+}
+
+/// Computes a `delta`-LLL-reduced form of the given positive semidefinite
+/// quadratic form.
 ///
-/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
-/// are `delta`-LLL-reduced. This means
-///  - (size-reduced) `|<bi,bj*>| < |bj*|^2 / 2` whenever `i > j`
-///  - (Lovasz-condition) `|bk*|^2 >= delta |b(k - 1)*|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)*|^2`
+/// The given quadratic form must be positive semidefinite.
 ///
-/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
+/// More concretely, this function transforms the quadratic form into another quadratic
+/// form `Q` by unimodular operations that are simultaneously applied to rows and columns,
+/// such that
+///  - (size-reduced) `2|ei^T Q ej*| < (ej*^T Q ej*)` whenever `i > j`
+///  - (Lovasz-condition) `(ek*^T Q ek*) >= delta (e(k-1)*^T Q e(k - 1)*) - (ek^T Q e(k-1)*) /
+///    (e(k-1)*^T Q e(k - 1)*)`
 ///
-/// The given quadratic form must be positive definite.
+/// Here the `ei*` refer to the Gram-Schmidt orthogonalization of the unit vectors `ei`
+/// w.r.t. the inner product defined by `Q`.
 ///
 /// # Internal computations with floating point numbers
 ///
 /// If `disable_float_lll` is not set, this function will first heuristically reduce
 /// the matrix using [`crate::algorithms::lll::float::lll_quadratic_form()`].
 /// This can significantly speed up the whole computation, as it means we have to do
-/// less rational arithmetic, which can be very slow.
+/// less rational arithmetic, which can be very slow. Note that, since updates to the
+/// basis are always performed in the ring `S`, there is no danger of incorrect results
+/// (assuming that `S` is an exact ring).
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn lll<R, I, V1, V2, A>(
-    ring: R,
-    quadratic_form: Submatrix<V1, El<R>>,
-    mut matrix: SubmatrixMut<V2, El<R>>,
-    delta: &El<R>,
-    allocator: A,
+pub fn lll_quadratic_form<S, I, H, V, T>(
+    mut quadratic_form: SubmatrixMut<V, S::Element>,
+    h: H,
+    delta: &RationalFieldEl<I>,
     disable_float_lll: bool,
+    mut transform: T,
 ) where
-    R: RingStore<Ring = RationalFieldBase<I>> + Copy,
+    S: ?Sized + RingBase + CanHomFrom<I::Ring>,
     I: RingStore,
     I::Ring: IntegerRing,
-    V1: AsPointerToSlice<El<R>>,
-    V2: AsPointerToSlice<El<R>>,
-    A: Allocator,
+    H: Homomorphism<S, RationalFieldBase<I>>,
+    V: AsPointerToSlice<S::Element>,
+    T: TransformTarget<S>,
 {
-    let n = matrix.col_count();
-    assert_eq!(matrix.row_count(), quadratic_form.col_count());
-    assert_eq!(matrix.row_count(), quadratic_form.col_count());
-    assert!(ring.is_lt(delta, &ring.one()));
-    assert!(ring.is_gt(
+    let ring = h.domain();
+    let QQ = h.codomain();
+    let n = quadratic_form.row_count();
+    assert_eq!(n, quadratic_form.row_count());
+    assert!(QQ.is_lt(delta, &QQ.one()));
+    assert!(QQ.is_gt(
         delta,
-        &ring.from_fraction(ring.base_ring().one(), ring.base_ring().int_hom().map(4))
+        &QQ.from_fraction(QQ.base_ring().one(), QQ.base_ring().int_hom().map(4))
     ));
-
-    let mut tmp = OwnedMatrix::zero_in(n, matrix.row_count(), ring, &allocator);
-    let mut compute_gram_matrix = |matrix: Submatrix<_, _>, gram_matrix: SubmatrixMut<_, _>| {
-        let mut tmp_data = tmp.data_mut().submatrix(0..matrix.col_count(), 0..matrix.row_count());
-        STANDARD_MATMUL.matmul(
-            TransposableSubmatrix::from(matrix).transpose(),
-            TransposableSubmatrix::from(quadratic_form),
-            TransposableSubmatrixMut::from(tmp_data.reborrow()),
-            ring,
-        );
-        STANDARD_MATMUL.matmul(
-            TransposableSubmatrix::from(tmp_data.as_const()),
-            TransposableSubmatrix::from(matrix),
-            TransposableSubmatrixMut::from(gram_matrix),
-            &ring,
-        );
-    };
-
-    let mut gram_matrix = OwnedMatrix::zero_in(n, n, ring, &allocator);
-    let mut gram_matrix = gram_matrix.data_mut();
-    compute_gram_matrix(matrix.as_const(), gram_matrix.reborrow());
 
     if !disable_float_lll {
         let RR = Real64::RING;
-        let QQ_to_RR = RR.can_hom(&ring).unwrap();
-        _ = lll_quadratic_form(
-            gram_matrix.reborrow(),
-            QQ_to_RR,
-            &0.999,
-            &0.51,
-            &mut TransformCols(matrix.reborrow(), ring.get_ring()),
-        );
+        let ring_to_RR = RR.can_hom(&QQ).unwrap().compose(&h);
+        _ = float::lll_quadratic_form(quadratic_form.reborrow(), ring_to_RR, &0.999, &0.51, &mut transform);
     }
+
+    let mut tmp = OwnedMatrix::zero(n, n, &QQ);
 
     // we have an outer loop which removes all generated zero vectors from
     // `matrix` and `gram_matrix`, thus shrinking these matrices; It will
@@ -250,39 +343,54 @@ pub fn lll<R, I, V1, V2, A>(
     // we might not be able to run it on the whole `gram_matrix` (with zero
     // vectors removed), since LDL can handle at most a single vector that is
     // in the Q-span of the previous ones
+    let mut offset = 0;
     'remove_zero_vectors: loop {
-        compute_gram_matrix(matrix.as_const(), gram_matrix.reborrow());
-        while gram_matrix.row_count() > 0 && ring.is_zero(gram_matrix.at(0, 0)) {
-            let n = matrix.col_count();
-            gram_matrix = gram_matrix.submatrix(1..n, 1..n);
-            matrix = matrix.restrict_cols(1..n);
+        while quadratic_form.row_count() > 0 && ring.is_zero(quadratic_form.at(0, 0)) {
+            let n = quadratic_form.col_count();
+            quadratic_form = quadratic_form.submatrix(1..n, 1..n);
+            offset += 1;
         }
-        let n = matrix.col_count();
-        let mut gso = match ldl(ring, gram_matrix.reborrow()) {
-            Ok(()) => gram_matrix.reborrow(),
-            Err(valid_cols) => gram_matrix
-                .reborrow()
-                .submatrix(0..(valid_cols + 1), 0..(valid_cols + 1)),
+        let n = quadratic_form.col_count();
+
+        let mut gso = {
+            let mut gram_matrix = tmp.data_mut().submatrix(0..n, 0..n);
+            for i in 0..n {
+                for j in 0..n {
+                    *gram_matrix.at_mut(i, j) = h.map_ref(quadratic_form.at(i, j));
+                }
+            }
+            match ldl(QQ, gram_matrix.reborrow()) {
+                Ok(()) => gram_matrix,
+                Err(valid_cols) => gram_matrix.submatrix(0..(valid_cols + 1), 0..(valid_cols + 1)),
+            }
         };
 
-        let mut col_ops = TransformCols(matrix.reborrow(), ring.get_ring());
+        let mut transform = AdjustLLLState {
+            transform: &mut transform,
+            to_QQ: &h,
+            pass_on_offset: offset,
+            from_ZZ: ring.can_hom(QQ.base_ring()).unwrap(),
+            quadratic_form: quadratic_form.reborrow(),
+            codomain: PhantomData,
+            domain: PhantomData,
+        };
         let mut i = 1;
 
         #[allow(unused_labels)]
         'lll_main_loop: while i < n {
             assert!(i > 0);
             let (target, gso_part) = gso.reborrow().split_cols(i..(i + 1), 0..i);
-            size_reduce(ring, target, i, gso_part.as_const(), &mut col_ops);
+            size_reduce(QQ, target, i, gso_part.as_const(), &mut transform);
 
-            if ring.is_gt(
-                &ring.mul_ref_snd(
-                    ring.sub_ref_fst(delta, ring.mul_ref(gso.at(i - 1, i), gso.at(i - 1, i))),
+            if QQ.is_gt(
+                &QQ.mul_ref_snd(
+                    QQ.sub_ref_fst(delta, QQ.mul_ref(gso.at(i - 1, i), gso.at(i - 1, i))),
                     gso.at(i - 1, i - 1),
                 ),
                 gso.at(i, i),
             ) {
-                col_ops.swap(ring, i - 1, i);
-                swap_gso_cols(&ring, gso.reborrow(), i - 1, i);
+                transform.swap(QQ, i - 1, i);
+                swap_gso_cols(QQ, gso.reborrow(), i - 1, i);
                 i -= 1;
                 if i == 0 {
                     // we might have generated a new zero vector, continue
@@ -296,14 +404,62 @@ pub fn lll<R, I, V1, V2, A>(
 
         // if we ran the lll main loop on the whole matrix, we are done now
         let just_lll_reduced_dimension = gso.row_count();
-        if just_lll_reduced_dimension == gram_matrix.row_count() {
+        if just_lll_reduced_dimension == n {
             return;
         }
     }
 }
 
-#[cfg(test)]
-use std::alloc::Global;
+/// LLL-reduces the lattice basis given by the columns of the given matrix.
+///
+/// The exact restrictions imposed on `B'` are that its columns `b1, ..., bn`
+/// are `delta`-LLL-reduced. This means
+///  - (size-reduced) `2|<bi,bj*>| < |bj*|^2` whenever `i > j`
+///  - (Lovasz-condition) `|bk*|^2 >= delta |b(k - 1)*|^2 - <bk, b(k - 1)*>^2 / |b(k - 1)*|^2`
+///
+/// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
+///
+/// # Internal computations with floating point numbers
+///
+/// If `disable_float_lll` is not set, this function will first heuristically reduce
+/// the matrix using [`crate::algorithms::lll::float::lll_quadratic_form()`].
+/// This can significantly speed up the whole computation, as it means we have to do
+/// less rational arithmetic, which can be very slow. Note that, since updates to the
+/// basis are always performed in the ring `S`, there is no danger of incorrect results
+/// (assuming that `S` is an exact ring).
+#[stability::unstable(feature = "enable")]
+#[instrument(skip_all, level = "trace")]
+pub fn lll<S, I, H, V, T>(
+    basis: SubmatrixMut<V, S::Element>,
+    h: H,
+    delta: &RationalFieldEl<I>,
+    disable_float_lll: bool,
+    transform: T,
+) where
+    S: ?Sized + RingBase + CanHomFrom<I::Ring>,
+    I: RingStore,
+    I::Ring: IntegerRing,
+    H: Homomorphism<S, RationalFieldBase<I>>,
+    V: AsPointerToSlice<S::Element>,
+    T: TransformTarget<S>,
+{
+    let n = basis.col_count();
+    let mut quadratic_form = OwnedMatrix::zero(n, n, h.domain());
+    STANDARD_MATMUL.matmul(
+        TransposableSubmatrix::from(basis.as_const()).transpose(),
+        TransposableSubmatrix::from(basis.as_const()),
+        TransposableSubmatrixMut::from(quadratic_form.data_mut()),
+        h.domain(),
+    );
+
+    lll_quadratic_form(
+        quadratic_form.data_mut(),
+        &h,
+        delta,
+        disable_float_lll,
+        DuplicateTransforms::new(TransformCols(basis, h.domain().get_ring()), transform),
+    );
+}
 
 #[cfg(test)]
 use test::Bencher;
@@ -397,12 +553,11 @@ fn test_lll_2d() {
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll(
-        QQ,
-        OwnedMatrix::identity(2, 2, QQ).data(),
         reduced_matrix.reborrow(),
+        QQ.identity(),
         &QQ.from_fraction(9, 10),
-        Global,
         true,
+        &mut (),
     );
 
     assert_rational_lattice_isomorphic(
@@ -426,12 +581,11 @@ fn test_lll_2d() {
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
     lll(
-        QQ,
-        OwnedMatrix::identity(2, 2, QQ).data(),
         reduced_matrix.reborrow(),
+        QQ.identity(),
         &QQ.from_fraction(9, 10),
-        Global,
         true,
+        &mut (),
     );
 
     assert_rational_lattice_isomorphic(
@@ -469,12 +623,11 @@ fn test_lll_3d() {
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll(
-        QQ,
-        OwnedMatrix::identity(3, 3, QQ).data(),
         reduced_matrix.reborrow(),
+        QQ.identity(),
         &QQ.from_fraction(999, 1000),
-        Global,
         true,
+        &mut (),
     );
 
     assert_rational_lattice_isomorphic(
@@ -516,12 +669,11 @@ fn test_lll_generating_set() {
     let mut reduced = original;
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll(
-        QQ,
-        OwnedMatrix::identity(3, 3, QQ).data(),
         reduced_matrix.reborrow(),
+        QQ.identity(),
         &QQ.from_fraction(999, 1000),
-        Global,
         true,
+        &mut (),
     );
 
     assert_rational_lattice_isomorphic(
@@ -562,12 +714,14 @@ fn test_lll_generating_set() {
     let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll(
-        &QQ,
-        OwnedMatrix::identity(5, 5, &QQ).data(),
         reduced_matrix.reborrow(),
-        &QQ.from_fraction(int_cast(999, ZZ, ZZi64), int_cast(1000, ZZ, ZZi64)),
-        Global,
+        QQ.identity(),
+        &QQ.from_fraction(
+            int_cast(999, ZZ, StaticRing::<i64>::RING),
+            int_cast(1000, ZZ, StaticRing::<i64>::RING),
+        ),
         true,
+        &mut (),
     );
 
     assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
@@ -600,10 +754,8 @@ fn test_lll_generating_set() {
         norm_squared(&QQ, &reduced_matrix.as_const().col_at(7))
     );
 
-    let original = matrix!(
-        QQ.inclusion()
-            .compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
-        DerefArray::from([
+    let original: [[i64; 8]; 5] = [
+        [
             -60725263117,
             -448122081513,
             -218368759847,
@@ -611,9 +763,9 @@ fn test_lll_generating_set() {
             216156377534,
             -3137996709827,
             14835704835919,
-            67504381450573
-        ]),
-        DerefArray::from([
+            67504381450573,
+        ],
+        [
             -1310716961940,
             -9682451257943,
             -4729935920987,
@@ -621,9 +773,9 @@ fn test_lll_generating_set() {
             4667627712725,
             -67791459966817,
             320528485599331,
-            1458334256347773
-        ]),
-        DerefArray::from([
+            1458334256347773,
+        ],
+        [
             1159398893231,
             8564380015666,
             4183444050825,
@@ -631,9 +783,9 @@ fn test_lll_generating_set() {
             -4128711773154,
             59963582382418,
             -283516375460965,
-            -1289940218804617
-        ]),
-        DerefArray::from([
+            -1289940218804617,
+        ],
+        [
             -1236320093452,
             -9132639612642,
             -4461079566742,
@@ -641,9 +793,9 @@ fn test_lll_generating_set() {
             4402644221490,
             -63942205977848,
             302328006373120,
-            1375528654002990
-        ]),
-        DerefArray::from([
+            1375528654002990,
+        ],
+        [
             -2344979577397,
             -17323890604545,
             -8464219959177,
@@ -651,21 +803,24 @@ fn test_lll_generating_set() {
             8351008895542,
             -121291584595649,
             573488494361461,
-            2609233431319737
-        ])
-    );
+            2609233431319737,
+        ],
+    ];
+    let original = OwnedMatrix::from_fn(5, 8, |i, j| QQ.coerce(&StaticRing::<i64>::RING, original[i][j]));
     let mut reduced = original.clone();
-    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+    let mut reduced_matrix = reduced.data_mut();
     lll(
-        &QQ,
-        OwnedMatrix::identity(5, 5, &QQ).data(),
         reduced_matrix.reborrow(),
-        &QQ.from_fraction(int_cast(999, ZZ, ZZi64), int_cast(1000, ZZ, ZZi64)),
-        Global,
+        QQ.identity(),
+        &QQ.from_fraction(
+            int_cast(999, ZZ, StaticRing::<i64>::RING),
+            int_cast(1000, ZZ, StaticRing::<i64>::RING),
+        ),
         true,
+        &mut (),
     );
 
-    assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
+    assert_rational_lattice_isomorphic(&QQ, &QQ, original.data(), reduced_matrix.as_const());
     assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
     assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
     assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
@@ -721,14 +876,15 @@ fn bench_lll_10d(bencher: &mut Bencher) {
         );
         let mut reduced = original.clone();
         let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-        let delta = QQ.from_fraction(int_cast(9, ZZ, ZZi64), int_cast(10, ZZ, ZZi64));
         lll(
-            &QQ,
-            OwnedMatrix::identity(10, 10, &QQ).data(),
             reduced_matrix.reborrow(),
-            &delta,
-            Global,
+            QQ.identity(),
+            &QQ.from_fraction(
+                int_cast(999, ZZ, StaticRing::<i64>::RING),
+                int_cast(1000, ZZ, StaticRing::<i64>::RING),
+            ),
             true,
+            &mut (),
         );
 
         assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
