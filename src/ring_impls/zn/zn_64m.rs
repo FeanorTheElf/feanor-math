@@ -25,6 +25,13 @@ use crate::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap
 ///
 /// The `64M` in the name stands for "64-bit Montgomery", which is the
 /// of internally used reduction algorithm. `R` is chosen as `2^64`.
+///
+/// Note that I expect this implementation to become faster than [`Zn64B`] eventually,
+/// but currently quite a few optimizations are still missing, so it might not
+/// yet be faster. Moreover, when you often compute representatives of elements modulo `n`
+/// (e.g. via [`ZnRing::smallest_lift()`]), this ring is unlikely to every become faster.
+///
+/// [`Zn64B`]: crate::ring_impls::zn::zn_64b::Zn64B
 #[stability::unstable(feature = "enable")]
 #[derive(Clone, Copy)]
 pub struct Zn64MBase {

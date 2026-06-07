@@ -48,7 +48,7 @@ The following algorithms are implemented
  - An implementation of the Cantor-Zassenhaus algorithm to factor polynomials over finite fields.
  - Factoring polynomials over the rationals/integers (using Hensel lifting) and over number fields.
  - Lenstra's Elliptic Curve algorithm to factor integers.
- - LLL algorithm for lattice reduction.
+ - LLL algorithm for lattice reduction (both a rational implementation and a variant of Stehle's L^2, floating-point base algorithm are implemented).
  - The Finke-Pohst lattice point enumeration algorithm.
  - Basic linear algebra over various rings, including finite integral extensions of principal ideal rings.
  - Miller-Rabin test to check primality of integers.

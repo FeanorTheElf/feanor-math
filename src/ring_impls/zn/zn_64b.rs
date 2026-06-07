@@ -6,11 +6,14 @@ use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use crate::algorithms::convolution::extlen::LengthExtendedConvolution;
+use crate::algorithms::convolution::ntt::NTTConvolution;
 use crate::algorithms::convolution::*;
+use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
+use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing, UnwrapHom};
 use crate::iters::multi_cartesian_product;
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::MonogeneticExtensionStore;

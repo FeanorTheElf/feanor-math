@@ -179,18 +179,12 @@ where
     ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
     /// Creates a new [`RNSConvolution`] with all the given configuration parameters.
-    ///
-    /// In particular
-    ///  - `required_root_of_unity_log2` and `max_prime_size_log2` control which prime factors are
-    ///    used for the underlying composite modulus; Only primes `<= 2^max_prime_size_log2` and `=
-    ///    1` mod `required_root_of_unity_log2` are sampled
-    ///  - `integer_ring` is the ring to store intermediate lifts in; this probably has to be
-    ///    [`BigIntRing`], unless inputs are pretty small
-    ///  - `allocator` is used to allocate elements modulo the internal modulus, as elements of
-    ///    [`zn_rns::Zn`]
-    ///  - `create_convolution` is called whenever a new convolution algorithm for a new prime has
-    ///    to be created; the modulus of the given [`Zn`] always satisfies the constraints defined
-    ///    by `max_prime_size_log2` and `required_root_of_unity_log2`
+    /// 
+    /// The parameter `conv_iter` should be an iterator over RNS basis components and
+    /// fast convolutions on them. In particular, all rings yielded by the iterator should
+    /// have coprime modulus. The computation of future convolutions may panic if the
+    /// iterator is exhausted, but the current RNS basis is not enough to compute the current
+    /// convolution.
     #[stability::unstable(feature = "enable")]
     pub fn new_with_convolution(integer_ring: I, allocator: A, mut conv_iter: ConvIter) -> Self {
         let (initial_ring, initial_conv) = conv_iter.next().unwrap();
