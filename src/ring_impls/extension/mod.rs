@@ -13,7 +13,7 @@ use crate::wrapper::RingElementWrapper;
 
 pub mod poly_modulus;
 
-/// Contains [`extension_impl::MonogeneticExtensionImpl`], an implementation of
+/// Contains [`extension_impl::MonogeneticExtensionSparse`], an implementation of
 /// [`MonogeneticExtension`] based on polynomial division.
 pub mod extension_impl;
 
@@ -37,7 +37,7 @@ pub mod conway;
 /// One consequence of this is that `R` is a free `S`-module, with a basis given by the powers
 /// of [`MonogeneticExtension::canonical_gen()`], which is where the name "free" comes from.
 ///
-/// The main implementation is [`MonogeneticExtensionImpl`].
+/// The main implementation is [`MonogeneticExtensionSparse`].
 ///
 /// # Nontrivial Automorphisms
 ///
@@ -49,7 +49,7 @@ pub mod conway;
 ///
 /// One of the most common use cases seems to be the implementation of finite fields (sometimes
 /// called galois fields). Since they are so common, Galois fields are explicitly modelled by
-/// [`GaloisField`], but can also be manually implemented based on [`MonogeneticExtensionImpl`].
+/// [`GaloisField`], but can also be manually implemented based on [`MonogeneticExtensionSparse`].
 /// ```rust
 /// #![feature(allocator_api)]
 /// # use std::alloc::Global;
@@ -63,7 +63,7 @@ pub mod conway;
 /// # use feanor_math::ring_properties::finite::*;
 /// // we have to decide for an implementation of the prime field
 /// let prime_field = zn_static::Fp::<3>::RING;
-/// let galois_field = MonogeneticExtensionImpl::new(prime_field, vec![2, 1, 0]);
+/// let galois_field = MonogeneticExtensionSparse::new(prime_field, vec![2, 1, 0]);
 /// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 2X + 1 is
 /// // irreducible modulo 3
 /// let galois_field = galois_field.as_field().ok().unwrap();
@@ -75,11 +75,11 @@ pub mod conway;
 /// assert!(galois_field_2.can_iso(&galois_field).is_none());
 /// ```
 ///
-/// [`MonogeneticExtensionImpl`]: crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl
+/// [`MonogeneticExtensionSparse`]: crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse
 /// [`GaloisField`]: crate::ring_impls::extension::galois_field::GaloisField
 pub trait MonogeneticExtension: RingExtension {
     /// Type of the canonical-basis representation of a ring element, as returned by
-    /// [`MonogeneticExtension::wrt_canonical_basis()`].
+    /// [`MonogeneticExtension::wrt_power_basis()`].
     type VectorRepresentation<'a>: VectorFn<El<Self::BaseRing>>
     where
         Self: 'a;
@@ -95,16 +95,16 @@ pub trait MonogeneticExtension: RingExtension {
     /// [`MonogeneticExtension::canonical_gen()`] and `i` goes from `0` to `rank - 1`.
     ///
     /// In this sense, this is the opposite function to
-    /// [`MonogeneticExtension::from_canonical_basis()`].
-    fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a>;
+    /// [`MonogeneticExtension::from_power_basis()`].
+    fn wrt_power_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a>;
 
     /// Returns the element that has the given representation w.r.t. the canonical basis, that is
     /// the basis given by the powers `x^i` where `x` is the canonical generator given by
     /// [`MonogeneticExtension::canonical_gen()`] and `i` goes from `0` to `rank - 1`.
     ///
     /// In this sense, this is the opposite function to
-    /// [`MonogeneticExtension::wrt_canonical_basis()`].
-    fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
+    /// [`MonogeneticExtension::wrt_power_basis()`].
+    fn from_power_basis<V>(&self, vec: V) -> Self::Element
     where
         V: IntoIterator<Item = El<Self::BaseRing>>,
         V::IntoIter: DoubleEndedIterator,
@@ -127,15 +127,15 @@ pub trait MonogeneticExtension: RingExtension {
         self.mul_assign(el, RingRef::from(self).pow(self.canonical_gen(), power));
     }
 
-    /// Like [`MonogeneticExtension::from_canonical_basis()`], this computes the sum `sum_i vec[i] *
+    /// Like [`MonogeneticExtension::from_power_basis()`], this computes the sum `sum_i vec[i] *
     /// x^i` where `x` is the canonical generator given by
     /// [`MonogeneticExtension::canonical_gen()`]. Unlike
-    /// [`MonogeneticExtension::from_canonical_basis()`], `vec` can return any number elements.
-    fn from_canonical_basis_extended<V>(&self, vec: V) -> Self::Element
+    /// [`MonogeneticExtension::from_power_basis()`], `vec` can return any number elements.
+    fn from_power_basis_extended<V>(&self, vec: V) -> Self::Element
     where
         V: IntoIterator<Item = El<Self::BaseRing>>,
     {
-        extension_ops::from_canonical_basis_extended(self, vec)
+        extension_ops::from_power_basis_extended(self, vec)
     }
 
     /// Computes the characteristic polynomial of the given element.
@@ -186,7 +186,7 @@ pub trait MonogeneticExtension: RingExtension {
         let mut current = el;
         let generator = self.canonical_gen();
         return self.base_ring().sum((0..self.rank()).map(|i| {
-            let result = self.wrt_canonical_basis(&current).at(i);
+            let result = self.wrt_power_basis(&current).at(i);
             self.mul_assign_ref(&mut current, &generator);
             return result;
         }));
@@ -220,29 +220,29 @@ where
     delegate! { MonogeneticExtension, fn trace(&self, el: El<Self>) -> El<BaseRingStore<Self>> }
     delegate! { MonogeneticExtension, fn mul_assign_gen_power(&self, el: &mut El<Self>, power: usize) -> () }
 
-    /// See [`MonogeneticExtension::wrt_canonical_basis()`].
-    fn wrt_canonical_basis<'a>(
+    /// See [`MonogeneticExtension::wrt_power_basis()`].
+    fn wrt_power_basis<'a>(
         &'a self,
         el: &'a El<Self>,
     ) -> <Self::Ring as MonogeneticExtension>::VectorRepresentation<'a> {
-        self.get_ring().wrt_canonical_basis(el)
+        self.get_ring().wrt_power_basis(el)
     }
 
-    /// See [`MonogeneticExtension::from_canonical_basis()`].
-    fn from_canonical_basis<V>(&self, vec: V) -> El<Self>
+    /// See [`MonogeneticExtension::from_power_basis()`].
+    fn from_power_basis<V>(&self, vec: V) -> El<Self>
     where
         V: IntoIterator<Item = El<BaseRingStore<Self>>>,
         V::IntoIter: DoubleEndedIterator,
     {
-        self.get_ring().from_canonical_basis(vec)
+        self.get_ring().from_power_basis(vec)
     }
 
-    /// See [`MonogeneticExtension::from_canonical_basis_extended()`].
-    fn from_canonical_basis_extended<V>(&self, vec: V) -> El<Self>
+    /// See [`MonogeneticExtension::from_power_basis_extended()`].
+    fn from_power_basis_extended<V>(&self, vec: V) -> El<Self>
     where
         V: IntoIterator<Item = El<BaseRingStore<Self>>>,
     {
-        self.get_ring().from_canonical_basis_extended(vec)
+        self.get_ring().from_power_basis_extended(vec)
     }
 
     /// Returns the generating polynomial of this ring, i.e. the monic polynomial `f(X)` such that
@@ -298,7 +298,7 @@ where
         P::Ring: PolyRing,
         H: Homomorphism<BaseRingBase<Self>, <BaseRingStore<P> as RingStore>::Ring>,
     {
-        let coeff_vec = self.wrt_canonical_basis(el);
+        let coeff_vec = self.wrt_power_basis(el);
         to.from_terms(
             (0..self.rank())
                 .map(|i| coeff_vec.at(i))
@@ -525,7 +525,7 @@ where
 
     fn map_ref(&self, x: &<RFrom::Ring as RingBase>::Element) -> <RTo::Ring as RingBase>::Element {
         self.to
-            .from_canonical_basis_extended(self.from.wrt_canonical_basis(x).iter().map(|c| self.hom.map(c)))
+            .from_power_basis_extended(self.from.wrt_power_basis(x).iter().map(|c| self.hom.map(c)))
     }
 }
 
@@ -541,7 +541,7 @@ pub mod generic_tests {
         let n = ring.rank();
 
         let xn_original = ring.pow(x.clone(), n);
-        let xn_vec = ring.wrt_canonical_basis(&xn_original);
+        let xn_vec = ring.wrt_power_basis(&xn_original);
         let xn = ring.sum(Iterator::map(0..n, |i| {
             ring.mul(ring.inclusion().map(xn_vec.at(i)), ring.pow(x.clone(), i))
         }));
@@ -556,19 +556,19 @@ pub mod generic_tests {
             }
         });
         let x_n_1 = ring.pow(x.clone(), n + 1);
-        let x_n_1_vec_actual = ring.wrt_canonical_basis(&x_n_1);
+        let x_n_1_vec_actual = ring.wrt_power_basis(&x_n_1);
         for i in 0..n {
             assert_el_eq!(ring.base_ring(), x_n_1_vec_expected.at(i), x_n_1_vec_actual.at(i));
         }
 
-        // test basis wrt_canonical_basis linearity and compatibility
-        // from_canonical_basis/wrt_canonical_basis
+        // test basis wrt_power_basis linearity and compatibility
+        // from_power_basis/wrt_power_basis
         for i in (0..ring.rank()).step_by(3) {
             for j in (1..ring.rank()).step_by(5) {
                 if i == j {
                     continue;
                 }
-                let element = ring.from_canonical_basis((0..n).map(|k| {
+                let element = ring.from_power_basis((0..n).map(|k| {
                     if k == i {
                         ring.base_ring().one()
                     } else if k == j {
@@ -582,7 +582,7 @@ pub mod generic_tests {
                     ring.int_hom().mul_map(ring.pow(x.clone(), j), 2),
                 );
                 assert_el_eq!(ring, expected, element);
-                let element_vec = ring.wrt_canonical_basis(&expected);
+                let element_vec = ring.wrt_power_basis(&expected);
                 for k in 0..ring.rank() {
                     if k == i {
                         assert_el_eq!(ring.base_ring(), ring.base_ring().one(), element_vec.at(k));

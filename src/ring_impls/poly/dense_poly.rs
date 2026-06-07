@@ -1164,7 +1164,7 @@ fn test_expensive_prod() {
 
     println!("Computed product in {} ms", (end - start).as_millis());
     for i in 0..2048 {
-        let coeff_wrt_basis = ring.wrt_canonical_basis(poly_ring.coefficient_at(&product, i));
+        let coeff_wrt_basis = ring.wrt_power_basis(poly_ring.coefficient_at(&product, i));
         assert!((1..2028).all(|j| ring.base_ring().is_zero(&coeff_wrt_basis.at(j))));
     }
 }

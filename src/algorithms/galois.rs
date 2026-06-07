@@ -165,7 +165,7 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>
 
     #[instrument(skip_all, level = "trace")]
     fn map_ref(&self, x: &<NumberFieldBase<Impl, I> as RingBase>::Element) -> <NumberFieldBase<Impl, I> as RingBase>::Element {
-        let coeffs_wrt_basis = self.field.wrt_canonical_basis(x);
+        let coeffs_wrt_basis = self.field.wrt_power_basis(x);
         let hom = self.field.inclusion();
         return self.field.sum(self.image_of_canonical_gen_powers.iter().zip(coeffs_wrt_basis.iter()).map(|(x, y)| hom.mul_ref_map(x, &y)));
     }

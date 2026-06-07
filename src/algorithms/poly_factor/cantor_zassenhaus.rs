@@ -7,8 +7,7 @@ use crate::algorithms::int_factor::is_prime_power;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_impls::extension::extension_impl::{MonogeneticExtensionImpl, MonogeneticExtensionImplBase};
-use crate::ring_impls::extension::poly_modulus::SchoolbookPolyModulus;
+use crate::ring_impls::extension::extension_impl::*;
 use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
@@ -60,7 +59,7 @@ where
         }
         let mut current = a.clone();
         for _ in 0..e {
-            let current_wrt_basis = ring.wrt_canonical_basis(&current);
+            let current_wrt_basis = ring.wrt_power_basis(&current);
             let mut new = ring.zero();
             for i in 0..ring.rank() {
                 new = ring
@@ -170,7 +169,7 @@ where
 
         // we can compute `current^q` as `current(X^q)` since over a finite field
         // of size `q`, we have `f^q(X) = f(X^q)`
-        let current_wrt_basis = mod_f_ring.wrt_canonical_basis(&current);
+        let current_wrt_basis = mod_f_ring.wrt_power_basis(&current);
         let mut new = mod_f_ring.zero();
         for i in 0..mod_f_ring.rank() {
             new = mod_f_ring
@@ -238,8 +237,7 @@ where
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
-    let mod_f_ring =
-        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(poly_ring.base_ring(), f_coeffs));
+    let mod_f_ring = MonogeneticExtensionBarrett::new(poly_ring.base_ring(), f_coeffs);
 
     let mut result = distinct_degree_factorization_base(&poly_ring, mod_f_ring);
     poly_ring.inclusion().mul_assign_map(&mut result[0], lc);
@@ -276,9 +274,8 @@ where
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
 
     for _ in 0..PROBABILISTIC_REPETITIONS {
-        let T = mod_f_ring.from_canonical_basis(
-            (0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())),
-        );
+        let T = mod_f_ring
+            .from_power_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
         let T_pow = mod_f_ring.pow_gen(
             pow_geometric_series_characteristic(&mod_f_ring, T.clone(), d - 1),
             &exp,
@@ -333,8 +330,7 @@ where
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
-    let mod_f_ring =
-        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(poly_ring.base_ring(), f_coeffs));
+    let mod_f_ring = MonogeneticExtensionBarrett::new(poly_ring.base_ring(), f_coeffs);
     let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
     return result;
 }
@@ -378,9 +374,8 @@ where
     // (q^d' - 1) / 3`
 
     for _ in 0..PROBABILISTIC_REPETITIONS {
-        let T = mod_f_ring.from_canonical_basis(
-            (0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())),
-        );
+        let T = mod_f_ring
+            .from_power_basis((0..mod_f_ring.rank()).map(|_| poly_ring.base_ring().random_element(|| rng.rand_u64())));
         let T_pow_exp = mod_f_ring.pow_gen(T, &exp, ZZ);
         let T_pow_exp_poly = mod_f_ring.poly_repr(&poly_ring, &T_pow_exp, &Fq.identity());
         let g = poly_ring
@@ -428,18 +423,16 @@ where
         // adjoin a third root of unity, this will enable use to use the main idea;
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion
         // (always adding a `&`)
-        let new_base_ring = MonogeneticExtensionImplBase::new(Fq, vec![Fq.neg_one(), Fq.neg_one()]);
-        let new_base_ring = RingRef::from(&new_base_ring);
+        let new_base_ring = MonogeneticExtensionSparse::new(Fq, vec![Fq.neg_one(), Fq.neg_one()]);
         let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(new_base_ring));
         let new_x_pow_rank = mod_f_ring
-            .wrt_canonical_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank()))
+            .wrt_power_basis(&mod_f_ring.pow(mod_f_ring.canonical_gen(), mod_f_ring.rank()))
             .into_iter()
             .map(|x| new_base_ring.inclusion().map(x))
             .collect::<Vec<_>>();
         // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves
         // e.g. sparse implementations?
-        let new_mod_f_ring =
-            MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(&new_base_ring, new_x_pow_rank));
+        let new_mod_f_ring = MonogeneticExtensionBarrett::new(&new_base_ring, new_x_pow_rank);
         let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
 
         // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that
@@ -456,29 +449,29 @@ where
 
             if new_poly_ring
                 .terms(&factor)
-                .all(|(c, _)| Fq.is_zero(&new_base_ring.wrt_canonical_basis(c).at(1)))
+                .all(|(c, _)| Fq.is_zero(&new_base_ring.wrt_power_basis(c).at(1)))
             {
                 // factor already lives in Fq
                 return poly_ring.from_terms(
                     new_poly_ring
                         .terms(&factor)
-                        .map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)),
+                        .map(|(c, i)| (new_base_ring.wrt_power_basis(c).at(0), i)),
                 );
             } else {
                 assert!(d % 2 == 0);
                 // if d is even, the factor might only live in `new_base_ring`, but we can just use its norm;
                 // the automorphism is X -> X^2
                 let factor_conjugate = new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
-                    let c_vec = new_base_ring.wrt_canonical_basis(c);
+                    let c_vec = new_base_ring.wrt_power_basis(c);
                     let new_c = new_base_ring
-                        .from_canonical_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter());
+                        .from_power_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter());
                     (new_c, i)
                 }));
                 let factor_norm = new_poly_ring.mul(factor, factor_conjugate);
                 let factor_norm_Fq = poly_ring.from_terms(
                     new_poly_ring
                         .terms(&factor_norm)
-                        .map(|(c, i)| (new_base_ring.wrt_canonical_basis(c).at(0), i)),
+                        .map(|(c, i)| (new_base_ring.wrt_power_basis(c).at(0), i)),
                 );
                 let potential_result = poly_ring.ideal_gen(&f, &factor_norm_Fq);
                 if poly_ring.degree(&potential_result).unwrap() < mod_f_ring.rank() {
@@ -509,8 +502,7 @@ where
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
-    let mod_f_ring =
-        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(poly_ring.base_ring(), f_coeffs));
+    let mod_f_ring = MonogeneticExtensionBarrett::new(poly_ring.base_ring(), f_coeffs);
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
     return result;
 }
@@ -571,7 +563,7 @@ fn test_is_irreducible() {
         ]
     });
     let create_extension_ring = |f| {
-        MonogeneticExtensionImpl::new(
+        MonogeneticExtensionBarrett::new(
             field,
             (0..ring.degree(f).unwrap())
                 .map(|i| field.negate(*ring.coefficient_at(f, i)))
@@ -618,7 +610,7 @@ fn test_cantor_zassenhaus_even() {
 fn test_cantor_zassenhaus_even_extension_field() {
     feanor_tracing::DelayedLogger::init_test();
 
-    let Fq = MonogeneticExtensionImpl::new(Fp::<2>::RING, vec![1, 1, 0, 0])
+    let Fq = MonogeneticExtensionSparse::new(Fp::<2>::RING, vec![1, 1, 0, 0])
         .as_field()
         .ok()
         .unwrap();
@@ -644,7 +636,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
             .any(|factors| ring.eq_el(&factor, &ring.prod(factors.iter().copied().cloned())))
     );
 
-    let Fq = MonogeneticExtensionImpl::new(Fp::<2>::RING, vec![1, 1, 0])
+    let Fq = MonogeneticExtensionSparse::new(Fp::<2>::RING, vec![1, 1, 0])
         .as_field()
         .ok()
         .unwrap();
@@ -662,7 +654,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
 fn test_pow_geometric_series_characteristic() {
     feanor_tracing::DelayedLogger::init_test();
     let base_ring = Fp::<65537>::RING;
-    let ring = MonogeneticExtensionImpl::new(base_ring, vec![1, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(base_ring, vec![1, 0, 0]);
     assert_el_eq!(
         &ring,
         ring.pow(ring.canonical_gen(), 1),
@@ -684,7 +676,7 @@ fn test_pow_geometric_series_characteristic() {
         pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
     );
 
-    let ring = MonogeneticExtensionImpl::new(base_ring, vec![4, 3, 0]);
+    let ring = MonogeneticExtensionSparse::new(base_ring, vec![4, 3, 0]);
     assert_el_eq!(
         &ring,
         ring.pow(ring.canonical_gen(), 1),
@@ -706,7 +698,7 @@ fn test_pow_geometric_series_characteristic() {
         pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
     );
 
-    let a = ring.from_canonical_basis([1, 2, 3]);
+    let a = ring.from_power_basis([1, 2, 3]);
     assert_el_eq!(
         &ring,
         ring.pow(a.clone(), 1),
@@ -729,7 +721,7 @@ fn test_pow_geometric_series_characteristic() {
     );
 
     let base_ring = Fp::<100003>::RING;
-    let ring = MonogeneticExtensionImpl::new(base_ring, vec![1, 1, 0]);
+    let ring = MonogeneticExtensionSparse::new(base_ring, vec![1, 1, 0]);
     assert_el_eq!(
         &ring,
         ring.pow(ring.canonical_gen(), 1),

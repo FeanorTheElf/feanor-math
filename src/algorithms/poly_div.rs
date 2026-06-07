@@ -1,8 +1,12 @@
+use std::alloc::*;
 use std::cmp::max;
 
 use tracing::instrument;
 
+use crate::algorithms::convolution::*;
 use crate::prelude::*;
+use crate::ring_impls::extension::poly_modulus::PolyModulus;
+use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::*;
 
 /// Computes the polynomial division of `lhs` by `rhs`, i.e. `lhs = q * rhs + r` with
@@ -209,11 +213,143 @@ where
     return fast_poly_div_impl(poly_ring, f, g, &mut left_div_lc);
 }
 
-#[cfg(test)]
-use dense_poly::DensePolyRing;
+/// A [`PolyModulus`] that uses Barrett reduction for faster reduction.
+///
+/// Note that as opposed to the simple [`PolyModulus`], this requires a significant
+/// amount of precomputation, but has online complexity `C(n - d + 1, n) + C(n - d, d + 1)`,
+/// where `C(s, t)` is the cost of computing a convolution of a length-`s` and a length-`t`
+/// sequence, `d` is the degree of the polynomial to divide by, and `n` is the length of
+/// the operand.
+pub struct BarrettPolyModulus<R: RingStore, C: ConvolutionAlgorithm<R::Ring>, A: Allocator> {
+    ring: R,
+    n: usize,
+    neg_Xn_div_f: Vec<El<R>>,
+    neg_Xn_div_f_prep: C::PreparedConvolutionOperand,
+    f: Vec<El<R>>,
+    f_prep: C::PreparedConvolutionOperand,
+    f_deg: usize,
+    x_pow_rank: Vec<El<R>>,
+    convolution: C,
+    allocator: A,
+}
+
+impl<R: RingStore, C: ConvolutionAlgorithm<R::Ring> + Clone, A: Allocator> BarrettPolyModulus<R, C, A> {
+    pub fn new(ring: R, operand_deg: usize, x_pow_rank: Vec<El<R>>, convolution: C, allocator: A) -> Self {
+        let f_deg = x_pow_rank.len();
+        let n = usize::max(1, usize::max(operand_deg + 1, f_deg));
+        let poly_ring = DensePolyRing::new(&ring, "X");
+        let f = poly_ring.from_terms(
+            (0..f_deg)
+                .map(|i| (ring.negate(x_pow_rank[i].clone()), i))
+                .chain([(ring.one(), f_deg)]),
+        );
+        let neg_Xn = poly_ring.from_terms([(ring.neg_one(), n)]);
+        let neg_Xn_div_f = poly_ring.div_rem_monic(neg_Xn, &f).0;
+        let neg_Xn_div_f = (0..=poly_ring.degree(&neg_Xn_div_f).unwrap_or(0))
+            .map(|i| poly_ring.coefficient_at(&neg_Xn_div_f, i).clone())
+            .collect::<Vec<_>>();
+        debug_assert_eq!(n + 1 - f_deg, neg_Xn_div_f.len());
+        let neg_Xn_div_f_prep =
+            convolution.prepare_convolution_operand(&neg_Xn_div_f, Some(2 * n - f_deg), ring.get_ring());
+        let f = (0..=poly_ring.degree(&f).unwrap_or(0))
+            .map(|i| poly_ring.coefficient_at(&f, i).clone())
+            .collect::<Vec<_>>();
+        debug_assert_eq!(f_deg + 1, f.len());
+        let f_prep = convolution.prepare_convolution_operand(&f, Some(n), ring.get_ring());
+        drop(poly_ring);
+        Self {
+            n,
+            neg_Xn_div_f,
+            neg_Xn_div_f_prep,
+            f,
+            f_prep,
+            f_deg,
+            x_pow_rank,
+            convolution,
+            ring,
+            allocator,
+        }
+    }
+}
+
+impl<R: RingStore, C: ConvolutionAlgorithm<R::Ring> + Clone, A: Allocator + Clone> Clone
+    for BarrettPolyModulus<R, C, A>
+{
+    fn clone(&self) -> Self {
+        let neg_Xn_div_f_prep = self.convolution.prepare_convolution_operand(
+            &self.neg_Xn_div_f,
+            Some(2 * self.n - self.f_deg),
+            self.ring.get_ring(),
+        );
+        let poly_prep = self
+            .convolution
+            .prepare_convolution_operand(&self.f, Some(self.n), self.ring.get_ring());
+        Self {
+            ring: self.ring.clone(),
+            n: self.n,
+            neg_Xn_div_f: self.neg_Xn_div_f.clone(),
+            neg_Xn_div_f_prep,
+            f: self.f.clone(),
+            f_prep: poly_prep,
+            f_deg: self.f_deg,
+            x_pow_rank: self.x_pow_rank.clone(),
+            convolution: self.convolution.clone(),
+            allocator: self.allocator.clone(),
+        }
+    }
+}
+
+impl<R: RingStore, C: ConvolutionAlgorithm<R::Ring>, A: Allocator> PolyModulus<R> for BarrettPolyModulus<R, C, A> {
+    fn degree(&self) -> usize { self.f_deg }
+
+    fn ring(&self) -> &R { &self.ring }
+
+    fn supported_operand_degree(&self) -> usize { self.n - 1 }
+
+    fn x_pow_rank(&self) -> &[El<R>] { &self.x_pow_rank }
+
+    #[instrument(skip_all, level = "trace")]
+    fn perform_reduction(&self, operand: &mut [El<R>]) {
+        assert!(operand.len() <= self.supported_operand_degree() + 1);
+        let mut data = (0..(2 * self.n - self.f_deg + 2))
+            .map(|_| self.ring.zero())
+            .collect::<Vec<_>>();
+        let quotient = &mut data[1..];
+        debug_assert_eq!(
+            self.neg_Xn_div_f.len() + self.supported_operand_degree() + 1,
+            quotient.len()
+        );
+        self.convolution.compute_convolution(
+            &operand,
+            None,
+            &self.neg_Xn_div_f,
+            Some(&self.neg_Xn_div_f_prep),
+            quotient,
+            self.ring.get_ring(),
+        );
+        let (tmp, quotient) = data[..(2 * self.n - self.f_deg + 1)].split_at_mut(self.n + 1);
+        debug_assert_eq!(self.f_deg + quotient.len() + 1, tmp.len());
+        for i in 0..tmp.len() {
+            tmp[i] = self.ring.zero();
+        }
+        self.convolution.compute_convolution(
+            quotient,
+            None,
+            &self.f,
+            Some(&self.f_prep),
+            &mut *tmp,
+            self.ring.get_ring(),
+        );
+        for (i, x) in data.into_iter().take(usize::min(self.f_deg, operand.len())).enumerate() {
+            self.ring.add_assign(&mut operand[i], x);
+        }
+    }
+}
 
 #[cfg(test)]
 use crate::function::no_error;
+#[cfg(test)]
+use crate::ring_impls::zn::zn_64b::Zn64B;
 
 #[test]
 fn test_fast_poly_div() {
@@ -233,4 +369,31 @@ fn test_fast_poly_div() {
             .unwrap_or_else(no_error)
             .0
     );
+}
+
+#[test]
+fn test_barrett_poly_reduction() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = Zn64B::new(65537);
+    // f = X^3 - 2 X^2 - 1
+    let x_pow_rank = [1, 0, 2].into_iter().map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
+    let reducer = BarrettPolyModulus::new(ring, 9, x_pow_rank, KaratsubaAlgorithm::new(4), Global);
+
+    let mut operand = [4, 3, 2, 1]
+        .into_iter()
+        .map(|x| ring.int_hom().map(x))
+        .collect::<Vec<_>>();
+    reducer.perform_reduction(&mut operand);
+    for i in 0..3 {
+        assert_el_eq!(&ring, ring.int_hom().map([5, 3, 4][i]), operand[i]);
+    }
+
+    let mut operand = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+        .into_iter()
+        .map(|x| ring.int_hom().map(x))
+        .collect::<Vec<_>>();
+    reducer.perform_reduction(&mut operand);
+    for i in 0..3 {
+        assert_el_eq!(&ring, ring.int_hom().map([330, 152, 711][i]), operand[i]);
+    }
 }

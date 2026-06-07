@@ -15,11 +15,11 @@ use crate::ring_impls::poly::{PolyRing, *};
 use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::seq::*;
 
-/// Default impl for [`MonogeneticExtension::from_canonical_basis_extended()`]
+/// Default impl for [`MonogeneticExtension::from_power_basis_extended()`]
 ///  
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn from_canonical_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
+pub fn from_power_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
 where
     R: ?Sized + MonogeneticExtension,
     V: IntoIterator<Item = El<<R as RingExtension>::BaseRing>>,
@@ -38,7 +38,7 @@ where
             let chunk = data
                 .drain(..taken_elements)
                 .chain((taken_elements..ring.rank()).map(|_| ring.base_ring().zero()));
-            let current = ring.from_canonical_basis(chunk);
+            let current = ring.from_power_basis(chunk);
             let result = (current, current_power.clone());
             ring.mul_assign_ref(&mut current_power, &power_of_canonical_gen);
             return Some(result);
@@ -82,7 +82,7 @@ where
         let mut lhs = OwnedMatrix::zero(ring.rank(), d, &base_ring);
         let mut current = ring.one();
         for j in 0..d {
-            let wrt_basis = ring.wrt_canonical_basis(&current);
+            let wrt_basis = ring.wrt_power_basis(&current);
             for i in 0..ring.rank() {
                 *lhs.at_mut(i, j) = hom.map(wrt_basis.at(i));
             }
@@ -90,7 +90,7 @@ where
             ring.mul_assign_ref(&mut current, el);
         }
         let mut rhs = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
-        let wrt_basis = ring.wrt_canonical_basis(&current);
+        let wrt_basis = ring.wrt_power_basis(&current);
         for i in 0..ring.rank() {
             *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
         }
@@ -154,7 +154,7 @@ where
     let g = ring.canonical_gen();
     for i in 0..ring.rank() {
         {
-            let current_basis_repr = ring.wrt_canonical_basis(&current);
+            let current_basis_repr = ring.wrt_power_basis(&current);
             for j in 0..ring.rank() {
                 *result.at_mut(j, i) = current_basis_repr.at(j);
             }
@@ -165,7 +165,7 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
@@ -174,7 +174,7 @@ use crate::ring_impls::rational::RationalField;
 #[test]
 fn test_charpoly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
     let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
@@ -213,7 +213,7 @@ fn test_charpoly() {
         )
     );
 
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 0, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0, 0]);
     let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
@@ -244,7 +244,7 @@ fn test_charpoly() {
 #[test]
 fn test_minpoly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 0, 0, 0, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0, 0, 0, 0]);
     let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) - 2]);
@@ -287,40 +287,40 @@ fn test_minpoly() {
 #[test]
 fn test_trace() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
 
-    assert_eq!(3, ring.trace(ring.from_canonical_basis([1, 0, 0])));
-    assert_eq!(0, ring.trace(ring.from_canonical_basis([0, 1, 0])));
-    assert_eq!(0, ring.trace(ring.from_canonical_basis([0, 0, 1])));
-    assert_eq!(6, ring.trace(ring.from_canonical_basis([2, 0, 0])));
-    assert_eq!(6, ring.trace(ring.from_canonical_basis([2, 1, 0])));
-    assert_eq!(6, ring.trace(ring.from_canonical_basis([2, 0, 1])));
+    assert_eq!(3, ring.trace(ring.from_power_basis([1, 0, 0])));
+    assert_eq!(0, ring.trace(ring.from_power_basis([0, 1, 0])));
+    assert_eq!(0, ring.trace(ring.from_power_basis([0, 0, 1])));
+    assert_eq!(6, ring.trace(ring.from_power_basis([2, 0, 0])));
+    assert_eq!(6, ring.trace(ring.from_power_basis([2, 1, 0])));
+    assert_eq!(6, ring.trace(ring.from_power_basis([2, 0, 1])));
 }
 
 #[test]
 fn test_discriminant() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
     assert_eq!(-108, discriminant(ring.get_ring()));
 
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 1, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 1, 0]);
     assert_eq!(-104, discriminant(ring.get_ring()));
 
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![3, 0, 0]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![3, 0, 0]);
     assert_eq!(-243, discriminant(ring.get_ring()));
 
     let base_ring = DensePolyRing::new(RationalField::new(ZZi64), "X");
     let [f] = base_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + 1]);
-    let ring = MonogeneticExtensionImpl::new(&base_ring, vec![f, base_ring.zero()]);
+    let ring = MonogeneticExtensionSparse::new(&base_ring, vec![f, base_ring.zero()]);
     let [expected] = base_ring.with_wrapped_indeterminate(|X| [4 * X.pow_ref(3) + 4]);
     assert_el_eq!(&base_ring, expected, discriminant(ring.get_ring()));
 }
 
 #[test]
-fn test_from_canonical_basis_extended() {
+fn test_from_power_basis_extended() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionImpl::new(ZZi64, vec![2, 0, 0]);
-    let actual = from_canonical_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
-    let expected = ring.from_canonical_basis([37, 12, 15]);
+    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+    let actual = from_power_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
+    let expected = ring.from_power_basis([37, 12, 15]);
     assert_el_eq!(&ring, expected, actual);
 }

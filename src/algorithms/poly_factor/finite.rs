@@ -81,15 +81,13 @@ where
     return (result, unit);
 }
 
-use crate::algorithms::poly_factor::FactorPolyField;
-use crate::ring_impls::extension::galois_field::GaloisField;
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-use crate::ring_impls::zn::ZnRingStore;
-use crate::ring_impls::zn::zn_64b::Zn64B;
-
 #[test]
 #[ignore]
 fn test_factor_finite_field_large() {
+    use crate::algorithms::poly_factor::FactorPolyField;
+    use crate::ring_impls::extension::galois_field::GaloisField;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+
     feanor_tracing::DelayedLogger::init_test();
     let FqX = DensePolyRing::new(GaloisField::new(257, 128), "X");
     let Fq = FqX.base_ring();
@@ -110,4 +108,5 @@ fn test_factor_finite_field_large() {
     FpX.println(&f);
 
     let factorization = poly_factor_finite_field(&FqX, &FqX.lifted_hom(&FpX, Fq.inclusion()).map(f));
+    _ = std::hint::black_box(factorization);
 }

@@ -6,7 +6,7 @@ use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::extension_impl::MonogeneticExtensionImpl;
+use super::extension_impl::MonogeneticExtensionSparse;
 use super::{Field, MonogeneticExtension};
 use crate::algorithms::convolution::*;
 use crate::algorithms::newton;
@@ -52,7 +52,7 @@ use crate::ring_properties::specialization::*;
 /// let i = QQi.canonical_gen();
 /// assert_el_eq!(&QQi, QQi.neg_one(), QQi.pow(i, 2));
 /// ```
-/// So far, we could have done the same with just [`MonogeneticExtensionImpl`], which indeed
+/// So far, we could have done the same with just [`MonogeneticExtensionSparse`], which indeed
 /// is used as the default implementation of the arithmetic. However, [`NumberField`]
 /// provides additional functionality, that is not available for general extensions.
 /// ```rust
@@ -148,9 +148,8 @@ where
 
 #[stability::unstable(feature = "enable")]
 pub type DefaultNumberFieldImpl = AsField<
-    MonogeneticExtensionImpl<
+    MonogeneticExtensionSparse<
         RationalField<BigIntRing>,
-        SparsePolyModulus<RationalField<BigIntRing>>,
         DynConvolution<'static, RationalFieldBase<BigIntRing>>,
         Global,
     >,
@@ -567,7 +566,7 @@ fn test_principal_ideal_ring_axioms() {
 
     let elements = multi_cartesian_product(
         [(-4..4), (-2..2)].into_iter(),
-        |slice| K.from_canonical_basis(slice.iter().map(|x| K.base_ring().int_hom().map(*x))),
+        |slice| K.from_power_basis(slice.iter().map(|x| K.base_ring().int_hom().map(*x))),
         |_, x| *x,
     )
     .collect::<Vec<_>>();

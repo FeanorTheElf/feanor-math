@@ -7,6 +7,8 @@ use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
+#[cfg(test)]
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
 use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
@@ -174,8 +176,6 @@ use crate::ring_impls::as_field::AsField;
 #[cfg(test)]
 use crate::ring_impls::as_field::AsFieldBase;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
-#[cfg(test)]
 use crate::ring_impls::extension::number_field::NumberField;
 #[cfg(test)]
 use crate::ring_impls::extension::number_field::NumberFieldBase;
@@ -185,11 +185,11 @@ use crate::ring_impls::rational::RationalField;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<MonogeneticExtensionImpl<RationalField<BigIntRing>>>> {
+fn test_field() -> NumberField<AsField<MonogeneticExtensionSparse<RationalField<BigIntRing>>>> {
     let QQ = RationalField::new(ZZbig);
     let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(MonogeneticExtensionImpl::new(QQ, modulus_vec)).unwrap(),
+        AsFieldBase::promise_is_field(MonogeneticExtensionSparse::new(QQ, modulus_vec)).unwrap(),
     )))
 }
 

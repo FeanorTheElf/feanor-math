@@ -793,18 +793,18 @@ where
 
     default fn canonical_gen(&self) -> Self::Element { self.rev_delegate(self.get_delegate().canonical_gen()) }
 
-    default fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
+    default fn from_power_basis<V>(&self, vec: V) -> Self::Element
     where
         V: IntoIterator<Item = El<Self::BaseRing>>,
         V::IntoIter: DoubleEndedIterator,
     {
-        self.rev_delegate(self.get_delegate().from_canonical_basis(vec.into_iter().map(|x| x)))
+        self.rev_delegate(self.get_delegate().from_power_basis(vec.into_iter().map(|x| x)))
     }
 
     default fn rank(&self) -> usize { self.get_delegate().rank() }
 
-    default fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
-        self.get_delegate().wrt_canonical_basis(self.delegate_ref(el))
+    default fn wrt_power_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a> {
+        self.get_delegate().wrt_power_basis(self.delegate_ref(el))
     }
 
     default fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {

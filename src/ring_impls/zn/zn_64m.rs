@@ -239,7 +239,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64M> {
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
-        let wrt_basis = ext_ring.wrt_canonical_basis(&el);
+        let wrt_basis = ext_ring.wrt_power_basis(&el);
         if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
             return Some(wrt_basis.at(0));
         } else {
@@ -259,7 +259,7 @@ impl InterpolationBaseRing for AsFieldBase<Zn64M> {
         let ring = super::generic_impls::interpolation_ring(RingRef::from(self), count);
         let points = multi_cartesian_product(
             (0..ring.rank()).map(|_| (0..*self.modulus()).map(|x| self.from_int_promise_reduced(x))),
-            |values| ring.from_canonical_basis(values.iter().copied()),
+            |values| ring.from_power_basis(values.iter().copied()),
             |_, x| *x,
         )
         .take(count)

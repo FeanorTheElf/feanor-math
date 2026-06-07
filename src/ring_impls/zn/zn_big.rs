@@ -358,7 +358,7 @@ where
         Self: 'a,
         S: RingStore<Ring = Self::ExtendedRingBase<'a>>,
     {
-        let wrt_basis = ext_ring.wrt_canonical_basis(&el);
+        let wrt_basis = ext_ring.wrt_power_basis(&el);
         if wrt_basis.iter().skip(1).all(|x| self.is_zero(&x)) {
             return Some(wrt_basis.at(0));
         } else {
@@ -391,7 +391,7 @@ where
         let points = multi_cartesian_product(
             (0..ring.rank()).map(|_| 0..(min(count.try_into().unwrap(), modulus))),
             |values| {
-                ring.from_canonical_basis(
+                ring.from_power_basis(
                     values
                         .iter()
                         .map(|x| self.from_int_promise_reduced(int_cast(*x, ZZ, ZZi64))),

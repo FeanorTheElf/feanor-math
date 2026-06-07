@@ -42,7 +42,7 @@ where
         for j in 0..lhs.col_count() {
             current = lhs.at(i, j).clone();
             for l in 0..ring.rank() {
-                let current_wrt_basis = ring.wrt_canonical_basis(&current);
+                let current_wrt_basis = ring.wrt_power_basis(&current);
                 for k in 0..ring.rank() {
                     *expanded_lhs.at_mut(i * ring.rank() + k, j * ring.rank() + l) = current_wrt_basis.at(k);
                 }
@@ -60,7 +60,7 @@ where
     );
     for i in 0..rhs.row_count() {
         for j in 0..rhs.col_count() {
-            let value_wrt_basis = ring.wrt_canonical_basis(rhs.at(i, j));
+            let value_wrt_basis = ring.wrt_power_basis(rhs.at(i, j));
             for k in 0..ring.rank() {
                 *expanded_rhs.at_mut(i * ring.rank() + k, j) = value_wrt_basis.at(k);
             }
@@ -87,7 +87,7 @@ where
     for i in 0..lhs.col_count() {
         for j in 0..rhs.col_count() {
             let res_value =
-                ring.from_canonical_basis((0..ring.rank()).map(|k| solution.at(i * ring.rank() + k, j).clone()));
+                ring.from_power_basis((0..ring.rank()).map(|k| solution.at(i * ring.rank() + k, j).clone()));
             *out.at_mut(i, j) = res_value;
         }
     }
@@ -103,7 +103,7 @@ use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static;
 
@@ -112,8 +112,8 @@ fn test_solve() {
     feanor_tracing::DelayedLogger::init_test();
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
-    let ring = MonogeneticExtensionImpl::new(base_ring, vec![14, 0, 14]);
-    let el = |coeffs: [u64; 3]| ring.from_canonical_basis(coeffs);
+    let ring = MonogeneticExtensionSparse::new(base_ring, vec![14, 0, 14]);
+    let el = |coeffs: [u64; 3]| ring.from_power_basis(coeffs);
 
     let data_A = [
         DerefArray::from([el([1, 0, 0]), el([0, 0, 0])]),
@@ -159,7 +159,7 @@ fn test_invert() {
     feanor_tracing::DelayedLogger::init_test();
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
-    let ring = MonogeneticExtensionImpl::new(base_ring, vec![14, 0, 14]);
+    let ring = MonogeneticExtensionSparse::new(base_ring, vec![14, 0, 14]);
 
     let matrix = OwnedMatrix::from_fn(2, 2, |i, j| {
         if i == 0 || j == 0 {

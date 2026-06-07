@@ -285,7 +285,7 @@ use crate::homomorphism::Homomorphism;
 #[cfg(test)]
 use crate::ring_impls::extension::MonogeneticExtensionStore;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
@@ -646,7 +646,7 @@ fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let field = GaloisField::create(
-        MonogeneticExtensionImpl::new(
+        MonogeneticExtensionSparse::new(
             base_field,
             vec![
                 base_field.int_hom().map(3),

@@ -19,7 +19,7 @@ use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
+use crate::ring_impls::extension::extension_impl::{MonogeneticExtensionImpl, MonogeneticExtensionSparse};
 use crate::ring_impls::extension::poly_modulus::{PolyModulus, SparsePolyModulus};
 use crate::ring_impls::extension::*;
 use crate::ring_impls::poly::PolyRing;
@@ -37,7 +37,7 @@ use crate::ring_properties::serialization::*;
 /// There exists a finite field with `q` elements if and only if `q = p^e` is a prime power. In
 /// these cases, this struct provides an implementation of arithmetic in these fields. Note that
 /// since those fields are always finite-degree extensions of `Z/pZ`, they can also be used by
-/// creating a suitable instance of [`super::extension_impl::MonogeneticExtensionImpl`]. In fact,
+/// creating a suitable instance of [`super::extension_impl::MonogeneticExtensionSparse`]. In fact,
 /// this is the way the old implementation of galois fields was designed. However, providing a new
 /// type can provide both ergonomic and performance benefits, and also gives better encapsulation.
 ///
@@ -57,7 +57,7 @@ use crate::ring_properties::serialization::*;
 /// [`GaloisFieldBase::new_with_base_field()`] or [`GaloisField::create()`].
 ///
 /// We also support conversion to and from a plain
-/// [`super::extension_impl::MonogeneticExtensionImpl`] representation.
+/// [`super::extension_impl::MonogeneticExtensionSparse`] representation.
 /// ```rust
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::extension::*;
@@ -66,7 +66,7 @@ use crate::ring_properties::serialization::*;
 /// # use feanor_math::ring_properties::finite::*;
 /// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let F25: GaloisField = GaloisField::new(5, 2);
-/// let raw_F25: AsField<MonogeneticExtensionImpl<_, _>> = F25.clone().into().unwrap_self();
+/// let raw_F25: AsField<MonogeneticExtensionSparse<_, _>> = F25.clone().into().unwrap_self();
 /// assert!(F25.can_iso(&raw_F25).is_some());
 /// ```
 /// The other way is slightly more dangerous, since at some point we either have to check, or assume
@@ -81,7 +81,7 @@ use crate::ring_properties::serialization::*;
 /// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::ring_impls::extension::galois_field::*;
 /// let base_ring = Zn64B::new(5).as_field().ok().unwrap();
-/// let F25_raw: MonogeneticExtensionImpl<_, _> = MonogeneticExtensionImpl::new(
+/// let F25_raw: MonogeneticExtensionSparse<_, _> = MonogeneticExtensionSparse::new(
 ///     base_ring,
 ///     vec![base_ring.int_hom().map(2), base_ring.zero()],
 /// );
@@ -97,17 +97,17 @@ use crate::ring_properties::serialization::*;
 ///
 /// As opposed to the more generic [`DelegateRing`]s, here I chose a "ping-pong" way
 /// of implementing [`CanHomFrom`] and [`CanIsoFromTo`] for [`GaloisFieldBase`] that is
-/// very powerful when we use the standard `Impl = AsField<MonogeneticExtensionImpl<_, _, _, _>>`.
+/// very powerful when we use the standard `Impl = AsField<MonogeneticExtensionSparse<_, _, _, _>>`.
 /// In particular, we implement `GaloisFieldBase<Impl>: CanHomFrom<S>` for all `S` with
 /// `Impl: CanHomFrom<S>`. It is great that we can provide such a large class of blanket impls,
 /// however this impl will then conflict with (almost) all other impls - which is the reason
 /// why we don't do it in other places like [`AsFieldBase`].
 ///
 /// Here, we complement it with just the impls `MonogeneticExtensionImplBase<_, _, _, _>:
-/// CanHomFrom<GaloisFieldBase<_>>` and `AsFieldBase<MonogeneticExtensionImpl<_, _, _, _>>:
+/// CanHomFrom<GaloisFieldBase<_>>` and `AsFieldBase<MonogeneticExtensionSparse<_, _, _, _>>:
 /// CanHomFrom<GaloisFieldBase<_>>`. This means that if `Impl =
-/// AsFieldBase<MonogeneticExtensionImpl<_, _, _, _>>`, together with the blanket implementation, it
-/// gives the very much desired self-isomorphism `GaloisFieldBase<_>:
+/// AsFieldBase<MonogeneticExtensionSparse<_, _, _, _>>`, together with the blanket implementation,
+/// it gives the very much desired self-isomorphism `GaloisFieldBase<_>:
 /// CanHomFrom<GaloisFieldBase<_>>`. The only downside of this approach is that `GaloisFieldBase`
 /// does not have a canonical self-isomorphism anymore if a nonstandard `Impl` is chosen - which I
 /// believe will be very rarely the case in practice.
@@ -128,18 +128,18 @@ where
 pub type GaloisField<Impl = DefaultGaloisFieldImpl> = RingValue<GaloisFieldBase<Impl>>;
 
 /// Type alias for the most common instantiation of [`GaloisField`], which
-/// uses [`MonogeneticExtensionImpl`] to compute ring arithmetic.
+/// uses [`MonogeneticExtensionSparse`] to compute ring arithmetic.
 pub type GaloisFieldOver<R, C = DynConvolution<'static, <R as RingStore>::Ring>, A = Global> =
     RingValue<GaloisFieldBaseOver<R, C, A>>;
 
 /// Type alias for the most common instantiation of [`GaloisFieldBase`], which
-/// uses [`MonogeneticExtensionImpl`] to compute ring arithmetic.
+/// uses [`MonogeneticExtensionSparse`] to compute ring arithmetic.
 pub type GaloisFieldBaseOver<R, C = DynConvolution<'static, <R as RingStore>::Ring>, A = Global> =
-    GaloisFieldBase<AsField<MonogeneticExtensionImpl<R, SparsePolyModulus<R>, C, A>>>;
+    GaloisFieldBase<AsField<MonogeneticExtensionSparse<R, C, A>>>;
 
 /// The default implementation of a finite field extension of a prime field,
 /// based on [`Zn64B`].
-pub type DefaultGaloisFieldImpl = AsField<MonogeneticExtensionImpl<AsField<Zn64B>>>;
+pub type DefaultGaloisFieldImpl = AsField<MonogeneticExtensionSparse<AsField<Zn64B>>>;
 
 impl GaloisField {
     /// Creates a new instance of the finite/galois field `GF(p^degree)`.
@@ -204,7 +204,7 @@ impl GaloisFieldBase {
     /// let inclusion = F25.inclusion();
     /// // the norm must be an element of the prime field
     /// assert!(
-    ///     F25.wrt_canonical_basis(&norm)
+    ///     F25.wrt_power_basis(&norm)
     ///         .iter()
     ///         .skip(1)
     ///         .all(|c| F25.base_ring().is_zero(&c))
@@ -251,7 +251,7 @@ where
     /// let inclusion = F25.inclusion();
     /// // the norm must be an element of the prime field
     /// assert!(
-    ///     F25.wrt_canonical_basis(&norm)
+    ///     F25.wrt_power_basis(&norm)
     ///         .iter()
     ///         .skip(1)
     ///         .all(|c| F25.base_ring().is_zero(&c))
@@ -300,7 +300,7 @@ where
     /// let inclusion = GF.inclusion();
     /// // the norm must be an element of the prime field
     /// assert!(
-    ///     GF.wrt_canonical_basis(&norm)
+    ///     GF.wrt_power_basis(&norm)
     ///         .iter()
     ///         .skip(1)
     ///         .all(|c| GF.base_ring().is_zero(&c))
@@ -377,7 +377,7 @@ where
     }
 }
 
-impl<A, C> GaloisFieldBase<AsField<MonogeneticExtensionImpl<AsField<Zn64B>, SparsePolyModulus<AsField<Zn64B>>, C, A>>>
+impl<A, C> GaloisFieldBase<AsField<MonogeneticExtensionSparse<AsField<Zn64B>, C, A>>>
 where
     A: Allocator + Clone + Send + Sync,
     C: ConvolutionAlgorithm<AsFieldBase<Zn64B>> + Clone,
@@ -448,7 +448,7 @@ where
         assert!(ZZbig.eq_el(&p, &self.base_ring().size(&ZZbig).unwrap()));
         let mut x_pow_rank = self.one();
         self.mul_assign_gen_power(&mut x_pow_rank, self.rank());
-        let x_pow_rank = self.wrt_canonical_basis(&x_pow_rank);
+        let x_pow_rank = self.wrt_power_basis(&x_pow_rank);
         let hom = new_base_ring.can_hom(self.base_ring().integer_ring()).unwrap();
         let modulus_vec = x_pow_rank
             .iter()
@@ -977,7 +977,7 @@ where
                 )
             }));
             let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
-                let c_wrt_basis = Fq.wrt_canonical_basis(c);
+                let c_wrt_basis = Fq.wrt_power_basis(c);
                 assert!(c_wrt_basis.iter().skip(1).all(|x| Fp.is_zero(&x)));
                 return (c_wrt_basis.at(0), i);
             }));
@@ -1080,7 +1080,7 @@ fn test_galois_field() {
     let field_ref = &field;
     let elements = (0..3).flat_map(|x| {
         (0..3).map(move |y| {
-            field_ref.from_canonical_basis([
+            field_ref.from_power_basis([
                 field_ref.base_ring().int_hom().map(x),
                 field_ref.base_ring().int_hom().map(y),
             ])
@@ -1098,7 +1098,7 @@ fn test_principal_ideal_ring_axioms() {
     let field_ref = &field;
     let elements = (0..3).flat_map(|x| {
         (0..3).map(move |y| {
-            field_ref.from_canonical_basis([
+            field_ref.from_power_basis([
                 field_ref.base_ring().int_hom().map(x),
                 field_ref.base_ring().int_hom().map(y),
             ])

@@ -15,9 +15,8 @@ use crate::algorithms::primelist::*;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::homomorphism::{CanHomFrom, LambdaHom};
 use crate::ring_impls::as_field::*;
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
+use crate::ring_impls::extension::extension_impl::*;
 use crate::ring_impls::extension::galois_field::*;
-use crate::ring_impls::extension::poly_modulus::SchoolbookPolyModulus;
 use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::rational::*;
@@ -34,10 +33,9 @@ enum QuotientAtError {
     ReductionNotWellDefined,
 }
 
-type ResidueField =
-    GaloisField<AsField<MonogeneticExtensionImpl<AsField<Zn64B>, SchoolbookPolyModulus<AsField<Zn64B>>>>>;
+type ResidueField = GaloisField<AsField<MonogeneticExtensionBarrett<AsField<Zn64B>>>>;
 type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
-type ResidueRing = MonogeneticExtensionImpl<ZnGB<BigIntRing>, SchoolbookPolyModulus<ZnGB<BigIntRing>>>;
+type ResidueRing = MonogeneticExtensionBarrett<ZnGB<BigIntRing>>;
 type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
 
 fn check_error<F, R>(f: F) -> Result<R, ()>
@@ -203,7 +201,7 @@ where
         // now lift the polynomial modulo `p^e` to the rationals
         let result = self
             .number_field
-            .from_canonical_basis((0..self.number_field.rank()).map(|i| {
+            .from_power_basis((0..self.number_field.rank()).map(|i| {
                 let (num, den) = balanced_rational_reconstruction(Zpe, self.ZpeX.coefficient_at(&combined, i).clone());
                 return QQ.div(
                     &QQ.inclusion().map(int_cast(num, ZZ, Zpe.integer_ring())),
@@ -248,7 +246,7 @@ impl ResidueFieldsAtPrime {
                         .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
                         .collect::<Vec<_>>();
                     let Fq = GaloisField::create(
-                        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(Fp.clone(), modulus))
+                        MonogeneticExtensionBarrett::new(Fp.clone(), modulus)
                             .as_field()
                             .unwrap(),
                     );
@@ -318,10 +316,7 @@ impl ResidueRingsAtPrimePower {
                 let modulus_vec = (0..self.ZpeX().degree(f).unwrap())
                     .map(|i| self.ZpeX().base_ring().negate(self.ZpeX().coefficient_at(f, i).clone()))
                     .collect();
-                let GR = MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(
-                    self.ZpeX().base_ring().clone(),
-                    modulus_vec,
-                ));
+                let GR = MonogeneticExtensionBarrett::new(self.ZpeX().base_ring().clone(), modulus_vec);
                 let GRX = DensePolyRing::new(GR, "X");
                 return GRX;
             })
@@ -389,9 +384,9 @@ impl NumberFieldFactorizationLift {
             let hom = GRX.base_ring().base_ring().clone().into_can_hom(ZZbig).unwrap();
             take_mut::take(lifter, |lifter| {
                 lifter.lift_to(lift_to_degree, GRX, &target_mod_pe, |old_base_ring, GR, x| {
-                    GR.from_canonical_basis(
+                    GR.from_power_basis(
                         old_base_ring
-                            .wrt_canonical_basis(x)
+                            .wrt_power_basis(x)
                             .iter()
                             .map(|c| hom.map(old_base_ring.base_ring().smallest_lift(c))),
                     )
@@ -776,11 +771,11 @@ use crate::ring_impls::extension::number_field::*;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<MonogeneticExtensionImpl<RationalField<BigIntRing>>>> {
+fn test_field() -> NumberField<AsField<MonogeneticExtensionSparse<RationalField<BigIntRing>>>> {
     let QQ = RationalField::new(ZZbig);
     let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(MonogeneticExtensionImpl::new(QQ, modulus_vec)).unwrap(),
+        AsFieldBase::promise_is_field(MonogeneticExtensionSparse::new(QQ, modulus_vec)).unwrap(),
     )))
 }
 
@@ -854,7 +849,7 @@ fn random_test_poly_power_decomposition_number_field() {
     let mut random_poly_of_deg = |deg: usize| {
         poly_ring.from_terms((0..=deg).map(|i| {
             (
-                field.from_canonical_basis((0..field.rank()).map(|_| {
+                field.from_power_basis((0..field.rank()).map(|_| {
                     QQ.inclusion()
                         .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
                 })),
@@ -982,7 +977,7 @@ fn random_test_poly_gcd_number_field() {
     let mut random_poly_of_deg = |deg: usize| {
         poly_ring.from_terms((0..=deg).map(|i| {
             (
-                field.from_canonical_basis((0..field.rank()).map(|_| {
+                field.from_power_basis((0..field.rank()).map(|_| {
                     QQ.inclusion()
                         .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
                 })),
