@@ -90,7 +90,7 @@ fn test_specialize_finite_field() {
     assert!(GaloisFieldBase::specialize(Verify(ring.get_ring(), 9)));
 
     let ring = GaloisField::new(3, 2).into().unwrap_self();
-    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(
+    assert!(<AsFieldBase<MonogeneticExtensionImpl<_, _, _, _>>>::specialize(Verify(
         ring.get_ring(),
         9
     )));
@@ -99,18 +99,20 @@ fn test_specialize_finite_field() {
     assert!(!<RationalFieldBase<_>>::specialize(Verify(ring.get_ring(), 0)));
 
     let QQ = RationalField::new(ZZbig);
-    let ring = FreeAlgebraImpl::new(&QQ, 2, [QQ.neg_one()]).as_field().ok().unwrap();
-    assert!(!<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(
-        ring.get_ring(),
-        0
-    )));
-
-    let base_ring = GaloisField::new(3, 2).into().unwrap_self();
-    let ring = FreeAlgebraImpl::new(&base_ring, 3, [base_ring.neg_one(), base_ring.one()])
+    let ring = MonogeneticExtensionImpl::new(&QQ, vec![QQ.neg_one(), QQ.zero()])
         .as_field()
         .ok()
         .unwrap();
-    assert!(<AsFieldBase<FreeAlgebraImpl<_, _, _, _>>>::specialize(Verify(
+    assert!(!<AsFieldBase<MonogeneticExtensionImpl<_, _, _, _>>>::specialize(
+        Verify(ring.get_ring(), 0)
+    ));
+
+    let base_ring = GaloisField::new(3, 2).into().unwrap_self();
+    let ring = MonogeneticExtensionImpl::new(&base_ring, vec![base_ring.neg_one(), base_ring.one(), base_ring.zero()])
+        .as_field()
+        .ok()
+        .unwrap();
+    assert!(<AsFieldBase<MonogeneticExtensionImpl<_, _, _, _>>>::specialize(Verify(
         ring.get_ring(),
         729
     )));

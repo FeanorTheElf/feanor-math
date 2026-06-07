@@ -95,9 +95,10 @@ pub trait FromModulusCreateableZnRing: Sized + ZnRing + Clone {
 pub mod generic_impls {
     use std::alloc::Global;
     use std::marker::PhantomData;
+    use std::ops::Range;
     use std::sync::Arc;
 
-    use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm, TypeErasedConvolution};
+    use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm};
     use crate::algorithms::int_bisect;
     use crate::ring_impls::extension::galois_field::*;
     use crate::ring_impls::primitive_int::StaticRingBase;
@@ -108,17 +109,14 @@ pub mod generic_impls {
     #[stability::unstable(feature = "enable")]
     pub fn create_default_convolution<'a, S>(
         _self_: S,
-        _max_len: Option<usize>,
+        _len_range: Option<Range<usize>>,
         log2_karatsuba_threshold: usize,
     ) -> DynConvolution<'a, S::Ring>
     where
         S: 'a + RingStore,
         S::Ring: ZnRing + CanHomFrom<BigIntRingBase>,
     {
-        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new_with_alloc(
-            log2_karatsuba_threshold,
-            Global,
-        )))
+        Arc::new(KaratsubaAlgorithm::new_with_alloc(log2_karatsuba_threshold, Global))
     }
 
     /// A generic `ZZ -> Z/nZ` homomorphism. Optimized for the case that values of `ZZ` can be very

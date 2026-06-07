@@ -1,10 +1,9 @@
 use std::fmt::{Debug, Formatter};
+use std::ops::Range;
 use std::sync::Arc;
 
 use super::*;
-use crate::algorithms::convolution::{
-    DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
-};
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, SchoolbookConvolution};
 use crate::algorithms::matmul::StrassenHint;
 use crate::homomorphism::{Homomorphism, *};
 use crate::ring::{EnvBindingStrength, HashableElRing};
@@ -413,12 +412,12 @@ where
     R: RingStore,
     R::Ring: Domain,
 {
-    fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    fn create_default_convolution<'conv, S>(_self_: S, _len_range: Option<Range<usize>>) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
+        Arc::new(SchoolbookConvolution)
     }
 }
 

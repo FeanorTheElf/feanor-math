@@ -1,6 +1,6 @@
 use crate::algorithms::newton::absolute_error_of_poly_eval;
 use crate::prelude::*;
-use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::float_complex::{Complex64, Complex64Base};
 use crate::ring_impls::poly::PolyRingStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
@@ -12,7 +12,7 @@ use crate::ring_impls::rational::RationalFieldBase;
 pub struct ComplexEmbedding<K, I>
 where
     K: RingStore,
-    K::Ring: FreeAlgebra,
+    K::Ring: MonogeneticExtension,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -25,7 +25,7 @@ where
 impl<K, I> ComplexEmbedding<K, I>
 where
     K: RingStore,
-    K::Ring: FreeAlgebra,
+    K::Ring: MonogeneticExtension,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -60,7 +60,7 @@ where
 impl<K, I> Homomorphism<K::Ring, Complex64Base> for ComplexEmbedding<K, I>
 where
     K: RingStore,
-    K::Ring: FreeAlgebra,
+    K::Ring: MonogeneticExtension,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,

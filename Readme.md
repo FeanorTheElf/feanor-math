@@ -38,7 +38,7 @@ The following rings are provided
  - The integer ring `Z`, as a trait [`IntegerRing`] with implementations for all primitive ints (`i8` to `i128`) given by [`StaticRing`], an arbitrary-precision implementation [`RustBigintRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`) given by [`MPZ`].
  - The quotient ring `Z/nZ`, as a trait [`ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`Zn64B`], an optimized implementation of Montgomery-reductions for moduli somewhat smaller than 64 bits [`Zn64M`], a generic implementation of Barett-reductions for any modulus and any integer ring (optimized for arbitrary-precision ones) [`ZnGBBase`] and a residue-number-system implementation for highly composite moduli [`ZnRNS`].
  - The polynomial ring `R[X]` over any base ring, as a trait [`PolyRing`] with two implementations, one for densely filled polynomials [`DensePolyRing`] and one for sparsely filled polynomials [`SparsePolyRing`].
- - Finite-rank simple and free ring extensions, as a trait [`FreeAlgebra`], with an implementation based on polynomial division [`FreeAlgebraImpl`]. In particular, this includes finite/galois fields and number fields.
+ - Finite-rank simple and free ring extensions, as a trait [`MonogeneticExtension`], with an implementation based on polynomial division [`MonogeneticExtensionImpl`]. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait [`MultivariatePolyRing`] and one implementation [`MultivariatePolyRingImpl`] based on a sparse representation using ordered vectors.
  - Combining the above, you can get Galois fields (easily available using [`GaloisField`]) or arbitrary number fields (they also have the wrapper type [`NumberField`] for a more convenient interface).
 
@@ -500,8 +500,8 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 [`PolyRing`]: crate::ring_impls::poly::PolyRing
 [`DensePolyRing`]: crate::ring_impls::poly::dense_poly::DensePolyRing
 [`SparsePolyRing`]: crate::ring_impls::poly::sparse_poly::SparsePolyRing
-[`FreeAlgebra`]: crate::ring_impls::extension::FreeAlgebra
-[`FreeAlgebraImpl`]: crate::ring_impls::extension::extension_impl::FreeAlgebraImpl
+[`MonogeneticExtension`]: crate::ring_impls::extension::MonogeneticExtension
+[`MonogeneticExtensionImpl`]: crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl
 [`MultivariatePolyRing`]: crate::ring_impls::multivariate::MultivariatePolyRing
 [`MultivariatePolyRingImpl`]: crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl
 [`GaloisField`]: crate::ring_impls::extension::galois_field::GaloisField

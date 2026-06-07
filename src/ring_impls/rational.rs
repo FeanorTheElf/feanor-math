@@ -2,7 +2,7 @@ use std::array::from_fn;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::mem::replace;
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::sync::Arc;
 
 use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
@@ -10,9 +10,7 @@ use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
 use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use crate::algorithms::convolution::{
-    DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
-};
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, SchoolbookConvolution};
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_factor::integer::poly_factor_integer;
@@ -390,12 +388,15 @@ impl<I: RingStore> DefaultConvolutionRing for RationalFieldBase<I>
 where
     I::Ring: IntegerRing,
 {
-    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(
+        _self_: S,
+        _len_range: Option<Range<usize>>,
+    ) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
+        Arc::new(SchoolbookConvolution)
     }
 }
 

@@ -38,7 +38,7 @@ The library is built around a deliberate two-trait split — read `Readme.md` (l
 
 ### Trait hierarchy
 
-`RingBase` → `DivisibilityRing` → `PrincipalIdealRing` → `EuclideanRing` / `Field`, with orthogonal traits `IntegerRing`, `ZnRing`, `FreeAlgebra`, `PolyRing`, `MultivariatePolyRing`, `FiniteRing`, `OrderedRing`, `ApproxRealField`. Algorithms declare exactly the algebraic structure they need.
+`RingBase` → `DivisibilityRing` → `PrincipalIdealRing` → `EuclideanRing` / `Field`, with orthogonal traits `IntegerRing`, `ZnRing`, `MonogeneticExtension`, `PolyRing`, `MultivariatePolyRing`, `FiniteRing`, `OrderedRing`, `ApproxRealField`. Algorithms declare exactly the algebraic structure they need.
 
 ### Conventions (from `Readme.md` "Conventions and best practices")
 

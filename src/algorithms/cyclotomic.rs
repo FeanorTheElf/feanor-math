@@ -361,9 +361,9 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::FreeAlgebraStore;
+use crate::ring_impls::extension::MonogeneticExtensionStore;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
@@ -460,7 +460,9 @@ fn test_is_prim_root_of_unity_pow2() {
     assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 1));
     assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 2));
 
-    let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]).as_field().unwrap();
+    let F = MonogeneticExtensionImpl::new(Fp::<5>::RING, vec![3, 1])
+        .as_field()
+        .unwrap();
     let FEl = |x: [u64; 2]| F.from_canonical_basis(x);
     assert_eq!(true, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 3));
     assert_eq!(false, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 4));
@@ -492,7 +494,9 @@ fn test_is_prim_root_of_unity() {
         is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(18))
     );
 
-    let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]).as_field().unwrap();
+    let F = MonogeneticExtensionImpl::new(Fp::<5>::RING, vec![3, 1])
+        .as_field()
+        .unwrap();
     let FEl = |x: [u64; 2]| F.from_canonical_basis(x);
     assert_eq!(true, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(6)));
     assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(9)));
@@ -514,7 +518,7 @@ fn test_is_prim_root_of_unity_general() {
     assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 3));
     assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 18));
 
-    let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]);
+    let F = MonogeneticExtensionImpl::new(Fp::<5>::RING, vec![3, 1]);
     let FEl = |x: [u64; 2]| F.from_canonical_basis(x);
     assert_eq!(true, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 6));
     assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 9));
@@ -556,7 +560,9 @@ fn test_get_prim_root_of_unity() {
     ));
     assert!(get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(4)).is_none());
 
-    let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]).as_field().unwrap();
+    let F = MonogeneticExtensionImpl::new(Fp::<5>::RING, vec![3, 1])
+        .as_field()
+        .unwrap();
     assert!(is_prim_root_of_unity(
         &F,
         &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(6)).unwrap(),
@@ -650,7 +656,9 @@ fn test_get_prim_root_of_unity_pow2() {
 
     assert!(get_prim_root_of_unity_pow2(Fp::<19>::RING, 2).is_none());
 
-    let F = FreeAlgebraImpl::new(Fp::<5>::RING, 2, [3, 1]).as_field().unwrap();
+    let F = MonogeneticExtensionImpl::new(Fp::<5>::RING, vec![3, 1])
+        .as_field()
+        .unwrap();
     assert!(is_prim_root_of_unity(
         &F,
         &get_prim_root_of_unity_pow2(&F, 1).unwrap(),

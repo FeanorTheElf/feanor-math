@@ -1,10 +1,9 @@
 use core::f64;
 use std::f64::EPSILON;
+use std::ops::Range;
 use std::sync::Arc;
 
-use crate::algorithms::convolution::{
-    DefaultConvolutionRing, DynConvolution, SchoolbookConvolution, TypeErasedConvolution,
-};
+use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution, SchoolbookConvolution};
 use crate::algorithms::matmul::StrassenHint;
 use crate::homomorphism::*;
 use crate::impl_eq_based_self_iso;
@@ -166,12 +165,15 @@ impl StrassenHint for Real64Base {
 }
 
 impl DefaultConvolutionRing for Real64Base {
-    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(
+        _self_: S,
+        _len_range: Option<Range<usize>>,
+    ) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
     {
         // disable Karatsuba's algorithm, as it is very numerically unstable
-        Arc::new(TypeErasedConvolution::new(SchoolbookConvolution))
+        Arc::new(SchoolbookConvolution)
     }
 }
 

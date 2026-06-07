@@ -20,7 +20,7 @@ pub mod eratosthenes;
 pub mod euclid;
 /// Contains basic algorithms for implementing operations on ring extensions. Unless
 /// you are implementing your own extension ring type, you should use the operations
-/// through [`crate::ring_impls::extension::FreeAlgebra`] instead.
+/// through [`crate::ring_impls::extension::MonogeneticExtension`] instead.
 pub mod extension_ops;
 /// Contains [`fft::FFTAlgorithm`], an abstraction for algorithms
 /// for computing FFTs over various rings, together with different implementations.

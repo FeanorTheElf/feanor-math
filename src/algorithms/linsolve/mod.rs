@@ -3,10 +3,10 @@ use std::alloc::{Allocator, Global};
 use super::convolution::ConvolutionAlgorithm;
 use crate::matrix::{AsPointerToSlice, SubmatrixMut};
 use crate::prelude::*;
-use crate::ring_impls::extension::extension_impl::FreeAlgebraImplBase;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImplBase;
+use crate::ring_impls::extension::poly_modulus::PolyModulus;
 use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::ring_properties::pid::PrincipalIdealRing;
-use crate::seq::VectorView;
 
 /// Contains the algorithm for solving linear systems over free ring extensions.
 pub mod extension;
@@ -142,11 +142,11 @@ impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
     }
 }
 
-impl<R, V, A_ring, C_ring> LinSolveRing for FreeAlgebraImplBase<R, V, C_ring, A_ring>
+impl<R, M, A_ring, C_ring> LinSolveRing for MonogeneticExtensionImplBase<R, M, C_ring, A_ring>
 where
     R: RingStore,
     R::Ring: LinSolveRing,
-    V: VectorView<El<R>> + Send + Sync,
+    M: PolyModulus<R> + Send + Sync,
     A_ring: Allocator + Clone + Send + Sync,
     C_ring: ConvolutionAlgorithm<R::Ring>,
 {

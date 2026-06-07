@@ -3,6 +3,7 @@ use std::cell::OnceCell;
 use std::cmp::min;
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::Range;
 
 use feanor_serde::dependent_tuple::DeserializeSeedDependentTuple;
 use feanor_serde::newtype_struct::*;
@@ -13,7 +14,7 @@ use crate::algorithms::convolution::*;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
 use crate::prelude::*;
-use crate::ring_impls::extension::FreeAlgebraStore;
+use crate::ring_impls::extension::MonogeneticExtensionStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::zn::*;
 use crate::ring_properties::divisibility::DivisibilityRing;
@@ -311,11 +312,14 @@ where
     I: Clone,
     I::Ring: IntegerRing,
 {
-    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(
+        self_: S,
+        len_range: Option<Range<usize>>,
+    ) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
     {
-        generic_impls::create_default_convolution(self_, max_len, 1)
+        generic_impls::create_default_convolution(self_, len_range, 1)
     }
 }
 

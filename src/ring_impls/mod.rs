@@ -27,7 +27,7 @@ pub mod as_field;
 /// numbers.
 pub mod float_complex;
 
-/// Contains the trait [`extension::FreeAlgebra`] for rings that are free modules of
+/// Contains the trait [`extension::MonogeneticExtension`] for rings that are free modules of
 /// finite rank over a base ring. It also provides one implementation in
 /// [`extension::extension_impl`] based on polynomial division.
 pub mod extension;

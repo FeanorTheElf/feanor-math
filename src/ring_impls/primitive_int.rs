@@ -440,10 +440,10 @@ macro_rules! impl_default_convolution_ring {
         $(
             impl DefaultConvolutionRing for StaticRingBase<$prim_type> {
 
-                default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+                default fn create_default_convolution<'conv, S>(_self_: S, _len_range: Option<std::ops::Range<usize>>) -> DynConvolution<'conv, Self>
                     where S: RingStore<Ring = Self> + 'conv
                 {
-                    std::sync::Arc::new($crate::algorithms::convolution::TypeErasedConvolution::new($crate::algorithms::convolution::KaratsubaAlgorithm::new($threshold_log2)))
+                    std::sync::Arc::new($crate::algorithms::convolution::KaratsubaAlgorithm::new($threshold_log2))
                 }
             }
         )*

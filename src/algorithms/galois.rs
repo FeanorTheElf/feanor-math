@@ -27,7 +27,7 @@ use super::sqr_mul::generic_pow_shortest_chain_table;
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn compute_galois_closure(field: NumberField) -> Result<
-        FreeAlgebraHom<NumberField, NumberField>,
+        MonogeneticExtensionHom<NumberField, NumberField>,
         (NumberField, Vec<El<NumberField>>)
     >
 {
@@ -61,7 +61,7 @@ pub fn compute_galois_closure(field: NumberField) -> Result<
 pub struct GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -73,7 +73,7 @@ pub struct GaloisAutomorphism<K, Impl, I>
 impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -147,7 +147,7 @@ impl<K, Impl, I> GaloisAutomorphism<K, Impl, I>
 impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>> for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -178,7 +178,7 @@ impl<K, Impl, I> Homomorphism<NumberFieldBase<Impl, I>, NumberFieldBase<Impl, I>
 impl<K, Impl, I> Debug for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -191,7 +191,7 @@ impl<K, Impl, I> Debug for GaloisAutomorphism<K, Impl, I>
 impl<K, Impl, I> Clone for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>> + Clone,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -207,7 +207,7 @@ impl<K, Impl, I> Clone for GaloisAutomorphism<K, Impl, I>
 impl<K, Impl, I> PartialEq for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -221,7 +221,7 @@ impl<K, Impl, I> PartialEq for GaloisAutomorphism<K, Impl, I>
 impl<K, Impl, I> Eq for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra,
+        Impl::Type: Field + MonogeneticExtension,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -230,7 +230,7 @@ impl<K, Impl, I> Eq for GaloisAutomorphism<K, Impl, I>
 impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
     where K: RingStore<Type = NumberFieldBase<Impl, I>>,
         Impl: RingStore,
-        Impl::Type: Field + FreeAlgebra + HashableElRing,
+        Impl::Type: Field + MonogeneticExtension + HashableElRing,
         BaseRingStore<Impl>: RingStore<Type = RationalFieldBase<I>>,
         I: RingStore,
         I::Type: IntegerRing
@@ -249,14 +249,14 @@ impl<K, Impl, I> Hash for GaloisAutomorphism<K, Impl, I>
 #[instrument(skip_all, level = "trace")]
 pub fn compute_galois_group<K>(field: K) -> Result<
         Vec<GaloisAutomorphism<K, DefaultNumberFieldImpl, BigIntRing>>, 
-        FreeAlgebraHom<K, NumberField>
+        MonogeneticExtensionHom<K, NumberField>
     >
     where K: Clone + RingStore<Type = NumberFieldBase<DefaultNumberFieldImpl, BigIntRing>>
 {
     match compute_galois_closure(RingValue::from_ref(field.get_ring()).clone()) {
         Ok(embedding) => {
             let (_, target, image) = embedding.destruct();
-            return Err(FreeAlgebraHom::promise_is_well_defined(field, target, image));
+            return Err(MonogeneticExtensionHom::promise_is_well_defined(field, target, image));
         },
         Err((_, conjugates)) => {
             let mut result: Vec<_> = conjugates.into_iter().map(|x| GaloisAutomorphism::new(field.clone(), x)).collect();

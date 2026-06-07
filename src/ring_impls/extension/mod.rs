@@ -11,8 +11,10 @@ use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::seq::*;
 use crate::wrapper::RingElementWrapper;
 
-/// Contains [`extension_impl::FreeAlgebraImpl`], an implementation of [`FreeAlgebra`] based
-/// on polynomial division.
+pub mod poly_modulus;
+
+/// Contains [`extension_impl::MonogeneticExtensionImpl`], an implementation of
+/// [`MonogeneticExtension`] based on polynomial division.
 pub mod extension_impl;
 
 /// Contains [`galois_field::GaloisField`], an implementation of Galois fields.
@@ -33,9 +35,9 @@ pub mod conway;
 /// over the base ring. While sounding quite technical, this includes a wide class of important
 /// rings, like number fields or galois fields.
 /// One consequence of this is that `R` is a free `S`-module, with a basis given by the powers
-/// of [`FreeAlgebra::canonical_gen()`], which is where the name "free" comes from.
+/// of [`MonogeneticExtension::canonical_gen()`], which is where the name "free" comes from.
 ///
-/// The main implementation is [`FreeAlgebraImpl`].
+/// The main implementation is [`MonogeneticExtensionImpl`].
 ///
 /// # Nontrivial Automorphisms
 ///
@@ -47,7 +49,7 @@ pub mod conway;
 ///
 /// One of the most common use cases seems to be the implementation of finite fields (sometimes
 /// called galois fields). Since they are so common, Galois fields are explicitly modelled by
-/// [`GaloisField`], but can also be manually implemented based on [`FreeAlgebraImpl`].
+/// [`GaloisField`], but can also be manually implemented based on [`MonogeneticExtensionImpl`].
 /// ```rust
 /// #![feature(allocator_api)]
 /// # use std::alloc::Global;
@@ -61,7 +63,7 @@ pub mod conway;
 /// # use feanor_math::ring_properties::finite::*;
 /// // we have to decide for an implementation of the prime field
 /// let prime_field = zn_static::Fp::<3>::RING;
-/// let galois_field = FreeAlgebraImpl::new(prime_field, 3, [2, 1]);
+/// let galois_field = MonogeneticExtensionImpl::new(prime_field, vec![2, 1, 0]);
 /// // this is now the finite field with 27 elements, or F_27 or GF(27) since X^3 + 2X + 1 is
 /// // irreducible modulo 3
 /// let galois_field = galois_field.as_field().ok().unwrap();
@@ -73,11 +75,11 @@ pub mod conway;
 /// assert!(galois_field_2.can_iso(&galois_field).is_none());
 /// ```
 ///
-/// [`FreeAlgebraImpl`]: crate::ring_impls::extension::extension_impl::FreeAlgebraImpl
+/// [`MonogeneticExtensionImpl`]: crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl
 /// [`GaloisField`]: crate::ring_impls::extension::galois_field::GaloisField
-pub trait FreeAlgebra: RingExtension {
+pub trait MonogeneticExtension: RingExtension {
     /// Type of the canonical-basis representation of a ring element, as returned by
-    /// [`FreeAlgebra::wrt_canonical_basis()`].
+    /// [`MonogeneticExtension::wrt_canonical_basis()`].
     type VectorRepresentation<'a>: VectorFn<El<Self::BaseRing>>
     where
         Self: 'a;
@@ -90,16 +92,18 @@ pub trait FreeAlgebra: RingExtension {
 
     /// Returns the representation of the element w.r.t. the canonical basis, that is the basis
     /// given by the powers `x^i` where `x` is the canonical generator given by
-    /// [`FreeAlgebra::canonical_gen()`] and `i` goes from `0` to `rank - 1`.
+    /// [`MonogeneticExtension::canonical_gen()`] and `i` goes from `0` to `rank - 1`.
     ///
-    /// In this sense, this is the opposite function to [`FreeAlgebra::from_canonical_basis()`].
+    /// In this sense, this is the opposite function to
+    /// [`MonogeneticExtension::from_canonical_basis()`].
     fn wrt_canonical_basis<'a>(&'a self, el: &'a Self::Element) -> Self::VectorRepresentation<'a>;
 
     /// Returns the element that has the given representation w.r.t. the canonical basis, that is
     /// the basis given by the powers `x^i` where `x` is the canonical generator given by
-    /// [`FreeAlgebra::canonical_gen()`] and `i` goes from `0` to `rank - 1`.
+    /// [`MonogeneticExtension::canonical_gen()`] and `i` goes from `0` to `rank - 1`.
     ///
-    /// In this sense, this is the opposite function to [`FreeAlgebra::wrt_canonical_basis()`].
+    /// In this sense, this is the opposite function to
+    /// [`MonogeneticExtension::wrt_canonical_basis()`].
     fn from_canonical_basis<V>(&self, vec: V) -> Self::Element
     where
         V: IntoIterator<Item = El<Self::BaseRing>>,
@@ -118,14 +122,15 @@ pub trait FreeAlgebra: RingExtension {
     }
 
     /// Multiplies the given element by the `power`-th power of the canonical generator
-    /// of this ring, as given by [`FreeAlgebra::canonical_gen()`].
+    /// of this ring, as given by [`MonogeneticExtension::canonical_gen()`].
     fn mul_assign_gen_power(&self, el: &mut Self::Element, power: usize) {
         self.mul_assign(el, RingRef::from(self).pow(self.canonical_gen(), power));
     }
 
-    /// Like [`FreeAlgebra::from_canonical_basis()`], this computes the sum `sum_i vec[i] * x^i`
-    /// where `x` is the canonical generator given by [`FreeAlgebra::canonical_gen()`]. Unlike
-    /// [`FreeAlgebra::from_canonical_basis()`], `vec` can return any number elements.
+    /// Like [`MonogeneticExtension::from_canonical_basis()`], this computes the sum `sum_i vec[i] *
+    /// x^i` where `x` is the canonical generator given by
+    /// [`MonogeneticExtension::canonical_gen()`]. Unlike
+    /// [`MonogeneticExtension::from_canonical_basis()`], `vec` can return any number elements.
     fn from_canonical_basis_extended<V>(&self, vec: V) -> Self::Element
     where
         V: IntoIterator<Item = El<Self::BaseRing>>,
@@ -152,7 +157,7 @@ pub trait FreeAlgebra: RingExtension {
     ///
     /// The minimal polynomial is the monic polynomial of minimal degree that
     /// has the given value as a root. Its degree is always at least 1 and at
-    /// most [`FreeAlgebra::rank()`]. If the base ring is a principal ideal domain,
+    /// most [`MonogeneticExtension::rank()`]. If the base ring is a principal ideal domain,
     /// then the minimal polynomial is unique.
     ///
     /// Note that the existence of the minimal polynomial is a consequence of the
@@ -205,22 +210,25 @@ pub trait FreeAlgebra: RingExtension {
     }
 }
 
-/// [`RingStore`] for [`FreeAlgebra`].
-pub trait FreeAlgebraStore: RingStore
+/// [`RingStore`] for [`MonogeneticExtension`].
+pub trait MonogeneticExtensionStore: RingStore
 where
-    Self::Ring: FreeAlgebra,
+    Self::Ring: MonogeneticExtension,
 {
-    delegate! { FreeAlgebra, fn canonical_gen(&self) -> El<Self> }
-    delegate! { FreeAlgebra, fn rank(&self) -> usize }
-    delegate! { FreeAlgebra, fn trace(&self, el: El<Self>) -> El<BaseRingStore<Self>> }
-    delegate! { FreeAlgebra, fn mul_assign_gen_power(&self, el: &mut El<Self>, power: usize) -> () }
+    delegate! { MonogeneticExtension, fn canonical_gen(&self) -> El<Self> }
+    delegate! { MonogeneticExtension, fn rank(&self) -> usize }
+    delegate! { MonogeneticExtension, fn trace(&self, el: El<Self>) -> El<BaseRingStore<Self>> }
+    delegate! { MonogeneticExtension, fn mul_assign_gen_power(&self, el: &mut El<Self>, power: usize) -> () }
 
-    /// See [`FreeAlgebra::wrt_canonical_basis()`].
-    fn wrt_canonical_basis<'a>(&'a self, el: &'a El<Self>) -> <Self::Ring as FreeAlgebra>::VectorRepresentation<'a> {
+    /// See [`MonogeneticExtension::wrt_canonical_basis()`].
+    fn wrt_canonical_basis<'a>(
+        &'a self,
+        el: &'a El<Self>,
+    ) -> <Self::Ring as MonogeneticExtension>::VectorRepresentation<'a> {
         self.get_ring().wrt_canonical_basis(el)
     }
 
-    /// See [`FreeAlgebra::from_canonical_basis()`].
+    /// See [`MonogeneticExtension::from_canonical_basis()`].
     fn from_canonical_basis<V>(&self, vec: V) -> El<Self>
     where
         V: IntoIterator<Item = El<BaseRingStore<Self>>>,
@@ -229,7 +237,7 @@ where
         self.get_ring().from_canonical_basis(vec)
     }
 
-    /// See [`FreeAlgebra::from_canonical_basis_extended()`].
+    /// See [`MonogeneticExtension::from_canonical_basis_extended()`].
     fn from_canonical_basis_extended<V>(&self, vec: V) -> El<Self>
     where
         V: IntoIterator<Item = El<BaseRingStore<Self>>>,
@@ -246,9 +254,11 @@ where
         H: Homomorphism<BaseRingBase<Self>, <BaseRingStore<P> as RingStore>::Ring>,
     {
         assert!(hom.domain().get_ring() == self.base_ring().get_ring());
+        let mut gen_pow_rank = self.one();
+        self.mul_assign_gen_power(&mut gen_pow_rank, self.rank());
         poly_ring.sub(
             poly_ring.from_terms([(poly_ring.base_ring().one(), self.rank())].into_iter()),
-            self.poly_repr(&poly_ring, &self.pow(self.canonical_gen(), self.rank()), hom),
+            self.poly_repr(&poly_ring, &gen_pow_rank, hom),
         )
     }
 
@@ -279,8 +289,9 @@ where
     }
 
     /// Returns the polynomial representation of the given element `y`, i.e. the polynomial `f(X)`
-    /// of degree at most [`FreeAlgebraStore::rank()`] such that `f(x) = y`, where `y` is the
-    /// canonical generator of this ring, as given by [`FreeAlgebraStore::canonical_gen()`].
+    /// of degree at most [`MonogeneticExtensionStore::rank()`] such that `f(x) = y`, where `y` is
+    /// the canonical generator of this ring, as given by
+    /// [`MonogeneticExtensionStore::canonical_gen()`].
     fn poly_repr<P, H>(&self, to: P, el: &El<Self>, hom: H) -> El<P>
     where
         P: PolyRingStore,
@@ -301,7 +312,7 @@ where
     /// which is defined as the determinant of the trace matrix `(Tr(a^(i + j)))`,
     /// where `a` is the canonical generator of this ring extension.
     ///
-    /// See also [`FreeAlgebra::discriminant()`].
+    /// See also [`MonogeneticExtension::discriminant()`].
     fn discriminant(&self) -> El<BaseRingStore<Self>>
     where
         BaseRingBase<Self>: PrincipalIdealRing,
@@ -309,7 +320,7 @@ where
         self.get_ring().discriminant()
     }
 
-    /// See also [`FreeAlgebra::charpoly()`].
+    /// See also [`MonogeneticExtension::charpoly()`].
     fn charpoly<P, H>(&self, el: &El<Self>, poly_ring: P, hom: H) -> El<P>
     where
         P: RingStore,
@@ -335,12 +346,12 @@ where
     /// homomorphism of polynomial rings `S[a] -> R[b], a -> b`. This is only
     /// well-defined if `MiPo(a)(b) = 0` in `R`.
     ///
-    /// As opposed to [`FreeAlgebraStore::lifted_hom()`], this transfers the ownership
+    /// As opposed to [`MonogeneticExtensionStore::lifted_hom()`], this transfers the ownership
     /// of `self` into the homomorphism object.
     fn into_lifted_hom<R, H>(self, from: R, hom: H) -> Result<CoefficientHom<R, Self, H>, (Self, R)>
     where
         R: RingStore,
-        R::Ring: FreeAlgebra,
+        R::Ring: MonogeneticExtension,
         H: Homomorphism<<BaseRingStore<R> as RingStore>::Ring, BaseRingBase<Self>>,
     {
         let RX = DensePolyRing::new(self.base_ring(), "X");
@@ -359,22 +370,22 @@ where
     fn lifted_hom<'a, R, H>(&'a self, from: R, hom: H) -> Result<CoefficientHom<R, &'a Self, H>, ()>
     where
         R: RingStore,
-        R::Ring: FreeAlgebra,
+        R::Ring: MonogeneticExtension,
         H: Homomorphism<<BaseRingStore<R> as RingStore>::Ring, BaseRingBase<Self>>,
     {
         self.into_lifted_hom(from, hom).map_err(|_| ())
     }
 }
 
-impl<R: RingStore> FreeAlgebraStore for R where R::Ring: FreeAlgebra {}
+impl<R: RingStore> MonogeneticExtensionStore for R where R::Ring: MonogeneticExtension {}
 
 #[stability::unstable(feature = "enable")]
-pub struct FreeAlgebraHom<R, S>
+pub struct MonogeneticExtensionHom<R, S>
 where
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     S: RingStore,
-    S::Ring: FreeAlgebra,
+    S::Ring: MonogeneticExtension,
     BaseRingStore<S>: RingStore<Ring = BaseRingBase<R>>,
 {
     from: R,
@@ -382,10 +393,10 @@ where
     image_of_generator: El<S>,
 }
 
-impl<R> FreeAlgebraHom<R, R>
+impl<R> MonogeneticExtensionHom<R, R>
 where
     R: RingStore + Clone,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
 {
     #[stability::unstable(feature = "enable")]
     pub fn identity(ring: R) -> Self {
@@ -397,20 +408,20 @@ where
     }
 }
 
-impl<R, S> FreeAlgebraHom<R, S>
+impl<R, S> MonogeneticExtensionHom<R, S>
 where
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     S: RingStore,
-    S::Ring: FreeAlgebra,
+    S::Ring: MonogeneticExtension,
     BaseRingStore<S>: RingStore<Ring = BaseRingBase<R>>,
 {
-    /// Creates a new [`FreeAlgebraHom`] from `R` to `S`, mapping the canonical
+    /// Creates a new [`MonogeneticExtensionHom`] from `R` to `S`, mapping the canonical
     /// generator of `R` to the given element of `S`. This assumes that the resulting
     /// homomorphism is well-defined, i.e. the generating polynomial of `R` evaluated
     /// at `image_of_generator` gives zero in `S`.
     ///
-    /// The checked variant of this function is [`FreeAlgebraHom::new()`].
+    /// The checked variant of this function is [`MonogeneticExtensionHom::new()`].
     #[stability::unstable(feature = "enable")]
     pub fn promise_is_well_defined(from: R, to: S, image_of_generator: El<S>) -> Self {
         assert!(from.base_ring().get_ring() == to.base_ring().get_ring());
@@ -421,10 +432,10 @@ where
         }
     }
 
-    /// Creates a new [`FreeAlgebraHom`] from `R` to `S`, mapping the canonical
+    /// Creates a new [`MonogeneticExtensionHom`] from `R` to `S`, mapping the canonical
     /// generator of `R` to the given element of `S`.
     ///
-    /// As opposed to [`FreeAlgebraHom::promise_is_well_defined()`], this function
+    /// As opposed to [`MonogeneticExtensionHom::promise_is_well_defined()`], this function
     /// checks that the resulting homomorphism is well-defined.
     #[stability::unstable(feature = "enable")]
     pub fn new(from: R, to: S, image_of_generator: El<S>) -> Self {
@@ -449,12 +460,12 @@ where
     pub fn destruct(self) -> (R, S, El<S>) { (self.from, self.to, self.image_of_generator) }
 }
 
-impl<R, S> Homomorphism<R::Ring, S::Ring> for FreeAlgebraHom<R, S>
+impl<R, S> Homomorphism<R::Ring, S::Ring> for MonogeneticExtensionHom<R, S>
 where
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     S: RingStore,
-    S::Ring: FreeAlgebra,
+    S::Ring: MonogeneticExtension,
     BaseRingStore<S>: RingStore<Ring = BaseRingBase<R>>,
 {
     type DomainStore = R;
@@ -476,18 +487,18 @@ where
     }
 }
 
-/// Homomorphism between two [`FreeAlgebra`]s, induced by a homomorphism between their coefficient
-/// rings.
+/// Homomorphism between two [`MonogeneticExtension`]s, induced by a homomorphism between their
+/// coefficient rings.
 ///
-/// This is the type returned by [`FreeAlgebraStore::lifted_hom()`] and
-/// [`FreeAlgebraStore::into_lifted_hom()`], which should be used to create an instance of this
-/// type.
+/// This is the type returned by [`MonogeneticExtensionStore::lifted_hom()`] and
+/// [`MonogeneticExtensionStore::into_lifted_hom()`], which should be used to create an instance of
+/// this type.
 pub struct CoefficientHom<RFrom, RTo, H>
 where
     RFrom: RingStore,
     RTo: RingStore,
-    RFrom::Ring: FreeAlgebra,
-    RTo::Ring: FreeAlgebra,
+    RFrom::Ring: MonogeneticExtension,
+    RTo::Ring: MonogeneticExtension,
     H: Homomorphism<BaseRingBase<RFrom>, BaseRingBase<RTo>>,
 {
     from: RFrom,
@@ -499,8 +510,8 @@ impl<RFrom, RTo, H> Homomorphism<RFrom::Ring, RTo::Ring> for CoefficientHom<RFro
 where
     RFrom: RingStore,
     RTo: RingStore,
-    RFrom::Ring: FreeAlgebra,
-    RTo::Ring: FreeAlgebra,
+    RFrom::Ring: MonogeneticExtension,
+    RTo::Ring: MonogeneticExtension,
     H: Homomorphism<BaseRingBase<RFrom>, BaseRingBase<RTo>>,
 {
     type DomainStore = RFrom;
@@ -522,9 +533,9 @@ where
 pub mod generic_tests {
     use super::*;
 
-    pub fn test_free_algebra_axioms<R: FreeAlgebraStore>(ring: R)
+    pub fn test_free_algebra_axioms<R: MonogeneticExtensionStore>(ring: R)
     where
-        R::Ring: FreeAlgebra,
+        R::Ring: MonogeneticExtension,
     {
         let x = ring.canonical_gen();
         let n = ring.rank();

@@ -7,7 +7,7 @@ use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_impls::primitive_int::StaticRing;
@@ -32,7 +32,7 @@ pub fn poly_factor_extfield_squarefree<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRingBase<P>: Field + FreeAlgebra + PolyTFracGCDRing,
+    BaseRingBase<P>: Field + MonogeneticExtension + PolyTFracGCDRing,
     BaseRingBase<BaseRingStore<P>>:
         PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
 {
@@ -131,7 +131,7 @@ pub fn poly_factor_extfield<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>,
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRingBase<P>: FreeAlgebra + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
+    BaseRingBase<P>: MonogeneticExtension + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
     BaseRingBase<BaseRingStore<P>>:
         PerfectField + PolyTFracGCDRing + FactorPolyField + FiniteRingSpecializable + InterpolationBaseRing + SelfIso,
 {
@@ -174,7 +174,7 @@ use crate::ring_impls::as_field::AsField;
 #[cfg(test)]
 use crate::ring_impls::as_field::AsFieldBase;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
 #[cfg(test)]
 use crate::ring_impls::extension::number_field::NumberField;
 #[cfg(test)]
@@ -185,12 +185,11 @@ use crate::ring_impls::rational::RationalField;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<FreeAlgebraImpl<RationalField<BigIntRing>, [El<RationalField<BigIntRing>>; 1]>>>
-{
+fn test_field() -> NumberField<AsField<MonogeneticExtensionImpl<RationalField<BigIntRing>>>> {
     let QQ = RationalField::new(ZZbig);
-    let neg_one = QQ.neg_one();
+    let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(QQ, 4, [neg_one])).unwrap(),
+        AsFieldBase::promise_is_field(MonogeneticExtensionImpl::new(QQ, modulus_vec)).unwrap(),
     )))
 }
 

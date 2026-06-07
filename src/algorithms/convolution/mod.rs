@@ -1,6 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::marker::PhantomData;
-use std::ops::Deref;
+use std::ops::{Deref, Range};
 use std::sync::Arc;
 
 use karatsuba::*;
@@ -103,7 +103,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// Returns whether this convolution algorithm supports computations of
     /// the given ring.
     ///
-    /// Note that most algorithms will support all rings of type `R`. However in some cases,
+    /// Note that many algorithms will support all rings of type `R`. However in some cases,
     /// e.g. for finite fields, required data might only be precomputed for some moduli,
     /// and thus only these will be supported.
     fn supports_ring(&self, ring: &R) -> bool;
@@ -457,7 +457,7 @@ impl<R: ?Sized + RingBase, C: ConvolutionAlgorithm<R>> ConvolutionAlgorithm<R> f
 }
 
 pub trait DefaultConvolutionRing: RingBase {
-    fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    fn create_default_convolution<'conv, S>(self_: S, len_range: Option<Range<usize>>) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
         // I would have thought this was implied by the above, but apparently it isn't
@@ -465,14 +465,15 @@ pub trait DefaultConvolutionRing: RingBase {
 }
 
 impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
-    default fn create_default_convolution<'conv, S>(_self_: S, _max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(
+        _self_: S,
+        _len_range: Option<Range<usize>>,
+    ) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
         Self: 'conv,
     {
-        Arc::new(TypeErasedConvolution::new(KaratsubaAlgorithm::new_with_alloc(
-            0, Global,
-        )))
+        Arc::new(KaratsubaAlgorithm::new_with_alloc(0, Global))
     }
 }
 

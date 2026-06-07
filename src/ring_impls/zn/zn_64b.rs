@@ -1,5 +1,6 @@
 use std::fmt::Debug;
 use std::marker::PhantomData;
+use std::ops::Range;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
@@ -12,7 +13,7 @@ use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::iters::multi_cartesian_product;
 use crate::ring::{EnvBindingStrength, HashableElRing};
-use crate::ring_impls::extension::FreeAlgebraStore;
+use crate::ring_impls::extension::MonogeneticExtensionStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::primitive_int::*;
 use crate::ring_impls::zn::{zn_big, *};
@@ -742,11 +743,14 @@ impl StrassenHint for Zn64BBase {
 }
 
 impl DefaultConvolutionRing for Zn64BBase {
-    default fn create_default_convolution<'conv, S>(self_: S, max_len: Option<usize>) -> DynConvolution<'conv, Self>
+    default fn create_default_convolution<'conv, S>(
+        self_: S,
+        len_range: Option<Range<usize>>,
+    ) -> DynConvolution<'conv, Self>
     where
         S: RingStore<Ring = Self> + 'conv,
     {
-        generic_impls::create_default_convolution(self_, max_len, 1)
+        generic_impls::create_default_convolution(self_, len_range, 1)
     }
 }
 

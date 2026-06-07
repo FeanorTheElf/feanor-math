@@ -15,9 +15,10 @@ use crate::algorithms::primelist::*;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::homomorphism::{CanHomFrom, LambdaHom};
 use crate::ring_impls::as_field::*;
-use crate::ring_impls::extension::extension_impl::FreeAlgebraImpl;
+use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImpl;
 use crate::ring_impls::extension::galois_field::*;
-use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::ring_impls::extension::poly_modulus::SchoolbookPolyModulus;
+use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::rational::*;
 use crate::ring_impls::zn::zn_64b::Zn64B;
@@ -33,9 +34,10 @@ enum QuotientAtError {
     ReductionNotWellDefined,
 }
 
-type ResidueField = GaloisField<AsField<FreeAlgebraImpl<AsField<Zn64B>, Vec<El<AsField<Zn64B>>>>>>;
+type ResidueField =
+    GaloisField<AsField<MonogeneticExtensionImpl<AsField<Zn64B>, SchoolbookPolyModulus<AsField<Zn64B>>>>>;
 type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
-type ResidueRing = FreeAlgebraImpl<ZnGB<BigIntRing>, Vec<El<ZnGB<BigIntRing>>>>;
+type ResidueRing = MonogeneticExtensionImpl<ZnGB<BigIntRing>, SchoolbookPolyModulus<ZnGB<BigIntRing>>>;
 type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
 
 fn check_error<F, R>(f: F) -> Result<R, ()>
@@ -83,12 +85,12 @@ fn K_to_GR_hom<'a, K, I, R>(
 ) -> impl use<'a, K, I, R> + Homomorphism<K::Ring, R::Ring>
 where
     K: 'a + RingStore,
-    K::Ring: FreeAlgebra + Field,
+    K::Ring: MonogeneticExtension + Field,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: 'a + RingStore,
     I::Ring: IntegerRing,
     R: 'a + RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     BaseRingBase<R>: ZnRing + CanHomFrom<I::Ring>,
 {
     let mod_p = QQ_to_Zpe_hom(number_field.base_ring().clone(), galois_ring.base_ring().clone(), error);
@@ -98,7 +100,7 @@ where
 struct ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
-    K::Ring: FreeAlgebra + Field,
+    K::Ring: MonogeneticExtension + Field,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -113,7 +115,7 @@ where
 impl<'a, K, I> ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
-    K::Ring: FreeAlgebra + Field,
+    K::Ring: MonogeneticExtension + Field,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -221,7 +223,7 @@ impl ResidueFieldsAtPrime {
     fn new<K, I>(number_field: K, Fp: AsField<Zn64B>) -> Result<Self, QuotientAtError>
     where
         K: RingStore,
-        K::Ring: FreeAlgebra + Field,
+        K::Ring: MonogeneticExtension + Field,
         BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -245,7 +247,11 @@ impl ResidueFieldsAtPrime {
                     let modulus = (0..degree)
                         .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
                         .collect::<Vec<_>>();
-                    let Fq = GaloisField::create(FreeAlgebraImpl::new(Fp.clone(), degree, modulus).as_field().unwrap());
+                    let Fq = GaloisField::create(
+                        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(Fp.clone(), modulus))
+                            .as_field()
+                            .unwrap(),
+                    );
                     let FqX = DensePolyRing::new(Fq, "X");
                     return FqX;
                 })
@@ -282,7 +288,7 @@ impl ResidueRingsAtPrimePower {
     fn lift_genpoly_factorization<K, I>(&mut self, number_field: K, lift_to_degree: usize)
     where
         K: RingStore,
-        K::Ring: Field + FreeAlgebra,
+        K::Ring: Field + MonogeneticExtension,
         BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -309,13 +315,13 @@ impl ResidueRingsAtPrimePower {
         self.lifter
             .factorization()
             .map(|f| {
-                let GR = FreeAlgebraImpl::new(
+                let modulus_vec = (0..self.ZpeX().degree(f).unwrap())
+                    .map(|i| self.ZpeX().base_ring().negate(self.ZpeX().coefficient_at(f, i).clone()))
+                    .collect();
+                let GR = MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(
                     self.ZpeX().base_ring().clone(),
-                    self.ZpeX().degree(f).unwrap(),
-                    (0..self.ZpeX().degree(f).unwrap())
-                        .map(|i| self.ZpeX().base_ring().negate(self.ZpeX().coefficient_at(f, i).clone()))
-                        .collect(),
-                );
+                    modulus_vec,
+                ));
                 let GRX = DensePolyRing::new(GR, "X");
                 return GRX;
             })
@@ -366,7 +372,7 @@ impl NumberFieldFactorizationLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingBase<P>: Field + MonogeneticExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -398,7 +404,7 @@ impl NumberFieldFactorizationLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingBase<P>: Field + MonogeneticExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -503,7 +509,7 @@ impl PolyGCDFactorizationLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingBase<P>: Field + MonogeneticExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -540,7 +546,7 @@ pub fn poly_gcd_number_field_squarefree<P, I>(KX: P, lhs: &El<P>, rhs: &El<P>, a
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRingBase<P>: Field + FreeAlgebra,
+    BaseRingBase<P>: Field + MonogeneticExtension,
     BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -609,7 +615,7 @@ pub fn poly_gcd_number_field<P, I>(KX: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRingBase<P>: Field + FreeAlgebra,
+    BaseRingBase<P>: Field + MonogeneticExtension,
     BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -683,7 +689,7 @@ impl PolyPowerDecompositionLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRingBase<P>: Field + FreeAlgebra,
+        BaseRingBase<P>: Field + MonogeneticExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -717,7 +723,7 @@ pub fn poly_power_decomposition_number_field<P, I>(KX: P, poly: &El<P>) -> Vec<(
 where
     P: RingStore + Copy,
     P::Ring: PolyRing,
-    BaseRingBase<P>: Field + FreeAlgebra,
+    BaseRingBase<P>: Field + MonogeneticExtension,
     BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -770,12 +776,11 @@ use crate::ring_impls::extension::number_field::*;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<FreeAlgebraImpl<RationalField<BigIntRing>, [El<RationalField<BigIntRing>>; 1]>>>
-{
+fn test_field() -> NumberField<AsField<MonogeneticExtensionImpl<RationalField<BigIntRing>>>> {
     let QQ = RationalField::new(ZZbig);
-    let neg_one = QQ.neg_one();
+    let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(FreeAlgebraImpl::new(QQ, 4, [neg_one])).unwrap(),
+        AsFieldBase::promise_is_field(MonogeneticExtensionImpl::new(QQ, modulus_vec)).unwrap(),
     )))
 }
 

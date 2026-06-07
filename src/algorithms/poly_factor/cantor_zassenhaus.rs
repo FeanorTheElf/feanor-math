@@ -7,8 +7,9 @@ use crate::algorithms::int_factor::is_prime_power;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::as_field::{AsField, AsFieldBase};
-use crate::ring_impls::extension::extension_impl::{FreeAlgebraImpl, FreeAlgebraImplBase};
-use crate::ring_impls::extension::{FreeAlgebra, FreeAlgebraStore};
+use crate::ring_impls::extension::extension_impl::{MonogeneticExtensionImpl, MonogeneticExtensionImplBase};
+use crate::ring_impls::extension::poly_modulus::SchoolbookPolyModulus;
+use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_properties::divisibility::DivisibilityRingStore;
@@ -31,7 +32,7 @@ use crate::seq::VectorFn;
 fn pow_geometric_series_characteristic<R>(ring: R, a: El<R>, e: usize) -> El<R>
 where
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     <BaseRingStore<R> as RingStore>::Ring: FiniteRing,
 {
     let q = ring.base_ring().size(ZZbig).unwrap();
@@ -82,7 +83,7 @@ where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
@@ -127,7 +128,7 @@ where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
@@ -148,13 +149,13 @@ where
     let mut current_deg = 0;
     result.push(poly_ring.one());
 
-    let mut x_power_q_powers = Vec::new();
-    x_power_q_powers.push(mod_f_ring.one());
-    x_power_q_powers.push(mod_f_ring.pow_gen(mod_f_ring.canonical_gen(), &q, ZZ));
+    let mut powers_of_gen_pow_q = Vec::new();
+    powers_of_gen_pow_q.push(mod_f_ring.one());
+    powers_of_gen_pow_q.push(mod_f_ring.pow_gen(mod_f_ring.canonical_gen(), &q, ZZ));
     for i in 2..mod_f_ring.rank() {
-        x_power_q_powers.push(mod_f_ring.mul_ref(&x_power_q_powers[1], &x_power_q_powers[i - 1]));
+        powers_of_gen_pow_q.push(mod_f_ring.mul_ref(&powers_of_gen_pow_q[1], &powers_of_gen_pow_q[i - 1]));
     }
-    let mut current = x_power_q_powers[1].clone();
+    let mut current = powers_of_gen_pow_q[1].clone();
     while 2 * current_deg <= poly_ring.degree(&f).unwrap() {
         current_deg += 1;
         let fq_defining_poly_mod_f = poly_ring.sub(
@@ -174,7 +175,7 @@ where
         for i in 0..mod_f_ring.rank() {
             new = mod_f_ring
                 .inclusion()
-                .fma_map(&x_power_q_powers[i], &current_wrt_basis.at(i), new);
+                .fma_map(&powers_of_gen_pow_q[i], &current_wrt_basis.at(i), new);
         }
         drop(current_wrt_basis);
         current = new;
@@ -237,7 +238,8 @@ where
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
+    let mod_f_ring =
+        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(poly_ring.base_ring(), f_coeffs));
 
     let mut result = distinct_degree_factorization_base(&poly_ring, mod_f_ring);
     poly_ring.inclusion().mul_assign_map(&mut result[0], lc);
@@ -253,7 +255,7 @@ where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
@@ -331,7 +333,8 @@ where
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
+    let mod_f_ring =
+        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(poly_ring.base_ring(), f_coeffs));
     let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
     return result;
 }
@@ -348,7 +351,7 @@ where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
@@ -406,7 +409,7 @@ where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
     R: RingStore,
-    R::Ring: FreeAlgebra,
+    R::Ring: MonogeneticExtension,
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
     <BaseRingStore<P> as RingStore>::Ring: FiniteRing + Field,
 {
@@ -425,7 +428,7 @@ where
         // adjoin a third root of unity, this will enable use to use the main idea;
         // use `promise_as_field()`, since `as_field().unwrap()` can cause infinite generic expansion
         // (always adding a `&`)
-        let new_base_ring = FreeAlgebraImplBase::new(Fq, 2, [Fq.neg_one(), Fq.neg_one()]);
+        let new_base_ring = MonogeneticExtensionImplBase::new(Fq, vec![Fq.neg_one(), Fq.neg_one()]);
         let new_base_ring = RingRef::from(&new_base_ring);
         let new_base_ring = AsField::from(AsFieldBase::promise_is_perfect_field(new_base_ring));
         let new_x_pow_rank = mod_f_ring
@@ -435,7 +438,8 @@ where
             .collect::<Vec<_>>();
         // once we have any kind of tensoring operation, maybe we can find a way to do this that preserves
         // e.g. sparse implementations?
-        let new_mod_f_ring = FreeAlgebraImpl::new(&new_base_ring, new_x_pow_rank.len(), &new_x_pow_rank);
+        let new_mod_f_ring =
+            MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(&new_base_ring, new_x_pow_rank));
         let new_poly_ring = DensePolyRing::new(&new_base_ring, "X");
 
         // it might happen that cantor_zassenhaus gives a nontrivial factor over the extension, but that
@@ -505,7 +509,8 @@ where
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
         .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
-    let mod_f_ring = FreeAlgebraImpl::new(poly_ring.base_ring(), f_coeffs.len(), &f_coeffs);
+    let mod_f_ring =
+        MonogeneticExtensionImpl::new_with_modulus(SchoolbookPolyModulus::new(poly_ring.base_ring(), f_coeffs));
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
     return result;
 }
@@ -566,9 +571,8 @@ fn test_is_irreducible() {
         ]
     });
     let create_extension_ring = |f| {
-        FreeAlgebraImpl::new(
+        MonogeneticExtensionImpl::new(
             field,
-            ring.degree(f).unwrap(),
             (0..ring.degree(f).unwrap())
                 .map(|i| field.negate(*ring.coefficient_at(f, i)))
                 .collect::<Vec<_>>(),
@@ -614,7 +618,7 @@ fn test_cantor_zassenhaus_even() {
 fn test_cantor_zassenhaus_even_extension_field() {
     feanor_tracing::DelayedLogger::init_test();
 
-    let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 4, [1, 1, 0, 0])
+    let Fq = MonogeneticExtensionImpl::new(Fp::<2>::RING, vec![1, 1, 0, 0])
         .as_field()
         .ok()
         .unwrap();
@@ -640,7 +644,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
             .any(|factors| ring.eq_el(&factor, &ring.prod(factors.iter().copied().cloned())))
     );
 
-    let Fq = FreeAlgebraImpl::new(Fp::<2>::RING, 3, [1, 1, 0])
+    let Fq = MonogeneticExtensionImpl::new(Fp::<2>::RING, vec![1, 1, 0])
         .as_field()
         .ok()
         .unwrap();
@@ -658,7 +662,7 @@ fn test_cantor_zassenhaus_even_extension_field() {
 fn test_pow_geometric_series_characteristic() {
     feanor_tracing::DelayedLogger::init_test();
     let base_ring = Fp::<65537>::RING;
-    let ring = FreeAlgebraImpl::new(base_ring, 3, [1]);
+    let ring = MonogeneticExtensionImpl::new(base_ring, vec![1, 0, 0]);
     assert_el_eq!(
         &ring,
         ring.pow(ring.canonical_gen(), 1),
@@ -680,7 +684,7 @@ fn test_pow_geometric_series_characteristic() {
         pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
     );
 
-    let ring = FreeAlgebraImpl::new(base_ring, 3, [4, 3]);
+    let ring = MonogeneticExtensionImpl::new(base_ring, vec![4, 3, 0]);
     assert_el_eq!(
         &ring,
         ring.pow(ring.canonical_gen(), 1),
@@ -725,7 +729,7 @@ fn test_pow_geometric_series_characteristic() {
     );
 
     let base_ring = Fp::<100003>::RING;
-    let ring = FreeAlgebraImpl::new(base_ring, 3, [1, 1]);
+    let ring = MonogeneticExtensionImpl::new(base_ring, vec![1, 1, 0]);
     assert_el_eq!(
         &ring,
         ring.pow(ring.canonical_gen(), 1),

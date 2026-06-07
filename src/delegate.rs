@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
-use crate::ring_impls::extension::FreeAlgebra;
+use crate::ring_impls::extension::MonogeneticExtension;
 use crate::ring_impls::zn::ZnRing;
 use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::ring_properties::finite::FiniteRing;
@@ -781,13 +781,13 @@ where
     fn from(&self, x: El<Self::BaseRing>) -> Self::Element { self.rev_delegate(self.get_delegate().from(x)) }
 }
 
-impl<R> FreeAlgebra for R
+impl<R> MonogeneticExtension for R
 where
     R: DelegateRing,
-    <R as DelegateRing>::Base: FreeAlgebra,
+    <R as DelegateRing>::Base: MonogeneticExtension,
 {
     type VectorRepresentation<'a>
-        = <<R as DelegateRing>::Base as FreeAlgebra>::VectorRepresentation<'a>
+        = <<R as DelegateRing>::Base as MonogeneticExtension>::VectorRepresentation<'a>
     where
         Self: 'a;
 
