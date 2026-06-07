@@ -4,7 +4,7 @@ use std::sync::atomic::AtomicBool;
 use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
-use crate::algorithms::hensel::{FactorsNotCoprimeError, HenselLift};
+use crate::algorithms::hensel::{FactorsNotCoprimeError, HenselLift, create_power_p_poly_ring};
 use crate::algorithms::interpolate::product_except_one;
 use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::gcd_lift::*;
@@ -292,8 +292,8 @@ impl ResidueRingsAtPrimePower {
         I::Ring: IntegerRing,
     {
         let QQ = number_field.base_ring();
-        let Zpe = ZnGB::new(ZZbig, ZZbig.pow(self.prime.clone(), lift_to_degree));
-        let ZpeX = DensePolyRing::new(Zpe.clone(), "X");
+        let ZpeX = create_power_p_poly_ring(self.prime.clone(), lift_to_degree);
+        let Zpe = ZpeX.base_ring();
 
         let target_mod_pe =
             check_error(|error| number_field.generating_poly(&ZpeX, QQ_to_Zpe_hom(QQ, &Zpe, &error))).unwrap();

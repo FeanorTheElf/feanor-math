@@ -53,21 +53,13 @@ where
         Self::new_with_hom(ring.into_identity(), base_root_of_unity, max_log2_len, Global)
     }
 
-    /// Creates a new [`NTTConvolution`].
-    ///
-    /// For the motivation behind separating the twiddle ring and the main ring, see
-    /// [`CooleyTuckeyFFT`].
-    ///
-    /// # Performance
-    ///
-    /// This function will factor the modulus `n` of the ring, which in some cases is a very
-    /// computationally demanding task.
+    /// Creates a new [`NTTConvolution`] over a prime field, automatically selecting roots of unity.
     #[stability::unstable(feature = "enable")]
-    pub fn for_zn(ring: R) -> Self
+    pub fn for_fp(ring: R) -> Self
     where
-        R::Ring: ZnRing,
+        R::Ring: ZnRing + Field,
     {
-        Self::for_zn_with_hom(ring.into_identity())
+        Self::for_fp_with_hom(ring.into_identity())
     }
 }
 
@@ -77,17 +69,12 @@ where
     R_twiddle: ?Sized + RingBase + DivisibilityRing,
     H: Homomorphism<R_twiddle, R_main> + Clone,
 {
-    /// Creates a new [`NTTConvolution`].
+    /// Creates a new [`NTTConvolution`] over a prime field, automatically selecting roots of unity.
     ///
     /// For the motivation behind separating the twiddle ring and the main ring, see
     /// [`CooleyTuckeyFFT`].
-    ///
-    /// # Performance
-    ///
-    /// This function will factor the modulus `n` of the ring, which in some cases is a very
-    /// computationally demanding task.
     #[stability::unstable(feature = "enable")]
-    pub fn for_zn_with_hom(hom: H) -> Self
+    pub fn for_fp_with_hom(hom: H) -> Self
     where
         R_twiddle: ZnRing,
     {
@@ -426,32 +413,34 @@ use test::Bencher;
 #[cfg(test)]
 use crate::algorithms::convolution::KaratsubaAlgorithm;
 #[cfg(test)]
-use crate::ring_impls::zn::zn_64b::{Zn64B, Zn64BBase, Zn64BEl};
+use crate::ring_impls::as_field::{AsField, AsFieldBase};
+#[cfg(test)]
+use crate::ring_impls::zn::zn_64b::Zn64B;
 
 #[test]
 fn test_convolution() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537);
-    let convolution = NTTConvolution::for_zn(ring);
+    let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
+    let convolution = NTTConvolution::for_fp(ring);
     super::generic_tests::test_convolution(&convolution, &ring, ring.one());
 }
 
 #[cfg(test)]
-fn run_benchmark<F>(ring: Zn64B, bencher: &mut Bencher, mut f: F)
+fn run_benchmark<F>(ring: AsField<Zn64B>, bencher: &mut Bencher, mut f: F)
 where
     F: FnMut(
         &[(
-            &[Zn64BEl],
-            Option<&PreparedConvolutionOperand<Zn64BBase>>,
-            &[Zn64BEl],
-            Option<&PreparedConvolutionOperand<Zn64BBase>>,
+            &[El<AsField<Zn64B>>],
+            Option<&PreparedConvolutionOperand<AsFieldBase<Zn64B>>>,
+            &[El<AsField<Zn64B>>],
+            Option<&PreparedConvolutionOperand<AsFieldBase<Zn64B>>>,
         )],
-        &mut [Zn64BEl],
-        Zn64B,
+        &mut [El<AsField<Zn64B>>],
+        AsField<Zn64B>,
     ),
 {
     let mut expected = (0..512).map(|_| ring.zero()).collect::<Vec<_>>();
-    let value: Vec<Zn64BEl> = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+    let value: Vec<_> = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution(
         &value,
         None,
@@ -495,8 +484,8 @@ where
 #[bench]
 fn bench_convolution_sum(bencher: &mut Bencher) {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537);
-    let convolution = NTTConvolution::for_zn(ring);
+    let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
+    let convolution = NTTConvolution::for_fp(ring);
 
     run_benchmark(ring, bencher, |values, dst, _| {
         convolution.compute_convolution_sum_impl(values, dst)
@@ -506,8 +495,8 @@ fn bench_convolution_sum(bencher: &mut Bencher) {
 #[bench]
 fn bench_convolution_sum_default(bencher: &mut Bencher) {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537);
-    let convolution = NTTConvolution::for_zn(ring);
+    let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
+    let convolution = NTTConvolution::for_fp(ring);
 
     run_benchmark(ring, bencher, |values, dst, ring| {
         for (lhs, lhs_prep, rhs, rhs_prep) in values {

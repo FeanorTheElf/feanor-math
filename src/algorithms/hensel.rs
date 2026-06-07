@@ -413,11 +413,13 @@ impl<P: ?Sized + PolyRing> Clone for HenselLiftableBarrettReducer<P> {
 #[instrument(skip_all, level = "trace")]
 #[stability::unstable(feature = "enable")]
 pub fn create_power_p_poly_ring(prime: El<BigIntRing>, power: usize) -> DensePolyRing<ZnGB<BigIntRing>> {
+    const USE_NTT_CONVOLUTION_LOG2_THRESHOLD: usize = 10;
+
     let dividing_power_of_two = ZZbig
         .abs_lowest_set_bit(&ZZbig.sub_ref_fst(&prime, ZZbig.one()))
         .unwrap();
     let Zpe = ZnGB::new(ZZbig, ZZbig.pow(prime.clone(), power));
-    if dividing_power_of_two >= 10 {
+    if dividing_power_of_two >= USE_NTT_CONVOLUTION_LOG2_THRESHOLD {
         let n = 1 << (dividing_power_of_two - 1);
         let mut rou = if ZZbig.abs_log2_ceil(&prime).unwrap() <= 57 {
             let Fp = Zn64B::new(int_cast(prime, ZZi64, ZZbig) as u64).as_field().unwrap();

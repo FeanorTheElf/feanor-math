@@ -293,7 +293,7 @@ where
     /// # use crate::feanor_math::seq::VectorFn;
     /// # use feanor_math::ring_impls::extension::galois_field::*;
     /// let F65537 = Zn64B::new(65537).as_field().ok().unwrap();
-    /// let convolution = Arc::new(NTTConvolution::for_zn(F65537));
+    /// let convolution = Arc::new(NTTConvolution::for_fp(F65537));
     /// let GF = GaloisField::new_with_convolution(F65537, 2, Global, convolution);
     /// let generator = GF.canonical_gen();
     /// let norm = GF.mul_ref_fst(&generator, GF.pow(generator.clone(), 65537));

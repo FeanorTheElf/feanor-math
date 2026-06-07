@@ -98,8 +98,7 @@ pub mod generic_impls {
     use std::ops::Range;
     use std::sync::Arc;
 
-    use crate::algorithms::convolution::extlen::LengthExtendedConvolution;
-use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm};
+    use crate::algorithms::convolution::{DynConvolution, KaratsubaAlgorithm};
     use crate::algorithms::int_bisect;
     use crate::ring_impls::extension::galois_field::*;
     use crate::ring_impls::primitive_int::StaticRingBase;

@@ -23,6 +23,8 @@ pub mod rns;
 
 pub mod extlen;
 
+pub mod delegate;
+
 /// Trait for objects that can compute a convolution over some ring.
 ///
 /// The functions all take the ring by reference to [`RingBase`], since
@@ -141,7 +143,7 @@ pub trait ConvolutionAlgorithm<R: ?Sized + RingBase>: Send + Sync {
     /// # use feanor_math::ring_impls::zn::zn_64b::*;
     /// # use feanor_math::ring_properties::finite::*;
     /// let ring = Zn64B::new(65537);
-    /// let convolution = NTTConvolution::for_zn(ring);
+    /// let convolution = NTTConvolution::for_fp(ring);
     /// let lhs = (0..10).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     /// let rhs = (0..10).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
     /// // "standard" use

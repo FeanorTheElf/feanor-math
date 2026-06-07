@@ -179,7 +179,7 @@ where
     ConvIter: Send + Iterator<Item = (Zn64B, C)>,
 {
     /// Creates a new [`RNSConvolution`] with all the given configuration parameters.
-    /// 
+    ///
     /// The parameter `conv_iter` should be an iterator over RNS basis components and
     /// fast convolutions on them. In particular, all rings yielded by the iterator should
     /// have coprime modulus. The computation of future convolutions may panic if the

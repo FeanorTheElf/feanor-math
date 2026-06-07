@@ -5,7 +5,7 @@ use std::ops::Range;
 use tracing::instrument;
 
 use super::complex_fft::*;
-use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2_zn, is_prim_root_of_unity_pow2};
+use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2, is_prim_root_of_unity_pow2};
 use crate::algorithms::fft::*;
 use crate::homomorphism::*;
 use crate::ring_impls::float_complex::*;
@@ -26,7 +26,7 @@ use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// // this ring has a 256-th primitive root of unity
 /// let ring = Zn64B::new(257);
-/// let fft_table = CooleyTuckeyFFT::for_zn(ring, 8).unwrap();
+/// let fft_table = CooleyTuckeyFFT::for_fp(ring, 8).unwrap();
 /// let mut data = [ring.one()]
 ///     .into_iter()
 ///     .chain((0..255).map(|_| ring.zero()))
@@ -208,16 +208,12 @@ where
 
     /// Creates an [`CooleyTuckeyFFT`] for a prime field, assuming it has a `2^log2_n`-th primitive
     /// root of unity.
-    ///
-    /// # Performance
-    ///
-    /// This function will factor the modulus `n` of the ring, which in some cases is a very
-    /// computationally demanding task.
-    pub fn for_zn(ring: R, log2_n: usize) -> Option<Self>
+    #[stability::unstable(feature = "enable")]
+    pub fn for_fp(ring: R, log2_n: usize) -> Option<Self>
     where
-        R::Ring: ZnRing,
+        R::Ring: ZnRing + Field,
     {
-        Self::for_zn_with_hom(ring.into_identity(), log2_n)
+        Self::for_fp_with_hom(ring.into_identity(), log2_n)
     }
 }
 
@@ -289,17 +285,13 @@ where
     /// performed in `S`. This allows both implicit ring conversions, and using patterns like
     /// [`Zn64BFastmul`] to precompute some data for better performance.
     ///
-    /// # Performance
-    ///
-    /// This function will factor the modulus `n` of the ring, which in some cases is a very
-    /// computationally demanding task.
-    ///
     /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
-    pub fn for_zn_with_hom(hom: H, log2_n: usize) -> Option<Self>
+    #[stability::unstable(feature = "enable")]
+    pub fn for_fp_with_hom(hom: H, log2_n: usize) -> Option<Self>
     where
-        R_twiddle: ZnRing,
+        R_twiddle: ZnRing + Field,
     {
-        let root_of_unity = get_prim_root_of_unity_pow2_zn(hom.domain(), log2_n)?;
+        let root_of_unity = get_prim_root_of_unity_pow2(hom.domain(), log2_n)?;
         Some(Self::new_with_hom(hom, root_of_unity, log2_n))
     }
 }
@@ -1041,7 +1033,7 @@ fn test_bitreverse_fft_inplace_advanced() {
 fn test_unordered_fft_permutation() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<17>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_fp(&ring, 4).unwrap();
     let mut values = [0, 1, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0];
     let mut expected = [0; 16];
     for i in 0..16 {
@@ -1056,7 +1048,7 @@ fn test_unordered_fft_permutation() {
 fn test_bitreverse_inv_fft_inplace() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<17>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(&ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_fp(&ring, 4).unwrap();
     let values: [u64; 16] = [1, 2, 3, 2, 1, 0, 17 - 1, 17 - 2, 17 - 1, 0, 1, 2, 3, 4, 5, 6];
     let mut work = values;
     fft.unordered_fft(&mut work, ring);
@@ -1084,14 +1076,14 @@ fn test_truncated_fft() {
 }
 
 #[test]
-fn test_for_zn() {
+fn test_for_fp() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<17>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_fp(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
 
     let ring = Fp::<97>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(ring, 4).unwrap();
+    let fft = CooleyTuckeyFFT::for_fp(ring, 4).unwrap();
     assert!(ring.is_neg_one(&ring.pow(fft.root_of_unity, 8)));
 }
 
@@ -1115,8 +1107,10 @@ const BENCH_SIZE_LOG2: usize = 13;
 #[bench]
 fn bench_fft_zn_big(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_big::ZnGB::new(StaticRing::<i128>::RING, 1073872897);
-    let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let ring = zn_big::ZnGB::new(StaticRing::<i128>::RING, 1073872897)
+        .as_field()
+        .unwrap();
+    let fft = CooleyTuckeyFFT::for_fp(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2))
         .map(|i| ring.int_hom().map(i))
         .collect::<Vec<_>>();
@@ -1127,8 +1121,8 @@ fn bench_fft_zn_big(bencher: &mut test::Bencher) {
 #[bench]
 fn bench_fft_zn_64(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(1073872897);
-    let fft = CooleyTuckeyFFT::for_zn(&ring, BENCH_SIZE_LOG2).unwrap();
+    let ring = zn_64b::Zn64B::new(1073872897).as_field().unwrap();
+    let fft = CooleyTuckeyFFT::for_fp(&ring, BENCH_SIZE_LOG2).unwrap();
     let data = (0..(1 << BENCH_SIZE_LOG2))
         .map(|i| ring.int_hom().map(i))
         .collect::<Vec<_>>();
@@ -1140,8 +1134,18 @@ fn bench_fft_zn_64(bencher: &mut test::Bencher) {
 fn bench_fft_zn_64_fastmul(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_64b::Zn64B::new(1073872897);
+    let ring_as_field = ring.as_field().unwrap();
     let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
-    let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.into_can_hom(fastmul_ring).ok().unwrap(), BENCH_SIZE_LOG2).unwrap();
+    let root_of_unity = ring.can_iso(&fastmul_ring).unwrap().map(
+        ring_as_field
+            .get_ring()
+            .unwrap_element(get_prim_root_of_unity_pow2(ring_as_field, BENCH_SIZE_LOG2).unwrap()),
+    );
+    let fft = CooleyTuckeyFFT::new_with_hom(
+        ring.into_can_hom(fastmul_ring).ok().unwrap(),
+        root_of_unity,
+        BENCH_SIZE_LOG2,
+    );
     let data = (0..(1 << BENCH_SIZE_LOG2))
         .map(|i| ring.int_hom().map(i))
         .collect::<Vec<_>>();
@@ -1172,7 +1176,7 @@ fn test_approximate_fft() {
 fn test_size_1_fft() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Fp::<17>::RING;
-    let fft = CooleyTuckeyFFT::for_zn(&ring, 0)
+    let fft = CooleyTuckeyFFT::for_fp(&ring, 0)
         .unwrap()
         .change_ring(ring.identity())
         .0;
@@ -1238,6 +1242,6 @@ fn test_butterfly() {
         zn_static::F17,
         zn_static::F17,
         0..17,
-        &get_prim_root_of_unity_pow2_zn(zn_static::F17, 4).unwrap(),
+        &get_prim_root_of_unity_pow2(zn_static::F17, 4).unwrap(),
     );
 }

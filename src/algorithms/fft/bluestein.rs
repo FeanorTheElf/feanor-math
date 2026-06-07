@@ -3,16 +3,13 @@ use std::fmt::Debug;
 
 use tracing::instrument;
 
-use crate::algorithms::cyclotomic::{
-    get_prim_root_of_unity_pow2_zn, get_prim_root_of_unity_zn, is_prim_root_of_unity_general,
-};
+use crate::algorithms::cyclotomic::is_prim_root_of_unity_general;
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::*;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
-use crate::ring_impls::zn::*;
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::ring_properties::integer::IntegerRingStore;
 use crate::seq::SwappableVectorViewMut;
@@ -141,23 +138,6 @@ where
             tmp_mem_allocator,
         )
     }
-
-    /// Creates an [`BluesteinFFT`] for a prime field, assuming it has suitable roots of
-    /// unity.
-    ///
-    /// Concretely, this requires that the given ring has an `n`-th primitive root of unity, and a
-    /// `m`-th primitive root of unity, where `m` is the smallest power of two `>= 2n`.
-    ///
-    /// # Performance
-    ///
-    /// This function will factor the modulus `n` of the ring, which in some cases is a very
-    /// computationally demanding task.
-    pub fn for_zn(ring: R, n: usize, tmp_mem_allocator: A) -> Option<Self>
-    where
-        R::Ring: ZnRing,
-    {
-        Self::for_zn_with_hom(ring.into_identity(), n, tmp_mem_allocator)
-    }
 }
 
 impl<R_main, R_twiddle, H, A> BluesteinFFT<R_main, R_twiddle, H, A>
@@ -244,40 +224,6 @@ where
     {
         let m_fft_table = CooleyTuckeyFFT::create(hom, &mut root_of_unity_m_pows, log2_m, tmp_mem_allocator);
         return Self::create(m_fft_table, |i| root_of_unity_2n_pows(2 * i), n);
-    }
-
-    /// Creates an [`BluesteinFFT`] for the given prime fields, assuming they have suitable
-    /// roots of unity.
-    ///
-    /// Concretely, this requires that the given ring has an `n`-th primitive root of unity, and a
-    /// `m`-th primitive root of unity, where `m` is the smallest power of two `>= 2n`.
-    ///
-    /// Instead of a ring, this function takes a homomorphism `R -> S`. Twiddle factors that are
-    /// precomputed will be stored as elements of `R`, while the main FFT computations will be
-    /// performed in `S`. This allows both implicit ring conversions, and using patterns like
-    /// [`Zn64BFastmul`] to precompute some data for better performance.
-    ///
-    /// # Performance
-    ///
-    /// This function will factor the modulus `n` of the ring, which in some cases is a very
-    /// computationally demanding task.
-    ///
-    /// [`Zn64BFastmul`]: crate::ring_impls::zn::zn_64b::Zn64BFastmul
-    pub fn for_zn_with_hom(hom: H, n: usize, tmp_mem_allocator: A) -> Option<Self>
-    where
-        R_twiddle: ZnRing,
-    {
-        let root_of_unity_2n = get_prim_root_of_unity_zn(hom.domain(), 2 * n)?;
-        let log2_m = ZZi64.abs_log2_ceil(&(n * 2).try_into().unwrap()).unwrap();
-        let root_of_unity_m = get_prim_root_of_unity_pow2_zn(hom.domain(), log2_m)?;
-        return Some(Self::new_with_hom(
-            hom,
-            root_of_unity_2n,
-            root_of_unity_m,
-            n,
-            log2_m,
-            tmp_mem_allocator,
-        ));
     }
 
     /// Most general way to construct a [`BluesteinFFT`].
@@ -520,6 +466,10 @@ where
 
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static::*;
+#[cfg(test)]
+use crate::ring_impls::zn::zn_64b::*;
+#[cfg(test)]
+use crate::algorithms::cyclotomic::get_prim_root_of_unity_zn;
 
 #[test]
 fn test_fft_base() {
@@ -536,8 +486,8 @@ fn test_fft_base() {
 #[test]
 fn test_fft_fastmul() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(241);
-    let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
+    let ring = Zn64B::new(241);
+    let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
     let fft = BluesteinFFT::new_with_hom(
         ring.can_hom(&fastmul_ring).unwrap(),
         fastmul_ring.int_hom().map(36),
@@ -592,8 +542,8 @@ const BENCH_SIZE: usize = 1009;
 #[bench]
 fn bench_bluestein(bencher: &mut test::Bencher) {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(18597889);
-    let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
+    let ring = Zn64B::new(18597889);
+    let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
     let embedding = ring.can_hom(&fastmul_ring).unwrap();
     let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * BENCH_SIZE).unwrap());
     let fft = BluesteinFFT::new_with_hom(

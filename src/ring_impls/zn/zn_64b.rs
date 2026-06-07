@@ -1,11 +1,15 @@
+use std::alloc::Global;
 use std::fmt::Debug;
 use std::marker::PhantomData;
 use std::ops::Range;
+use std::sync::Arc;
 
 use feanor_serde::newtype_struct::*;
 use serde::de::{DeserializeSeed, Error};
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
+use tracing::instrument;
 
+use crate::algorithms::convolution::delegate::DelegateConvolution;
 use crate::algorithms::convolution::extlen::LengthExtendedConvolution;
 use crate::algorithms::convolution::ntt::NTTConvolution;
 use crate::algorithms::convolution::*;
@@ -13,7 +17,7 @@ use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing, UnwrapHom};
+use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::iters::multi_cartesian_product;
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::MonogeneticExtensionStore;
@@ -116,6 +120,42 @@ impl Zn64BBase {
         }
     }
 
+    /// Creates an [`NTTConvolution`] over this ring, assuming it has sufficiently large roots of
+    /// unity.
+    ///
+    /// Panics if the ring is not a field. In such a case, finding roots of unity requires factoring
+    /// the modulus, which can be expensive.
+    #[stability::unstable(feature = "enable")]
+    #[instrument(skip_all, level = "trace")]
+    pub fn create_default_convolution_ntt_based(
+        &self,
+        len_range: Option<Range<usize>>,
+    ) -> Option<LengthExtendedConvolution<NTTConvolution<Zn64BBase, Zn64BFastmulBase, CanHom<Zn64BFastmul, Zn64B>>>>
+    {
+        const USE_NTT_CONVOLUTION_LOG2_THRESHOLD: usize = 8;
+        if len_range.is_some() && len_range.unwrap().end < (1 << USE_NTT_CONVOLUTION_LOG2_THRESHOLD) {
+            return None;
+        }
+        let log2_l = ZZi64.abs_lowest_set_bit(&(self.modulus() - 1)).unwrap();
+        if log2_l < USE_NTT_CONVOLUTION_LOG2_THRESHOLD {
+            return None;
+        }
+        let self_fastmul = Zn64BFastmul::new(RingValue::from(*self)).unwrap();
+        let self_as_field = RingValue::from(*self).as_field().unwrap();
+        let root_of_unit = RingValue::from(*self).can_iso(&self_fastmul).unwrap().map(
+            self_as_field
+                .get_ring()
+                .unwrap_element(get_prim_root_of_unity_pow2(self_as_field, log2_l).unwrap()),
+        );
+        let ntt_conv = NTTConvolution::new_with_hom(
+            RingValue::from(*self).into_can_hom(self_fastmul).unwrap(),
+            root_of_unit,
+            log2_l,
+            Global,
+        );
+        return Some(LengthExtendedConvolution::new(ntt_conv, 1 << log2_l));
+    }
+
     fn modulus_u64(&self) -> u64 { self.modulus as u64 }
 
     /// Positive integers bounded by `self.repr_bound()` (inclusive) are considered
@@ -144,7 +184,6 @@ impl Zn64BBase {
     /// As opposed to the faster [`ZnBase::bounded_reduce()`], this should work for all inputs in
     /// `u128` (assuming configured with the right value of `FACTOR`). Currently only used by
     /// the specialization of [`ComputeInnerProduct::inner_product()`].
-    #[inline(never)]
     fn bounded_reduce_larger<const FACTOR: usize>(&self, value: u128) -> u64 {
         assert!(FACTOR == 32);
         debug_assert!(value <= FACTOR as u128 * self.repr_bound() as u128 * self.repr_bound() as u128);
@@ -754,6 +793,22 @@ impl DefaultConvolutionRing for Zn64BBase {
         S: RingStore<Ring = Self> + 'conv,
     {
         generic_impls::create_default_convolution(self_, len_range, 1)
+    }
+}
+
+impl DefaultConvolutionRing for AsFieldBase<Zn64B> {
+    default fn create_default_convolution<'conv, S>(
+        self_: S,
+        len_range: Option<Range<usize>>,
+    ) -> DynConvolution<'conv, Self>
+    where
+        S: RingStore<Ring = Self> + 'conv,
+    {
+        if let Some(ntt_conv) = self_.get_ring().get_delegate().create_default_convolution_ntt_based(len_range.clone()) {
+            Arc::new(TypeErasedConvolution::new(DelegateConvolution::new(ntt_conv, Global)))
+        } else {
+            generic_impls::create_default_convolution(self_, len_range, 1)
+        }
     }
 }
 
