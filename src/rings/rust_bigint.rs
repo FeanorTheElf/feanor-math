@@ -412,7 +412,9 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
                 .parse(string.as_str(), 10)
                 .map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
-            let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
+            let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| if data.len() == 0 {
+                Vec::new_in(self.allocator.clone())
+            } else {
                 let mut result_data =
                     Vec::with_capacity_in((data.len() - 1) / size_of::<u64>() + 1, self.allocator.clone());
                 let (chunks, last) = data.as_chunks();
@@ -634,6 +636,7 @@ fn edge_case_elements() -> impl Iterator<Item = RustBigint> {
         .cloned()
         .map(|s| RustBigintRing::RING.get_ring().parse(s, 10))
         .map(Result::unwrap)
+        .chain([RustBigint(false, vec![])])
 }
 
 #[test]
