@@ -902,7 +902,6 @@ impl HashableElRing for Zn64BBase {
 /// roots of unity.
 /// ```rust
 /// # #![feature(const_type_name)]
-
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::*;
@@ -910,7 +909,7 @@ impl HashableElRing for Zn64BBase {
 /// let ring = Zn64B::new(1073872897);
 /// let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
-/// let fft = CooleyTuckeyFFT::for_zn_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
+/// let fft = CooleyTuckeyFFT::for_fp_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
 /// // Note that data uses `ZnBase`
 /// let mut data = (0..(1 << 15))
 ///     .map(|i| ring.int_hom().map(i))
