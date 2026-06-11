@@ -566,7 +566,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             QQ.identity(),
             &QQ.div(&ZZ_to_QQ.map(9), &ZZ_to_QQ.map(10)),
             false,
-            &mut ()
+            &mut (),
         );
 
         let mut result_QQ = rhs;

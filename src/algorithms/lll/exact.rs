@@ -226,7 +226,12 @@ where
             j,
             &matrix,
         );
-        self.transform.transform(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset, &matrix);
+        self.transform.transform(
+            self.to_QQ.domain(),
+            i + self.pass_on_offset,
+            j + self.pass_on_offset,
+            &matrix,
+        );
     }
 
     fn subtract<S: Copy + RingStore<Type = RationalFieldBase<I>>>(
@@ -255,22 +260,28 @@ where
             dst,
             &factor,
         );
-        self.transform.subtract(self.to_QQ.domain(), src + self.pass_on_offset, dst + self.pass_on_offset, &factor);
+        self.transform.subtract(
+            self.to_QQ.domain(),
+            src + self.pass_on_offset,
+            dst + self.pass_on_offset,
+            &factor,
+        );
     }
 
     fn swap<S: Copy + RingStore<Type = RationalFieldBase<I>>>(&mut self, ring: S, i: usize, j: usize) {
         assert!(ring.get_ring() == self.to_QQ.codomain().get_ring());
         TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
         TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
-        self.transform.swap(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset);
+        self.transform
+            .swap(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset);
     }
 }
 
 /// Computes a `delta`-LLL-reduced form of the given positive semidefinite
 /// quadratic form.
-/// 
+///
 /// The given quadratic form must be positive semidefinite.
-/// 
+///
 /// More concretely, this function transforms the quadratic form into another quadratic
 /// form `Q` by unimodular operations that are simultaneously applied to rows and columns,
 /// such that
@@ -346,8 +357,7 @@ pub fn lll_quadratic_form<S, I, H, V, T>(
             }
             match ldl(QQ, gram_matrix.reborrow()) {
                 Ok(()) => gram_matrix,
-                Err(valid_cols) => gram_matrix
-                    .submatrix(0..(valid_cols + 1), 0..(valid_cols + 1)),
+                Err(valid_cols) => gram_matrix.submatrix(0..(valid_cols + 1), 0..(valid_cols + 1)),
             }
         };
 
@@ -448,6 +458,7 @@ pub fn lll<S, I, H, V, T>(
 
 #[cfg(test)]
 use test::Bencher;
+
 #[cfg(test)]
 use crate::algorithms::lll::{assert_rational_lattice_isomorphic, norm_squared};
 #[cfg(test)]

@@ -412,19 +412,21 @@ impl<A: Allocator + Clone> SerializableElementRing for RustBigintRingBase<A> {
                 .parse(string.as_str(), 10)
                 .map_err(|()| de::Error::custom(format!("cannot parse \"{}\" as number", string)));
         } else {
-            let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| if data.len() == 0 {
-                Vec::new_in(self.allocator.clone())
-            } else {
-                let mut result_data =
-                    Vec::with_capacity_in((data.len() - 1) / size_of::<u64>() + 1, self.allocator.clone());
-                let (chunks, last) = data.as_chunks();
-                for digit in chunks {
-                    result_data.push(u64::from_le_bytes(*digit));
+            let (negative, data) = deserialize_bigint_from_bytes(deserializer, |data| {
+                if data.len() == 0 {
+                    Vec::new_in(self.allocator.clone())
+                } else {
+                    let mut result_data =
+                        Vec::with_capacity_in((data.len() - 1) / size_of::<u64>() + 1, self.allocator.clone());
+                    let (chunks, last) = data.as_chunks();
+                    for digit in chunks {
+                        result_data.push(u64::from_le_bytes(*digit));
+                    }
+                    result_data.push(u64::from_le_bytes(std::array::from_fn(|i| {
+                        if i >= last.len() { 0 } else { last[i] }
+                    })));
+                    return result_data;
                 }
-                result_data.push(u64::from_le_bytes(std::array::from_fn(|i| {
-                    if i >= last.len() { 0 } else { last[i] }
-                })));
-                return result_data;
             })?;
             return Ok(RustBigint(negative, data));
         }
