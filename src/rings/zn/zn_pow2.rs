@@ -135,7 +135,9 @@ where
                 x
             }
         });
-        Z2kEl(SmallVec::from_iter(data))
+        let mut data = SmallVec::from_iter(data);
+        data.resize(self.n_limbs, 0);
+        Z2kEl(data)
     }
 }
 
@@ -623,5 +625,25 @@ mod tests {
             let R: Z2k = Z2k::new(k);
             crate::rings::finite::generic_tests::test_finite_ring_axioms(&R);
         }
+    }
+
+    #[test]
+    fn test_abs_from_base_u64_repr_roundtrip() {
+        let r: Z2k = Z2k::new(130);
+        let rb = r.get_ring();
+        let x = rb.from_base_u64_repr([1u64, 2, 0xFFFF_FFFF_FFFF_FFFDu64].into_iter());
+        let y = rb.from_base_u64_repr(rb.abs_base_u64_repr(&x));
+        assert_el_eq!(r, x, y);
+    }
+
+    #[test]
+    fn test_from_base_u64_repr_iterator_shorter_than_limbs() {
+        let r: Z2k = Z2k::new(130);
+        let rb = r.get_ring();
+        assert_eq!(rb.n_limbs, 3);
+
+        let padded = rb.from_base_u64_repr([0xDEAD_BEEF_CAFEu64].into_iter());
+        let full = rb.from_base_u64_repr([0xDEAD_BEEF_CAFEu64, 0, 0].into_iter());
+        assert_el_eq!(r, padded, full);
     }
 }
