@@ -1,4 +1,3 @@
-use crate::algorithms;
 use crate::algorithms::miller_rabin::is_prime_base;
 use crate::homomorphism::*;
 use crate::prelude::*;
@@ -611,7 +610,7 @@ where
 pub mod generic_tests {
 
     use super::*;
-    use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
+    use crate::{algorithms::miller_rabin::is_prime, ring_impls::primitive_int::{StaticRing, StaticRingBase}};
 
     pub fn test_zn_axioms<R: RingStore>(R: R)
     where
@@ -622,7 +621,7 @@ pub mod generic_tests {
         let n = R.modulus();
 
         assert!(R.is_zero(&R.coerce(ZZ, n.clone())));
-        assert!(R.is_field() == algorithms::miller_rabin::is_prime(ZZ, n, 10));
+        assert!(R.is_field() == is_prime(ZZ, n, 10));
 
         if ZZ.is_lt(n, &ZZ.power_of_two(7)) {
             let mut k = ZZ.one();

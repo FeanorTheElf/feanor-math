@@ -17,7 +17,9 @@ use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
 use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
+use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
+use crate::function::no_error;
 use crate::iters::multi_cartesian_product;
 use crate::ring::{EnvBindingStrength, HashableElRing};
 use crate::ring_impls::extension::MonogeneticExtensionStore;
@@ -360,17 +362,17 @@ impl RingBase for Zn64BBase {
         R::Ring: IntegerRing,
     {
         assert!(!integers.is_neg(power));
-        algorithms::sqr_mul::generic_abs_square_and_multiply(
+        try_generic_abs_square_and_multiply_uninstrumented(
             x,
             power,
             &integers,
             |mut a| {
                 self.square(&mut a);
-                a
+                Ok(a)
             },
-            |a, b| self.mul_ref_fst(a, b),
+            |a, b| Ok(self.mul_ref_fst(a, b)),
             self.one(),
-        )
+        ).unwrap_or_else(no_error)
     }
 
     fn is_approximate(&self) -> bool { false }

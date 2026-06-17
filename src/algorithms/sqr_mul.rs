@@ -62,6 +62,26 @@ pub fn try_generic_abs_square_and_multiply<T, U, F, H, I, E>(
     base: U,
     power: &El<I>,
     int_ring: I,
+    square: F,
+    multiply_base: H,
+    identity: T,
+) -> Result<T, E>
+where
+    I: RingStore,
+    I::Ring: IntegerRing,
+    F: FnMut(T) -> Result<T, E>,
+    H: FnMut(&U, T) -> Result<T, E>,
+{
+    try_generic_abs_square_and_multiply_uninstrumented(base, power, int_ring, square, multiply_base, identity)
+}
+
+/// Like [`try_generic_abs_square_and_multiply()`], but uninstrumented. Use to implement
+/// [`RingBase::pow_gen()`] when ring arithmetic is really cheap.
+#[stability::unstable(feature = "enable")]
+pub fn try_generic_abs_square_and_multiply_uninstrumented<T, U, F, H, I, E>(
+    base: U,
+    power: &El<I>,
+    int_ring: I,
     mut square: F,
     mut multiply_base: H,
     identity: T,

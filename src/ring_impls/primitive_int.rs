@@ -10,7 +10,8 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use crate::algorithms::convolution::{DefaultConvolutionRing, DynConvolution};
 use crate::algorithms::euclid::{general_euclid, general_extended_euclid};
 use crate::algorithms::matmul::StrassenHint;
-use crate::algorithms::sqr_mul::generic_abs_square_and_multiply;
+use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
+use crate::function::no_error;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
@@ -419,17 +420,17 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
         R::Ring: IntegerRing,
     {
         assert!(!integers.is_neg(power));
-        generic_abs_square_and_multiply(
+        try_generic_abs_square_and_multiply_uninstrumented(
             x,
             power,
             &integers,
             |mut a| {
                 self.square(&mut a);
-                a
+                Ok(a)
             },
-            |a, b| self.mul_ref_fst(a, b),
+            |a, b| Ok(self.mul_ref_fst(a, b)),
             self.one(),
-        )
+        ).unwrap_or_else(no_error)
     }
 
     fn is_approximate(&self) -> bool { false }

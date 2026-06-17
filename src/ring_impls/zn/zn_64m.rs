@@ -10,6 +10,8 @@ use super::{zn_big, *};
 use crate::algorithms::convolution::*;
 use crate::algorithms::euclid::const_extended_euclid;
 use crate::algorithms::matmul::StrassenHint;
+use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
+use crate::function::no_error;
 use crate::iters::multi_cartesian_product;
 use crate::ring_impls::extension::MonogeneticExtensionStore;
 use crate::ring_impls::extension::galois_field::*;
@@ -187,6 +189,24 @@ impl RingBase for Zn64MBase {
         write!(out, "{}", self.smallest_positive_lift(*value))
     }
 
+    fn pow_gen<R: RingStore>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
+    where
+        R::Ring: IntegerRing,
+    {
+        assert!(!integers.is_neg(power));
+        try_generic_abs_square_and_multiply_uninstrumented(
+            x,
+            power,
+            &integers,
+            |mut a| {
+                self.square(&mut a);
+                Ok(a)
+            },
+            |a, b| Ok(self.mul_ref_fst(a, b)),
+            self.one(),
+        ).unwrap_or_else(no_error)
+    }
+    
     fn characteristic<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
     where
         I::Ring: IntegerRing,
