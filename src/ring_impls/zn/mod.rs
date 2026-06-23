@@ -610,7 +610,8 @@ where
 pub mod generic_tests {
 
     use super::*;
-    use crate::{algorithms::miller_rabin::is_prime, ring_impls::primitive_int::{StaticRing, StaticRingBase}};
+    use crate::algorithms::miller_rabin::is_prime;
+    use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
 
     pub fn test_zn_axioms<R: RingStore>(R: R)
     where

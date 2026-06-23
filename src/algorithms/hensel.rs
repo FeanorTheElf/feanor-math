@@ -297,6 +297,15 @@ where
             .unwrap()])
     }
 
+    /// Returns the Bezout coefficients that are used internally. Concretely, i-th element of the
+    /// iterator is a pair `(s, t)` such that `factors[i] * s + factors[i + 1] * ... * factors[n -
+    /// 1] * t = 1` modulo the full polynomial.
+    pub fn bezout_coefficients<'a>(&'a self) -> impl Iterator<Item = (&'a El<P_current>, &'a El<P_current>)> {
+        self.current_factor_bezout
+            .iter()
+            .zip(self.current_partial_prods_bezout.iter())
+    }
+
     pub fn current_e(&self) -> usize { self.current_e }
 }
 

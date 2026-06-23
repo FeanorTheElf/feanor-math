@@ -465,11 +465,11 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_static::*;
+use crate::algorithms::cyclotomic::get_prim_root_of_unity_zn;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_64b::*;
 #[cfg(test)]
-use crate::algorithms::cyclotomic::get_prim_root_of_unity_zn;
+use crate::ring_impls::zn::zn_static::*;
 
 #[test]
 fn test_fft_base() {

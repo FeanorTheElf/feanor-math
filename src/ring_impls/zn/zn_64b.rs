@@ -372,7 +372,8 @@ impl RingBase for Zn64BBase {
             },
             |a, b| Ok(self.mul_ref_fst(a, b)),
             self.one(),
-        ).unwrap_or_else(no_error)
+        )
+        .unwrap_or_else(no_error)
     }
 
     fn is_approximate(&self) -> bool { false }
@@ -806,7 +807,11 @@ impl DefaultConvolutionRing for AsFieldBase<Zn64B> {
     where
         S: RingStore<Ring = Self> + 'conv,
     {
-        if let Some(ntt_conv) = self_.get_ring().get_delegate().create_default_convolution_ntt_based(len_range.clone()) {
+        if let Some(ntt_conv) = self_
+            .get_ring()
+            .get_delegate()
+            .create_default_convolution_ntt_based(len_range.clone())
+        {
             Arc::new(TypeErasedConvolution::new(DelegateConvolution::new(ntt_conv, Global)))
         } else {
             generic_impls::create_default_convolution(self_, len_range, 1)

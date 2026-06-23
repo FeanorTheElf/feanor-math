@@ -430,7 +430,8 @@ impl<T: PrimitiveInt> RingBase for StaticRingBase<T> {
             },
             |a, b| Ok(self.mul_ref_fst(a, b)),
             self.one(),
-        ).unwrap_or_else(no_error)
+        )
+        .unwrap_or_else(no_error)
     }
 
     fn is_approximate(&self) -> bool { false }

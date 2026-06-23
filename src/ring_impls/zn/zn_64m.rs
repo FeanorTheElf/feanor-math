@@ -204,9 +204,10 @@ impl RingBase for Zn64MBase {
             },
             |a, b| Ok(self.mul_ref_fst(a, b)),
             self.one(),
-        ).unwrap_or_else(no_error)
+        )
+        .unwrap_or_else(no_error)
     }
-    
+
     fn characteristic<I: RingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
     where
         I::Ring: IntegerRing,
