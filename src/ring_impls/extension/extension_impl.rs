@@ -1109,10 +1109,7 @@ use crate::ring_impls::zn::zn_64b::Zn64B;
 use crate::ring_impls::zn::zn_static;
 
 #[cfg(test)]
-fn test_ring0_and_elements() -> (
-    MonogenicExtensionSparse<Zn64B>,
-    Vec<MonogenicExtensionImplEl<Zn64B>>,
-) {
+fn test_ring0_and_elements() -> (MonogenicExtensionSparse<Zn64B>, Vec<MonogenicExtensionImplEl<Zn64B>>) {
     let R = MonogenicExtensionSparse::new(Zn64B::new(7), vec![Zn64B::new(7).neg_one()]);
     let elements = (0..7).map(|x| R.int_hom().map(x)).collect();
     return (R, elements);

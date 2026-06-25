@@ -148,11 +148,7 @@ where
 
 #[stability::unstable(feature = "enable")]
 pub type DefaultNumberFieldImpl = AsField<
-    MonogenicExtensionSparse<
-        RationalField<BigIntRing>,
-        DynConvolution<'static, RationalFieldBase<BigIntRing>>,
-        Global,
-    >,
+    MonogenicExtensionSparse<RationalField<BigIntRing>, DynConvolution<'static, RationalFieldBase<BigIntRing>>, Global>,
 >;
 
 #[stability::unstable(feature = "enable")]

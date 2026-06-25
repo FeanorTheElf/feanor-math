@@ -109,11 +109,10 @@ fn test_specialize_finite_field() {
     )));
 
     let base_ring = GaloisField::new(3, 2).into().unwrap_self();
-    let ring =
-        MonogenicExtensionSparse::new(&base_ring, vec![base_ring.neg_one(), base_ring.one(), base_ring.zero()])
-            .as_field()
-            .ok()
-            .unwrap();
+    let ring = MonogenicExtensionSparse::new(&base_ring, vec![base_ring.neg_one(), base_ring.one(), base_ring.zero()])
+        .as_field()
+        .ok()
+        .unwrap();
     assert!(<AsFieldBase<MonogenicExtensionSparse<_, _, _>>>::specialize(Verify(
         ring.get_ring(),
         729

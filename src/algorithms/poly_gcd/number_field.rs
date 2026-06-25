@@ -245,11 +245,8 @@ impl ResidueFieldsAtPrime {
                     let modulus = (0..degree)
                         .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
                         .collect::<Vec<_>>();
-                    let Fq = GaloisField::create(
-                        MonogenicExtensionBarrett::new(Fp.clone(), modulus)
-                            .as_field()
-                            .unwrap(),
-                    );
+                    let Fq =
+                        GaloisField::create(MonogenicExtensionBarrett::new(Fp.clone(), modulus).as_field().unwrap());
                     let FqX = DensePolyRing::new(Fq, "X");
                     return FqX;
                 })

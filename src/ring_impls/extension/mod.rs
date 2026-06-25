@@ -221,10 +221,7 @@ where
     delegate! { MonogenicExtension, fn mul_assign_gen_power(&self, el: &mut El<Self>, power: usize) -> () }
 
     /// See [`MonogenicExtension::wrt_power_basis()`].
-    fn wrt_power_basis<'a>(
-        &'a self,
-        el: &'a El<Self>,
-    ) -> <Self::Ring as MonogenicExtension>::VectorRepresentation<'a> {
+    fn wrt_power_basis<'a>(&'a self, el: &'a El<Self>) -> <Self::Ring as MonogenicExtension>::VectorRepresentation<'a> {
         self.get_ring().wrt_power_basis(el)
     }
 

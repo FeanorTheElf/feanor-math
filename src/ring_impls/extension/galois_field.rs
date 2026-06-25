@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::array::from_fn;
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
 
@@ -11,10 +12,10 @@ use zn_64b::Zn64B;
 
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::convolution::*;
-use crate::algorithms::cyclotomic::get_prim_root_of_unity;
+use crate::algorithms::cyclotomic::{get_prim_root_of_unity, get_prim_root_of_unity_pow2};
 use crate::algorithms::int_factor::*;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
-use crate::algorithms::poly_factor::cantor_zassenhaus;
+use crate::algorithms::poly_factor::cantor_zassenhaus::squarefree_is_irreducible_base;
 use crate::algorithms::poly_gcd::finite::poly_squarefree_part_finite_field;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::prelude::*;
@@ -857,11 +858,13 @@ where
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
+    poly_ring.println(&f);
     let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
+    poly_ring.println(&squarefree_part);
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }
-    if !cantor_zassenhaus::squarefree_is_irreducible_base(&poly_ring, &mod_f_ring) {
+    if !squarefree_is_irreducible_base(&poly_ring, &mod_f_ring) {
         return None;
     }
     return Some(mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity()));
@@ -882,6 +885,15 @@ where
     C: Copy + ConvolutionAlgorithm<<BaseRingStore<P> as RingStore>::Ring>,
 {
     let Fp = *poly_ring.base_ring();
+    // if p is very small, in particular p = 2, this avoids testing lots of polynomials that
+    // are clearly reducible
+    let rand_nonzero_el = |rng: &mut oorandom::Rand64| {
+        let mut result = Fp.random_element(|| rng.rand_u64());
+        while Fp.is_zero(&result) {
+            result = Fp.random_element(|| rng.rand_u64());
+        }
+        return result;
+    };
     let create_mod_f_ring = |f: &El<P>| {
         let modulus_vec = (0..degree)
             .map(|i| Fp.negate(poly_ring.coefficient_at(f, i).clone()))
@@ -893,114 +905,135 @@ where
             convolution,
         ));
     };
+    let deg_i64 = i64::try_from(degree).unwrap();
 
-    if degree > 3 {
-        // first try trinomials, they seem to have a good chance of being irreducible
-        for _ in 0..16 {
-            let i = (ZZi64.get_uniformly_random(&(TryInto::<i64>::try_into(degree).unwrap() - 1), || rng.rand_u64())
-                + 1) as usize;
-            let a = Fp.random_element(|| rng.rand_u64());
-            let b = Fp.random_element(|| rng.rand_u64());
-            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)].into_iter());
+    if degree == 1 {
+        return poly_ring.indeterminate();
+    } else if degree == 2 {
+        if Fp
+            .integer_ring()
+            .eq_el(Fp.modulus(), &Fp.integer_ring().int_hom().map(2))
+        {
+            return poly_ring.from_terms([(Fp.one(), 0), (Fp.one(), 1), (Fp.one(), 2)]);
+        } else {
+            let val2_order = Fp
+                .integer_ring()
+                .abs_highest_set_bit(&Fp.integer_ring().sub_ref_fst(Fp.modulus(), Fp.integer_ring().one()))
+                .unwrap();
+            let quadratic_non_residue = get_prim_root_of_unity_pow2(Fp, val2_order).unwrap();
+            return poly_ring.from_terms([(Fp.negate(quadratic_non_residue), 0), (Fp.one(), 2)]);
+        }
+    }
+
+    // first try trinomials, they seem to have a good chance of being irreducible;
+    // Swan's theorem: this won't work if d = 0 mod 8
+    if degree % 8 != 0 {
+        // the probability that a randomly chosen polynomial is irreducible is about 1/d
+        for _ in 0..(2 * degree) {
+            let i = (ZZi64.get_uniformly_random(&(deg_i64 - 1), || rng.rand_u64()) + 1) as usize;
+            let [a, b] = from_fn(|_| rand_nonzero_el(rng));
+            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)]);
             if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
                 return result;
             }
         }
+    }
 
-        // next, check for cases where we can take `small_poly(X^high_power)`; these cases are characterized
-        // by the fact that we have `degree = small_d * padding_d * large_d` with `large_d |
-        // #F_(q^small_d)*`
-        let p = Fp.size(&ZZbig).unwrap();
-        let mut small_d = 1;
-        let mut large_d = {
-            let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), small_d as usize), ZZbig.one());
-            int_cast(
-                ZZbig.ideal_gen(
-                    &Fq_star_order,
-                    &int_cast(TryInto::<i64>::try_into(degree).unwrap() / small_d, ZZbig, ZZi64),
-                ),
+    // next, check for cases where we can take `small_poly(X^high_power)`; these cases are characterized
+    // by the fact that we have `degree = small_d * padding_d * large_d` with `large_d |
+    // #F_(q^small_d)*`
+    let p = Fp.size(&ZZbig).unwrap();
+    let mut small_d = 1;
+    let mut large_d = {
+        let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), small_d as usize), ZZbig.one());
+        int_cast(
+            ZZbig.ideal_gen(&Fq_star_order, &int_cast(deg_i64 / small_d, ZZbig, ZZi64)),
+            ZZi64,
+            ZZbig,
+        )
+    };
+    let mut increased_small_d = true;
+    while increased_small_d {
+        increased_small_d = false;
+        // use a greedy approach, just add a factor to small_d if it makes large_d larger
+        for (k, _) in factor(&ZZi64, deg_i64 / small_d) {
+            let new_small_d = small_d * k;
+            let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), new_small_d as usize), ZZbig.one());
+            let new_large_d = int_cast(
+                ZZbig.ideal_gen(&Fq_star_order, &int_cast(deg_i64 / new_small_d, ZZbig, ZZi64)),
                 ZZi64,
                 ZZbig,
-            )
-        };
-        let mut increased_small_d = true;
-        while increased_small_d {
-            increased_small_d = false;
-            // use a greedy approach, just add a factor to small_d if it makes large_d larger
-            for (k, _) in factor(&ZZi64, TryInto::<i64>::try_into(degree).unwrap() / small_d) {
-                let new_small_d = small_d * k;
-                let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), new_small_d as usize), ZZbig.one());
-                let new_large_d = int_cast(
-                    ZZbig.ideal_gen(
-                        &Fq_star_order,
-                        &int_cast(TryInto::<i64>::try_into(degree).unwrap() / new_small_d, ZZbig, ZZi64),
-                    ),
-                    ZZi64,
-                    ZZbig,
-                );
-                if new_large_d > large_d {
-                    small_d = new_small_d;
-                    large_d = new_large_d;
-                    increased_small_d = true;
-                    break;
-                }
+            );
+            if new_large_d > large_d {
+                small_d = new_small_d;
+                large_d = new_large_d;
+                increased_small_d = true;
+                break;
             }
         }
-
-        let base_degree = TryInto::<i64>::try_into(degree).unwrap() / large_d;
-        if large_d != 1 {
-            let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), base_degree as usize), ZZbig.one());
-            // careful here to not get an infinite generic argument recursion
-            let Fq = RingValue::from(GaloisFieldBase::new_internal(
-                Fp,
-                base_degree as usize,
-                Global,
-                convolution,
-            ));
-            // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d
-            // | #Fq*`; hence we can use `MinPoly(primitive_element)(X^large_d)`
-            let primitive_element = get_prim_root_of_unity(&Fq, &Fq_star_order).unwrap();
-            // I thought for a while that it would be enough to have a primitive `gcd(Fq_star_order,
-            // large_d^inf)`-th root of unity, however it is not guaranteed that this would indeed
-            // generate the field
-            let FqX = DensePolyRing::new(&Fq, "X");
-            let minpoly = FqX.prod((0..base_degree).map(|i| {
-                FqX.from_terms(
-                    [
-                        (
-                            Fq.negate(Fq.pow_gen(primitive_element.clone(), &ZZbig.pow(p.clone(), i as usize), ZZbig)),
-                            0,
-                        ),
-                        (Fq.one(), 1),
-                    ]
-                    .into_iter(),
-                )
-            }));
-            let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
-                let c_wrt_basis = Fq.wrt_power_basis(c);
-                assert!(c_wrt_basis.iter().skip(1).all(|x| Fp.is_zero(&x)));
-                return (c_wrt_basis.at(0), i);
-            }));
-            let f = poly_ring.evaluate(
-                &minpoly_Fp,
-                &poly_ring.from_terms([(Fp.one(), large_d as usize)].into_iter()),
-                &poly_ring.inclusion(),
-            );
-            return f;
-        }
     }
 
-    // fallback, just generate a random irreducible polynomial
-    for _ in 0..PROBABILISTIC_REPETITIONS {
-        let f = poly_ring.from_terms(
-            (0..degree)
-                .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
-                .chain([(Fp.one(), degree)].into_iter()),
+    let base_degree = deg_i64 / large_d;
+    if large_d != 1 {
+        let Fq_star_order = ZZbig.sub(ZZbig.pow(p.clone(), base_degree as usize), ZZbig.one());
+        // careful here to not get an infinite generic argument recursion
+        let Fq = RingValue::from(GaloisFieldBase::new_internal(
+            Fp,
+            base_degree as usize,
+            Global,
+            convolution,
+        ));
+        // the primitive element of `Fq` clearly has no `k`-th root, for every `k | large_d` since `large_d
+        // | #Fq*`; hence we can use `MinPoly(primitive_element)(X^large_d)`
+        let primitive_element = get_prim_root_of_unity(&Fq, &Fq_star_order).unwrap();
+        // I thought for a while that it would be enough to have a primitive `gcd(Fq_star_order,
+        // large_d^inf)`-th root of unity, however it is not guaranteed that this would indeed
+        // generate the field
+        let FqX = DensePolyRing::new(&Fq, "X");
+        let constant_coeff =
+            |i| Fq.negate(Fq.pow_gen(primitive_element.clone(), &ZZbig.pow(p.clone(), i as usize), ZZbig));
+        let minpoly =
+            FqX.prod((0..base_degree).map(|i| FqX.from_terms([(constant_coeff(i), 0), (Fq.one(), 1)].into_iter())));
+        let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {
+            let c_wrt_basis = Fq.wrt_power_basis(c);
+            assert!(c_wrt_basis.iter().skip(1).all(|x| Fp.is_zero(&x)));
+            return (c_wrt_basis.at(0), i);
+        }));
+        let f = poly_ring.evaluate(
+            &minpoly_Fp,
+            &poly_ring.from_terms([(Fp.one(), large_d as usize)].into_iter()),
+            &poly_ring.inclusion(),
         );
-        if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
-            return result;
+        return f;
+    }
+
+    if degree > 5 {
+        // try pentanomials here
+        for _ in 0..(PROBABILISTIC_REPETITIONS * degree) {
+            let [i1, i2, i3] =
+                from_fn(|_| (ZZi64.get_uniformly_random(&(deg_i64 - 1), || rng.rand_u64()) + 1) as usize);
+            let [a, b, c, d] = from_fn(|_| rand_nonzero_el(rng));
+            let f = poly_ring.from_terms([(a, 0), (b, i1), (c, i2), (d, i3), (Fp.one(), degree)]);
+            println!();
+            poly_ring.println(&f);
+            if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
+                return result;
+            }
+        }
+    } else {
+        // trinomials should suffice here
+        for _ in 0..(PROBABILISTIC_REPETITIONS * degree) {
+            let i = (ZZi64.get_uniformly_random(&(deg_i64 - 1), || rng.rand_u64()) + 1) as usize;
+            let [a, b] = from_fn(|_| rand_nonzero_el(rng));
+            let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)]);
+            println!();
+            poly_ring.println(&f);
+            if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
+                return result;
+            }
         }
     }
+
     unreachable!()
 }
 
@@ -1030,10 +1063,8 @@ fn test_can_hom_from() {
         A: Allocator + Clone + Send + Sync,
         C: ConvolutionAlgorithm<R::Ring> + Clone,
     {
-        assert_impl_CanHomFrom::<
-            MonogenicExtensionImplBase<R, M, C, A>,
-            AsFieldBase<MonogenicExtensionImpl<R, M, C, A>>,
-        >();
+        assert_impl_CanHomFrom::<MonogenicExtensionImplBase<R, M, C, A>, AsFieldBase<MonogenicExtensionImpl<R, M, C, A>>>(
+        );
     }
 
     #[allow(unused)]
@@ -1119,6 +1150,21 @@ fn test_galois_field_even() {
 }
 
 #[test]
+fn test_construct_galois_field() {
+    for p in [2, 3, 5] {
+        for d in [1, 2, 3, 5, 8, 12, 13] {
+            println!("{}, {}", p, d);
+            let GF = GaloisField::new(p, d);
+            let ZpX = DensePolyRing::new(GF.base_ring(), "X");
+            assert!(FactorPolyField::is_irred(
+                &ZpX,
+                &GF.generating_poly(&ZpX, ZpX.base_ring().identity())
+            ));
+        }
+    }
+}
+
+#[test]
 fn test_galois_field_odd() {
     feanor_tracing::DelayedLogger::init_test();
     for degree in 1..=9 {
@@ -1172,7 +1218,18 @@ fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
 
 #[test]
 #[ignore]
-fn test_galois_field_huge() {
+fn test_galois_field_2_976() {
+    feanor_tracing::DelayedLogger::init_test();
+    let start = Instant::now();
+    let field = GaloisField::new(2, 976);
+    _ = std::hint::black_box(field);
+    let end = Instant::now();
+    println!("Created GF(2^976) in {} ms", (end - start).as_millis());
+}
+
+#[test]
+#[ignore]
+fn test_galois_field_17_2048() {
     feanor_tracing::DelayedLogger::init_test();
     let start = Instant::now();
     let field = GaloisField::new(17, 2048);

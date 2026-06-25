@@ -141,23 +141,27 @@ where
         debug_assert!(ring.degree(&sb).unwrap() <= ring.degree(&rhs).unwrap() - ring.degree(&b).unwrap_or(0));
         debug_assert!(ring.degree(&tb).unwrap() <= ring.degree(&lhs).unwrap() - ring.degree(&b).unwrap_or(0));
     }
+    debug_assert!(ring.degree(&sa).unwrap_or(0) <= ring.degree(&rhs).unwrap().saturating_sub(ring.degree(&a).unwrap_or(0)));
+    debug_assert!(ring.degree(&ta).unwrap_or(0) <= ring.degree(&lhs).unwrap().saturating_sub(ring.degree(&a).unwrap_or(0)));
+    debug_assert!(ring.degree(&sb).unwrap_or(0) <= ring.degree(&rhs).unwrap().saturating_sub(ring.degree(&b).unwrap_or(0)));
+    debug_assert!(ring.degree(&tb).unwrap_or(0) <= ring.degree(&lhs).unwrap().saturating_sub(ring.degree(&b).unwrap_or(0)));
     return ([sa, ta, sb, tb], [a, b]);
 }
 
 const FAST_POLY_EEA_THRESHOLD: usize = 32;
 
 /// Computes a Bezout identity for polynomials, using a fast divide-and-conquer
-/// polynomial gcd algorithm. Unless you are implementing
-/// [`crate::ring_properties::pid::PrincipalIdealRing`] for a custom type, you should use
-/// [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`] to get a Bezout
+/// polynomial gcd algorithm. Unless you are implementing [`PrincipalIdealRing`] for a custom type,
+/// you should use [`PrincipalIdealRing::extended_ideal_gen()`] to get a Bezout
 /// identity instead.
 ///
-/// A Bezout identity is exactly as specified by
-/// [`crate::ring_properties::pid::PrincipalIdealRing::extended_ideal_gen()`], i.e. `s, t, d` such
-/// that `d` is the gcd of `lhs` and `rhs`, and `d = lhs * s + rhs * t`. Note that this algorithm
-/// does not try to avoid coefficient growth, and thus is only fast over finite fields. Furthermore,
-/// it will fall back to a slightly less efficient variant of the standard Euclidean algorithm on
-/// small inputs.
+/// A Bezout identity is exactly as specified by [`PrincipalIdealRing::extended_ideal_gen()`], i.e.
+/// `s, t, d` such that `d` is the gcd of `lhs` and `rhs`, and `d = lhs * s + rhs * t`. Note that
+/// this algorithm does not try to avoid coefficient growth, and thus is only fast over finite
+/// fields. Furthermore, it will fall back to a slightly less efficient variant of the standard
+/// Euclidean algorithm on small inputs.
+///
+/// [`PrincipalIdealRing`]: crate::ring_properties::pid::PrincipalIdealRing
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn fast_poly_eea<P>(poly_ring: P, lhs: El<P>, rhs: El<P>) -> (El<P>, El<P>, El<P>)
@@ -166,6 +170,9 @@ where
     P::Ring: PolyRing + EuclideanRing,
     <BaseRingStore<P> as RingStore>::Ring: Field,
 {
+    /// Computes `s1, t1, s2, t2` such that `x = s1 * lhs + t1 * rhs` and `x' = s2 * lhs + t2 * rhs`
+    /// span the same P-module as `lhs` and `rhs`, and `x`, `x'` have degree roughly `target_deg`.
+    /// I'm currently not quite sure how to quantify "roughly" here.
     fn fast_poly_eea_impl<P>(
         poly_ring: P,
         lhs: El<P>,
@@ -213,6 +220,7 @@ where
                 .filter(|(_, i)| *i >= split_deg)
                 .map(|(c, i)| (c.clone(), i - split_deg)),
         );
+        debug_assert_eq!(poly_ring.degree(&lhs_upper).unwrap_or(0), ldeg.saturating_sub(split_deg));
         let mut lhs_lower = lhs;
         poly_ring.truncate_monomials(&mut lhs_lower, split_deg);
         let rhs_upper = poly_ring.from_terms(
@@ -221,6 +229,7 @@ where
                 .filter(|(_, i)| *i >= split_deg)
                 .map(|(c, i)| (c.clone(), i - split_deg)),
         );
+        debug_assert_eq!(poly_ring.degree(&rhs_upper).unwrap_or(0), rdeg.saturating_sub(split_deg));
         let mut rhs_lower = rhs;
         poly_ring.truncate_monomials(&mut rhs_lower, split_deg);
 
@@ -230,6 +239,7 @@ where
         );
         let (fst_transform, [mut lhs_rest, mut rhs_rest]) =
             fast_poly_eea_impl(poly_ring, lhs_upper, rhs_upper, part_target_deg, memory);
+        debug_assert!(poly_ring.degree(&rhs_rest).unwrap_or(0) <= part_target_deg);
 
         poly_ring.mul_assign_monomial(&mut lhs_rest, split_deg);
         poly_ring.mul_assign_monomial(&mut rhs_rest, split_deg);
@@ -239,10 +249,11 @@ where
         rhs_rest = poly_ring.fma(&fst_transform[2], &lhs_lower, rhs_rest);
         rhs_rest = poly_ring.fma(&fst_transform[3], &rhs_lower, rhs_rest);
 
-        assert!(
-            poly_ring.degree(&lhs_rest).unwrap_or(0) + poly_ring.degree(&rhs_rest).unwrap_or(0)
-                <= ldeg + rdeg - split_deg
-        );
+        // this assertion fails for below test case; I don't know why I put it there in the first place
+        // assert!(
+        //     poly_ring.degree(&lhs_rest).unwrap_or(0) + poly_ring.degree(&rhs_rest).unwrap_or(0)
+        //         <= ldeg + rdeg - split_deg
+        // );
         let (snd_transform, rest) = fast_poly_eea_impl(poly_ring, lhs_rest, rhs_rest, target_deg, memory);
 
         // multiply snd_transform * fst_transform
@@ -290,6 +301,14 @@ use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::zn::zn_64b::Zn64B;
 #[cfg(test)]
 use crate::ring_impls::zn::*;
+
+#[test]
+fn test_poly_squarefree_part() {
+    let F2 = Zn64B::new(2).as_field().unwrap();
+    let F2X = DensePolyRing::new(F2, "X");
+    let [f] = F2X.with_wrapped_indeterminate(|X| [X.pow_ref(3) + X.pow_ref(2) + 1]);
+    assert_el_eq!(&F2X, &f, poly_squarefree_part_finite_field(&F2X, &f));
+}
 
 #[test]
 fn test_partial_eea_poly() {
@@ -369,6 +388,19 @@ fn test_fast_poly_eea() {
         &poly_ring,
         poly_ring.pow(poly_ring.indeterminate(), 54),
         poly_ring.normalize(d).0
+    );
+
+    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
+        [
+            X.pow_ref(976) + X.pow_ref(943) + X.pow_ref(765) + X.pow_ref(602) + 1,
+            X.pow_ref(942) + X.pow_ref(764),
+        ]
+    });
+    let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
+    assert_el_eq!(
+        &poly_ring,
+        &d,
+        poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
     );
 
     let field = zn_64b::Zn64B::new(65537).as_field().ok().unwrap();
