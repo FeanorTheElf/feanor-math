@@ -8,7 +8,7 @@ use crate::algorithms::hensel::{HenselLift, create_power_p_poly_ring};
 use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::power_decomposition_lift::*;
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_root::poly_root;
+use crate::algorithms::poly_root::poly_root_monic;
 use crate::algorithms::primelist::prime_fields_for_local_computation;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
@@ -262,7 +262,7 @@ where
             return lifted_factorization
                 .into_iter()
                 .zip(exponents.iter())
-                .map(|(f, i)| poly_root(ZZX, &f, *i).map(|f| (f, *i)).ok_or(LiftUnsuccessful))
+                .map(|(f, i)| poly_root_monic(ZZX, &f, *i).map(|f| (f, *i)).ok_or(LiftUnsuccessful))
                 .collect();
         } else {
             return Err(LiftUnsuccessful);

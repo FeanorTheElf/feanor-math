@@ -10,7 +10,7 @@ use crate::algorithms::poly_factor::FactorPolyField;
 use crate::algorithms::poly_gcd::gcd_lift::*;
 use crate::algorithms::poly_gcd::power_decomposition_lift::*;
 use crate::algorithms::poly_gcd::*;
-use crate::algorithms::poly_root::poly_root;
+use crate::algorithms::poly_root::poly_root_monic;
 use crate::algorithms::primelist::*;
 use crate::algorithms::rational_reconstruction::balanced_rational_reconstruction;
 use crate::homomorphism::{CanHomFrom, LambdaHom};
@@ -697,7 +697,7 @@ impl PolyPowerDecompositionLift {
             return reconstructed_factorization
                 .into_iter()
                 .zip(self.exponents.iter())
-                .map(|(f, i)| poly_root(KX, &f, *i).map(|f| (f, *i)).ok_or(LiftUnsuccessful))
+                .map(|(f, i)| poly_root_monic(KX, &f, *i).map(|f| (f, *i)).ok_or(LiftUnsuccessful))
                 .collect();
         } else {
             return Err(LiftUnsuccessful);
