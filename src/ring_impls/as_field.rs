@@ -466,7 +466,7 @@ where
 /// This has to be a macro, as a blanket implementation would unfortunately cause conflicting impls.
 /// Usually, whenever a ring naturally might be a ring (e.g. like
 /// [`crate::ring_impls::zn::zn_64b::Zn64B`]
-/// or [`crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse`], which even
+/// or [`crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse`], which even
 /// provide a function like [`crate::ring_impls::zn::ZnRingStore::as_field()`]), you might use this
 /// macro to implement [`CanHomFrom`] that simplify conversion from and to the field wrapper.
 ///

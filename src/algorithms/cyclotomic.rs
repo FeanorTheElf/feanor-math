@@ -361,9 +361,9 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::MonogeneticExtensionStore;
+use crate::ring_impls::extension::MonogenicExtensionStore;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
+use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
@@ -460,7 +460,7 @@ fn test_is_prim_root_of_unity_pow2() {
     assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 1));
     assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 2));
 
-    let F = MonogeneticExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
         .as_field()
         .unwrap();
     let FEl = |x: [u64; 2]| F.from_power_basis(x);
@@ -494,7 +494,7 @@ fn test_is_prim_root_of_unity() {
         is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(18))
     );
 
-    let F = MonogeneticExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
         .as_field()
         .unwrap();
     let FEl = |x: [u64; 2]| F.from_power_basis(x);
@@ -518,7 +518,7 @@ fn test_is_prim_root_of_unity_general() {
     assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 3));
     assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 18));
 
-    let F = MonogeneticExtensionSparse::new(Fp::<5>::RING, vec![3, 1]);
+    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1]);
     let FEl = |x: [u64; 2]| F.from_power_basis(x);
     assert_eq!(true, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 6));
     assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 9));
@@ -560,7 +560,7 @@ fn test_get_prim_root_of_unity() {
     ));
     assert!(get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(4)).is_none());
 
-    let F = MonogeneticExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
         .as_field()
         .unwrap();
     assert!(is_prim_root_of_unity(
@@ -656,7 +656,7 @@ fn test_get_prim_root_of_unity_pow2() {
 
     assert!(get_prim_root_of_unity_pow2(Fp::<19>::RING, 2).is_none());
 
-    let F = MonogeneticExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
         .as_field()
         .unwrap();
     assert!(is_prim_root_of_unity(

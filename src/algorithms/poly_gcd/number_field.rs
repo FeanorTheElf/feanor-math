@@ -17,7 +17,7 @@ use crate::homomorphism::{CanHomFrom, LambdaHom};
 use crate::ring_impls::as_field::*;
 use crate::ring_impls::extension::extension_impl::*;
 use crate::ring_impls::extension::galois_field::*;
-use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
+use crate::ring_impls::extension::{MonogenicExtension, MonogenicExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::rational::*;
 use crate::ring_impls::zn::zn_64b::Zn64B;
@@ -33,9 +33,9 @@ enum QuotientAtError {
     ReductionNotWellDefined,
 }
 
-type ResidueField = GaloisField<AsField<MonogeneticExtensionBarrett<AsField<Zn64B>>>>;
+type ResidueField = GaloisField<AsField<MonogenicExtensionBarrett<AsField<Zn64B>>>>;
 type ResidueFieldPolyRing = DensePolyRing<ResidueField>;
-type ResidueRing = MonogeneticExtensionBarrett<ZnGB<BigIntRing>>;
+type ResidueRing = MonogenicExtensionBarrett<ZnGB<BigIntRing>>;
 type ResidueRingPolyRing = DensePolyRing<ResidueRing>;
 
 fn check_error<F, R>(f: F) -> Result<R, ()>
@@ -83,12 +83,12 @@ fn K_to_GR_hom<'a, K, I, R>(
 ) -> impl use<'a, K, I, R> + Homomorphism<K::Ring, R::Ring>
 where
     K: 'a + RingStore,
-    K::Ring: MonogeneticExtension + Field,
+    K::Ring: MonogenicExtension + Field,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: 'a + RingStore,
     I::Ring: IntegerRing,
     R: 'a + RingStore,
-    R::Ring: MonogeneticExtension,
+    R::Ring: MonogenicExtension,
     BaseRingBase<R>: ZnRing + CanHomFrom<I::Ring>,
 {
     let mod_p = QQ_to_Zpe_hom(number_field.base_ring().clone(), galois_ring.base_ring().clone(), error);
@@ -98,7 +98,7 @@ where
 struct ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
-    K::Ring: MonogeneticExtension + Field,
+    K::Ring: MonogenicExtension + Field,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -113,7 +113,7 @@ where
 impl<'a, K, I> ReconstructNumberFieldEl<'a, K, I>
 where
     K: RingStore,
-    K::Ring: MonogeneticExtension + Field,
+    K::Ring: MonogenicExtension + Field,
     BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -221,7 +221,7 @@ impl ResidueFieldsAtPrime {
     fn new<K, I>(number_field: K, Fp: AsField<Zn64B>) -> Result<Self, QuotientAtError>
     where
         K: RingStore,
-        K::Ring: MonogeneticExtension + Field,
+        K::Ring: MonogenicExtension + Field,
         BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -246,7 +246,7 @@ impl ResidueFieldsAtPrime {
                         .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
                         .collect::<Vec<_>>();
                     let Fq = GaloisField::create(
-                        MonogeneticExtensionBarrett::new(Fp.clone(), modulus)
+                        MonogenicExtensionBarrett::new(Fp.clone(), modulus)
                             .as_field()
                             .unwrap(),
                     );
@@ -286,7 +286,7 @@ impl ResidueRingsAtPrimePower {
     fn lift_genpoly_factorization<K, I>(&mut self, number_field: K, lift_to_degree: usize)
     where
         K: RingStore,
-        K::Ring: Field + MonogeneticExtension,
+        K::Ring: Field + MonogenicExtension,
         BaseRingStore<K>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -316,7 +316,7 @@ impl ResidueRingsAtPrimePower {
                 let modulus_vec = (0..self.ZpeX().degree(f).unwrap())
                     .map(|i| self.ZpeX().base_ring().negate(self.ZpeX().coefficient_at(f, i).clone()))
                     .collect();
-                let GR = MonogeneticExtensionBarrett::new(self.ZpeX().base_ring().clone(), modulus_vec);
+                let GR = MonogenicExtensionBarrett::new(self.ZpeX().base_ring().clone(), modulus_vec);
                 let GRX = DensePolyRing::new(GR, "X");
                 return GRX;
             })
@@ -367,7 +367,7 @@ impl NumberFieldFactorizationLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRingBase<P>: Field + MonogeneticExtension,
+        BaseRingBase<P>: Field + MonogenicExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -399,7 +399,7 @@ impl NumberFieldFactorizationLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRingBase<P>: Field + MonogeneticExtension,
+        BaseRingBase<P>: Field + MonogenicExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -504,7 +504,7 @@ impl PolyGCDFactorizationLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing + DivisibilityRing,
-        BaseRingBase<P>: Field + MonogeneticExtension,
+        BaseRingBase<P>: Field + MonogenicExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -541,7 +541,7 @@ pub fn poly_gcd_number_field_squarefree<P, I>(KX: P, lhs: &El<P>, rhs: &El<P>, a
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRingBase<P>: Field + MonogeneticExtension,
+    BaseRingBase<P>: Field + MonogenicExtension,
     BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -610,7 +610,7 @@ pub fn poly_gcd_number_field<P, I>(KX: P, lhs: &El<P>, rhs: &El<P>) -> El<P>
 where
     P: RingStore + Copy,
     P::Ring: PolyRing + DivisibilityRing,
-    BaseRingBase<P>: Field + MonogeneticExtension,
+    BaseRingBase<P>: Field + MonogenicExtension,
     BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -684,7 +684,7 @@ impl PolyPowerDecompositionLift {
     where
         P: RingStore + Copy,
         P::Ring: PolyRing,
-        BaseRingBase<P>: Field + MonogeneticExtension,
+        BaseRingBase<P>: Field + MonogenicExtension,
         BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
         I: RingStore,
         I::Ring: IntegerRing,
@@ -718,7 +718,7 @@ pub fn poly_power_decomposition_number_field<P, I>(KX: P, poly: &El<P>) -> Vec<(
 where
     P: RingStore + Copy,
     P::Ring: PolyRing,
-    BaseRingBase<P>: Field + MonogeneticExtension,
+    BaseRingBase<P>: Field + MonogenicExtension,
     BaseRingStore<BaseRingStore<P>>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -771,11 +771,11 @@ use crate::ring_impls::extension::number_field::*;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<MonogeneticExtensionSparse<RationalField<BigIntRing>>>> {
+fn test_field() -> NumberField<AsField<MonogenicExtensionSparse<RationalField<BigIntRing>>>> {
     let QQ = RationalField::new(ZZbig);
     let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(MonogeneticExtensionSparse::new(QQ, modulus_vec)).unwrap(),
+        AsFieldBase::promise_is_field(MonogenicExtensionSparse::new(QQ, modulus_vec)).unwrap(),
     )))
 }
 

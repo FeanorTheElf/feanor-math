@@ -972,7 +972,7 @@ use crate::iters::multiset_combinations;
 #[cfg(test)]
 use crate::ring_impls::approx_real::float::Real64;
 #[cfg(test)]
-use crate::ring_impls::extension::MonogeneticExtensionStore;
+use crate::ring_impls::extension::MonogenicExtensionStore;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]

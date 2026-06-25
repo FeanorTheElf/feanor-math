@@ -283,9 +283,9 @@ use crate::assert_matrix_eq;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]
-use crate::ring_impls::extension::MonogeneticExtensionStore;
+use crate::ring_impls::extension::MonogenicExtensionStore;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
+use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::extension::galois_field::GaloisField;
 #[cfg(test)]
@@ -646,7 +646,7 @@ fn bench_solve_right_using_pre_smith_galois_field(bencher: &mut Bencher) {
     feanor_tracing::DelayedLogger::init_test();
     let base_field = Zn64B::new(257).as_field().ok().unwrap();
     let field = GaloisField::create(
-        MonogeneticExtensionSparse::new(
+        MonogenicExtensionSparse::new(
             base_field,
             vec![
                 base_field.int_hom().map(3),

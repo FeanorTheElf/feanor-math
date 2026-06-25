@@ -5,7 +5,7 @@ use tracing::instrument;
 use super::{LinSolveRing, SolveResult};
 use crate::matrix::*;
 use crate::prelude::*;
-use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
+use crate::ring_impls::extension::{MonogenicExtension, MonogenicExtensionStore};
 use crate::seq::*;
 
 #[stability::unstable(feature = "enable")]
@@ -19,7 +19,7 @@ pub fn solve_right_over_extension<R, V1, V2, V3, A>(
 ) -> SolveResult
 where
     R: RingStore,
-    R::Ring: MonogeneticExtension,
+    R::Ring: MonogenicExtension,
     <BaseRingStore<R> as RingStore>::Ring: LinSolveRing,
     V1: AsPointerToSlice<El<R>>,
     V2: AsPointerToSlice<El<R>>,
@@ -103,7 +103,7 @@ use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
 #[cfg(test)]
 use crate::assert_matrix_eq;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
+use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static;
 
@@ -112,7 +112,7 @@ fn test_solve() {
     feanor_tracing::DelayedLogger::init_test();
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
-    let ring = MonogeneticExtensionSparse::new(base_ring, vec![14, 0, 14]);
+    let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
     let el = |coeffs: [u64; 3]| ring.from_power_basis(coeffs);
 
     let data_A = [
@@ -159,7 +159,7 @@ fn test_invert() {
     feanor_tracing::DelayedLogger::init_test();
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
-    let ring = MonogeneticExtensionSparse::new(base_ring, vec![14, 0, 14]);
+    let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
 
     let matrix = OwnedMatrix::from_fn(2, 2, |i, j| {
         if i == 0 || j == 0 {

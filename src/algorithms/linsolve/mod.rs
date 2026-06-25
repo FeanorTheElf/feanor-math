@@ -3,7 +3,7 @@ use std::alloc::{Allocator, Global};
 use super::convolution::ConvolutionAlgorithm;
 use crate::matrix::{AsPointerToSlice, SubmatrixMut};
 use crate::prelude::*;
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionImplBase;
+use crate::ring_impls::extension::extension_impl::MonogenicExtensionImplBase;
 use crate::ring_impls::extension::poly_modulus::PolyModulus;
 use crate::ring_properties::divisibility::DivisibilityRing;
 use crate::ring_properties::pid::PrincipalIdealRing;
@@ -142,7 +142,7 @@ impl<R: ?Sized + PrincipalIdealRing> LinSolveRing for R {
     }
 }
 
-impl<R, M, A_ring, C_ring> LinSolveRing for MonogeneticExtensionImplBase<R, M, C_ring, A_ring>
+impl<R, M, A_ring, C_ring> LinSolveRing for MonogenicExtensionImplBase<R, M, C_ring, A_ring>
 where
     R: RingStore,
     R::Ring: LinSolveRing,

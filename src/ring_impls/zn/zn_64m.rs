@@ -13,7 +13,7 @@ use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
 use crate::function::no_error;
 use crate::iters::multi_cartesian_product;
-use crate::ring_impls::extension::MonogeneticExtensionStore;
+use crate::ring_impls::extension::MonogenicExtensionStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::primitive_int::*;
 use crate::ring_properties::lift_poly_eval::InterpolationBaseRing;

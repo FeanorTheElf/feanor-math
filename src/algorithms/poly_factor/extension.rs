@@ -8,8 +8,8 @@ use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
-use crate::ring_impls::extension::{MonogeneticExtension, MonogeneticExtensionStore};
+use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
+use crate::ring_impls::extension::{MonogenicExtension, MonogenicExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
 use crate::ring_impls::primitive_int::StaticRing;
@@ -34,7 +34,7 @@ pub fn poly_factor_extfield_squarefree<P>(
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRingBase<P>: Field + MonogeneticExtension + PolyTFracGCDRing,
+    BaseRingBase<P>: Field + MonogenicExtension + PolyTFracGCDRing,
     BaseRingBase<BaseRingStore<P>>:
         PerfectField + PolyTFracGCDRing + FactorPolyField + InterpolationBaseRing + FiniteRingSpecializable + SelfIso,
 {
@@ -133,7 +133,7 @@ pub fn poly_factor_extfield<P>(poly_ring: P, f: &El<P>) -> (Vec<(El<P>, usize)>,
 where
     P: RingStore,
     P::Ring: PolyRing + EuclideanRing,
-    BaseRingBase<P>: MonogeneticExtension + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
+    BaseRingBase<P>: MonogenicExtension + PerfectField + FiniteRingSpecializable + PolyTFracGCDRing,
     BaseRingBase<BaseRingStore<P>>:
         PerfectField + PolyTFracGCDRing + FactorPolyField + FiniteRingSpecializable + InterpolationBaseRing + SelfIso,
 {
@@ -185,11 +185,11 @@ use crate::ring_impls::rational::RationalField;
 use crate::wrapper::RingElementWrapper;
 
 #[cfg(test)]
-fn test_field() -> NumberField<AsField<MonogeneticExtensionSparse<RationalField<BigIntRing>>>> {
+fn test_field() -> NumberField<AsField<MonogenicExtensionSparse<RationalField<BigIntRing>>>> {
     let QQ = RationalField::new(ZZbig);
     let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
     NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(MonogeneticExtensionSparse::new(QQ, modulus_vec)).unwrap(),
+        AsFieldBase::promise_is_field(MonogenicExtensionSparse::new(QQ, modulus_vec)).unwrap(),
     )))
 }
 

@@ -6,8 +6,8 @@ use feanor_serde::newtype_struct::*;
 use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-use super::extension_impl::MonogeneticExtensionSparse;
-use super::{Field, MonogeneticExtension};
+use super::extension_impl::MonogenicExtensionSparse;
+use super::{Field, MonogenicExtension};
 use crate::algorithms::convolution::*;
 use crate::algorithms::newton;
 use crate::algorithms::poly_factor::extension::poly_factor_extfield;
@@ -52,7 +52,7 @@ use crate::ring_properties::specialization::*;
 /// let i = QQi.canonical_gen();
 /// assert_el_eq!(&QQi, QQi.neg_one(), QQi.pow(i, 2));
 /// ```
-/// So far, we could have done the same with just [`MonogeneticExtensionSparse`], which indeed
+/// So far, we could have done the same with just [`MonogenicExtensionSparse`], which indeed
 /// is used as the default implementation of the arithmetic. However, [`NumberField`]
 /// provides additional functionality, that is not available for general extensions.
 /// ```rust
@@ -138,7 +138,7 @@ use crate::ring_properties::specialization::*;
 pub struct NumberFieldBase<Impl = DefaultNumberFieldImpl, I = BigIntRing>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -148,7 +148,7 @@ where
 
 #[stability::unstable(feature = "enable")]
 pub type DefaultNumberFieldImpl = AsField<
-    MonogeneticExtensionSparse<
+    MonogenicExtensionSparse<
         RationalField<BigIntRing>,
         DynConvolution<'static, RationalFieldBase<BigIntRing>>,
         Global,
@@ -210,7 +210,7 @@ impl NumberFieldBase {
         let log2_padded_len = ZZi64.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
         let len_range = (2 << log2_padded_len)..((2 << log2_padded_len) + 1);
         let convolution = RationalFieldBase::create_default_convolution(QQ.clone(), Some(len_range));
-        return RingValue::from(MonogeneticExtensionImplBase::new_with_convolution(
+        return RingValue::from(MonogenicExtensionImplBase::new_with_convolution(
             SparsePolyModulus::new(QQ, modulus_vec),
             "θ",
             Global,
@@ -300,7 +300,7 @@ impl NumberFieldBase {
 impl<Impl, I> NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -357,7 +357,7 @@ where
 impl<Impl, I> Clone for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Clone,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -372,7 +372,7 @@ where
 impl<Impl, I> Copy for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Copy,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -384,7 +384,7 @@ where
 impl<Impl, I> PartialEq for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -395,7 +395,7 @@ where
 impl<Impl, I> DelegateRing for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -414,7 +414,7 @@ where
 impl<Impl, I> DelegateRingImplEuclideanRing for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -424,7 +424,7 @@ where
 impl<Impl, I> Debug for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -435,7 +435,7 @@ where
 impl<Impl, I> FiniteRingSpecializable for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -446,7 +446,7 @@ where
 impl<Impl, I> Field for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -456,7 +456,7 @@ where
 impl<Impl, I> PerfectField for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -466,7 +466,7 @@ where
 impl<Impl, I> Domain for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -476,7 +476,7 @@ where
 impl<Impl, I> PolyTFracGCDRing for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -503,7 +503,7 @@ where
 impl<Impl, I> FactorPolyField for NumberFieldBase<Impl, I>
 where
     Impl: RingStore,
-    Impl::Ring: Field + MonogeneticExtension,
+    Impl::Ring: Field + MonogenicExtension,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -521,7 +521,7 @@ where
 impl<Impl, I> Serialize for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Serialize,
-    Impl::Ring: Field + MonogeneticExtension + SerializableElementRing,
+    Impl::Ring: Field + MonogenicExtension + SerializableElementRing,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,
@@ -537,7 +537,7 @@ where
 impl<'de, Impl, I> Deserialize<'de> for NumberFieldBase<Impl, I>
 where
     Impl: RingStore + Deserialize<'de>,
-    Impl::Ring: Field + MonogeneticExtension + SerializableElementRing,
+    Impl::Ring: Field + MonogenicExtension + SerializableElementRing,
     BaseRingStore<Impl>: RingStore<Ring = RationalFieldBase<I>>,
     I: RingStore,
     I::Ring: IntegerRing,

@@ -22,7 +22,7 @@ use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
 use crate::function::no_error;
 use crate::iters::multi_cartesian_product;
 use crate::ring::{EnvBindingStrength, HashableElRing};
-use crate::ring_impls::extension::MonogeneticExtensionStore;
+use crate::ring_impls::extension::MonogenicExtensionStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::primitive_int::*;
 use crate::ring_impls::zn::{zn_big, *};

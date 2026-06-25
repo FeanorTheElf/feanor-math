@@ -15,13 +15,13 @@ use crate::ring_impls::poly::{PolyRing, *};
 use crate::ring_properties::pid::PrincipalIdealRing;
 use crate::seq::*;
 
-/// Default impl for [`MonogeneticExtension::from_power_basis_extended()`]
+/// Default impl for [`MonogenicExtension::from_power_basis_extended()`]
 ///  
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn from_power_basis_extended<R, V>(ring: &R, vec: V) -> R::Element
 where
-    R: ?Sized + MonogeneticExtension,
+    R: ?Sized + MonogenicExtension,
     V: IntoIterator<Item = El<<R as RingExtension>::BaseRing>>,
 {
     let mut data = vec.into_iter().collect::<Vec<_>>();
@@ -50,7 +50,7 @@ where
 #[instrument(skip_all, level = "trace")]
 pub fn charpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
 where
-    R: ?Sized + MonogeneticExtension,
+    R: ?Sized + MonogenicExtension,
     P: RingStore,
     P::Ring: PolyRing,
     <BaseRingStore<P> as RingStore>::Ring: LinSolveRing,
@@ -67,7 +67,7 @@ where
 #[instrument(skip_all, level = "trace")]
 pub fn minpoly<R, P, H>(ring: &R, el: &R::Element, poly_ring: P, hom: H) -> El<P>
 where
-    R: ?Sized + MonogeneticExtension,
+    R: ?Sized + MonogenicExtension,
     P: RingStore,
     P::Ring: PolyRing,
     <BaseRingStore<P> as RingStore>::Ring: LinSolveRing,
@@ -117,12 +117,12 @@ where
     return result.unwrap();
 }
 
-/// Default impl for [`MonogeneticExtension::discriminant()`]
+/// Default impl for [`MonogenicExtension::discriminant()`]
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn discriminant<R>(ring: &R) -> El<R::BaseRing>
 where
-    R: ?Sized + MonogeneticExtension,
+    R: ?Sized + MonogenicExtension,
     <R::BaseRing as RingStore>::Ring: PrincipalIdealRing,
 {
     let mut current = ring.one();
@@ -147,7 +147,7 @@ pub fn create_multiplication_matrix<R: RingStore, A: Allocator>(
     allocator: A,
 ) -> OwnedMatrix<El<BaseRingStore<R>>, A>
 where
-    R::Ring: MonogeneticExtension,
+    R::Ring: MonogenicExtension,
 {
     let mut result = OwnedMatrix::zero_in(ring.rank(), ring.rank(), ring.base_ring(), allocator);
     let mut current = el.clone();
@@ -165,7 +165,7 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogeneticExtensionSparse;
+use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
 #[cfg(test)]
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 #[cfg(test)]
@@ -174,7 +174,7 @@ use crate::ring_impls::rational::RationalField;
 #[test]
 fn test_charpoly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
     let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
@@ -213,7 +213,7 @@ fn test_charpoly() {
         )
     );
 
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0, 0]);
     let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
@@ -244,7 +244,7 @@ fn test_charpoly() {
 #[test]
 fn test_minpoly() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0, 0, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0, 0, 0, 0]);
     let poly_ring = DensePolyRing::new(ZZi64, "X");
 
     let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) - 2]);
@@ -287,7 +287,7 @@ fn test_minpoly() {
 #[test]
 fn test_trace() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
 
     assert_eq!(3, ring.trace(ring.from_power_basis([1, 0, 0])));
     assert_eq!(0, ring.trace(ring.from_power_basis([0, 1, 0])));
@@ -300,18 +300,18 @@ fn test_trace() {
 #[test]
 fn test_discriminant() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
     assert_eq!(-108, discriminant(ring.get_ring()));
 
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 1, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 1, 0]);
     assert_eq!(-104, discriminant(ring.get_ring()));
 
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![3, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![3, 0, 0]);
     assert_eq!(-243, discriminant(ring.get_ring()));
 
     let base_ring = DensePolyRing::new(RationalField::new(ZZi64), "X");
     let [f] = base_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + 1]);
-    let ring = MonogeneticExtensionSparse::new(&base_ring, vec![f, base_ring.zero()]);
+    let ring = MonogenicExtensionSparse::new(&base_ring, vec![f, base_ring.zero()]);
     let [expected] = base_ring.with_wrapped_indeterminate(|X| [4 * X.pow_ref(3) + 4]);
     assert_el_eq!(&base_ring, expected, discriminant(ring.get_ring()));
 }
@@ -319,7 +319,7 @@ fn test_discriminant() {
 #[test]
 fn test_from_power_basis_extended() {
     feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogeneticExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
     let actual = from_power_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
     let expected = ring.from_power_basis([37, 12, 15]);
     assert_el_eq!(&ring, expected, actual);

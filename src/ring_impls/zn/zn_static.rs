@@ -6,7 +6,7 @@ use crate::algorithms::convolution::DynConvolution;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
 use crate::prelude::*;
-use crate::ring_impls::extension::MonogeneticExtensionStore;
+use crate::ring_impls::extension::MonogenicExtensionStore;
 use crate::ring_impls::extension::galois_field::*;
 use crate::ring_impls::zn::*;
 use crate::ring_properties::field::*;
