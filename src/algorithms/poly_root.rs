@@ -20,13 +20,12 @@ use crate::ring_impls::poly::*;
 /// ```
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn poly_root_monic<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
+pub fn poly_root<P>(poly_ring: P, f: &El<P>, k: usize) -> Option<El<P>>
 where
     P: RingStore,
     P::Ring: PolyRing,
-    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing
+    <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing + Domain,
 {
-    assert!(poly_ring.base_ring().is_one(poly_ring.lc(&f).unwrap()));
     assert!(poly_ring.degree(&f).unwrap() % k == 0);
     let d = poly_ring.degree(&f).unwrap() / k;
     let ring = poly_ring.base_ring();
@@ -56,7 +55,7 @@ where
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 
 #[test]
-fn test_poly_root_monic() {
+fn test_poly_root() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZbig;
     let poly_ring = DensePolyRing::new(ring, "X");
@@ -67,7 +66,7 @@ fn test_poly_root_monic() {
         assert_el_eq!(
             &poly_ring,
             &f,
-            poly_root_monic(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
+            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
         );
     }
 
@@ -78,7 +77,7 @@ fn test_poly_root_monic() {
         assert_el_eq!(
             &poly_ring,
             &f,
-            poly_root_monic(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
+            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
         );
     }
 }
