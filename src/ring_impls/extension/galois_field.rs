@@ -858,9 +858,7 @@ where
     BaseRingStore<R>: RingStore<Ring = <BaseRingStore<P> as RingStore>::Ring>,
 {
     let f = mod_f_ring.generating_poly(&poly_ring, &poly_ring.base_ring().identity());
-    poly_ring.println(&f);
     let squarefree_part = poly_squarefree_part_finite_field(&poly_ring, &f);
-    poly_ring.println(&squarefree_part);
     if poly_ring.degree(&squarefree_part) != Some(degree) {
         return None;
     }
@@ -1014,8 +1012,6 @@ where
                 from_fn(|_| (ZZi64.get_uniformly_random(&(deg_i64 - 1), || rng.rand_u64()) + 1) as usize);
             let [a, b, c, d] = from_fn(|_| rand_nonzero_el(rng));
             let f = poly_ring.from_terms([(a, 0), (b, i1), (c, i2), (d, i3), (Fp.one(), degree)]);
-            println!();
-            poly_ring.println(&f);
             if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
                 return result;
             }
@@ -1026,8 +1022,6 @@ where
             let i = (ZZi64.get_uniformly_random(&(deg_i64 - 1), || rng.rand_u64()) + 1) as usize;
             let [a, b] = from_fn(|_| rand_nonzero_el(rng));
             let f = poly_ring.from_terms([(a, 0), (b, i), (Fp.one(), degree)]);
-            println!();
-            poly_ring.println(&f);
             if let Some(result) = filter_irreducible(&poly_ring, create_mod_f_ring(&f), degree) {
                 return result;
             }
@@ -1153,7 +1147,6 @@ fn test_galois_field_even() {
 fn test_construct_galois_field() {
     for p in [2, 3, 5] {
         for d in [1, 2, 3, 5, 8, 12, 13] {
-            println!("{}, {}", p, d);
             let GF = GaloisField::new(p, d);
             let ZpX = DensePolyRing::new(GF.base_ring(), "X");
             assert!(FactorPolyField::is_irred(
