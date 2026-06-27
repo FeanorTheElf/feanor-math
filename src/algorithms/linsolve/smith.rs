@@ -5,13 +5,16 @@ use tracing::{Level, event, instrument};
 use transform::TransformList;
 
 use crate::algorithms::linsolve::SolveResult;
-use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget};
+use crate::matrix::transform::{TransformCols, TransformRows, TransformTarget, TransposeTransform};
 use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring_properties::pid::{PrincipalIdealRing, PrincipalIdealRingStore};
 
 /// Transforms `A` into `A'` via transformations `L, R` such that
 /// `L A R = A'` and `A'` is diagonal.
+///
+/// `L` is treated as a left-transform and `R` is treated as a right-transform,
+/// as outlined in [`TransformTarget`].
 ///
 /// # (Non-)Uniqueness of the solution
 ///
@@ -53,11 +56,11 @@ where
                 if ring.is_zero(A.at(i, k)) {
                     continue;
                 } else if let Some(quo) = ring.checked_div(A.at(i, k), A.at(k, k)) {
-                    TransformRows(A.reborrow(), ring.get_ring()).subtract(ring, k, i, &quo);
+                    TransformRows::new(A.reborrow()).subtract(ring, k, i, &quo);
                     L.subtract(ring, k, i, &quo);
                 } else {
                     let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(i, k));
-                    TransformRows(A.reborrow(), ring.get_ring()).transform(ring, k, i, &transform);
+                    TransformRows::new(A.reborrow()).transform(ring, k, i, &transform);
                     L.transform(ring, k, i, &transform);
                 }
             }
@@ -68,12 +71,12 @@ where
                     continue;
                 } else if let Some(quo) = ring.checked_div(A.at(k, j), A.at(k, k)) {
                     changed_row = true;
-                    TransformCols(A.reborrow(), ring.get_ring()).subtract(ring, k, j, &quo);
+                    TransformCols::new(A.reborrow()).subtract(ring, k, j, &quo);
                     R.subtract(ring, k, j, &quo);
                 } else {
                     changed_row = true;
                     let (transform, _) = ring.get_ring().create_elimination_matrix(A.at(k, k), A.at(k, j));
-                    TransformCols(A.reborrow(), ring.get_ring()).transform(ring, k, j, &transform);
+                    TransformCols::new(A.reborrow()).transform(ring, k, j, &transform);
                     R.transform(ring, k, j, &transform);
                 }
             }
@@ -107,12 +110,7 @@ where
     assert_eq!(rhs.col_count(), out.col_count());
 
     let mut R = TransformList::new(lhs.col_count());
-    pre_smith(
-        ring,
-        &mut TransformRows(rhs.reborrow(), ring.get_ring()),
-        &mut R,
-        lhs.reborrow(),
-    );
+    pre_smith(ring, &mut TransformRows::new(rhs.reborrow()), &mut R, lhs.reborrow());
 
     for i in out.row_count()..rhs.row_count() {
         for j in 0..rhs.col_count() {
@@ -138,7 +136,7 @@ where
         }
     }
 
-    R.replay_transposed(ring, TransformRows(out, ring.get_ring()));
+    R.replay_reversed(ring, TransposeTransform::new(TransformRows::new(out)));
     return if solution_unique {
         SolveResult::FoundUniqueSolution
     } else {
@@ -192,7 +190,7 @@ where
     for (i, (j, a)) in annihilators {
         *B.at_mut(i, j) = a.clone();
     }
-    R.replay_transposed(ring, &mut TransformRows(B.data_mut(), ring.get_ring()));
+    R.replay_reversed(ring, &mut TransposeTransform::new(TransformRows::new(B.data_mut())));
     return B;
 }
 
@@ -341,8 +339,8 @@ fn test_smith_integers() {
     let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, ZZi64);
     pre_smith(
         ring,
-        &mut TransformRows(L.data_mut(), ring.get_ring()),
-        &mut TransformCols(R.data_mut(), ring.get_ring()),
+        &mut TransformRows::new(L.data_mut()),
+        &mut TransformCols::new(R.data_mut()),
         A.data_mut(),
     );
 
@@ -361,8 +359,8 @@ fn test_smith_zn() {
     let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
     pre_smith(
         ring,
-        &mut TransformRows(L.data_mut(), ring.get_ring()),
-        &mut TransformCols(R.data_mut(), ring.get_ring()),
+        &mut TransformRows::new(L.data_mut()),
+        &mut TransformCols::new(R.data_mut()),
         A.data_mut(),
     );
 

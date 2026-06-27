@@ -1,5 +1,7 @@
 use std::marker::PhantomData;
 
+use tracing::instrument;
+
 use super::{AsPointerToSlice, OwnedMatrix, SubmatrixMut};
 use crate::prelude::*;
 
@@ -8,11 +10,27 @@ use crate::prelude::*;
 /// This is mainly used during algorithms that work on matrices, since in many cases
 /// they transform matrices using elementary row or column operations, and have to
 /// accumulate data depending on these operations.
+///
+/// # Left- and right-transforms
+///
+/// In most aspects, a [`TransformTarget`] is just fed a matrix via its factorization.
+/// However, there is a difference if the factors are accumulated from the left or the
+/// right. Concretely
+///  - If an algorithm feeds a [`TransformTarget`] a left-transform, the transform target receives
+///    elementary matrices `L1, ..., Lr`, and the complete transform is then left-multiplication by
+///    the matrix `L = Lr ... L1` (notice the reversal coming from the left-multiplication).
+///  - If an algorithm feeds a [`TransformTarget`] a right-transform, the transform target receives
+///    elementary matrices `R1, ..., Rr`, and the complete transform is then right-multiplication by
+///    the matrix `R = R1^T ... Rr^T` (notice the transpose).
 pub trait TransformTarget<R>
 where
     R: ?Sized + RingBase,
 {
-    /// The transformation given by the matrix `A` with `A[k, l]` being
+    /// The transformation corresponds to replacing two rows (in the context of a left-transform)
+    /// resp. two columns (in the context of a right-transform) by linear combinations of them.
+    ///
+    /// Concretely, in the context of a left-transform, the transformation given by the matrix `A`
+    /// with `A[k, l]` being
     ///  - `1` if `k = l` and `k != i, j`
     ///  - `transform[0]` if `(k, l) = (i, i)`
     ///  - `transform[1]` if `(k, l) = (i, j)`
@@ -25,23 +43,25 @@ where
     /// | 1  ...  0                       |
     /// | ⋮        ⋮                       |
     /// | 0  ...  1                       |
-    /// |    A             B              | <- i-th row
+    /// |    a             b              | <- i-th row
     /// |            1  ...  0            |
     /// |            ⋮        ⋮            |
     /// |            0  ...  1            |
-    /// |    C             D              | <- j-th row
+    /// |    c             c              | <- j-th row
     /// |                       1  ...  0 |
     /// |                       ⋮        ⋮ |
     /// |                       0  ...  1 |
     ///      ^ i-th col    ^ j-th col
     /// ```
-    /// where `transform = [A, B, C, D]`.
+    /// where `transform = [a, b, c, d]`.
     fn transform<S: Copy + RingStore<Ring = R>>(&mut self, ring: S, i: usize, j: usize, transform: &[R::Element; 4]);
 
     /// The transformation corresponding to subtracting `factor` times the `src`-th row
-    /// resp. col from the `dst`-th row resp. col.
+    /// (in the context of a left-transform) resp. col from the `dst`-th row resp. col
+    /// (in the context of a right transform).
     ///
-    /// More precisely, the `(k, l)`-th entry of the transform matrix is defined to be
+    /// More precisely, in the context of a left-transform, the `(k, l)`-th entry of the transform
+    /// matrix is defined to be
     ///  - `1` if `k == l`
     ///  - `-factor` if `k == dst, l == src`
     ///  - `0` otherwise
@@ -55,7 +75,7 @@ where
     }
 
     /// The transformation corresponding to the permutation matrix swapping `i`-th and `j`-th row
-    /// resp. column.
+    /// (in the context of a left-transform) resp. column (in the context of a right transform).
     ///
     /// More precisely, the `(k, l)`-th entry of the transform matrix is defined to be
     ///  - `1` if `k == l, k != i, k != j`
@@ -87,27 +107,46 @@ where
 
 /// Wraps a [`SubmatrixMut`] to get a [`TransformTarget`]. Every transform is multiplied to
 /// the wrapped matrix from the left, i.e. applied to the rows of the matrix.
-///
-/// TODO: at next breaking release, remove the reference to the ring
-pub struct TransformRows<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
+pub struct TransformRows<'a, V, R>
 where
     V: AsPointerToSlice<R::Element>,
-    R: ?Sized + RingBase;
+    R: ?Sized + RingBase,
+{
+    target: SubmatrixMut<'a, V, R::Element>,
+}
 
 /// Wraps a [`SubmatrixMut`] to get a [`TransformTarget`]. Every transform is multiplied to
 /// the wrapped matrix from the right, i.e. applied to the cols of the matrix.
-///
-/// TODO: at next breaking release, remove the reference to the ring
-pub struct TransformCols<'a, V, R>(pub SubmatrixMut<'a, V, R::Element>, pub &'a R)
+pub struct TransformCols<'a, V, R>
 where
     V: AsPointerToSlice<R::Element>,
-    R: ?Sized + RingBase;
+    R: ?Sized + RingBase,
+{
+    target: SubmatrixMut<'a, V, R::Element>,
+}
+
+impl<'a, V, R> TransformRows<'a, V, R>
+where
+    V: AsPointerToSlice<R::Element>,
+    R: ?Sized + RingBase,
+{
+    pub fn new(target: SubmatrixMut<'a, V, R::Element>) -> Self { Self { target } }
+}
+
+impl<'a, V, R> TransformCols<'a, V, R>
+where
+    V: AsPointerToSlice<R::Element>,
+    R: ?Sized + RingBase,
+{
+    pub fn new(target: SubmatrixMut<'a, V, R::Element>) -> Self { Self { target } }
+}
 
 impl<'a, V, R> TransformTarget<R> for TransformRows<'a, V, R>
 where
     V: AsPointerToSlice<R::Element>,
     R: ?Sized + RingBase,
 {
+    #[instrument(skip_all, level = "trace")]
     fn transform<S: Copy + RingStore<Ring = R>>(
         &mut self,
         ring: S,
@@ -115,8 +154,7 @@ where
         j: usize,
         transform: &[<R as RingBase>::Element; 4],
     ) {
-        assert!(ring.get_ring() == self.1);
-        let A = &mut self.0;
+        let A = &mut self.target;
         for l in 0..A.col_count() {
             let (new_i, new_j) = (
                 ring.add(
@@ -133,6 +171,7 @@ where
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn subtract<S: Copy + RingStore<Ring = R>>(
         &mut self,
         ring: S,
@@ -140,8 +179,7 @@ where
         dst: usize,
         factor: &<R as RingBase>::Element,
     ) {
-        assert!(ring.get_ring() == self.1);
-        let A = &mut self.0;
+        let A = &mut self.target;
         for j in 0..A.col_count() {
             let to_sub = ring.mul_ref(factor, A.at(src, j));
             ring.sub_assign(A.at_mut(dst, j), to_sub);
@@ -154,6 +192,7 @@ where
     V: AsPointerToSlice<R::Element>,
     R: ?Sized + RingBase,
 {
+    #[instrument(skip_all, level = "trace")]
     fn transform<S: Copy + RingStore<Ring = R>>(
         &mut self,
         ring: S,
@@ -161,8 +200,7 @@ where
         j: usize,
         transform: &[<R as RingBase>::Element; 4],
     ) {
-        assert!(ring.get_ring() == self.1);
-        let A = &mut self.0;
+        let A = &mut self.target;
         for l in 0..A.row_count() {
             let (new_i, new_j) = (
                 ring.add(
@@ -179,6 +217,7 @@ where
         }
     }
 
+    #[instrument(skip_all, level = "trace")]
     fn subtract<S: Copy + RingStore<Ring = R>>(
         &mut self,
         ring: S,
@@ -186,12 +225,109 @@ where
         dst: usize,
         factor: &<R as RingBase>::Element,
     ) {
-        assert!(ring.get_ring() == self.1);
-        let A = &mut self.0;
+        let A = &mut self.target;
         for i in 0..A.row_count() {
             let to_sub = ring.mul_ref(factor, A.at(i, src));
             ring.sub_assign(A.at_mut(i, dst), to_sub);
         }
+    }
+}
+
+pub struct InvertTransform<T> {
+    delegate_inverted: T,
+}
+
+impl<T> InvertTransform<T> {
+    pub fn new(delegate_inverted: T) -> Self { Self { delegate_inverted } }
+}
+
+impl<R, T> TransformTarget<R> for InvertTransform<T>
+where
+    R: ?Sized + RingBase + DivisibilityRing,
+    T: TransformTarget<R>,
+{
+    fn transform<S: Copy + RingStore<Ring = R>>(
+        &mut self,
+        ring: S,
+        i: usize,
+        j: usize,
+        transform: &[<R as RingBase>::Element; 4],
+    ) {
+        let det = ring.sub(
+            ring.mul_ref(&transform[0], &transform[3]),
+            ring.mul_ref(&transform[1], &transform[2]),
+        );
+        assert!(
+            ring.is_unit(&det),
+            "InvertTransform requires that all elemetary transforms passed to the target are invertible"
+        );
+        let det_inv = ring.invert(&det).unwrap();
+        let inv_transform = [
+            ring.mul_ref(&transform[3], &det_inv),
+            ring.negate(ring.mul_ref(&transform[1], &det_inv)),
+            ring.negate(ring.mul_ref(&transform[2], &det_inv)),
+            ring.mul_ref(&transform[0], &det_inv),
+        ];
+        self.delegate_inverted.transform(ring, i, j, &inv_transform);
+    }
+
+    fn subtract<S: Copy + RingStore<Ring = R>>(
+        &mut self,
+        ring: S,
+        src: usize,
+        dst: usize,
+        factor: &<R as RingBase>::Element,
+    ) {
+        self.delegate_inverted
+            .subtract(ring, src, dst, &ring.negate(factor.clone()));
+    }
+
+    fn swap<S: Copy + RingStore<Ring = R>>(&mut self, ring: S, i: usize, j: usize) {
+        self.delegate_inverted.swap(ring, i, j)
+    }
+}
+
+pub struct TransposeTransform<T> {
+    delegate_transposed: T,
+}
+
+impl<T> TransposeTransform<T> {
+    pub fn new(delegate_transposed: T) -> Self { Self { delegate_transposed } }
+}
+
+impl<R, T> TransformTarget<R> for TransposeTransform<T>
+where
+    R: ?Sized + RingBase + DivisibilityRing,
+    T: TransformTarget<R>,
+{
+    fn transform<S: Copy + RingStore<Ring = R>>(
+        &mut self,
+        ring: S,
+        i: usize,
+        j: usize,
+        transform: &[<R as RingBase>::Element; 4],
+    ) {
+        let transposed_transform = [
+            transform[0].clone(),
+            transform[2].clone(),
+            transform[1].clone(),
+            transform[3].clone(),
+        ];
+        self.delegate_transposed.transform(ring, i, j, &transposed_transform);
+    }
+
+    fn subtract<S: Copy + RingStore<Ring = R>>(
+        &mut self,
+        ring: S,
+        src: usize,
+        dst: usize,
+        factor: &<R as RingBase>::Element,
+    ) {
+        self.delegate_transposed.subtract(ring, dst, src, factor);
+    }
+
+    fn swap<S: Copy + RingStore<Ring = R>>(&mut self, ring: S, i: usize, j: usize) {
+        self.delegate_transposed.swap(ring, i, j)
     }
 }
 
@@ -237,21 +373,11 @@ where
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn replay_transposed<S: Copy + RingStore<Ring = R>, T: TransformTarget<R>>(&self, ring: S, mut target: T) {
+    pub fn replay_reversed<S: Copy + RingStore<Ring = R>, T: TransformTarget<R>>(&self, ring: S, mut target: T) {
         for transform in self.transforms.iter().rev() {
             match transform {
-                Transform::General(i, j, matrix) => target.transform(
-                    ring,
-                    *i,
-                    *j,
-                    &[
-                        matrix[0].clone(),
-                        matrix[2].clone(),
-                        matrix[1].clone(),
-                        matrix[3].clone(),
-                    ],
-                ),
-                Transform::Subtract(src, dst, factor) => target.subtract(ring, *dst, *src, factor),
+                Transform::General(i, j, matrix) => target.transform(ring, *i, *j, matrix),
+                Transform::Subtract(src, dst, factor) => target.subtract(ring, *src, *dst, factor),
                 Transform::Swap(i, j) => target.swap(ring, *i, *j),
             }
         }
@@ -260,7 +386,7 @@ where
     #[stability::unstable(feature = "enable")]
     pub fn to_matrix<S: Copy + RingStore<Ring = R>>(&self, ring: S) -> OwnedMatrix<R::Element> {
         let mut result = OwnedMatrix::identity(self.row_count, self.row_count, ring);
-        self.replay(ring, TransformRows(result.data_mut(), ring.get_ring()));
+        self.replay(ring, TransformRows::new(result.data_mut()));
         return result;
     }
 }

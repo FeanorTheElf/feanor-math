@@ -48,13 +48,13 @@ where
         j: usize,
         transform: &[<I as RingBase>::Element; 4],
     ) {
-        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
-        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).transform(ring, i, j, transform);
+        TransformRows::new(self.quadratic_form.reborrow()).transform(ring, i, j, transform);
+        TransformCols::new(self.quadratic_form.reborrow()).transform(ring, i, j, transform);
     }
 
     fn swap<S: Copy + RingStore<Ring = I>>(&mut self, ring: S, i: usize, j: usize) {
-        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).swap(ring, i, j);
-        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).swap(ring, i, j);
+        TransformRows::new(self.quadratic_form.reborrow()).swap(ring, i, j);
+        TransformCols::new(self.quadratic_form.reborrow()).swap(ring, i, j);
     }
 
     fn subtract<S: Copy + RingStore<Ring = I>>(
@@ -64,8 +64,8 @@ where
         dst: usize,
         factor: &<I as RingBase>::Element,
     ) {
-        TransformRows(self.quadratic_form.reborrow(), ring.get_ring()).subtract(ring, src, dst, factor);
-        TransformCols(self.quadratic_form.reborrow(), ring.get_ring()).subtract(ring, src, dst, factor);
+        TransformRows::new(self.quadratic_form.reborrow()).subtract(ring, src, dst, factor);
+        TransformCols::new(self.quadratic_form.reborrow()).subtract(ring, src, dst, factor);
     }
 }
 
@@ -376,6 +376,9 @@ where
 /// Here the `ei*` refer to the Gram-Schmidt orthogonalization of the unit vectors `ei`
 /// w.r.t. the inner product defined by `Q`.
 ///
+/// The given [`TransformTarget`] is treated as both a left- and a right-transform, since
+/// unimodular matrices act on quadratic forms by simultaneous left- and right-multiplication.
+///
 /// # Algorithm and numerical stability
 ///
 /// The used algorithm is a custom variant of the L^2 algorithm by
@@ -469,6 +472,8 @@ where
 /// prove that the result is `(delta, eta)`-LLL-reduced. However, it will usually
 /// be quite reduced already, and may even be `(delta, eta)`-LLL-reduced.
 ///
+/// The given [`TransformTarget`] is treated as a right-transform.
+///
 /// For more details, see [`lll_quadratic_form()`].
 #[stability::unstable(feature = "enable")]
 pub fn lll<I, R, H, V1, T>(
@@ -499,7 +504,7 @@ where
         &h,
         delta,
         eta,
-        DuplicateTransforms::new(TransformCols(basis, h.domain().get_ring()), transform),
+        DuplicateTransforms::new(TransformCols::new(basis), transform),
     )?;
 
     return Ok(());
@@ -573,7 +578,7 @@ fn test_lll_float_2d() {
         RR.can_hom(&ZZ).unwrap(),
         &0.9,
         &0.55,
-        TransformCols(transform_matrix.data_mut(), ZZ.get_ring()),
+        TransformCols::new(transform_matrix.data_mut()),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, OwnedMatrix::identity(2, 2, ZZ), reduced_matrix);
@@ -606,7 +611,7 @@ fn test_lll_float_2d() {
         RR.can_hom(&ZZ).unwrap(),
         &0.9,
         &0.55,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -638,7 +643,7 @@ fn test_lll_float_3d() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -677,7 +682,7 @@ fn test_lll_precision() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -707,7 +712,7 @@ fn test_lll_precision() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -737,7 +742,7 @@ fn test_lll_precision() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -770,7 +775,7 @@ fn test_lll_generating_set() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -798,7 +803,7 @@ fn test_lll_generating_set() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);
@@ -874,7 +879,7 @@ fn test_lll_generating_set() {
         RR.can_hom(&ZZ).unwrap(),
         &0.999,
         &0.51,
-        TransformCols(transformed_matrix, ZZ.get_ring()),
+        TransformCols::new(transformed_matrix),
     )
     .unwrap();
     assert_matrix_eq!(ZZ, reduced_matrix, transformed);

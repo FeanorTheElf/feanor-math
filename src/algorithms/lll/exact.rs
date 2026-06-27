@@ -217,18 +217,8 @@ where
                     .unwrap(),
             )
         });
-        TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).transform(
-            self.to_QQ.domain(),
-            i,
-            j,
-            &matrix,
-        );
-        TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).transform(
-            self.to_QQ.domain(),
-            i,
-            j,
-            &matrix,
-        );
+        TransformRows::new(self.quadratic_form.reborrow()).transform(self.to_QQ.domain(), i, j, &matrix);
+        TransformCols::new(self.quadratic_form.reborrow()).transform(self.to_QQ.domain(), i, j, &matrix);
         self.transform.transform(
             self.to_QQ.domain(),
             i + self.pass_on_offset,
@@ -251,18 +241,8 @@ where
             ZZ.checked_div(QQ.get_ring().num(factor), QQ.get_ring().den(factor))
                 .unwrap(),
         );
-        TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).subtract(
-            self.to_QQ.domain(),
-            src,
-            dst,
-            &factor,
-        );
-        TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).subtract(
-            self.to_QQ.domain(),
-            src,
-            dst,
-            &factor,
-        );
+        TransformRows::new(self.quadratic_form.reborrow()).subtract(self.to_QQ.domain(), src, dst, &factor);
+        TransformCols::new(self.quadratic_form.reborrow()).subtract(self.to_QQ.domain(), src, dst, &factor);
         self.transform.subtract(
             self.to_QQ.domain(),
             src + self.pass_on_offset,
@@ -273,8 +253,8 @@ where
 
     fn swap<S: Copy + RingStore<Ring = RationalFieldBase<I>>>(&mut self, ring: S, i: usize, j: usize) {
         assert!(ring.get_ring() == self.to_QQ.codomain().get_ring());
-        TransformRows(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
-        TransformCols(self.quadratic_form.reborrow(), self.to_QQ.domain().get_ring()).swap(self.to_QQ.domain(), i, j);
+        TransformRows::new(self.quadratic_form.reborrow()).swap(self.to_QQ.domain(), i, j);
+        TransformCols::new(self.quadratic_form.reborrow()).swap(self.to_QQ.domain(), i, j);
         self.transform
             .swap(self.to_QQ.domain(), i + self.pass_on_offset, j + self.pass_on_offset);
     }
@@ -294,6 +274,9 @@ where
 ///
 /// Here the `ei*` refer to the Gram-Schmidt orthogonalization of the unit vectors `ei`
 /// w.r.t. the inner product defined by `Q`.
+///
+/// The given [`TransformTarget`] is treated as both a left- and a right-transform, since
+/// unimodular matrices act on quadratic forms by simultaneous left- and right-multiplication.
 ///
 /// # Internal computations with floating point numbers
 ///
@@ -419,6 +402,8 @@ pub fn lll_quadratic_form<S, I, H, V, T>(
 ///
 /// Here the `bi*` refer to the Gram-Schmidt orthogonalization of the `bi`.
 ///
+/// The given [`TransformTarget`] is treated as a right-transform.
+///
 /// # Internal computations with floating point numbers
 ///
 /// If `disable_float_lll` is not set, this function will first heuristically reduce
@@ -457,7 +442,7 @@ pub fn lll<S, I, H, V, T>(
         &h,
         delta,
         disable_float_lll,
-        DuplicateTransforms::new(TransformCols(basis, h.domain().get_ring()), transform),
+        DuplicateTransforms::new(TransformCols::new(basis), transform),
     );
 }
 

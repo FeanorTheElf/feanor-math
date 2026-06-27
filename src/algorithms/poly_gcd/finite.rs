@@ -141,10 +141,18 @@ where
         debug_assert!(ring.degree(&sb).unwrap() <= ring.degree(&rhs).unwrap() - ring.degree(&b).unwrap_or(0));
         debug_assert!(ring.degree(&tb).unwrap() <= ring.degree(&lhs).unwrap() - ring.degree(&b).unwrap_or(0));
     }
-    debug_assert!(ring.degree(&sa).unwrap_or(0) <= ring.degree(&rhs).unwrap().saturating_sub(ring.degree(&a).unwrap_or(0)));
-    debug_assert!(ring.degree(&ta).unwrap_or(0) <= ring.degree(&lhs).unwrap().saturating_sub(ring.degree(&a).unwrap_or(0)));
-    debug_assert!(ring.degree(&sb).unwrap_or(0) <= ring.degree(&rhs).unwrap().saturating_sub(ring.degree(&b).unwrap_or(0)));
-    debug_assert!(ring.degree(&tb).unwrap_or(0) <= ring.degree(&lhs).unwrap().saturating_sub(ring.degree(&b).unwrap_or(0)));
+    debug_assert!(
+        ring.degree(&sa).unwrap_or(0) <= ring.degree(&rhs).unwrap().saturating_sub(ring.degree(&a).unwrap_or(0))
+    );
+    debug_assert!(
+        ring.degree(&ta).unwrap_or(0) <= ring.degree(&lhs).unwrap().saturating_sub(ring.degree(&a).unwrap_or(0))
+    );
+    debug_assert!(
+        ring.degree(&sb).unwrap_or(0) <= ring.degree(&rhs).unwrap().saturating_sub(ring.degree(&b).unwrap_or(0))
+    );
+    debug_assert!(
+        ring.degree(&tb).unwrap_or(0) <= ring.degree(&lhs).unwrap().saturating_sub(ring.degree(&b).unwrap_or(0))
+    );
     return ([sa, ta, sb, tb], [a, b]);
 }
 
@@ -220,7 +228,10 @@ where
                 .filter(|(_, i)| *i >= split_deg)
                 .map(|(c, i)| (c.clone(), i - split_deg)),
         );
-        debug_assert_eq!(poly_ring.degree(&lhs_upper).unwrap_or(0), ldeg.saturating_sub(split_deg));
+        debug_assert_eq!(
+            poly_ring.degree(&lhs_upper).unwrap_or(0),
+            ldeg.saturating_sub(split_deg)
+        );
         let mut lhs_lower = lhs;
         poly_ring.truncate_monomials(&mut lhs_lower, split_deg);
         let rhs_upper = poly_ring.from_terms(
@@ -229,7 +240,10 @@ where
                 .filter(|(_, i)| *i >= split_deg)
                 .map(|(c, i)| (c.clone(), i - split_deg)),
         );
-        debug_assert_eq!(poly_ring.degree(&rhs_upper).unwrap_or(0), rdeg.saturating_sub(split_deg));
+        debug_assert_eq!(
+            poly_ring.degree(&rhs_upper).unwrap_or(0),
+            rdeg.saturating_sub(split_deg)
+        );
         let mut rhs_lower = rhs;
         poly_ring.truncate_monomials(&mut rhs_lower, split_deg);
 
