@@ -16,9 +16,8 @@ use tracing::instrument;
 
 use crate::algorithms::int_bisect::root_floor;
 use crate::algorithms::int_factor::factor;
-use crate::algorithms::linsolve::LinSolveRingStore;
+use crate::algorithms::lattices::{lattice_eq, lattice_p_saturation_tower};
 use crate::algorithms::linsolve::smith::{determinant_using_pre_smith, pre_smith};
-use crate::algorithms::lll::exact::lll;
 use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
 use crate::group::{HashableGroupEl, MultGroup, *};
 use crate::homomorphism::Homomorphism;
@@ -27,15 +26,14 @@ use crate::matrix::transform::TransformTarget;
 use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
-use crate::ring_impls::rational::RationalField;
 use crate::ring_impls::zn::{ZnRing, ZnRingStore, zn_big};
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
-use crate::ring_properties::field::FieldStore;
 use crate::ring_properties::finite::FiniteRingStore;
 use crate::ring_properties::integer::{BigIntRing, int_cast};
 use crate::ring_properties::ordered::OrderedRingStore;
 use crate::ring_properties::pid::PrincipalIdealRingStore;
 use crate::ring_properties::serialization::{DeserializeWithRing, SerializeWithRing};
+use crate::seq::VectorView;
 
 /// Represents a subgroup of an [`AbelianGroupBase`] by a set of generators.
 /// Supports computing discrete logarithms, i.e. representing a given element
@@ -55,7 +53,7 @@ pub struct SubgroupBase<G: AbelianGroupStore> {
     /// the `(i, j)`-th entry has rows that form a basis of the relation lattice of
     /// the set `n/pi^j g1, ..., n/pi^j gk` (where `n` is [`SubgroupBase::order_multiple`],
     /// and the `pi^ei` are its prime power factors)
-    scaled_relation_lattices: Vec<Vec<OwnedMatrix<i64>>>,
+    scaled_relation_lattices_: Vec<Vec<OwnedMatrix<i64>>>,
     /// the `(i, j, k)`-th entry contains `sum_l row[l] n/pi^(j + 1) gl`, where
     /// `row` is the `k`-th row of `scaled_relation_lattice[i, j]`; These values
     /// are important, since they form a basis of the `p`-torsion subgroup of
@@ -89,7 +87,7 @@ impl<G: AbelianGroupStore> Subgroup<G> {
                     .map(|(p, e)| (int_cast(p, ZZi64, ZZbig), e))
                     .collect(),
                 scaled_generating_sets: Vec::new(),
-                scaled_relation_lattices: Vec::new(),
+                scaled_relation_lattices_: Vec::new(),
             });
         } else {
             let mut result = Self::new(group, order_multiple.clone(), Vec::new());
@@ -155,7 +153,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         }
         for i in 0..self.order_factorization.len() {
             let (p, e) = self.order_factorization[i];
-            let relation_lattice = self.scaled_relation_lattices[i][e].data();
+            let relation_lattice = self.scaled_relation_lattices_[i][e].data();
             let Zpne = zn_big::ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, ZZi64), e * n));
             let mod_pne = Zpne.can_hom(&ZZi64).unwrap();
             let relation_lattice_det = determinant_using_pre_smith(
@@ -230,7 +228,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 new_scaled_relation_lattices.push(
                     (0..(e - e_old))
                         .map(|_| OwnedMatrix::identity(k, k, ZZi64))
-                        .chain(self.scaled_relation_lattices[idx_old].drain(..))
+                        .chain(self.scaled_relation_lattices_[idx_old].drain(..))
                         .collect(),
                 );
             } else {
@@ -257,7 +255,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         self.order_factorization = new_factorization;
         self.order_multiple = new_order_multiple;
         self.scaled_generating_sets = new_scaled_generating_sets;
-        self.scaled_relation_lattices = new_scaled_relation_lattices;
+        self.scaled_relation_lattices_ = new_scaled_relation_lattices;
     }
 
     fn compute_scaled_generating_set<I>(
@@ -277,12 +275,12 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         for i in 0..e {
             let generating_set = scaled_relation_lattices[i]
                 .data()
-                .row_iter()
-                .map(|row| {
+                .col_iter()
+                .map(|col| {
                     let scale = ZZbig.pow(int_cast(p, ZZbig, ZZi64), e - i - 1);
                     let result = gens
                         .clone()
-                        .zip(row.iter())
+                        .zip(col.as_iter())
                         .fold(group.identity(), |current, (g, pow)| {
                             group.op(
                                 current,
@@ -332,7 +330,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             let mut main_relation_matrix = OwnedMatrix::zero(n + 1, n + 1, ZZi64);
             for i in 0..n {
                 for j in 0..n {
-                    *main_relation_matrix.at_mut(i, j) = *self.scaled_relation_lattices[p_idx][e].at(i, j);
+                    *main_relation_matrix.at_mut(i, j) = *self.scaled_relation_lattices_[p_idx][e].at(i, j);
                 }
             }
             *main_relation_matrix.at_mut(n, n) = -ZZi64.pow(p, e);
@@ -344,25 +342,21 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 ) {
                     *main_relation_matrix.at_mut(n, n) = -ZZi64.pow(p, k);
                     for j in 0..n {
-                        *main_relation_matrix.at_mut(n, j) = dlog[j];
+                        *main_relation_matrix.at_mut(j, n) = dlog[j];
                     }
                     break;
                 }
             }
-            debug_assert!(main_relation_matrix.data().row_iter().all(|row| group.is_identity(
-                &(0..n).fold(group.pow(new_gen.clone(), row[n]), |current, i| {
-                    group.op(current, group.pow(gens[i].clone(), row[i]))
+            debug_assert!(main_relation_matrix.data().col_iter().all(|col| group.is_identity(
+                &(0..n).fold(group.pow(new_gen.clone(), *col.at(n)), |current, i| {
+                    group.op(current, group.pow(gens[i].clone(), *col.at(i)))
                 })
             )));
 
             let mut result = Vec::with_capacity(e + 1);
-            result.push(main_relation_matrix);
-            for _ in 0..e {
-                result.push(Self::relation_lattice_basis_downscale_p(
-                    result.last().unwrap().data(),
-                    p,
-                ));
-            }
+            result.extend(lattice_p_saturation_tower(ZZi64, p, main_relation_matrix));
+            debug_assert!(result.len() <= e + 1);
+            result.resize_with(e + 1, || OwnedMatrix::identity(n + 1, n + 1, ZZi64));
             result.reverse();
             scaled_relation_lattices.push(result);
             scaled_generating_sets.push(Self::compute_scaled_generating_set(
@@ -389,7 +383,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             order_multiple: self.order_multiple.clone(),
             order_factorization: self.order_factorization.clone(),
             scaled_generating_sets,
-            scaled_relation_lattices,
+            scaled_relation_lattices_: scaled_relation_lattices,
             parent: self.parent,
         };
     }
@@ -464,7 +458,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             let mut result = (0..n).map(|_| 0).collect::<Vec<_>>();
             STANDARD_MATMUL.matmul(
                 TransposableSubmatrix::from(Submatrix::from_1d(&H_dlog_wrt_H_gens, 1, n)),
-                TransposableSubmatrix::from(self.scaled_relation_lattices[p_idx][e - 1].data()),
+                TransposableSubmatrix::from(self.scaled_relation_lattices_[p_idx][e - 1].data()).transpose(),
                 TransposableSubmatrixMut::from(SubmatrixMut::from_1d(&mut result, 1, n)),
                 ZZi64,
             );
@@ -552,7 +546,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
 
         let Zpne = zn_big::ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, ZZi64), e * n));
         let mod_pne = Zpne.can_hom(&ZZi64).unwrap();
-        let relation_lattice = self.scaled_relation_lattices[p_idx][e].data();
+        let relation_lattice = self.scaled_relation_lattices_[p_idx][e].data();
         let mut relation_lattice_mod_pne =
             OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| {
                 mod_pne.map(*relation_lattice.at(k, l))
@@ -604,11 +598,11 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
 
         pre_smith(
             &Zpne,
-            &mut (),
             &mut TransformGenerators {
                 group,
                 generators: &mut generators,
             },
+            &mut (),
             relation_lattice_mod_pne.data_mut(),
         );
 
@@ -661,57 +655,6 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             },
             |_, x| *x,
         )
-    }
-
-    /// Takes a matrix whose rows form a basis of the relation lattice w.r.t. group
-    /// elements `g1, ..., gn` and computes a matrix whose rows form a basis of the relation
-    /// lattice of `p g1, ..., p gn`.
-    #[instrument(skip_all, level = "trace")]
-    fn relation_lattice_basis_downscale_p<V>(basis: Submatrix<V, i64>, p: i64) -> OwnedMatrix<i64>
-    where
-        V: AsPointerToSlice<i64>,
-    {
-        let n = basis.row_count();
-        assert_eq!(n, basis.col_count());
-
-        let QQ = RationalField::new(ZZbig);
-        let ZZ_to_QQ = QQ.inclusion().compose(QQ.base_ring().can_hom(&ZZi64).unwrap());
-        let as_ZZ = |x| int_cast(ZZbig.checked_div(QQ.num(x), QQ.den(x)).unwrap(), ZZi64, ZZbig);
-
-        let mut dual_basis = OwnedMatrix::identity(n, 2 * n, &QQ);
-        let mut Binv = dual_basis.data_mut().submatrix(0..n, n..(2 * n));
-        let mut rhs = OwnedMatrix::identity(n, n, &QQ);
-        QQ.solve_right(
-            OwnedMatrix::from_fn(n, n, |i, j| ZZ_to_QQ.map_ref(basis.at(i, j))).data_mut(),
-            rhs.data_mut(),
-            Binv.reborrow(),
-        )
-        .assert_solved();
-        Binv.reborrow()
-            .row_iter()
-            .flat_map(|row| row.iter_mut())
-            .for_each(|x| ZZ_to_QQ.mul_assign_map(x, p));
-
-        let mut identity = OwnedMatrix::identity(n, n, &QQ);
-        lll(
-            dual_basis.data_mut(),
-            QQ.identity(),
-            &QQ.div(&ZZ_to_QQ.map(9), &ZZ_to_QQ.map(10)),
-            false,
-            &mut (),
-        );
-
-        let mut result_QQ = rhs;
-        QQ.solve_right(
-            dual_basis.data_mut().submatrix(0..n, n..(2 * n)),
-            identity.data_mut(),
-            result_QQ.data_mut(),
-        )
-        .assert_solved();
-
-        let result = OwnedMatrix::from_fn(n, n, |i, j| as_ZZ(result_QQ.at(i, j)));
-
-        return result;
     }
 }
 
@@ -858,8 +801,8 @@ where
                 .iter()
                 .map(|sets| sets.iter().map(|set| set.iter().map(|g| g.clone()).collect()).collect())
                 .collect(),
-            scaled_relation_lattices: self
-                .scaled_relation_lattices
+            scaled_relation_lattices_: self
+                .scaled_relation_lattices_
                 .iter()
                 .map(|x| x.iter().map(|x| x.clone()).collect())
                 .collect(),
@@ -927,7 +870,7 @@ where
                 ),
                 order_factorization: max_order_factorization,
                 scaled_generating_sets: Vec::new(),
-                scaled_relation_lattices: Vec::new(),
+                scaled_relation_lattices_: Vec::new(),
             });
         } else {
             let mut result = Self::for_zn(group, Vec::new());
@@ -1181,6 +1124,8 @@ use crate::assert_matrix_eq;
 use crate::group::AddGroup;
 #[cfg(test)]
 use crate::ring_impls::zn::zn_static::Zn;
+#[cfg(test)]
+use crate::algorithms::linsolve::LinSolveRingStore;
 
 #[test]
 fn test_baby_giant_step() {
@@ -1220,57 +1165,53 @@ fn test_baby_giant_step() {
 fn test_padic_relation_lattice() {
     feanor_tracing::DelayedLogger::init_test();
     let G = AddGroup::new(Zn::<81>::RING);
-    let ZZi64_inner_prod = |l: &[i64], r: &[i64]| ZZi64.get_ring().inner_product_ref(l.iter().zip(r.iter()));
+    let ZZi64_inner_prod = |l: Column<_, _>, r: &[i64]| ZZi64.get_ring().inner_product_ref(l.as_iter().zip(r.iter()));
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![1]);
-    assert_matrix_eq!(ZZi64, [[-81]], subgroup.get_group().scaled_relation_lattices[0][4]);
-    assert_matrix_eq!(ZZi64, [[-27]], subgroup.get_group().scaled_relation_lattices[0][3]);
-    assert_matrix_eq!(ZZi64, [[-9]], subgroup.get_group().scaled_relation_lattices[0][2]);
-    assert_matrix_eq!(ZZi64, [[-3]], subgroup.get_group().scaled_relation_lattices[0][1]);
-    assert_matrix_eq!(ZZi64, [[1]], subgroup.get_group().scaled_relation_lattices[0][0]);
+    assert_matrix_eq!(ZZi64, [[-81]], subgroup.get_group().scaled_relation_lattices_[0][4]);
+    assert_matrix_eq!(ZZi64, [[-27]], subgroup.get_group().scaled_relation_lattices_[0][3]);
+    assert_matrix_eq!(ZZi64, [[-9]], subgroup.get_group().scaled_relation_lattices_[0][2]);
+    assert_matrix_eq!(ZZi64, [[-3]], subgroup.get_group().scaled_relation_lattices_[0][1]);
+    assert_matrix_eq!(ZZi64, [[-1]], subgroup.get_group().scaled_relation_lattices_[0][0]);
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 6]);
-    let matrix = &subgroup.get_group().scaled_relation_lattices[0][4];
-    assert_eq!(-27, *matrix.at(0, 0));
-    assert_eq!(-1, *matrix.at(1, 1));
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[3, 6]) % 81);
+    let matrix = &subgroup.get_group().scaled_relation_lattices_[0][4];
+    let expected = OwnedMatrix::new(vec![1, 0, 13, 27], 2, 2);
+    assert!(lattice_eq(ZZi64, expected.data(), matrix.data()));
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[3, 6]) % 81);
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 9]);
-    let matrix = &subgroup.get_group().scaled_relation_lattices[0][4];
-    assert_eq!(-27, *matrix.at(0, 0));
-    assert_eq!(-1, *matrix.at(1, 1));
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[3, 9]) % 81);
+    let matrix = &subgroup.get_group().scaled_relation_lattices_[0][4];
+    let expected = OwnedMatrix::new(vec![3, 0, -1, 9], 2, 2);
+    assert!(lattice_eq(ZZi64, expected.data(), matrix.data()));
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[3, 9]) % 81);
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![6, 18, 9]);
-    let matrix = &subgroup.get_group().scaled_relation_lattices[0][4];
-    assert_eq!(-27, *matrix.at(0, 0));
-    assert_eq!(-1, *matrix.at(1, 1));
-    assert_eq!(-1, *matrix.at(2, 2));
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[6, 18, 9]) % 81);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(2), &[6, 18, 9]) % 81);
+    let matrix = &subgroup.get_group().scaled_relation_lattices_[0][4];
+    let expected = OwnedMatrix::new(vec![0, 3, 0, 1, -1, 0, -2, 0, 9], 3, 3);
+    assert!(lattice_eq(ZZi64, expected.data(), matrix.data()));
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[6, 18, 9]) % 81);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(2), &[6, 18, 9]) % 81);
 
     let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<81>::RING)));
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![[1, 4], [1, 1]]);
-    let matrix = &subgroup.get_group().scaled_relation_lattices[0][4];
-    assert_eq!(-81, *matrix.at(0, 0));
-    assert_eq!(-27, *matrix.at(1, 1));
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[1, 1]) % 81);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[4, 1]) % 81);
+    let matrix = &subgroup.get_group().scaled_relation_lattices_[0][4];
+    let expected = OwnedMatrix::new(vec![81, 27, 0, -27], 2, 2);
+    assert!(lattice_eq(ZZi64, expected.data(), matrix.data()));
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[1, 1]) % 81);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[4, 1]) % 81);
 
     let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<8>::RING)));
 
     let subgroup = Subgroup::new(&G, int_cast(8, ZZbig, ZZi64), vec![[6, 3, 5], [6, 2, 6], [4, 5, 7]]);
-    let matrix = &subgroup.get_group().scaled_relation_lattices[0][3];
-    assert_eq!(-8, *matrix.at(0, 0));
-    assert_eq!(-4, *matrix.at(1, 1));
-    assert_eq!(-2, *matrix.at(2, 2));
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[6, 6, 4]) % 8);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[3, 2, 5]) % 8);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(1), &[5, 6, 7]) % 8);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(2), &[6, 6, 4]) % 8);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(2), &[3, 2, 5]) % 8);
-    assert_eq!(0, ZZi64_inner_prod(matrix.data().row_at(2), &[5, 6, 7]) % 8);
+    let matrix = &subgroup.get_group().scaled_relation_lattices_[0][3];
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[6, 6, 4]) % 8);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[3, 2, 5]) % 8);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(1), &[5, 6, 7]) % 8);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(2), &[6, 6, 4]) % 8);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(2), &[3, 2, 5]) % 8);
+    assert_eq!(0, ZZi64_inner_prod(matrix.data().col_at(2), &[5, 6, 7]) % 8);
 }
 
 #[test]
@@ -1371,40 +1312,6 @@ fn test_zn_multiplicative_order() {
     assert_eq!(4, multiplicative_order(ring.pow(g1, 4), ring));
     assert_eq!(2, multiplicative_order(ring.pow(g1, 8), ring));
     assert_eq!(2, multiplicative_order(g2, ring));
-}
-
-#[test]
-fn test_increase_order_multiple() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<153>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
-
-    let mut group1 = Subgroup::for_zn(group, vec![g1.clone(), g2.clone()]).into();
-    group1.increase_order_multiple(int_cast(96 * 18 * 17, ZZbig, ZZi64));
-    let group2 = Subgroup::new(group, int_cast(96 * 18 * 17, ZZbig, ZZi64), vec![g1, g2]).into();
-
-    let mut tmp = OwnedMatrix::zero(2, 2, ZZi64);
-    assert_eq!(
-        group1.scaled_relation_lattices.len(),
-        group2.scaled_relation_lattices.len()
-    );
-    for (l, r) in group1
-        .scaled_relation_lattices
-        .iter()
-        .zip(&group2.scaled_relation_lattices)
-    {
-        assert_eq!(l.len(), r.len());
-        for (l, r) in l.iter().zip(r) {
-            ZZi64
-                .solve_right(l.clone().data_mut(), r.clone().data_mut(), tmp.data_mut())
-                .assert_solved();
-            ZZi64
-                .solve_right(r.clone().data_mut(), l.clone().data_mut(), tmp.data_mut())
-                .assert_solved();
-        }
-    }
 }
 
 #[test]

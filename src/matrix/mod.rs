@@ -1,4 +1,4 @@
-use std::fmt::Display;
+use std::fmt::{Display, Debug};
 
 use crate::prelude::*;
 
@@ -16,7 +16,7 @@ pub use transpose::*;
 pub mod transform;
 
 #[stability::unstable(feature = "enable")]
-pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ring: R) -> impl 'a + Display
+pub fn format_matrix<'a, M, R>(row_count: usize, col_count: usize, matrix: M, ring: R) -> impl 'a + Debug + Display
 where
     R: 'a + RingStore,
     El<R>: 'a,
@@ -57,6 +57,12 @@ where
                 }
             }
             return Ok(());
+        }
+    }
+
+    impl<'a, R: 'a + RingStore, M: Fn(usize, usize) -> &'a El<R>> Debug for DisplayWrapper<'a, R, M> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "{}", self)
         }
     }
 
