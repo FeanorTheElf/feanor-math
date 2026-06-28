@@ -1039,6 +1039,21 @@ where
 }
 
 /// Alias for `<<Self as RingStore>::Type as RingBase>::Element`.
+/// 
+/// # Attempt of introducing a trait `HasElements`
+/// 
+/// I once tried to introduce a trait
+/// ```ignore
+/// trait HasElements {
+///     type Element;
+/// }
+/// ```
+/// and make this a supertrait for [`RingBase`], [`RingStore`] and groups.
+/// That would enable using [`El`] for all of these. Unfortunately, even
+/// when restricting the `type Ring` in [`RingStore`] to `RingBase<Element = Self::Element>`,
+/// the compiler didn't realize that `El<RingStore>` and `El<RingBase>` were the
+/// same. While this could be fixed, the verbosity this would introduce seems
+/// prohibitive.
 pub type El<R> = <<R as RingStore>::Ring as RingBase>::Element;
 
 /// The most fundamental [`crate::ring::RingStore`]. It is basically
