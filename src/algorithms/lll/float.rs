@@ -409,6 +409,10 @@ where
     T: TransformTarget<I>,
 {
     assert_eq!(quadratic_form.row_count(), quadratic_form.col_count());
+    if quadratic_form.row_count() == 0 {
+        return Ok(());
+    }
+
     assert!(!h.domain().get_ring().is_approximate());
     let RR = h.codomain();
 

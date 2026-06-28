@@ -9,8 +9,6 @@ pub mod buchberger;
 pub mod convolution;
 /// Contains [`cyclotomic::cyclotomic_polynomial()`] for computing cyclotomic polynomials.
 pub mod cyclotomic;
-/// Contains various algorithms for computing discrete logarithms over generic monoids.
-pub mod subgroup;
 /// Contains an implementation of Lenstra's ECM factoring algorithm.
 pub mod ec_factor;
 /// Contains an implementation of the Sieve of Erathostenes, for enumerating
@@ -38,6 +36,8 @@ pub mod int_bisect;
 pub mod int_factor;
 /// Contains algorithms for polynomial interpolation.
 pub mod interpolate;
+/// Contains algorithms for the union, intersection etc of lattices.
+pub mod lattices;
 /// Contains [`linsolve::LinSolveRing`] for rings over which we can solve linear systems.
 ///
 /// Additionally contains most of the algorithms for actually solving linear systems over
@@ -84,3 +84,5 @@ pub mod resultant;
 /// Contains [`sqr_mul::generic_abs_square_and_multiply()`] and other functions
 /// for computing a power of an element in a generic monoid.
 pub mod sqr_mul;
+/// Contains various algorithms for computing discrete logarithms over generic monoids.
+pub mod subgroup;

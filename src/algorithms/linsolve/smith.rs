@@ -333,7 +333,7 @@ where
 fn test_smith_integers() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZi64;
-    let mut A = OwnedMatrix::new(vec![1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6], 4);
+    let mut A = OwnedMatrix::new(vec![1, 2, 3, 4, 2, 3, 4, 5, 3, 4, 5, 6], 3, 4);
     let original_A = A.clone();
     let mut L: OwnedMatrix<i64> = OwnedMatrix::identity(3, 3, ZZi64);
     let mut R: OwnedMatrix<i64> = OwnedMatrix::identity(4, 4, ZZi64);
@@ -353,7 +353,11 @@ fn test_smith_integers() {
 fn test_smith_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
-    let mut A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
+    let mut A = OwnedMatrix::new(
+        vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39],
+        5,
+        4,
+    );
     let original_A = A.clone();
     let mut L: OwnedMatrix<u64> = OwnedMatrix::identity(5, 5, ring);
     let mut R: OwnedMatrix<u64> = OwnedMatrix::identity(4, 4, ring);
@@ -377,9 +381,10 @@ fn test_smith_zn() {
 fn test_solve_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
-    let A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 4);
+    let A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 5, 4);
     let B = OwnedMatrix::new(
         vec![11, 43, 10, 22, 18, 9, 27, 27, 8, 34, 7, 22, 41, 13, 40, 37, 3, 9, 3, 0],
+        5,
         4,
     );
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 4, ring);
@@ -393,8 +398,8 @@ fn test_solve_zn() {
 #[test]
 fn test_unique_solution_correct() {
     let ring = zn_static::Zn::<45>::RING;
-    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 4);
-    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 1);
+    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1], 4, 4);
+    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 4, 1);
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
     assert_eq!(
         SolveResult::FoundUniqueSolution,
@@ -403,8 +408,8 @@ fn test_unique_solution_correct() {
     );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 
-    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], 4);
-    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 1);
+    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0], 4, 4);
+    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 4, 1);
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
     assert_eq!(
         SolveResult::FoundSomeSolution,
@@ -413,8 +418,8 @@ fn test_unique_solution_correct() {
     );
     assert_matrix_eq!(&ring, &multiply([A.data(), solution.data()], ring), &B);
 
-    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3], 4);
-    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 1);
+    let A = OwnedMatrix::new(vec![1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 1, 0, 0, 0, 0, 3], 4, 4);
+    let B = OwnedMatrix::new(vec![1, 1, 0, 0], 4, 1);
     let mut solution: OwnedMatrix<_> = OwnedMatrix::zero(4, 1, ring);
     assert_eq!(
         SolveResult::FoundSomeSolution,
@@ -428,7 +433,7 @@ fn test_unique_solution_correct() {
 fn test_solve_int() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZi64;
-    let A = OwnedMatrix::new(vec![3, 6, 2, 0, 4, 7, 5, 5, 4, 5, 5, 5], 6);
+    let A = OwnedMatrix::new(vec![3, 6, 2, 0, 4, 7, 5, 5, 4, 5, 5, 5], 2, 6);
     let B: OwnedMatrix<i64> = OwnedMatrix::identity(2, 2, ring);
     let mut solution: OwnedMatrix<i64> = OwnedMatrix::zero(6, 2, ring);
     ring.get_ring()
@@ -468,7 +473,7 @@ fn test_large() {
 fn test_determinant() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = ZZi64;
-    let A = OwnedMatrix::new(vec![1, 0, 3, 2, 1, 0, 9, 8, 7], 3);
+    let A = OwnedMatrix::new(vec![1, 0, 3, 2, 1, 0, 9, 8, 7], 3, 3);
     assert_el_eq!(
         ring,
         (7 + 48 - 27),
@@ -517,7 +522,7 @@ fn test_determinant() {
     }
 
     let ring = RingValue::from(TestRing);
-    let A = OwnedMatrix::new(vec![9, 0, 15, 3], 2);
+    let A = OwnedMatrix::new(vec![9, 0, 15, 3], 2, 2);
     assert_el_eq!(
         ring,
         27,
@@ -538,7 +543,7 @@ fn test_kernel_basis() {
         kernel_basis_using_pre_smith(ring, A.data_mut(), Global)
     );
 
-    let A = OwnedMatrix::new(vec![1, 1, 2, 3, 2, 1], 3);
+    let A = OwnedMatrix::new(vec![1, 1, 2, 3, 2, 1], 2, 3);
     let B = kernel_basis_using_pre_smith(ring, A.clone().data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert!(!ring.is_zero(B.at(0, 0)));
@@ -551,7 +556,7 @@ fn test_kernel_basis() {
     );
     assert_matrix_eq!(ring, [[0], [0]], product);
 
-    let A = OwnedMatrix::new(vec![1, 1, 1, 1, 1, 1], 2);
+    let A = OwnedMatrix::new(vec![1, 1, 1, 1, 1, 1], 3, 2);
     let B = kernel_basis_using_pre_smith(ring, A.clone().data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert!(!ring.is_zero(B.at(0, 0)));
@@ -565,7 +570,7 @@ fn test_kernel_basis() {
     assert_matrix_eq!(ring, [[0], [0], [0]], product);
 
     let ring = Zn64B::new(6);
-    let A = OwnedMatrix::new(vec![ring.int_hom().map(2)], 1);
+    let A = OwnedMatrix::new(vec![ring.int_hom().map(2)], 1, 1);
     let B = kernel_basis_using_pre_smith(ring, A.clone().data_mut(), Global);
     assert_eq!(1, B.col_count());
     assert_matrix_eq!(ring, [[ring.int_hom().map(3)]], B);

@@ -448,31 +448,31 @@ where
 fn test_float_qr() {
     feanor_tracing::DelayedLogger::init_test();
     let RR = Real64::RING;
-    let a = OwnedMatrix::new_with_shape(vec![0.0, 1.0, 1.0, 0.0], 2, 2);
+    let a = OwnedMatrix::new(vec![0.0, 1.0, 1.0, 0.0], 2, 2);
     let mut r = a.clone();
     let mut q = OwnedMatrix::zero(2, 2, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
+    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
     let mut r = a.clone();
     let mut q = OwnedMatrix::zero(3, 3, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
+    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
     let mut r = a.clone();
     let mut q = OwnedMatrix::zero(2, 2, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(vec![1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 0.0, 0.0, 1.0], 3, 3);
+    let a = OwnedMatrix::new(vec![1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 0.0, 0.0, 1.0], 3, 3);
     let mut r = a.clone();
     let mut q = OwnedMatrix::zero(3, 3, RR);
     RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
     assert_is_correct_qr(a.data(), q.data(), r.data());
 
-    let a = OwnedMatrix::new_with_shape(
+    let a = OwnedMatrix::new(
         (1..31)
             .map(|x| x as f64 * if x % 2 == 0 { -1.0 } else { 1.0 })
             .collect::<Vec<_>>(),
@@ -489,7 +489,7 @@ fn test_float_qr() {
 fn test_float_qdr() {
     feanor_tracing::DelayedLogger::init_test();
     let RR = Real64::RING;
-    let a = OwnedMatrix::new_with_shape((1..10).map(|c| c as f64).collect(), 3, 3);
+    let a = OwnedMatrix::new((1..10).map(|c| c as f64).collect(), 3, 3);
     let mut r = a.clone();
     let mut q = OwnedMatrix::zero(3, 3, RR);
     let diags = RR.get_ring().scaled_qr_decomposition(r.data_mut(), q.data_mut());
@@ -509,18 +509,18 @@ fn test_float_qdr() {
 fn test_float_ldl() {
     feanor_tracing::DelayedLogger::init_test();
     let RR = Real64::RING;
-    let a = OwnedMatrix::new_with_shape(vec![5.0, 1.0, 1.0, 5.0], 2, 2);
+    let a = OwnedMatrix::new(vec![5.0, 1.0, 1.0, 5.0], 2, 2);
     let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
-    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, 20.0], 3, 3);
+    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, 20.0], 3, 3);
     let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
     let mut a = OwnedMatrix::zero(5, 5, RR);
-    let factor = OwnedMatrix::new((0..25).map(|c| (c as f64).powi(2)).collect(), 5);
+    let factor = OwnedMatrix::new((0..25).map(|c| (c as f64).powi(2)).collect(), 5, 5);
     STANDARD_MATMUL.matmul(
         TransposableSubmatrix::from(factor.data()),
         TransposableSubmatrix::from(factor.data()).transpose(),
@@ -531,7 +531,7 @@ fn test_float_ldl() {
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
 
-    let a = OwnedMatrix::new_with_shape(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, -20.0], 3, 3);
+    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, -20.0], 3, 3);
     let mut l = a.clone();
     let d = RR.get_ring().ldl_decomposition(l.data_mut());
     assert_is_correct_ldl(a.data(), l.data(), &d);
@@ -541,7 +541,7 @@ fn test_float_ldl() {
 fn test_rational_qdr() {
     feanor_tracing::DelayedLogger::init_test();
     let QQ = RationalField::new(ZZi64);
-    let mut actual_r = OwnedMatrix::new_with_shape((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
+    let mut actual_r = OwnedMatrix::new((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
     let mut actual_q = OwnedMatrix::zero(3, 3, &QQ);
     let diags = QQ
         .get_ring()

@@ -58,27 +58,8 @@ impl<T> OwnedMatrix<T> {
 
 impl<T, A: Allocator> OwnedMatrix<T, A> {
     /// Creates the `row_count x col_count` [`OwnedMatrix`] matrix, whose entries are
-    /// taken from the given vector, interpreted as a row-major matrix. The number of
-    /// rows is `row_count = data.len() / col_count`.
-    ///
-    /// If `col_count` is zero, this will panic. If that can happen, consider
-    /// using [`OwnedMatrix::new_with_shape()`].
-    pub fn new(data: Vec<T, A>, col_count: usize) -> Self {
-        let row_count = data.len() / col_count;
-        Self::new_with_shape(data, row_count, col_count)
-    }
-
-    /// Creates the `row_count x col_count` [`OwnedMatrix`] matrix, whose entries are
     /// taken from the given vector, interpreted as a row-major matrix.
-    ///
-    /// # Example
-    /// ```
-    /// # use feanor_math::matrix::*;
-    /// let matrix = OwnedMatrix::new_with_shape(vec![1, 2, 3, 4, 5, 6], 3, 2);
-    /// assert_eq!(3, *matrix.at(1, 0));
-    /// assert_eq!(6, *matrix.at(2, 1));
-    /// ```
-    pub fn new_with_shape(data: Vec<T, A>, row_count: usize, col_count: usize) -> Self {
+    pub fn new(data: Vec<T, A>, row_count: usize, col_count: usize) -> Self {
         assert_eq!(row_count * col_count, data.len());
         Self {
             data,
@@ -100,7 +81,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 data.push(f(i, j));
             }
         }
-        return Self::new_with_shape(data, row_count, col_count);
+        return Self::new(data, row_count, col_count);
     }
 
     /// Returns a [`Submatrix`] view on the data of this matrix.
@@ -140,7 +121,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 result.push(ring.zero());
             }
         }
-        return Self::new_with_shape(result, row_count, col_count);
+        return Self::new(result, row_count, col_count);
     }
 
     /// Creates the `row_count x col_count` identity matrix over the given ring.
@@ -159,7 +140,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
                 }
             }
         }
-        return Self::new_with_shape(result, row_count, col_count);
+        return Self::new(result, row_count, col_count);
     }
 
     #[stability::unstable(feature = "enable")]
@@ -188,7 +169,7 @@ impl<T: Clone, A: Allocator + Clone> Clone for OwnedMatrix<T, A> {
 #[test]
 fn test_zero_col_matrix() {
     feanor_tracing::DelayedLogger::init_test();
-    let A: OwnedMatrix<i64> = OwnedMatrix::new_with_shape(Vec::new(), 10, 0);
+    let A: OwnedMatrix<i64> = OwnedMatrix::new(Vec::new(), 10, 0);
     assert_eq!(0, A.col_count());
     assert_eq!(10, A.row_count());
 
