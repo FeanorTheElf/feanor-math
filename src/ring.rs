@@ -774,24 +774,19 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     }
 
     /// Raises the given element to the given power.
-    fn pow(&self, mut x: El<Self>, power: usize) -> El<Self> {
-        // special cases to increase performance
-        if power == 0 {
-            return self.one();
-        } else if power == 1 {
-            return x;
-        } else if power == 2 {
-            self.square(&mut x);
-            return x;
-        }
-        self.pow_gen(x, &power.try_into().unwrap(), ZZi64)
-    }
+    ///
+    /// See also [`RingBase::pow_gen()`] and [`RingStore::pow_gen()`].
+    fn pow(&self, x: El<Self>, power: usize) -> El<Self> { self.pow_gen(x, &power.try_into().unwrap(), ZZi64) }
+
+    /// Raises the given element to the given power.
+    ///
+    /// See also [`RingBase::pow_gen()`] and [`RingStore::pow_gen()`].
+    fn pow_bigint(&self, x: El<Self>, power: &El<BigIntRing>) -> El<Self> { self.pow_gen(x, power, ZZbig) }
 
     /// Raises the given element to the given power, which should be a positive integer
     /// belonging to an arbitrary [`IntegerRing`].
     ///
-    /// This can in particular be used to compute exponentiation when the exponent does
-    /// not fit in a `usize`.
+    /// See also [`RingBase::pow_gen()`].
     fn pow_gen<R: RingStore>(&self, x: El<Self>, power: &El<R>, integers: R) -> El<Self>
     where
         R::Ring: IntegerRing,
@@ -1039,9 +1034,9 @@ where
 }
 
 /// Alias for `<<Self as RingStore>::Type as RingBase>::Element`.
-/// 
+///
 /// # Attempt of introducing a trait `HasElements`
-/// 
+///
 /// I once tried to introduce a trait
 /// ```ignore
 /// trait HasElements {

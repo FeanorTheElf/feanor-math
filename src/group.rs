@@ -59,17 +59,21 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H);
 
     /// Raises a group element to the given power, i.e. computes `x * x * ... * x`,
-    /// in total `e` times.
-    fn pow(&self, x: &Self::Element, e: &El<BigIntRing>) -> Self::Element {
+    /// in total `power` times. Works also for negative values of `power`.
+    fn pow_gen<R>(&self, x: Self::Element, power: &El<R>, integers: R) -> Self::Element
+    where
+        R: RingStore,
+        R::Ring: IntegerRing,
+    {
         let res = generic_abs_square_and_multiply(
-            x.clone(),
-            e,
-            ZZbig,
+            x,
+            power,
+            &integers,
             |a| self.op_ref(&a, &a),
             |a, b| self.op_ref_snd(b, &a),
             self.identity(),
         );
-        if !ZZbig.is_neg(e) { res } else { self.inv(&res) }
+        if !integers.is_neg(power) { res } else { self.inv(&res) }
     }
 
     /// Checks whether the given element is the identity element of the group.
@@ -81,9 +85,10 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
 }
 
 /// Alias for the type of elements of a group underlying an `AbelianGroupStore`.
+///
+/// Analogue of [`El`] for rings.
 #[stability::unstable(feature = "enable")]
-#[allow(type_alias_bounds)]
-pub type GroupEl<G: AbelianGroupStore> = <G::Type as AbelianGroupBase>::Element;
+pub type GEl<G> = <<G as AbelianGroupStore>::Group as AbelianGroupBase>::Element;
 
 /// Analogue of [`crate::delegate!`] for groups.
 #[macro_export]
@@ -91,13 +96,13 @@ macro_rules! delegate_group {
     ($base_trait:ty, fn $name:ident (&self, $($pname:ident: $ptype:ty),*) -> $rtype:ty) => {
         #[doc = concat!(" See [`", stringify!($base_trait), "::", stringify!($name), "()`]")]
         fn $name (&self, $($pname: $ptype),*) -> $rtype {
-            <Self::Type as $base_trait>::$name(self.get_group(), $($pname),*)
+            <Self::Group as $base_trait>::$name(self.get_group(), $($pname),*)
         }
     };
     ($base_trait:ty, fn $name:ident (&self) -> $rtype:ty) => {
         #[doc = concat!(" See [`", stringify!($base_trait), "::", stringify!($name), "()`]")]
         fn $name (&self) -> $rtype {
-            <Self::Type as $base_trait>::$name(self.get_group())
+            <Self::Group as $base_trait>::$name(self.get_group())
         }
     };
 }
@@ -108,22 +113,42 @@ macro_rules! delegate_group {
 /// the design of [`RingBase`] and [`RingStore`]. See there for details.
 #[stability::unstable(feature = "enable")]
 pub trait AbelianGroupStore: Send + Sync {
-    type Type: AbelianGroupBase;
+    type Group: AbelianGroupBase;
 
-    fn get_group(&self) -> &Self::Type;
+    fn get_group(&self) -> &Self::Group;
 
-    delegate_group! { AbelianGroupBase, fn eq_el(&self, lhs: &GroupEl<Self>, rhs: &GroupEl<Self>) -> bool }
-    delegate_group! { AbelianGroupBase, fn op(&self, lhs: GroupEl<Self>, rhs: GroupEl<Self>) -> GroupEl<Self> }
-    delegate_group! { AbelianGroupBase, fn op_ref(&self, lhs: &GroupEl<Self>, rhs: &GroupEl<Self>) -> GroupEl<Self> }
-    delegate_group! { AbelianGroupBase, fn op_ref_snd(&self, lhs: GroupEl<Self>, rhs: &GroupEl<Self>) -> GroupEl<Self> }
-    delegate_group! { AbelianGroupBase, fn inv(&self, x: &GroupEl<Self>) -> GroupEl<Self> }
-    delegate_group! { AbelianGroupBase, fn identity(&self) -> GroupEl<Self> }
-    delegate_group! { AbelianGroupBase, fn pow(&self, x: &GroupEl<Self>, e: &El<BigIntRing>) -> GroupEl<Self> }
-    delegate_group! { AbelianGroupBase, fn is_identity(&self, x: &GroupEl<Self>) -> bool }
+    delegate_group! { AbelianGroupBase, fn eq_el(&self, lhs: &GEl<Self>, rhs: &GEl<Self>) -> bool }
+    delegate_group! { AbelianGroupBase, fn op(&self, lhs: GEl<Self>, rhs: GEl<Self>) -> GEl<Self> }
+    delegate_group! { AbelianGroupBase, fn op_ref(&self, lhs: &GEl<Self>, rhs: &GEl<Self>) -> GEl<Self> }
+    delegate_group! { AbelianGroupBase, fn op_ref_snd(&self, lhs: GEl<Self>, rhs: &GEl<Self>) -> GEl<Self> }
+    delegate_group! { AbelianGroupBase, fn inv(&self, x: &GEl<Self>) -> GEl<Self> }
+    delegate_group! { AbelianGroupBase, fn identity(&self) -> GEl<Self> }
+    delegate_group! { AbelianGroupBase, fn is_identity(&self, x: &GEl<Self>) -> bool }
 
-    fn hash<H: Hasher>(&self, x: &GroupEl<Self>, hasher: &mut H) { self.get_group().hash(x, hasher) }
+    fn hash<H: Hasher>(&self, x: &GEl<Self>, hasher: &mut H) { self.get_group().hash(x, hasher) }
 
-    fn formatted_el<'a>(&'a self, x: &'a GroupEl<Self>) -> GroupElementDisplayWrapper<'a, Self::Type> {
+    /// Raises the given element to the given power.
+    ///
+    /// See also [`RingBase::pow_gen()`] and [`RingStore::pow_gen()`].
+    fn pow(&self, x: GEl<Self>, power: i64) -> GEl<Self> { self.pow_gen(x, &power, ZZi64) }
+
+    /// Raises the given element to the given power.
+    ///
+    /// See also [`RingBase::pow_gen()`] and [`RingStore::pow_gen()`].
+    fn pow_bigint(&self, x: GEl<Self>, power: &El<BigIntRing>) -> GEl<Self> { self.pow_gen(x, power, ZZbig) }
+
+    /// Raises the given element to the given power, which should be a positive integer
+    /// belonging to an arbitrary [`IntegerRing`].
+    ///
+    /// See also [`RingBase::pow_gen()`].
+    fn pow_gen<R: RingStore>(&self, x: GEl<Self>, power: &El<R>, integers: R) -> GEl<Self>
+    where
+        R::Ring: IntegerRing,
+    {
+        self.get_group().pow_gen(x, power, integers)
+    }
+
+    fn formatted_el<'a>(&'a self, x: &'a GEl<Self>) -> GroupElementDisplayWrapper<'a, Self::Group> {
         GroupElementDisplayWrapper {
             group: self.get_group(),
             element: x,
@@ -136,9 +161,9 @@ where
     G: Deref + Send + Sync,
     G::Target: AbelianGroupStore,
 {
-    type Type = <G::Target as AbelianGroupStore>::Type;
+    type Group = <G::Target as AbelianGroupStore>::Group;
 
-    fn get_group(&self) -> &Self::Type { (**self).get_group() }
+    fn get_group(&self) -> &Self::Group { (**self).get_group() }
 }
 
 /// Analogue of [`RingValue`] for groups.
@@ -162,9 +187,9 @@ impl<G: AbelianGroupBase + Sized> GroupValue<G> {
 }
 
 impl<G: AbelianGroupBase> AbelianGroupStore for GroupValue<G> {
-    type Type = G;
+    type Group = G;
 
-    fn get_group(&self) -> &Self::Type { &self.group }
+    fn get_group(&self) -> &Self::Group { &self.group }
 }
 
 impl<G: AbelianGroupBase + Clone> Clone for GroupValue<G> {
@@ -381,12 +406,12 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct HashableGroupEl<G: AbelianGroupStore> {
     group: G,
-    el: GroupEl<G>,
+    el: GEl<G>,
 }
 
 impl<G: AbelianGroupStore> HashableGroupEl<G> {
     #[stability::unstable(feature = "enable")]
-    pub fn new(group: G, el: GroupEl<G>) -> Self { Self { group, el } }
+    pub fn new(group: G, el: GEl<G>) -> Self { Self { group, el } }
 }
 
 impl<G: AbelianGroupStore> PartialEq for HashableGroupEl<G> {
@@ -423,7 +448,7 @@ pub trait SerializableElementGroup: AbelianGroupBase {
 #[derive(Clone)]
 pub struct DeserializeWithGroup<G: AbelianGroupStore>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     group: G,
 }
@@ -431,7 +456,7 @@ where
 impl<G> DeserializeWithGroup<G>
 where
     G: AbelianGroupStore,
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     #[stability::unstable(feature = "enable")]
     pub fn new(group: G) -> Self { Self { group } }
@@ -440,9 +465,9 @@ where
 impl<'de, G> DeserializeSeed<'de> for DeserializeWithGroup<G>
 where
     G: AbelianGroupStore,
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
-    type Value = GroupEl<G>;
+    type Value = GEl<G>;
 
     fn deserialize<D>(self, deserializer: D) -> Result<Self::Value, D::Error>
     where
@@ -457,23 +482,23 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct SerializeWithGroup<'a, G: AbelianGroupStore>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     group: G,
-    el: &'a GroupEl<G>,
+    el: &'a GEl<G>,
 }
 
 impl<'a, G: AbelianGroupStore> SerializeWithGroup<'a, G>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(el: &'a GroupEl<G>, group: G) -> Self { Self { el, group } }
+    pub fn new(el: &'a GEl<G>, group: G) -> Self { Self { el, group } }
 }
 
 impl<'a, G: AbelianGroupStore> Serialize for SerializeWithGroup<'a, G>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
@@ -488,23 +513,23 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct SerializeOwnedWithGroup<G: AbelianGroupStore>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     group: G,
-    el: GroupEl<G>,
+    el: GEl<G>,
 }
 
 impl<G: AbelianGroupStore> SerializeOwnedWithGroup<G>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     #[stability::unstable(feature = "enable")]
-    pub fn new(el: GroupEl<G>, group: G) -> Self { Self { el, group } }
+    pub fn new(el: GEl<G>, group: G) -> Self { Self { el, group } }
 }
 
 impl<G: AbelianGroupStore> Serialize for SerializeOwnedWithGroup<G>
 where
-    G::Type: SerializableElementGroup,
+    G::Group: SerializableElementGroup,
 {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where

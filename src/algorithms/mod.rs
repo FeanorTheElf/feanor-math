@@ -10,7 +10,7 @@ pub mod convolution;
 /// Contains [`cyclotomic::cyclotomic_polynomial()`] for computing cyclotomic polynomials.
 pub mod cyclotomic;
 /// Contains various algorithms for computing discrete logarithms over generic monoids.
-pub mod discrete_log;
+pub mod subgroup;
 /// Contains an implementation of Lenstra's ECM factoring algorithm.
 pub mod ec_factor;
 /// Contains an implementation of the Sieve of Erathostenes, for enumerating
