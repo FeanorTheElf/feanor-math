@@ -23,13 +23,14 @@ use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
 use crate::group::{HashableGroupEl, MultGroup, *};
 use crate::homomorphism::Homomorphism;
 use crate::iters::multi_cartesian_product;
-use crate::matrix::transform::TransformTarget;
+use crate::matrix::transform::*;
 use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring::HashableElRing;
-use crate::ring_impls::zn::zn_big::{ZnGB, ZnGBBase};
+use crate::ring_impls::zn::zn_64b::Zn64B;
+use crate::ring_impls::zn::zn_big::*;
 use crate::ring_impls::zn::zn_rns::ZnRNS;
-use crate::ring_impls::zn::{ZnRing, ZnRingStore, zn_big};
+use crate::ring_impls::zn::{ZnRing, ZnRingStore};
 use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
 use crate::ring_properties::finite::FiniteRingStore;
 use crate::ring_properties::integer::{BigIntRing, int_cast};
@@ -118,6 +119,12 @@ impl<G: AbelianGroupStore> Subgroup<G> {
         Self::from(self.into().add_generator(generator, generator_order_multiple))
     }
 
+    /// Returns (g1, n1), ..., (gr, nr) such that we have the isomorphism
+    /// ```text
+    ///   G -> C_n1 x ... x C_nr,    gi -> ei
+    /// ```
+    pub fn cyclic_decomposition(&self) -> Vec<(GEl<Self>, usize)> { self.get_group().cyclic_decomposition() }
+
     /// Checks whether the given element of the parent group is contained
     /// in the subgroup.
     pub fn contains(&self, element: &GEl<G>) -> bool { self.get_group().contains(element) }
@@ -162,19 +169,15 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         for i in 0..self.order_factorization.len() {
             let (p, e) = self.order_factorization[i];
             let relation_lattice = self.padic_relation_lattices[i][e].data();
-            let Zpne = zn_big::ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, ZZi64), e * n));
-            let mod_pne = Zpne.can_hom(&ZZi64).unwrap();
-            let relation_lattice_det = determinant_using_pre_smith(
-                &Zpne,
-                OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| {
-                    mod_pne.map(*relation_lattice.at(k, l))
-                })
-                .data_mut(),
-                Global,
-            );
+            let ring = ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, ZZi64), e * n + 1));
+            let to_ring = ring.can_hom(&ZZi64).unwrap();
+            let mut A = OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| {
+                to_ring.map(*relation_lattice.at(k, l))
+            });
+            let relation_lattice_det = determinant_using_pre_smith(&ring, A.data_mut(), Global);
             ZZbig.mul_assign(
                 &mut result,
-                ZZbig.ideal_gen(Zpne.modulus(), &Zpne.smallest_positive_lift(relation_lattice_det)),
+                ZZbig.ideal_gen(ring.modulus(), &ring.smallest_positive_lift(relation_lattice_det)),
             );
         }
         return result;
@@ -323,7 +326,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
     /// Returns an iterator that yields every element contained in the subgroup
     /// exactly once.
     pub fn enumerate_elements<'a>(&'a self) -> impl use<'a, G> + Clone + Iterator<Item = GEl<G>> {
-        let rectangular_form = Rc::new(self.rectangular_form());
+        let rectangular_form = Rc::new(self.cyclic_decomposition());
         multi_cartesian_product(
             rectangular_form
                 .iter()
@@ -529,10 +532,8 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         return Some(result);
     }
 
-    // TODO: this is ridiculous. First, check whether this actually computes a cyclic decomposition - if
-    // yes, name it accordingly. Furthermore, simplify the implementation
     #[instrument(skip_all, level = "trace")]
-    fn padic_rectangular_form<'a>(&'a self, p_idx: usize) -> Vec<(GEl<G>, usize)> {
+    fn padic_cyclic_decomposition<'a>(&'a self, p_idx: usize) -> Vec<(GEl<G>, usize)> {
         let group = &self.parent;
         let (p, e) = self.order_factorization[p_idx];
         let power = ZZbig
@@ -543,94 +544,60 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         if n == 0 {
             return Vec::new();
         }
-
-        let Zpne = ZnGB::new(ZZbig, ZZbig.pow(int_cast(p, ZZbig, ZZi64), e * n));
-        let mod_pne = Zpne.can_hom(&ZZi64).unwrap();
-        let relation_lattice = self.padic_relation_lattices[p_idx][e].data();
-        let mut relation_lattice_mod_pne =
-            OwnedMatrix::from_fn(relation_lattice.row_count(), relation_lattice.col_count(), |k, l| {
-                mod_pne.map(*relation_lattice.at(k, l))
-            });
-        let mut generators = self
-            .generators
-            .iter()
-            .map(|g| group.pow_bigint(g.clone(), &power))
-            .collect::<Vec<_>>();
-
-        struct TransformGenerators<'a, G: AbelianGroupStore> {
-            group: &'a G,
-            generators: &'a mut [GEl<G>],
-        }
-        impl<'a, G: AbelianGroupStore> TransformTarget<ZnGBBase<BigIntRing>> for TransformGenerators<'a, G> {
-            fn transform<S: Copy + RingStore<Ring = ZnGBBase<BigIntRing>>>(
-                &mut self,
-                ring: S,
-                i: usize,
-                j: usize,
-                transform: &[El<ZnGB<BigIntRing>>; 4],
-            ) {
-                let transform_inv_det = ring
-                    .invert(&ring.sub(
-                        ring.mul_ref(&transform[0], &transform[3]),
-                        ring.mul_ref(&transform[1], &transform[2]),
-                    ))
-                    .unwrap();
-                let inv_transform = [
-                    ring.smallest_positive_lift(ring.mul_ref(&transform[3], &transform_inv_det)),
-                    ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[1], &transform_inv_det))),
-                    ring.smallest_positive_lift(ring.negate(ring.mul_ref(&transform[2], &transform_inv_det))),
-                    ring.smallest_positive_lift(ring.mul_ref(&transform[0], &transform_inv_det)),
-                ];
-                let new_gens = (
-                    self.group.op(
-                        self.group.pow_bigint(self.generators[i].clone(), &inv_transform[0]),
-                        self.group.pow_bigint(self.generators[j].clone(), &inv_transform[1]),
-                    ),
-                    self.group.op(
-                        self.group.pow_bigint(self.generators[i].clone(), &inv_transform[2]),
-                        self.group.pow_bigint(self.generators[j].clone(), &inv_transform[3]),
-                    ),
-                );
-                self.generators[i] = new_gens.0;
-                self.generators[j] = new_gens.1;
+        let Zpe = Zn64B::new(ZZi64.pow(p, e) as u64);
+        let mod_pe = Zpe.can_hom(&ZZi64).unwrap();
+        let mut A = self.padic_relation_lattices[p_idx]
+            .last()
+            .unwrap()
+            .clone()
+            .map(|x| mod_pe.map(x));
+        let mut L = OwnedMatrix::identity(n, n, &Zpe);
+        pre_smith(
+            &Zpe,
+            &mut InvertTransform::new(TransposeTransform::new(TransformRows::new(L.data_mut()))),
+            &mut (),
+            A.data_mut(),
+        );
+        let mut diagonal = Vec::new();
+        for i in 0..n {
+            let pivot = Zpe.smallest_positive_lift(*A.at(i, i));
+            let order = ZZi64.gcd(&pivot, Zpe.modulus());
+            diagonal.push(order as usize);
+            if pivot != 0 {
+                let factor = Zpe.coerce(&ZZi64, ZZi64.checked_div(&pivot, &order).unwrap());
+                debug_assert!(Zpe.is_unit(&factor));
+                for j in 0..n {
+                    Zpe.mul_assign(L.at_mut(i, j), factor);
+                }
             }
         }
-
-        pre_smith(
-            &Zpne,
-            &mut TransformGenerators {
-                group,
-                generators: &mut generators,
-            },
-            &mut (),
-            relation_lattice_mod_pne.data_mut(),
-        );
-
-        return generators
-            .into_iter()
+        let row_as_group_el = |row: &[El<Zn64B>]| {
+            row.iter()
+                .zip(self.generators.iter())
+                .map(|(c, g)| {
+                    group.pow_bigint(
+                        g.clone(),
+                        &ZZbig.mul_ref_fst(&power, int_cast(Zpe.smallest_positive_lift(*c), ZZbig, ZZi64)),
+                    )
+                })
+                .fold(group.identity(), |x, y| group.op(x, y))
+        };
+        return L
+            .data()
+            .row_iter()
             .enumerate()
-            .map(|(i, g)| {
-                (
-                    g,
-                    int_cast(
-                        ZZbig.ideal_gen(
-                            Zpne.modulus(),
-                            &Zpne.smallest_positive_lift(relation_lattice_mod_pne.at(i, i).clone()),
-                        ),
-                        ZZi64,
-                        ZZbig,
-                    ) as usize,
-                )
-            })
+            .map(|(i, row)| (row_as_group_el(row), diagonal[i]))
             .collect();
     }
 
-    /// Returns a list (g[i], l[i]) such that every element of the subgroup
-    /// can be uniquely written as `prod_i g[i]^k[i]` with `0 <= k[i] < l[i]`.
+    /// Returns (g1, n1), ..., (gr, nr) such that we have the isomorphism
+    /// ```text
+    ///   G -> C_n1 x ... x C_nr,    gi -> ei
+    /// ```
     #[stability::unstable(feature = "enable")]
-    pub fn rectangular_form<'a>(&'a self) -> Vec<(GEl<G>, usize)> {
+    pub fn cyclic_decomposition<'a>(&'a self) -> Vec<(GEl<G>, usize)> {
         (0..self.order_factorization.len())
-            .flat_map(|p_idx| self.padic_rectangular_form(p_idx))
+            .flat_map(|p_idx| self.padic_cyclic_decomposition(p_idx))
             .collect()
     }
 
@@ -1406,7 +1373,7 @@ fn test_global_relation_lattice() {
     assert!(lattice_eq(ZZbig, expected.data(), actual.data(), None, None));
 
     let g3 = group.from_ring_el(ring.int_hom().map(10)).unwrap();
-    let subgroup = Subgroup::for_zn(group, vec![g1, g2, g3]);
+    let subgroup = subgroup.add_generator(g3, &int_cast(16, ZZbig, ZZi64));
     let actual = subgroup.get_group().relation_lattice();
     let expected = OwnedMatrix::new(vec![6, 0, 30, -4, 16, -55, 0, 0, 1], 3, 3).map(|x| int_cast(x, ZZbig, ZZi64));
     assert!(lattice_eq(ZZbig, expected.data(), actual.data(), None, None));
@@ -1414,6 +1381,22 @@ fn test_global_relation_lattice() {
 
 #[test]
 fn test_intersection() {
+    let ring = Zn::<7>::RING;
+    let group = MultGroup::new(ring);
+    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+    let g2 = group.from_ring_el(ring.int_hom().map(5)).unwrap();
+    let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+    let actual = Subgroup::for_zn(group, vec![g1]).intersection(&Subgroup::for_zn(group, vec![g2]));
+    let expected = Subgroup::for_zn(group, vec![g3]);
+    println!("{:?}", actual.get_group().cyclic_decomposition());
+    assert_eq!(expected.get_group(), actual.get_group());
+    let mut elements = actual
+        .enumerate_elements()
+        .map(|x| ring.smallest_positive_lift(*group.as_ring_el(&x)))
+        .collect::<Vec<_>>();
+    elements.sort_unstable();
+    assert_eq!(vec![1, 2, 4], elements);
+
     let ring = Zn::<153>::RING;
     let group = MultGroup::new(ring);
     let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
@@ -1430,15 +1413,19 @@ fn test_enumerate_elements() {
     let ring = Zn::<45>::RING;
     let group = AddGroup::new(ring);
 
-    assert_eq!(
-        vec![ring.zero()],
-        Subgroup::new(group.clone(), int_cast(45, ZZbig, ZZi64), Vec::new())
-            .enumerate_elements()
-            .collect::<Vec<_>>()
-    );
+    let subgroup = Subgroup::new(group.clone(), int_cast(45, ZZbig, ZZi64), Vec::new());
+    let elements = subgroup.enumerate_elements().collect::<Vec<_>>();
+    assert_eq!(vec![ring.zero()], elements);
 
     let subgroup = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![9, 15]);
     let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
     elements.sort_unstable();
     assert_eq!((0..45).step_by(3).collect::<Vec<_>>(), elements);
+
+    let ring = Zn::<6>::RING;
+    let group = AddGroup::new(ring);
+    let subgroup = Subgroup::new(group, int_cast(6, ZZbig, ZZi64), vec![2, 2]);
+    let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
+    elements.sort_unstable();
+    assert_eq!(vec![0, 2, 4], elements);
 }
