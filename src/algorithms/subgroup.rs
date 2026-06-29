@@ -1388,7 +1388,6 @@ fn test_intersection() {
     let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
     let actual = Subgroup::for_zn(group, vec![g1]).intersection(&Subgroup::for_zn(group, vec![g2]));
     let expected = Subgroup::for_zn(group, vec![g3]);
-    println!("{:?}", actual.get_group().cyclic_decomposition());
     assert_eq!(expected.get_group(), actual.get_group());
     let mut elements = actual
         .enumerate_elements()
