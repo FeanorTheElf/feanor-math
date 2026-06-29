@@ -23,7 +23,6 @@ use crate::ring_properties::serialization::{DeserializeWithRing, SerializableEle
 ///
 /// The design mirrors [`RingBase`] and [`RingStore`], with [`AbelianGroupStore`] being
 /// the counterpart to [`RingStore`].
-#[stability::unstable(feature = "enable")]
 pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
     /// Type used to represent elements of this group.
     type Element: Sized + Send + Sync + Clone;
@@ -87,7 +86,6 @@ pub trait AbelianGroupBase: PartialEq + Debug + Send + Sync {
 /// Alias for the type of elements of a group underlying an `AbelianGroupStore`.
 ///
 /// Analogue of [`El`] for rings.
-#[stability::unstable(feature = "enable")]
 pub type GEl<G> = <<G as AbelianGroupStore>::Group as AbelianGroupBase>::Element;
 
 /// Analogue of [`crate::delegate!`] for groups.
@@ -111,7 +109,6 @@ macro_rules! delegate_group {
 ///
 /// The design of [`AbelianGroupBase`] and [`AbelianGroupStore`] mirrors
 /// the design of [`RingBase`] and [`RingStore`]. See there for details.
-#[stability::unstable(feature = "enable")]
 pub trait AbelianGroupStore: Send + Sync {
     type Group: AbelianGroupBase;
 
@@ -167,7 +164,6 @@ where
 }
 
 /// Analogue of [`RingValue`] for groups.
-#[stability::unstable(feature = "enable")]
 #[repr(transparent)]
 #[derive(Serialize, Deserialize)]
 pub struct GroupValue<G: AbelianGroupBase> {
@@ -179,10 +175,8 @@ impl<G: AbelianGroupBase> From<G> for GroupValue<G> {
 }
 
 impl<G: AbelianGroupBase + Sized> GroupValue<G> {
-    #[stability::unstable(feature = "enable")]
     pub fn into(self) -> G { self.group }
 
-    #[stability::unstable(feature = "enable")]
     pub fn from_ref<'a>(group: &'a G) -> &'a Self { unsafe { std::mem::transmute(group) } }
 }
 
@@ -212,26 +206,19 @@ impl<G: AbelianGroupBase + Copy> Copy for GroupValue<G> {}
 /// In most cases, it does not make much sense to compute dlogs in the additive
 /// group of a ring using generic methods, since algorithms as in
 /// [`crate::algorithms::linsolve`] will be much faster.
-#[stability::unstable(feature = "enable")]
 pub struct AddGroupBase<R: RingStore>(pub R);
 
 /// [`AbelianGroupStore`] corresponding to [`AddGroupBase`].
-#[stability::unstable(feature = "enable")]
-#[allow(type_alias_bounds)]
-pub type AddGroup<R: RingStore> = GroupValue<AddGroupBase<R>>;
+pub type AddGroup<R> = GroupValue<AddGroupBase<R>>;
 
 /// The multiplicative group of a ring, implements [`AbelianGroupBase`].
-#[stability::unstable(feature = "enable")]
 #[derive(Serialize, Deserialize)]
 pub struct MultGroupBase<R: RingStore>(R);
 
 /// [`AbelianGroupStore`] corresponding to [`MultGroupBase`].
-#[stability::unstable(feature = "enable")]
-#[allow(type_alias_bounds)]
-pub type MultGroup<R: RingStore> = GroupValue<MultGroupBase<R>>;
+pub type MultGroup<R> = GroupValue<MultGroupBase<R>>;
 
 /// Elements from the multiplicative group of `R`.
-#[stability::unstable(feature = "enable")]
 pub struct MultGroupEl<R: RingStore>(El<R>);
 
 impl<R: RingStore> PartialEq for AddGroupBase<R>
@@ -268,7 +255,6 @@ impl<R: RingStore> AddGroup<R>
 where
     R::Ring: HashableElRing,
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self { Self::from(AddGroupBase(ring)) }
 }
 
@@ -365,21 +351,17 @@ impl<R: RingStore> MultGroupBase<R>
 where
     R::Ring: HashableElRing + DivisibilityRing,
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self { return Self(ring); }
 
-    #[stability::unstable(feature = "enable")]
     pub fn underlying_ring(&self) -> &R { &self.0 }
 
     /// If `x` is contained in `R*`, returns a [`MultGroupEl`] representing
     /// `x`. Otherwise, `None` is returned.
-    #[stability::unstable(feature = "enable")]
     pub fn from_ring_el(&self, x: El<R>) -> Option<MultGroupEl<R>> {
         if self.0.is_unit(&x) { Some(MultGroupEl(x)) } else { None }
     }
 
     /// Returns the ring element represented by the given group element.
-    #[stability::unstable(feature = "enable")]
     pub fn as_ring_el<'a>(&self, x: &'a MultGroupEl<R>) -> &'a El<R> { &x.0 }
 }
 
@@ -387,30 +369,24 @@ impl<R: RingStore> MultGroup<R>
 where
     R::Ring: HashableElRing + DivisibilityRing,
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(ring: R) -> Self { Self::from(MultGroupBase::new(ring)) }
 
-    #[stability::unstable(feature = "enable")]
     pub fn underlying_ring(&self) -> &R { self.get_group().underlying_ring() }
 
     /// If `x` is contained in `R*`, returns a [`MultGroupEl`] representing
     /// `x`. Otherwise, `None` is returned.
-    #[stability::unstable(feature = "enable")]
     pub fn from_ring_el(&self, x: El<R>) -> Option<MultGroupEl<R>> { self.get_group().from_ring_el(x) }
 
     /// Returns the ring element represented by the given group element.
-    #[stability::unstable(feature = "enable")]
     pub fn as_ring_el<'a>(&self, x: &'a MultGroupEl<R>) -> &'a El<R> { self.get_group().as_ring_el(x) }
 }
 
-#[stability::unstable(feature = "enable")]
 pub struct HashableGroupEl<G: AbelianGroupStore> {
     group: G,
     el: GEl<G>,
 }
 
 impl<G: AbelianGroupStore> HashableGroupEl<G> {
-    #[stability::unstable(feature = "enable")]
     pub fn new(group: G, el: GEl<G>) -> Self { Self { group, el } }
 }
 
@@ -429,7 +405,6 @@ impl<G: AbelianGroupStore> Hash for HashableGroupEl<G> {
 /// Serialization and deserialization mostly follow the principles of the `serde` crate, with
 /// the main difference that ring elements cannot be serialized/deserialized on their own, but
 /// only w.r.t. a specific ring.
-#[stability::unstable(feature = "enable")]
 pub trait SerializableElementGroup: AbelianGroupBase {
     /// Deserializes an element of this ring from the given deserializer.
     fn deserialize<'de, D>(&self, deserializer: D) -> Result<Self::Element, D::Error>
@@ -444,7 +419,6 @@ pub trait SerializableElementGroup: AbelianGroupBase {
 
 /// Wrapper of a group that implements [`serde::DeserializationSeed`] by trying to deserialize
 /// an element w.r.t. the wrapped group.
-#[stability::unstable(feature = "enable")]
 #[derive(Clone)]
 pub struct DeserializeWithGroup<G: AbelianGroupStore>
 where
@@ -458,7 +432,6 @@ where
     G: AbelianGroupStore,
     G::Group: SerializableElementGroup,
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(group: G) -> Self { Self { group } }
 }
 
@@ -479,7 +452,6 @@ where
 
 /// Wraps a group and a reference to one of its elements. Implements [`serde::Serialize`]
 /// and will serialize the element w.r.t. the group.
-#[stability::unstable(feature = "enable")]
 pub struct SerializeWithGroup<'a, G: AbelianGroupStore>
 where
     G::Group: SerializableElementGroup,
@@ -492,7 +464,6 @@ impl<'a, G: AbelianGroupStore> SerializeWithGroup<'a, G>
 where
     G::Group: SerializableElementGroup,
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(el: &'a GEl<G>, group: G) -> Self { Self { el, group } }
 }
 
@@ -510,7 +481,6 @@ where
 
 /// Wraps a ring and a one of its elements. Implements [`serde::Serialize`] and
 /// will serialize the element w.r.t. the ring.
-#[stability::unstable(feature = "enable")]
 pub struct SerializeOwnedWithGroup<G: AbelianGroupStore>
 where
     G::Group: SerializableElementGroup,
@@ -523,7 +493,6 @@ impl<G: AbelianGroupStore> SerializeOwnedWithGroup<G>
 where
     G::Group: SerializableElementGroup,
 {
-    #[stability::unstable(feature = "enable")]
     pub fn new(el: GEl<G>, group: G) -> Self { Self { el, group } }
 }
 
@@ -539,7 +508,6 @@ where
     }
 }
 
-#[stability::unstable(feature = "enable")]
 pub struct GroupElementDisplayWrapper<'a, G: AbelianGroupBase + ?Sized> {
     group: &'a G,
     element: &'a G::Element,

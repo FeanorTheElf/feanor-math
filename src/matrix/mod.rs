@@ -1,4 +1,4 @@
-use std::fmt::{Display, Debug};
+use std::fmt::{Debug, Display};
 
 use crate::prelude::*;
 
@@ -61,9 +61,7 @@ where
     }
 
     impl<'a, R: 'a + RingStore, M: Fn(usize, usize) -> &'a El<R>> Debug for DisplayWrapper<'a, R, M> {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "{}", self)
-        }
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{}", self) }
     }
 
     DisplayWrapper {

@@ -1,20 +1,29 @@
 use tracing::instrument;
 
 use crate::algorithms::int_bisect::bisect_floor;
+use crate::algorithms::linsolve::LinSolveRingStore;
 use crate::algorithms::linsolve::smith::pre_smith;
 use crate::algorithms::lll::exact::lll;
-use crate::matrix::*;
 use crate::matrix::transform::{InvertTransform, TransformCols, TransformList, TransformRows};
+use crate::matrix::*;
 use crate::prelude::*;
 use crate::ring_impls::fraction::FractionFieldStore;
 use crate::ring_impls::rational::RationalField;
 use crate::seq::VectorView;
-use crate::algorithms::linsolve::LinSolveRingStore;
 
 /// Computes a basis of the lattice `A Z^m`. The basis is returned as the columns of the result
 /// matrix.
+///
+/// If known, multiples of the the co-volumes of the lattices can be given, this can significantly
+/// speed up computations.
 #[instrument(skip_all, level = "trace")]
-pub fn lattice_eq<I, V1, V2>(ZZ: I, A: Submatrix<V1, El<I>>, B: Submatrix<V2, El<I>>) -> bool
+pub fn lattice_eq<I, V1, V2>(
+    ZZ: I,
+    A: Submatrix<V1, El<I>>,
+    B: Submatrix<V2, El<I>>,
+    _vol_A_mult: Option<El<I>>,
+    _vol_B_mult: Option<El<I>>,
+) -> bool
 where
     I: RingStore,
     I::Ring: IntegerRing,
@@ -23,8 +32,17 @@ where
 {
     let mut tmp_A = OwnedMatrix::from_fn(A.row_count(), A.col_count(), |i, j| A.at(i, j).clone());
     let mut tmp_B = OwnedMatrix::from_fn(B.row_count(), B.col_count(), |i, j| B.at(i, j).clone());
-    let mut tmp_sol = (0..(A.col_count() * B.col_count())).map(|_| ZZ.zero()).collect::<Vec<_>>();
-    if !ZZ.solve_right(tmp_A.data_mut(), tmp_B.data_mut(), SubmatrixMut::from_1d(&mut tmp_sol, A.col_count(), B.col_count())).is_solved() {
+    let mut tmp_sol = (0..(A.col_count() * B.col_count()))
+        .map(|_| ZZ.zero())
+        .collect::<Vec<_>>();
+    if !ZZ
+        .solve_right(
+            tmp_A.data_mut(),
+            tmp_B.data_mut(),
+            SubmatrixMut::from_1d(&mut tmp_sol, A.col_count(), B.col_count()),
+        )
+        .is_solved()
+    {
         return false;
     }
     for i in 0..A.row_count() {
@@ -37,7 +55,14 @@ where
             *tmp_B.at_mut(i, j) = B.at(i, j).clone();
         }
     }
-    if !ZZ.solve_right(tmp_B.data_mut(), tmp_A.data_mut(), SubmatrixMut::from_1d(&mut tmp_sol, B.col_count(), A.col_count())).is_solved() {
+    if !ZZ
+        .solve_right(
+            tmp_B.data_mut(),
+            tmp_A.data_mut(),
+            SubmatrixMut::from_1d(&mut tmp_sol, B.col_count(), A.col_count()),
+        )
+        .is_solved()
+    {
         return false;
     }
     return true;
@@ -45,8 +70,15 @@ where
 
 /// Computes a basis of the lattice `A Z^m`. The basis is returned as the columns of the result
 /// matrix.
+///
+/// If known, a multiple of the the co-volume of the lattice can be given, this can significantly
+/// speed up computations.
 #[instrument(skip_all, level = "trace")]
-pub fn lattice_basis_from_generating_set<I>(ZZ: I, mut A: OwnedMatrix<El<I>>) -> OwnedMatrix<El<I>>
+pub fn lattice_basis_from_generating_set<I>(
+    ZZ: I,
+    mut A: OwnedMatrix<El<I>>,
+    _vol_A_mult: Option<El<I>>,
+) -> OwnedMatrix<El<I>>
 where
     I: RingStore,
     I::Ring: IntegerRing,
@@ -70,6 +102,9 @@ where
 /// iterator terminates as soon as the sequence becomes stationary, and the last element is thus the
 /// standard p-saturation of L.
 ///
+/// If known, a multiple of the the co-volume of the lattice can be given, this can significantly
+/// speed up computations.
+///
 /// # Implementation
 ///
 /// This function computes the [`pre_smith`]-form of the matrix first, and then derives every
@@ -80,6 +115,7 @@ pub fn lattice_p_saturation_tower<I>(
     ZZ: I,
     p: El<I>,
     mut A: OwnedMatrix<El<I>>,
+    _vol_A_mult: Option<El<I>>,
 ) -> impl use<I> + ExactSizeIterator + DoubleEndedIterator<Item = OwnedMatrix<El<I>>>
 where
     I: RingStore,
@@ -119,8 +155,17 @@ where
 
 /// Computes the intersection of the two lattices `A Z^n` and `B Z^m`. The basis is returned as the
 /// columns of the result matrix.
+///
+/// If known, multiples of the the co-volumes of the lattices can be given, this can significantly
+/// speed up computations.
 #[instrument(skip_all, level = "trace")]
-pub fn lattice_intersect<I>(ZZ: I, A: OwnedMatrix<El<I>>, B: OwnedMatrix<El<I>>) -> OwnedMatrix<El<I>>
+pub fn lattice_intersect<I>(
+    ZZ: I,
+    A: OwnedMatrix<El<I>>,
+    B: OwnedMatrix<El<I>>,
+    _vol_A_mult: Option<El<I>>,
+    _vol_B_mult: Option<El<I>>,
+) -> OwnedMatrix<El<I>>
 where
     I: RingStore,
     I::Ring: IntegerRing,
@@ -156,6 +201,7 @@ where
         OwnedMatrix::from_fn(k, kernel_cols.len(), |i, j| {
             ZZbig.sum((0..n).map(|s| h.mul_ref_map(U.at(s, kernel_cols[j]), A.at(i, s))))
         }),
+        None,
     );
 
     OwnedMatrix::from_fn(k, result.col_count(), |i, j| {
@@ -169,14 +215,14 @@ fn test_lattice_intersect() {
     let A = OwnedMatrix::new(vec![1, 2, 3, 4, 5, 6], 3, 2);
     let B = OwnedMatrix::new(vec![3, 7, 11], 3, 1);
     let expected = B.clone();
-    let intersection = lattice_intersect(ZZi64, A.clone(), B.clone());
+    let intersection = lattice_intersect(ZZi64, A.clone(), B.clone(), None, None);
     assert_eq!(1, intersection.col_count());
-    assert!(lattice_eq(ZZi64, expected.data(), intersection.data()));
+    assert!(lattice_eq(ZZi64, expected.data(), intersection.data(), None, None));
 
     let B = OwnedMatrix::new(vec![3, 7, 12], 3, 1);
-    let intersection = lattice_intersect(ZZi64, A.clone(), B.clone());
+    let intersection = lattice_intersect(ZZi64, A.clone(), B.clone(), None, None);
     let expected = OwnedMatrix::new(Vec::new(), 3, 0);
-    assert!(lattice_eq(ZZi64, expected.data(), intersection.data()));
+    assert!(lattice_eq(ZZi64, expected.data(), intersection.data(), None, None));
 }
 
 #[test]
@@ -187,11 +233,11 @@ fn test_lattice_p_saturation_tower() {
         A.clone(),
         OwnedMatrix::new(vec![18, 9, -27, 0, 1, -2, 9, 7, -18], 3, 3),
         OwnedMatrix::new(vec![6, 9, -27, 0, 1, -2, 3, 7, -18], 3, 3),
-        OwnedMatrix::new(vec![2, 9, -27, 0, 1, -2, 1, 7, -18], 3, 3)
+        OwnedMatrix::new(vec![2, 9, -27, 0, 1, -2, 1, 7, -18], 3, 3),
     ];
-    let actual = lattice_p_saturation_tower(ZZi64, 3, A).collect::<Vec<_>>();
+    let actual = lattice_p_saturation_tower(ZZi64, 3, A, None).collect::<Vec<_>>();
     assert_eq!(expected.len(), actual.len());
     for (expected, actual) in expected.iter().zip(actual.iter()) {
-        assert!(lattice_eq(ZZi64, expected.data(), actual.data()));
+        assert!(lattice_eq(ZZi64, expected.data(), actual.data(), None, None));
     }
 }

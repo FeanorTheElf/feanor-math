@@ -381,7 +381,11 @@ fn test_smith_zn() {
 fn test_solve_zn() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = zn_static::Zn::<45>::RING;
-    let A = OwnedMatrix::new(vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39], 5, 4);
+    let A = OwnedMatrix::new(
+        vec![8, 3, 5, 8, 0, 9, 0, 9, 5, 9, 5, 14, 8, 3, 5, 23, 3, 39, 0, 39],
+        5,
+        4,
+    );
     let B = OwnedMatrix::new(
         vec![11, 43, 10, 22, 18, 9, 27, 27, 8, 34, 7, 22, 41, 13, 40, 37, 3, 9, 3, 0],
         5,

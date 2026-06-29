@@ -105,9 +105,19 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
     /// Returns the number of rows of this matrix.
     pub fn row_count(&self) -> usize { self.row_count }
 
-    ////
     /// Returns the number of columns of this matrix.
     pub fn col_count(&self) -> usize { self.col_count }
+
+    pub fn map<F, U>(self, f: F) -> OwnedMatrix<U, A>
+    where
+        F: FnMut(T) -> U,
+        A: Clone,
+    {
+        let (row_count, col_count) = (self.row_count(), self.col_count());
+        let mut result = Vec::with_capacity_in(self.data.len(), self.data.allocator().clone());
+        result.extend(self.data.into_iter().map(f));
+        OwnedMatrix::new(result, row_count, col_count)
+    }
 
     /// Creates the `row_count x col_count` zero matrix over the given ring.
     #[stability::unstable(feature = "enable")]

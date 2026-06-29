@@ -96,14 +96,22 @@ impl<const N: u64, const IS_FIELD: bool> RingBase for ZnSBase<N, IS_FIELD> {
     fn is_approximate(&self) -> bool { false }
 }
 
-impl<const N: u64, const IS_FIELD: bool> CanHomFrom<StaticRingBase<i64>> for ZnSBase<N, IS_FIELD> {
+impl<R, const N: u64, const IS_FIELD: bool> CanHomFrom<R> for ZnSBase<N, IS_FIELD>
+where
+    R: IntegerRing,
+{
     type Homomorphism = ();
 
-    fn has_canonical_hom(&self, _: &StaticRingBase<i64>) -> Option<()> { Some(()) }
+    fn has_canonical_hom(&self, _: &R) -> Option<()> { Some(()) }
 
-    fn map_in(&self, _: &StaticRingBase<i64>, el: i64, _: &()) -> Self::Element {
-        let result = ((el % (N as i64)) + (N as i64)) as u64;
-        if result >= N { result - N } else { result }
+    fn map_in(&self, integer_ring: &R, el: R::Element, _: &()) -> Self::Element {
+        let N_ = int_cast(N as i64, RingRef::from(integer_ring), ZZi64);
+        let result = integer_ring.euclidean_rem(el, &N_);
+        if integer_ring.is_neg(&result) {
+            int_cast(integer_ring.add(result, N_), ZZi64, RingRef::from(integer_ring)) as u64
+        } else {
+            int_cast(result, ZZi64, RingRef::from(integer_ring)) as u64
+        }
     }
 }
 
