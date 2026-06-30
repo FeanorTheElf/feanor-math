@@ -168,7 +168,7 @@ where
     let transform_back = |result| {
         let result = make_primitive(ZZX, &unmake_monic(ZZX, &result, &lc_lcm, &lc_lcm)).0;
         return if ZZX.base_ring().is_neg(ZZX.lc(&result).unwrap()) {
-            ZZX.negate(result)
+            ZZX.neg(result)
         } else {
             result
         };
@@ -346,7 +346,7 @@ where
         .map(|(f, i)| (unmake_monic(&ZZX, &f, &lc_poly, &lc_poly), i))
         .map(|(f, i)| {
             if ZZX.base_ring().is_neg(ZZX.lc(&f).unwrap()) {
-                (ZZX.negate(f), i)
+                (ZZX.neg(f), i)
             } else {
                 (f, i)
             }

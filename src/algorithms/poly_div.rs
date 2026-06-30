@@ -42,7 +42,7 @@ where
     }
     let result = poly_ring.try_from_terms((0..(lhs_deg + 1 - rhs_deg)).rev().map(|i| {
         let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i + rhs_deg))?;
-        let neg_quo = poly_ring.base_ring().negate(quo);
+        let neg_quo = poly_ring.base_ring().neg(quo);
         if !poly_ring.base_ring().is_zero(&neg_quo) {
             poly_ring.get_ring().add_assign_from_terms(
                 &mut lhs,
@@ -51,7 +51,7 @@ where
                     .map(|(c, j)| (poly_ring.base_ring().mul_ref(&neg_quo, c), i + j)),
             );
         }
-        Ok((poly_ring.base_ring().negate(neg_quo), i))
+        Ok((poly_ring.base_ring().neg(neg_quo), i))
     }))?;
     return Ok((result, lhs));
 }
@@ -92,7 +92,7 @@ where
     }
     for i in (0..(lhs_deg + 1 - rhs_deg)).rev() {
         let quo = left_div_lc(poly_ring.coefficient_at(&lhs, i + rhs_deg))?;
-        let neg_quo = poly_ring.base_ring().negate(quo);
+        let neg_quo = poly_ring.base_ring().neg(quo);
         if !poly_ring.base_ring().is_zero(&neg_quo) {
             poly_ring.get_ring().add_assign_from_terms(
                 &mut lhs,
@@ -184,7 +184,7 @@ where
             &mut f_lower,
             poly_ring.terms(&g_lower).map(|(c, i)| {
                 (
-                    poly_ring.base_ring().negate(c.clone()),
+                    poly_ring.base_ring().neg(c.clone()),
                     i + split_degree_f - split_degree_g,
                 )
             }),
@@ -240,7 +240,7 @@ impl<R: RingStore, C: ConvolutionAlgorithm<R::Ring> + Clone, A: Allocator> Barre
         let poly_ring = DensePolyRing::new(&ring, "X");
         let f = poly_ring.from_terms(
             (0..f_deg)
-                .map(|i| (ring.negate(x_pow_rank[i].clone()), i))
+                .map(|i| (ring.neg(x_pow_rank[i].clone()), i))
                 .chain([(ring.one(), f_deg)]),
         );
         let neg_Xn = poly_ring.from_terms([(ring.neg_one(), n)]);

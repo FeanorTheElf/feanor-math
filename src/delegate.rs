@@ -412,8 +412,8 @@ impl<R: DelegateRing + PartialEq + ?Sized> RingBase for R {
         self.get_delegate().fmt_el_within(self.delegate_ref(value), out, env)
     }
 
-    default fn negate(&self, value: Self::Element) -> Self::Element {
-        self.rev_delegate(self.get_delegate().negate(self.delegate(value)))
+    default fn neg(&self, value: Self::Element) -> Self::Element {
+        self.rev_delegate(self.get_delegate().neg(self.delegate(value)))
     }
 
     default fn sub_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) {

@@ -235,7 +235,7 @@ where
     f = poly_ring.normalize(f).0;
 
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
-        .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
+        .map(|i| poly_ring.base_ring().neg(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
     let mod_f_ring = MonogenicExtensionBarrett::new(poly_ring.base_ring(), f_coeffs);
 
@@ -328,7 +328,7 @@ where
 {
     f = poly_ring.normalize(f).0;
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
-        .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
+        .map(|i| poly_ring.base_ring().neg(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
     let mod_f_ring = MonogenicExtensionBarrett::new(poly_ring.base_ring(), f_coeffs);
     let result = cantor_zassenhaus_base(&poly_ring, mod_f_ring, d);
@@ -464,7 +464,7 @@ where
                 let factor_conjugate = new_poly_ring.from_terms(new_poly_ring.terms(&factor).map(|(c, i)| {
                     let c_vec = new_base_ring.wrt_power_basis(c);
                     let new_c = new_base_ring
-                        .from_power_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.negate(c_vec.at(1))].into_iter());
+                        .from_power_basis([Fq.sub(c_vec.at(0), c_vec.at(1)), Fq.neg(c_vec.at(1))].into_iter());
                     (new_c, i)
                 }));
                 let factor_norm = new_poly_ring.mul(factor, factor_conjugate);
@@ -500,7 +500,7 @@ where
 {
     f = poly_ring.normalize(f).0;
     let f_coeffs = (0..poly_ring.degree(&f).unwrap())
-        .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&f, i).clone()))
+        .map(|i| poly_ring.base_ring().neg(poly_ring.coefficient_at(&f, i).clone()))
         .collect::<Vec<_>>();
     let mod_f_ring = MonogenicExtensionBarrett::new(poly_ring.base_ring(), f_coeffs);
     let result = cantor_zassenhaus_even_base(&poly_ring, &mod_f_ring, d);
@@ -566,7 +566,7 @@ fn test_is_irreducible() {
         MonogenicExtensionBarrett::new(
             field,
             (0..ring.degree(f).unwrap())
-                .map(|i| field.negate(*ring.coefficient_at(f, i)))
+                .map(|i| field.neg(*ring.coefficient_at(f, i)))
                 .collect::<Vec<_>>(),
         )
     };

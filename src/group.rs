@@ -274,7 +274,7 @@ where
 
     fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { self.0.eq_el(lhs, rhs) }
     fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element { self.0.add(lhs, rhs) }
-    fn inv(&self, x: &Self::Element) -> Self::Element { self.0.negate(x.clone()) }
+    fn inv(&self, x: &Self::Element) -> Self::Element { self.0.neg(x.clone()) }
     fn identity(&self) -> Self::Element { self.0.zero() }
     fn hash<H: Hasher>(&self, x: &Self::Element, hasher: &mut H) { self.0.hash(x, hasher) }
     fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {

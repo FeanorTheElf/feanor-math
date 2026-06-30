@@ -175,7 +175,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
             self.base_ring.sub_assign_ref(&mut lhs.data[i], &rhs.data[i]);
         }
         for i in min(lhs.data.len(), rhs.data.len())..rhs.data.len() {
-            lhs.data.push(self.base_ring().negate(rhs.data[i].clone()));
+            lhs.data.push(self.base_ring().neg(rhs.data[i].clone()));
         }
     }
 

@@ -989,9 +989,9 @@ fn test_is_zero() {
     let mut nonzero = ZZ.one();
     ZZ.mul_pow_2(&mut nonzero, 83124);
     assert!(ZZ.is_zero(&zero));
-    assert!(ZZ.is_zero(&ZZ.negate(zero)));
+    assert!(ZZ.is_zero(&ZZ.neg(zero)));
     assert!(!ZZ.is_zero(&nonzero));
-    assert!(!ZZ.is_zero(&ZZ.negate(nonzero)));
+    assert!(!ZZ.is_zero(&ZZ.neg(nonzero)));
 }
 
 #[test]
@@ -1093,7 +1093,7 @@ fn test_fma_map_in() {
         from_i64.fma_map(
             &ZZ.get_ring().parse("100000000000000000000", 10).unwrap(),
             &100,
-            ZZ.negate(ZZ.zero())
+            ZZ.neg(ZZ.zero())
         )
     );
     assert_el_eq!(
@@ -1102,7 +1102,7 @@ fn test_fma_map_in() {
         from_i64.fma_map(
             &ZZ.get_ring().parse("100000000000000000000", 10).unwrap(),
             &-100,
-            ZZ.negate(ZZ.zero())
+            ZZ.neg(ZZ.zero())
         )
     );
 

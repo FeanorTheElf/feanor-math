@@ -172,7 +172,7 @@ where
         let alpha = if ring.is_neg(matrix.at(i, i)) {
             norm.clone()
         } else {
-            ring.negate(norm.clone())
+            ring.neg(norm.clone())
         };
         // | x - alpha * e1 | / sqrt(2)
         let scale = ring

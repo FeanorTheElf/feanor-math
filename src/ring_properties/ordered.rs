@@ -39,7 +39,7 @@ pub trait OrderedRing: RingBase {
 
     /// Returns the absolute value of `value`, i.e. `value` if `value >= 0` and `-value` otherwise.
     fn abs(&self, value: Self::Element) -> Self::Element {
-        if self.is_neg(&value) { self.negate(value) } else { value }
+        if self.is_neg(&value) { self.neg(value) } else { value }
     }
 
     /// Returns the larger one of `fst` and `snd`.

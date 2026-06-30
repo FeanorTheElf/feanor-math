@@ -698,7 +698,7 @@ where
         assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
         let rank = poly_ring.degree(&poly).unwrap();
         let x_pow_rank = (0..rank)
-            .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&poly, i).clone()))
+            .map(|i| poly_ring.base_ring().neg(poly_ring.coefficient_at(&poly, i).clone()))
             .collect::<Vec<_>>();
         let base_ring = poly_ring.into().into_base_ring();
         let log2_padded_len = ZZi64.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();

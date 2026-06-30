@@ -243,7 +243,7 @@ impl ResidueFieldsAtPrime {
                 .map(|(f, _)| {
                     let degree = FpX.degree(&f).unwrap();
                     let modulus = (0..degree)
-                        .map(|i| Fp.negate(FpX.coefficient_at(&f, i).clone()))
+                        .map(|i| Fp.neg(FpX.coefficient_at(&f, i).clone()))
                         .collect::<Vec<_>>();
                     let Fq =
                         GaloisField::create(MonogenicExtensionBarrett::new(Fp.clone(), modulus).as_field().unwrap());
@@ -311,7 +311,7 @@ impl ResidueRingsAtPrimePower {
             .factorization()
             .map(|f| {
                 let modulus_vec = (0..self.ZpeX().degree(f).unwrap())
-                    .map(|i| self.ZpeX().base_ring().negate(self.ZpeX().coefficient_at(f, i).clone()))
+                    .map(|i| self.ZpeX().base_ring().neg(self.ZpeX().coefficient_at(f, i).clone()))
                     .collect();
                 let GR = MonogenicExtensionBarrett::new(self.ZpeX().base_ring().clone(), modulus_vec);
                 let GRX = DensePolyRing::new(GR, "X");

@@ -526,7 +526,7 @@ where
             &lhs,
             rhs.data
                 .iter()
-                .map(|(c, m)| (self.base_ring().negate(c.clone()), m.data.clone().wrap())),
+                .map(|(c, m)| (self.base_ring().neg(c.clone()), m.data.clone().wrap())),
             Vec::new_in(self.allocator.clone()),
         );
     }

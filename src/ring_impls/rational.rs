@@ -321,7 +321,7 @@ where
     fn is_one(&self, value: &Self::Element) -> bool { self.integers.eq_el(&value.0, &value.1) }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.integers.eq_el(&value.0, &self.integers.negate(value.1.clone()))
+        self.integers.eq_el(&value.0, &self.integers.neg(value.1.clone()))
     }
 
     fn is_approximate(&self) -> bool { false }

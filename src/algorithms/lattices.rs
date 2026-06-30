@@ -180,7 +180,7 @@ where
         if j < n {
             h.map_ref(A.at(i, j))
         } else {
-            ZZbig.negate(h.map_ref(B.at(i, j - n)))
+            ZZbig.neg(h.map_ref(B.at(i, j - n)))
         }
     });
 

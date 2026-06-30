@@ -339,7 +339,7 @@ impl<P: ?Sized + PolyRing> HenselLiftableBarrettReducer<P> {
                 .filter(|(_, i)| *i < self.poly_deg)
                 .map(|(c, i)| (c.clone(), i)),
         );
-        return (poly_ring.negate(quotient), truncated_remainder);
+        return (poly_ring.neg(quotient), truncated_remainder);
     }
 
     #[instrument(skip_all, level = "trace")]

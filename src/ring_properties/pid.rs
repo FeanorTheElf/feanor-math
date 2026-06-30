@@ -70,7 +70,7 @@ pub trait PrincipalIdealRing: DivisibilityRing {
             .unwrap();
         // this has unit determinant and will map `(a, b)` to `(d, b * new_a - a * new_b)`; after a
         // subtraction step, we are done
-        let mut result = [s, t, self.negate(new_b), new_a];
+        let mut result = [s, t, self.neg(new_b), new_a];
 
         let sub1 = self.mul_ref(&result[0], &subtract_factor);
         self.sub_assign(&mut result[2], sub1);

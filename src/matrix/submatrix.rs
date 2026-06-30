@@ -6,6 +6,7 @@ use std::ptr::{NonNull, addr_of_mut};
 #[cfg(feature = "ndarray")]
 use ndarray::{ArrayBase, DataMut, Ix2};
 
+use crate::matrix::OwnedMatrix;
 use crate::seq::{SwappableVectorViewMut, VectorView, VectorViewMut};
 
 /// Trait for objects that can be considered a contiguous part of memory. In particular,
@@ -637,6 +638,14 @@ where
 
     /// Returns the number of rows of this matrix.
     pub fn row_count(&self) -> usize { self.raw_data.row_count }
+
+    /// Creates an [`OwnedMatrix`] whose entries are copies of the entries of this matrix.
+    pub fn to_owned(&self) -> OwnedMatrix<T>
+    where
+        T: Clone,
+    {
+        OwnedMatrix::from_fn(self.row_count(), self.col_count(), |i, j| self.at(i, j).clone())
+    }
 }
 
 impl<'a, V, T: Debug> Debug for Submatrix<'a, V, T>
@@ -829,6 +838,14 @@ where
 
     /// Returns the number of rows of this matrix.
     pub fn row_count(&self) -> usize { self.raw_data.row_count }
+
+    /// Creates an [`OwnedMatrix`] whose entries are copies of the entries of this matrix.
+    pub fn to_owned(&self) -> OwnedMatrix<T>
+    where
+        T: Clone,
+    {
+        self.as_const().to_owned()
+    }
 }
 
 impl<'a, V, T: Debug> Debug for SubmatrixMut<'a, V, T>

@@ -230,13 +230,13 @@ impl Zn64BBase {
         let el_abs = <T as Into<i128>>::into(el).unsigned_abs();
         if el_abs <= self.modulus_u64() as u128 {
             if is_neg {
-                self.negate(self.from_u64_promise_reduced(el_abs as u64))
+                self.neg(self.from_u64_promise_reduced(el_abs as u64))
             } else {
                 self.from_u64_promise_reduced(el_abs as u64)
             }
         } else if el_abs <= self.repr_bound() as u128 {
             if is_neg {
-                self.negate(self.from_u64_promise_reduced(self.bounded_reduce(el_abs)))
+                self.neg(self.from_u64_promise_reduced(self.bounded_reduce(el_abs)))
             } else {
                 self.from_u64_promise_reduced(self.bounded_reduce(el_abs))
             }
@@ -649,7 +649,7 @@ impl DivisibilityRing for Zn64BBase {
         return Zn64BPreparedDivisorData {
             is_unit: d == 1,
             unit_part: if s < 0 {
-                self.negate(self.from_u64_promise_reduced(-s as u64))
+                self.neg(self.from_u64_promise_reduced(-s as u64))
             } else {
                 self.from_u64_promise_reduced(s as u64)
             },

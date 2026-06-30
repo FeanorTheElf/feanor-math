@@ -70,7 +70,7 @@ where
             ring,
             src,
             dst,
-            &[ring.one(), ring.zero(), ring.negate(factor.clone()), ring.one()],
+            &[ring.one(), ring.zero(), ring.neg(factor.clone()), ring.one()],
         )
     }
 
@@ -264,8 +264,8 @@ where
         let det_inv = ring.invert(&det).unwrap();
         let inv_transform = [
             ring.mul_ref(&transform[3], &det_inv),
-            ring.negate(ring.mul_ref(&transform[1], &det_inv)),
-            ring.negate(ring.mul_ref(&transform[2], &det_inv)),
+            ring.neg(ring.mul_ref(&transform[1], &det_inv)),
+            ring.neg(ring.mul_ref(&transform[2], &det_inv)),
             ring.mul_ref(&transform[0], &det_inv),
         ];
         self.delegate_inverted.transform(ring, i, j, &inv_transform);
@@ -279,7 +279,7 @@ where
         factor: &<R as RingBase>::Element,
     ) {
         self.delegate_inverted
-            .subtract(ring, src, dst, &ring.negate(factor.clone()));
+            .subtract(ring, src, dst, &ring.neg(factor.clone()));
     }
 
     fn swap<S: Copy + RingStore<Ring = R>>(&mut self, ring: S, i: usize, j: usize) {

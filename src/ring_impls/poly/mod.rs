@@ -720,7 +720,7 @@ pub mod generic_tests {
                 for c in &elements {
                     let f = ring.from_terms([(a.clone(), 0), (b.clone(), 3)].into_iter());
                     let g = ring
-                        .from_terms([(ring.base_ring().negate(c.clone()), 0), (ring.base_ring().one(), 1)].into_iter());
+                        .from_terms([(ring.base_ring().neg(c.clone()), 0), (ring.base_ring().one(), 1)].into_iter());
 
                     let (quo, rem) = ring.div_rem_monic(f.clone(), &g);
                     assert_el_eq!(

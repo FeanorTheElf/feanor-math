@@ -284,9 +284,9 @@ fn test_pow() {
     feanor_tracing::DelayedLogger::init_test();
     let CC = Complex64::RING;
     let i = Complex64::I;
-    assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 3), 1));
-    assert!(!CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 1));
-    assert!(CC.is_approx_eq(CC.negate(i), CC.pow(i, 1024 + 3), 100));
+    assert!(CC.is_approx_eq(CC.neg(i), CC.pow(i, 3), 1));
+    assert!(!CC.is_approx_eq(CC.neg(i), CC.pow(i, 1024 + 3), 1));
+    assert!(CC.is_approx_eq(CC.neg(i), CC.pow(i, 1024 + 3), 100));
     assert!(CC.is_approx_eq(
         CC.exp(CC.mul(CC.from_f64(PI / 4.0), i)),
         CC.mul(CC.add(CC.one(), i), CC.from_f64(2.0f64.powf(-0.5))),
@@ -303,6 +303,6 @@ fn test_mul() {
     let CC = Complex64::RING;
     let i = Complex64::I;
     assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.0), 1));
-    assert!(CC.is_approx_eq(CC.mul(i, CC.negate(i)), CC.from_f64(1.0), 1));
+    assert!(CC.is_approx_eq(CC.mul(i, CC.neg(i)), CC.from_f64(1.0), 1));
     assert!(CC.is_approx_eq(CC.mul(CC.add(i, CC.one()), i), CC.sub(i, CC.one()), 1));
 }

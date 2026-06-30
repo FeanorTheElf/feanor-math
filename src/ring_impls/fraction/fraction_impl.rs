@@ -193,8 +193,7 @@ where
     fn is_one(&self, value: &Self::Element) -> bool { self.base_ring.eq_el(&value.num, &value.den) }
 
     fn is_neg_one(&self, value: &Self::Element) -> bool {
-        self.base_ring
-            .eq_el(&self.base_ring.negate(value.num.clone()), &value.den)
+        self.base_ring.eq_el(&self.base_ring.neg(value.num.clone()), &value.den)
     }
 
     fn is_approximate(&self) -> bool { self.base_ring.get_ring().is_approximate() }

@@ -276,7 +276,7 @@ pub trait RingBase: PartialEq + Debug + Send + Sync {
 
     fn square(&self, value: &mut Self::Element) { self.mul_assign(value, value.clone()); }
 
-    fn negate(&self, mut value: Self::Element) -> Self::Element {
+    fn neg(&self, mut value: Self::Element) -> Self::Element {
         self.negate_inplace(&mut value);
         return value;
     }
@@ -612,7 +612,7 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     delegate! { RingBase, fn is_zero(&self, value: &El<Self>) -> bool }
     delegate! { RingBase, fn is_one(&self, value: &El<Self>) -> bool }
     delegate! { RingBase, fn is_neg_one(&self, value: &El<Self>) -> bool }
-    delegate! { RingBase, fn negate(&self, value: El<Self>) -> El<Self> }
+    delegate! { RingBase, fn neg(&self, value: El<Self>) -> El<Self> }
     delegate! { RingBase, fn sub_assign(&self, lhs: &mut El<Self>, rhs: El<Self>) -> () }
     delegate! { RingBase, fn add_ref(&self, lhs: &El<Self>, rhs: &El<Self>) -> El<Self> }
     delegate! { RingBase, fn add_ref_fst(&self, lhs: &El<Self>, rhs: El<Self>) -> El<Self> }

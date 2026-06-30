@@ -1,3 +1,5 @@
+use std::iter::repeat;
+
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::homomorphism::*;
 use crate::ring::*;
@@ -227,7 +229,7 @@ pub trait IntegerRing:
     /// assert_eq!(2, StaticRing::<i32>::RING.floor_div(-7, &-3));
     /// ```
     fn floor_div(&self, lhs: Self::Element, rhs: &Self::Element) -> Self::Element {
-        self.negate(self.ceil_div(self.negate(lhs), rhs))
+        self.neg(self.ceil_div(self.neg(lhs), rhs))
     }
 
     /// Returns the value `2^power` in this integer ring.
@@ -368,71 +370,6 @@ where
     <T::Ring as IntCast<F::Ring>>::cast(to.get_ring(), from.get_ring(), value)
 }
 
-/// Computes the binomial coefficient of `n` and `k`, defined as `n(n - 1)...(n - k + 1)/k!`.
-///
-/// The above definition works for any `n` and `k >= 0`. If `k < 0`, we define the binomial
-/// coefficient to be zero. This function will not overflow, if the integer rings supports number up
-/// to `binomial(n, k) * k`.
-///
-/// # Example
-/// ```rust
-/// # use feanor_math::prelude::*;
-/// # use feanor_math::iters::*;
-/// // the binomial coefficient is equal to the number of combinations of fixed size
-/// assert_eq!(
-///     binomial(10, &3, ZZi64) as usize,
-///     multiset_combinations(&[1; 10], 3, |_| ()).count()
-/// );
-/// ```
-pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
-where
-    I: RingStore + Copy,
-    I::Ring: IntegerRing,
-{
-    if ring.is_neg(&n) {
-        let mut result = binomial(ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k, ring);
-        if !ring.is_even(k) {
-            ring.negate_inplace(&mut result);
-        }
-        return result;
-    } else if ring.is_neg(k) || ring.is_gt(k, &n) {
-        return ring.zero();
-    } else {
-        // this formula works always, and is guaranteed not to overflow if k <= n/2 and `binomial(n, k) * k`
-        // fits into an integer; thus distinguish this case that k > n/2
-        let n_neg_k = ring.sub_ref(&n, &k);
-        if ring.is_lt(&n_neg_k, k) {
-            return binomial(n, &n_neg_k, ring);
-        }
-        let mut result = ring.one();
-        let mut i = ring.one();
-        while ring.is_leq(&i, &k) {
-            ring.mul_assign(&mut result, ring.sub_ref_snd(ring.add_ref_fst(&n, ring.one()), &i));
-            result = ring.checked_div(&result, &i).unwrap();
-            ring.add_assign(&mut i, ring.one());
-        }
-        return result;
-    }
-}
-
-#[stability::unstable(feature = "enable")]
-pub fn factorial<I>(n: &El<I>, ring: I) -> El<I>
-where
-    I: RingStore + Copy,
-    I::Ring: IntegerRing,
-{
-    let mut current = ring.zero();
-    let one = ring.one();
-    return ring.prod((0..).map_while(|_| {
-        if ring.is_lt(&current, &n) {
-            ring.add_assign_ref(&mut current, &one);
-            return Some(current.clone());
-        } else {
-            return None;
-        }
-    }));
-}
-
 /// Trait for [`RingStore`]s that store [`IntegerRing`]s. Mainly used
 /// to provide a convenient interface to the `IntegerRing`-functions.
 pub trait IntegerRingStore: RingStore
@@ -536,7 +473,7 @@ pub mod generic_impls {
             to.mul_assign_ref(&mut current_pow, &basis);
         }
         if is_neg {
-            return to.negate(current);
+            return to.neg(current);
         } else {
             return current;
         }
@@ -576,11 +513,93 @@ pub mod generic_impls {
             })
         });
         if negative {
-            return result.map(|result| ring.negate(result));
+            return result.map(|result| ring.neg(result));
         } else {
             return result;
         }
     }
+}
+
+/// Computes the binomial coefficient of `n` and `k`, defined as `n(n - 1)...(n - k + 1)/k!`.
+///
+/// The above definition works for any `n` and `k >= 0`. If `k < 0`, we define the binomial
+/// coefficient to be zero. This function will not overflow, if the integer rings supports number up
+/// to `binomial(n, k) * k`.
+///
+/// # Example
+/// ```rust
+/// # use feanor_math::prelude::*;
+/// # use feanor_math::iters::*;
+/// // the binomial coefficient is equal to the number of combinations of fixed size
+/// assert_eq!(
+///     binomial(10, &3, ZZi64) as usize,
+///     multiset_combinations(&[1; 10], 3, |_| ()).count()
+/// );
+/// ```
+pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
+where
+    I: RingStore + Copy,
+    I::Ring: IntegerRing,
+{
+    if ring.is_neg(&n) {
+        let mut result = binomial(ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k, ring);
+        if !ring.is_even(k) {
+            ring.negate_inplace(&mut result);
+        }
+        return result;
+    } else if ring.is_neg(k) || ring.is_gt(k, &n) {
+        return ring.zero();
+    } else {
+        // this formula works always, and is guaranteed not to overflow if k <= n/2 and `binomial(n, k) * k`
+        // fits into an integer; thus distinguish this case that k > n/2
+        let n_neg_k = ring.sub_ref(&n, &k);
+        if ring.is_lt(&n_neg_k, k) {
+            return binomial(n, &n_neg_k, ring);
+        }
+        let mut result = ring.one();
+        let mut i = ring.one();
+        while ring.is_leq(&i, &k) {
+            ring.mul_assign(&mut result, ring.sub_ref_snd(ring.add_ref_fst(&n, ring.one()), &i));
+            result = ring.checked_div(&result, &i).unwrap();
+            ring.add_assign(&mut i, ring.one());
+        }
+        return result;
+    }
+}
+
+/// Computes the factorial `n! = 1 * 2 * 3 * ... * (n - 1) * n`.
+pub fn factorial<I>(n: &El<I>, ring: I) -> El<I>
+where
+    I: RingStore,
+    I::Ring: IntegerRing,
+{
+    let mut current = ring.zero();
+    let one = ring.one();
+    return ring.prod((0..).map_while(|_| {
+        if ring.is_lt(&current, &n) {
+            ring.add_assign_ref(&mut current, &one);
+            return Some(current.clone());
+        } else {
+            return None;
+        }
+    }));
+}
+
+#[stability::unstable(feature = "enable")]
+pub fn int_range_exclusive<I>(ring: I, n: El<I>) -> impl use<I> + Clone + Iterator<Item = El<I>>
+where
+    I: RingStore,
+    I::Ring: IntegerRing,
+{
+    let one = ring.one();
+    repeat(()).scan(ring.neg_one(), move |current, ()| {
+        ring.add_assign_ref(current, &one);
+        if ring.is_lt(current, &n) {
+            return Some(current.clone());
+        } else {
+            None
+        }
+    })
 }
 
 #[cfg(test)]
@@ -628,7 +647,7 @@ pub mod generic_tests {
             let mut ceil_pow_2 = ring.int_hom().map(2);
             ring.mul_pow_2(&mut ceil_pow_2, ring.abs_highest_set_bit(a).unwrap_or(0));
             assert!(ring.is_lt(a, &ceil_pow_2));
-            assert!(ring.is_lt(&ring.negate(a.clone()), &ceil_pow_2));
+            assert!(ring.is_lt(&ring.neg(a.clone()), &ceil_pow_2));
 
             for i in 0..ring.abs_highest_set_bit(a).unwrap_or(0) {
                 let mut pow_2 = ring.one();
@@ -820,7 +839,7 @@ fn test_parse() {
     );
     assert_el_eq!(
         &ZZbig,
-        &ZZbig.negate(ZZbig.power_of_two(100)),
+        &ZZbig.neg(ZZbig.power_of_two(100)),
         ZZbig.parse("-1267650600228229401496703205376", 10).unwrap()
     );
     assert_el_eq!(

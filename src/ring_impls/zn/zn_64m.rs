@@ -86,13 +86,13 @@ impl Zn64MBase {
         let el_abs = <T as Into<i128>>::into(el).unsigned_abs();
         if el_abs <= self.modulus_u64() as u128 {
             if is_neg {
-                self.negate(self.from_int_promise_reduced(el_abs as i64))
+                self.neg(self.from_int_promise_reduced(el_abs as i64))
             } else {
                 self.from_int_promise_reduced(el_abs as i64)
             }
         } else {
             if is_neg {
-                self.negate(self.from_int_promise_reduced((el_abs % self.modulus as u128) as i64))
+                self.neg(self.from_int_promise_reduced((el_abs % self.modulus as u128) as i64))
             } else {
                 self.from_int_promise_reduced((el_abs % self.modulus as u128) as i64)
             }

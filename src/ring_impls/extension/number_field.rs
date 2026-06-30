@@ -201,7 +201,7 @@ impl NumberFieldBase {
         let QQ = RationalField::new(ZZbig);
         let rank = poly_ring.degree(generating_poly).unwrap();
         let modulus_vec = (0..rank)
-            .map(|i| QQ.negate(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i))))
+            .map(|i| QQ.neg(QQ.inclusion().map_ref(poly_ring.coefficient_at(generating_poly, i))))
             .collect::<Vec<_>>();
         let log2_padded_len = ZZi64.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
         let len_range = (2 << log2_padded_len)..((2 << log2_padded_len) + 1);

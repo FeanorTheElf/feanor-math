@@ -117,7 +117,7 @@ where
                 && (ZZ.abs_log2_ceil(&x_pow_root_half).unwrap() - 1) * 2 >= log2_ceil_n
             {
                 if ZZ.is_neg(x) {
-                    return ZZ.negate(n.clone());
+                    return ZZ.neg(n.clone());
                 } else {
                     return n.clone();
                 }

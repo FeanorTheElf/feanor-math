@@ -955,7 +955,7 @@ pub mod generic_tests {
                         [
                             base_ring.int_hom().map(3),
                             base_ring.int_hom().mul_ref_map(a, &10),
-                            base_ring.negate(base_ring.pow(a.clone(), 2)),
+                            base_ring.neg(base_ring.pow(a.clone(), 2)),
                             base_ring.mul_ref(a, b),
                         ],
                     );

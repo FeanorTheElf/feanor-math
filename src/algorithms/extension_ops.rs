@@ -92,7 +92,7 @@ where
         let mut rhs = OwnedMatrix::zero(ring.rank(), 1, &base_ring);
         let wrt_basis = ring.wrt_power_basis(&current);
         for i in 0..ring.rank() {
-            *rhs.at_mut(i, 0) = base_ring.negate(hom.map(wrt_basis.at(i)));
+            *rhs.at_mut(i, 0) = base_ring.neg(hom.map(wrt_basis.at(i)));
         }
         let mut sol = OwnedMatrix::zero(d, 1, &base_ring);
         let sol_poly = |sol: &OwnedMatrix<El<BaseRingStore<P>>>| {

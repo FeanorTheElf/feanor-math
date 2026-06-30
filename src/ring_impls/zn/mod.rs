@@ -221,7 +221,7 @@ pub mod generic_impls {
         G: FnOnce(J::Element) -> R::Element,
     {
         let (neg, n) = if from.is_neg(&el) {
-            (true, from.negate(el))
+            (true, from.neg(el))
         } else {
             (false, el)
         };
@@ -239,7 +239,7 @@ pub mod generic_impls {
                 &hom.iso,
             ))
         };
-        if neg { to.negate(reduced) } else { reduced }
+        if neg { to.neg(reduced) } else { reduced }
     }
 
     /// Generates a uniformly random element of `Z/nZ` using the randomness of `rng`.

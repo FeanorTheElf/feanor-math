@@ -37,7 +37,7 @@ where
     let mut point_polys = vec![
         points
             .iter()
-            .map(|x| poly_ring.from_terms([(base_ring.one(), 0), (base_ring.negate(x.clone()), 1)]))
+            .map(|x| poly_ring.from_terms([(base_ring.one(), 0), (base_ring.neg(x.clone()), 1)]))
             .collect::<Vec<_>>(),
     ];
     while point_polys.last().unwrap().len() > 1 {

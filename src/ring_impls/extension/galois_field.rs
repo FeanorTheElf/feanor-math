@@ -321,7 +321,7 @@ where
             .map(|i| {
                 poly_ring
                     .base_ring()
-                    .negate(poly_ring.coefficient_at(&generating_poly, i).clone())
+                    .neg(poly_ring.coefficient_at(&generating_poly, i).clone())
             })
             .collect::<Vec<_>>();
         drop(poly_ring);
@@ -360,7 +360,7 @@ where
             .map(|i| {
                 poly_ring
                     .base_ring()
-                    .negate(poly_ring.coefficient_at(&generating_poly, i).clone())
+                    .neg(poly_ring.coefficient_at(&generating_poly, i).clone())
             })
             .collect::<Vec<_>>();
         drop(poly_ring);
@@ -894,7 +894,7 @@ where
     };
     let create_mod_f_ring = |f: &El<P>| {
         let modulus_vec = (0..degree)
-            .map(|i| Fp.negate(poly_ring.coefficient_at(f, i).clone()))
+            .map(|i| Fp.neg(poly_ring.coefficient_at(f, i).clone()))
             .collect::<Vec<_>>();
         return RingValue::from(MonogenicExtensionImplBase::new_with_convolution(
             SparsePolyModulus::new(Fp, modulus_vec),
@@ -919,7 +919,7 @@ where
                 .abs_highest_set_bit(&Fp.integer_ring().sub_ref_fst(Fp.modulus(), Fp.integer_ring().one()))
                 .unwrap();
             let quadratic_non_residue = get_prim_root_of_unity_pow2(Fp, val2_order).unwrap();
-            return poly_ring.from_terms([(Fp.negate(quadratic_non_residue), 0), (Fp.one(), 2)]);
+            return poly_ring.from_terms([(Fp.neg(quadratic_non_residue), 0), (Fp.one(), 2)]);
         }
     }
 
@@ -989,7 +989,7 @@ where
         // generate the field
         let FqX = DensePolyRing::new(&Fq, "X");
         let constant_coeff =
-            |i| Fq.negate(Fq.pow_gen(primitive_element.clone(), &ZZbig.pow(p.clone(), i as usize), ZZbig));
+            |i| Fq.neg(Fq.pow_gen(primitive_element.clone(), &ZZbig.pow(p.clone(), i as usize), ZZbig));
         let minpoly =
             FqX.prod((0..base_degree).map(|i| FqX.from_terms([(constant_coeff(i), 0), (Fq.one(), 1)].into_iter())));
         let minpoly_Fp = poly_ring.from_terms(FqX.terms(&minpoly).map(|(c, i)| {

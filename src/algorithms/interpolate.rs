@@ -148,7 +148,7 @@ where
     let base_ring = poly_ring.base_ring();
     let null_poly = poly_ring.prod(
         x.iter()
-            .map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.negate(x), 0)])),
+            .map(|x| poly_ring.from_terms([(base_ring.one(), 1), (base_ring.neg(x), 0)])),
     );
     let mut nums = Vec::with_capacity_in(x.len(), &allocator);
     let div_linear = |poly: &El<P>, a: &El<BaseRingStore<P>>| {

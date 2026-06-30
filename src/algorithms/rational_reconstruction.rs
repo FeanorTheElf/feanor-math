@@ -108,7 +108,7 @@ where
 {
     let [b, a] = reduce_2d_modular_relation_basis(&Zn, x).0;
     if Zn.integer_ring().is_neg(&b) {
-        return (Zn.integer_ring().negate(a), Zn.integer_ring().negate(b));
+        return (Zn.integer_ring().neg(a), Zn.integer_ring().neg(b));
     } else {
         return (a, b);
     }

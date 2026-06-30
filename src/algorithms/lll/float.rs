@@ -244,7 +244,7 @@ where
             let min_entry = if RR.is_neg(&min_entry) {
                 RR.zero()
             } else if RR.is_neg(gso.cholesky.at(k, i)) {
-                RR.negate(min_entry)
+                RR.neg(min_entry)
             } else {
                 min_entry
             };
