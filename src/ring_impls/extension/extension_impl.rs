@@ -623,7 +623,7 @@ where
 
     default fn invert(&self, el: &Self::Element) -> Option<Self::Element> { self.checked_div(&self.one(), el) }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<R, M, C, A> Debug for MonogenicExtensionImplBase<R, M, C, A>

@@ -339,7 +339,7 @@ impl<T: PrimitiveInt> IntegerRing for StaticRingBase<T> {
     }
 
     fn get_uniformly_random_bits<G: FnMut() -> u64>(&self, log2_bound_exclusive: usize, mut rng: G) -> Self::Element {
-        assert!(log2_bound_exclusive <= T::bits() - 1);
+        assert!(log2_bound_exclusive < T::bits());
         RingRef::from(self).coerce::<StaticRing<i128>>(
             &StaticRing::<i128>::RING,
             ((((rng() as u128) << u64::BITS) | (rng() as u128)) & ((1 << log2_bound_exclusive) - 1)) as i128,

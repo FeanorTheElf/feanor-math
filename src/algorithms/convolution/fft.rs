@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::borrow::Cow;
 use std::marker::PhantomData;
 
 use elsa::sync::FrozenMap;
@@ -8,7 +9,6 @@ use super::ConvolutionAlgorithm;
 use crate::algorithms::fft::FFTAlgorithm;
 use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
-use crate::cow::*;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
@@ -70,7 +70,7 @@ where
         log2_len: usize,
         mut to_int: ToInt,
         log2_el_size: Option<usize>,
-    ) -> MyCow<'a, Vec<El<Complex64>, A>>
+    ) -> Cow<'a, Vec<El<Complex64>, A>>
     where
         R: ?Sized + RingBase,
         V: VectorView<R::Element>,
@@ -100,12 +100,12 @@ where
 
         return if let Some(data_prep) = data_prep {
             if let Some(res) = data_prep.fft_data.get(&log2_len) {
-                MyCow::Borrowed(res)
+                Cow::Borrowed(res)
             } else {
-                MyCow::Borrowed(data_prep.fft_data.insert(log2_len, Box::new(compute_result())))
+                Cow::Borrowed(data_prep.fft_data.insert(log2_len, Box::new(compute_result())))
             }
         } else {
-            MyCow::Owned(compute_result())
+            Cow::Owned(compute_result())
         };
     }
 
@@ -187,7 +187,7 @@ where
 
         let mut lhs_fft = self.get_fft_data(lhs, lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
         let mut rhs_fft = self.get_fft_data(rhs, rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
-        if rhs_fft.is_owned() {
+        if let Cow::Owned(_) = &rhs_fft {
             std::mem::swap(&mut lhs_fft, &mut rhs_fft);
         }
         let lhs_fft: &mut Vec<El<Complex64>, A> = lhs_fft.to_mut();
@@ -279,7 +279,7 @@ where
 
             let mut lhs_fft = self.get_fft_data(lhs, *lhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
             let mut rhs_fft = self.get_fft_data(rhs, *rhs_prep, ring, log2_len, &mut to_int, ring_log2_el_size);
-            if rhs_fft.is_owned() {
+            if let Cow::Owned(_) = &rhs_fft {
                 std::mem::swap(&mut lhs_fft, &mut rhs_fft);
             }
             let lhs_fft: &mut Vec<El<Complex64>, A> = lhs_fft.to_mut();

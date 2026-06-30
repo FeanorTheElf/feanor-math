@@ -37,7 +37,6 @@ use crate::ring_properties::specialization::*;
 ///
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 ///
@@ -78,7 +77,6 @@ use crate::ring_properties::specialization::*;
 /// ```rust
 /// # use std::fmt::Debug;
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::delegate::*;
 /// # use feanor_math::{assert_el_eq, impl_eq_based_self_iso};
 ///

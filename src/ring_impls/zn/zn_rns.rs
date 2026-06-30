@@ -27,10 +27,8 @@ use crate::seq::VectorView;
 /// # Example
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::ring_impls::zn::zn_rns::*;
-
 /// # use feanor_math::seq::*;
 ///
 /// let R = ZnRNS::create_from_primes(vec![17, 19], ZZi64);
@@ -57,10 +55,8 @@ use crate::seq::VectorView;
 /// This ring has a canonical isomorphism to Barett-reduction based Zn
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::ring_impls::zn::zn_rns::*;
-
 /// let R = ZnRNS::create_from_primes(vec![17, 19], ZZbig);
 /// let S = zn_big::ZnGB::new(ZZi64, 17 * 19);
 /// assert!(R.eq_el(&R.int_hom().map(12), &R.coerce(&S, S.int_hom().map(12))));
@@ -72,10 +68,8 @@ use crate::seq::VectorView;
 /// and a canonical homomorphism from any integer ring
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::ring_impls::zn::zn_rns::*;
-
 /// let R = ZnRNS::create_from_primes(vec![3, 5, 7], ZZbig);
 /// let S = ZZbig;
 /// assert!(R.eq_el(
@@ -707,7 +701,7 @@ where
         return Some(ZnRNSEl { data });
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<C: RingStore, J: RingStore, A: Allocator + Send + Sync + Clone> HashableElRing for ZnRNSBase<C, J, A>

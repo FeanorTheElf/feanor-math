@@ -17,7 +17,6 @@ use crate::ring_properties::ordered::OrderedRingStore;
 /// ```rust
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::poly::*;
-
 /// # use feanor_math::ring_impls::poly::dense_poly::*;
 /// let poly_ring = DensePolyRing::new(ZZi64, "X");
 /// let f = poly_ring.add(poly_ring.one(), poly_ring.indeterminate());
@@ -124,7 +123,6 @@ pub enum EnvBindingStrength {
 /// consider the following code
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::ring_impls::zn::*;
 /// let Z7 = zn_big::ZnGB::new(ZZi64, 7);
 /// let Z11 = zn_big::ZnGB::new(ZZi64, 11);
@@ -505,9 +503,7 @@ macro_rules! delegate {
 /// # Example
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::assert_el_eq;
-///
 /// assert_el_eq!(StaticRing::<i32>::RING, 3, 3);
 /// // is equivalent to
 /// assert_eq!(3, 3);
@@ -515,7 +511,6 @@ macro_rules! delegate {
 /// If the ring elements are not comparable on their own, this is really useful
 /// ```rust
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::assert_el_eq;
 /// // this does not have an equivalent representation with assert_eq!
 /// assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), ZZbig.int_hom().map(3));
@@ -567,7 +562,6 @@ macro_rules! debug_assert_el_eq {
 /// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::prelude::*;
-
 /// # use std::sync::Arc;
 /// fn add_in_ring<R: RingStore>(ring: R, a: El<R>, b: El<R>) -> El<R> { ring.add(a, b) }
 ///
@@ -818,7 +812,6 @@ pub trait RingStore: Sized + Send + Sync + Clone {
     /// ```rust
     /// # use feanor_math::prelude::*;
     /// # use feanor_math::ring_impls::poly::dense_poly::*;
-
     /// # use feanor_math::ring_impls::poly::*;
     /// let ring = DensePolyRing::new(ZZi64, "X");
     /// let [f, g] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1]);

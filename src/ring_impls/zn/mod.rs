@@ -138,14 +138,16 @@ pub mod generic_impls {
     /// This will only ever return `None` if one of the integer ring `has_canonical_hom/iso` returns
     /// `None`.
     #[stability::unstable(feature = "enable")]
-    pub fn has_canonical_hom_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing>(
+    pub fn has_canonical_hom_from_bigint<I, J, R>(
         from: &I,
         to: &R,
         to_large_int_ring: &J,
         bounded_reduce_bound: Option<&J::Element>,
     ) -> Option<BigIntToZnHom<I, J, R>>
     where
-        I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,
+        I: ?Sized + IntegerRing,
+        J: ?Sized + IntegerRing,
+        R: ?Sized + ZnRing
     {
         if let Some(bound) = bounded_reduce_bound {
             Some(BigIntToZnHom {
@@ -202,7 +204,7 @@ pub mod generic_impls {
     /// a problem if the primitive integer rings `StaticRing::<ixx>::RING` are used, or if `B >=
     /// 2n`.
     #[stability::unstable(feature = "enable")]
-    pub fn map_in_from_bigint<I: ?Sized + IntegerRing, J: ?Sized + IntegerRing, R: ?Sized + ZnRing, F, G>(
+    pub fn map_in_from_bigint<I, J, R, F, G>(
         from: &I,
         to: &R,
         to_large_int_ring: &J,
@@ -212,7 +214,9 @@ pub mod generic_impls {
         from_positive_representative_bounded: G,
     ) -> R::Element
     where
-        I: CanIsoFromTo<R::IntegerRingBase> + CanIsoFromTo<J>,
+        I: ?Sized + IntegerRing,
+        J: ?Sized + IntegerRing,
+        R: ?Sized + ZnRing,
         F: FnOnce(El<R::IntegerRing>) -> R::Element,
         G: FnOnce(J::Element) -> R::Element,
     {
@@ -296,12 +300,12 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn interpolation_ring<'conv, R: ZnRingStore>(
+    pub fn interpolation_ring<'conv, R>(
         ring: R,
         count: usize,
     ) -> GaloisFieldOver<R, DynConvolution<'conv, R::Ring>>
     where
-        R: 'conv + Clone,
+        R: 'conv + Clone + RingStore,
         R::Ring: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,
     {
         let modulus = int_cast(ring.modulus().clone(), ZZbig, ring.integer_ring());

@@ -27,7 +27,6 @@ use crate::ring_properties::specialization::FiniteRingSpecializable;
 /// example are implementations of [`ZnRing`] with modulus chosen at runtime.
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::as_field::*;
 /// # use feanor_math::ring_impls::zn::*;
@@ -46,7 +45,6 @@ use crate::ring_properties::specialization::FiniteRingSpecializable;
 /// use the functions given by [`DelegateRing`], e.g.
 /// ```rust
 /// # use feanor_math::assert_el_eq;
-
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::as_field::*;
 /// # use feanor_math::ring_impls::zn::*;
@@ -476,7 +474,6 @@ where
 /// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::ring_impls::as_field::*;
 /// # use feanor_math::delegate::*;
-
 /// # use feanor_math::{impl_eq_based_self_iso, impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 /// // A no-op wrapper around Zn
 /// #[derive(Copy, Clone, Debug)]

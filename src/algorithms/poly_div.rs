@@ -169,7 +169,7 @@ where
             poly_ring.degree(&q_upper).is_none()
                 || poly_ring.degree(&q_upper).unwrap() <= deg_f + split_degree_g - split_degree_f - deg_g
         );
-        debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() <= deg_g - split_degree_g - 1);
+        debug_assert!(poly_ring.degree(&r).is_none() || poly_ring.degree(&r).unwrap() < deg_g - split_degree_g);
 
         poly_ring.get_ring().add_assign_from_terms(
             &mut f_lower,

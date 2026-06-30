@@ -11,6 +11,8 @@
     // unused_qualifications,
     unused_results,
     // missing_docs
+    clippy::type_repetition_in_bounds,
+    clippy::trait_duplication_in_bounds,
 )]
 #![feature(associated_type_defaults)]
 #![feature(btree_cursors)]
@@ -50,9 +52,7 @@ pub mod ring_impls;
 /// Collection of traits that represent special properties of rings, like
 /// [`ring_properties::field::Field`] and [`ring_properties::pid::PrincipalIdealRing`].
 pub mod ring_properties;
-
 pub mod algorithms;
-mod cow;
 /// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the
 /// newtype-pattern for rings.
 pub mod delegate;

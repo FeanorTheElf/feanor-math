@@ -316,7 +316,7 @@ where
         }
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<R> Domain for FractionFieldImplBase<R>

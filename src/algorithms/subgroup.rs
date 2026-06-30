@@ -1240,13 +1240,19 @@ fn test_dlog() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Zn::<153>::RING;
     let group = AddGroup::new(ring);
-    let subgroup = Subgroup::new(group, int_cast(3 * 17, ZZbig, ZZi64), vec![3]);
+    let subgroup = Subgroup::new(&group, int_cast(3 * 17, ZZbig, ZZi64), vec![3]);
     assert!(subgroup.dlog(&1).is_none());
     assert!(subgroup.dlog(&17).is_none());
-    assert_el_eq!(ZZbig, ZZbig.one(), subgroup.dlog(&3).unwrap()[0]);
+    assert_gel_eq!(group, 3, group.pow_bigint(3, &subgroup.dlog(&3).unwrap()[0]));
     let subgroup = subgroup.add_generator(17, &int_cast(9, ZZbig, ZZi64));
-    assert_el_eq!(ZZbig, ZZbig.zero(), subgroup.dlog(&17).unwrap()[0]);
-    assert_el_eq!(ZZbig, ZZbig.one(), subgroup.dlog(&17).unwrap()[1]);
+    assert_gel_eq!(
+        group,
+        17,
+        group.op(
+            group.pow_bigint(3, &subgroup.dlog(&17).unwrap()[0]),
+            group.pow_bigint(17, &subgroup.dlog(&17).unwrap()[1])
+        )
+    );
 }
 
 #[test]

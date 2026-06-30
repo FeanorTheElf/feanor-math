@@ -130,7 +130,7 @@ impl DivisibilityRing for Real64Base {
         return Some(*lhs / *rhs);
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl PrincipalIdealRing for Real64Base {

@@ -334,7 +334,7 @@ impl<A: Allocator + Send + Sync + Clone> DivisibilityRing for RustBigintRingBase
         Some(elements.fold(self.zero(), |a, b| self.ideal_gen(&a, b)))
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigintRingBase<A> {

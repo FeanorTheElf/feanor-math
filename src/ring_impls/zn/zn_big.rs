@@ -65,7 +65,6 @@ use crate::{impl_field_wrap_unwrap_homs, impl_field_wrap_unwrap_isos};
 /// # use feanor_math::homomorphism::*;
 /// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::ring_impls::zn::zn_big::*;
-
 /// let R = ZnGB::new(StaticRing::<i16>::RING, 7);
 /// let S = ZZbig;
 /// assert!(R.eq_el(
@@ -443,7 +442,7 @@ where
         super::generic_impls::checked_div(RingRef::from(self), lhs, rhs)
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<I: RingStore, J: RingStore> CanHomFrom<ZnGBBase<J>> for ZnGBBase<I>

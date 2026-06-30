@@ -873,7 +873,7 @@ where
             .map(|c| RingRef::from(self).inclusion().map(c))
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<R, A, C> PrincipalIdealRing for DensePolyRingBase<R, C, A>

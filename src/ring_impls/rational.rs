@@ -598,7 +598,7 @@ where
         return Some(RationalFieldEl(num, den));
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl_interpolation_base_ring_char_zero! { <{I}> InterpolationBaseRing for RationalFieldBase<I> where I: RingStore, I::Ring: IntegerRing + ComputeResultantRing }

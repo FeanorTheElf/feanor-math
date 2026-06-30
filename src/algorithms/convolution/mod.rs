@@ -359,7 +359,6 @@ impl<R: ?Sized + RingBase, A: Allocator + Send + Sync> ConvolutionAlgorithm<R> f
         _length_hint: Option<usize>,
         _ring: &R,
     ) -> Self::PreparedConvolutionOperand {
-        ()
     }
 
     fn supports_ring(&self, _ring: &R) -> bool { true }
@@ -388,9 +387,7 @@ impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for SchoolbookConvolution {
         _: &[R::Element],
         _: Option<usize>,
         _: &R,
-    ) -> Self::PreparedConvolutionOperand {
-        ()
-    }
+    ) -> Self::PreparedConvolutionOperand {}
 
     fn supports_ring(&self, _: &R) -> bool { true }
 }

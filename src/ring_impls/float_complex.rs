@@ -188,7 +188,7 @@ impl DivisibilityRing for Complex64Base {
         return Some(Complex64El(res_re / abs_sqr, res_im / abs_sqr));
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl PrincipalIdealRing for Complex64Base {

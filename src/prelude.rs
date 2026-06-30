@@ -1,3 +1,4 @@
+pub use crate::group::{AbelianGroupBase, AbelianGroupStore, GEl, GroupValue};
 pub use crate::homomorphism::Homomorphism;
 pub use crate::ring::{
     BaseRingBase, BaseRingStore, El, EnvBindingStrength, HashableElRing, HashableElRingStore, RingBase, RingExtension,
@@ -12,4 +13,4 @@ pub use crate::ring_properties::integer::{
 };
 pub use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
 pub use crate::ring_properties::pid::{EuclideanRing, EuclideanRingStore, PrincipalIdealRing, PrincipalIdealRingStore};
-pub use crate::{assert_el_eq, debug_assert_el_eq};
+pub use crate::{assert_el_eq, assert_gel_eq, debug_assert_el_eq, debug_assert_gel_eq};

@@ -1,4 +1,5 @@
 use std::alloc::{Allocator, Global};
+use std::borrow::Cow;
 
 use elsa::sync::FrozenMap;
 use tracing::instrument;
@@ -7,7 +8,6 @@ use super::ConvolutionAlgorithm;
 use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2_zn, is_prim_root_of_unity_pow2};
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::algorithms::int_factor::factor;
-use crate::cow::*;
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::zn::*;
@@ -177,7 +177,7 @@ where
         data: V,
         data_prep: Option<&'a PreparedConvolutionOperand<R_main, A>>,
         significant_entries: usize,
-    ) -> MyCow<'a, Vec<R_main::Element, A>>
+    ) -> Cow<'a, Vec<R_main::Element, A>>
     where
         V: VectorView<R_main::Element>,
     {
@@ -195,9 +195,9 @@ where
 
         return if let Some(data_prep) = data_prep {
             assert!(data_prep.significant_entries >= significant_entries);
-            MyCow::Borrowed(&data_prep.ntt_data)
+            Cow::Borrowed(&data_prep.ntt_data)
         } else {
-            MyCow::Owned(compute_result())
+            Cow::Owned(compute_result())
         };
     }
 
@@ -209,7 +209,7 @@ where
         rhs: V2,
         mut rhs_prep: Option<&'a PreparedConvolutionOperand<R_main, A>>,
         len: usize,
-    ) -> MyCow<'a, Vec<R_main::Element, A>>
+    ) -> Cow<'a, Vec<R_main::Element, A>>
     where
         V1: VectorView<R_main::Element>,
         V2: VectorView<R_main::Element>,
@@ -229,14 +229,10 @@ where
 
         let mut lhs_ntt = self.get_ntt_data(lhs, lhs_prep, len);
         let mut rhs_ntt = self.get_ntt_data(rhs, rhs_prep, len);
-        if rhs_ntt.is_owned() {
+        if let Cow::Owned(_) = &rhs_ntt {
             std::mem::swap(&mut lhs_ntt, &mut rhs_ntt);
         }
-        let lhs_ntt_data = lhs_ntt.to_mut_with(|data| {
-            let mut copied_data = Vec::with_capacity_in(data.len(), self.allocator.clone());
-            copied_data.extend(data.iter().map(|x| x.clone()));
-            copied_data
-        });
+        let lhs_ntt_data = lhs_ntt.to_mut();
 
         for i in 0..len {
             self.ring().mul_assign_ref(&mut lhs_ntt_data[i], &rhs_ntt[i]);
@@ -296,7 +292,7 @@ where
         let log2_len = ZZi64.abs_log2_ceil(&len.try_into().unwrap()).unwrap();
 
         let mut lhs_ntt = self.compute_convolution_ntt(lhs, lhs_prep, rhs, rhs_prep, len);
-        let lhs_ntt = lhs_ntt.to_mut_with(|_| unreachable!());
+        let lhs_ntt = lhs_ntt.to_mut();
         self.get_ntt_table(log2_len)
             .unordered_truncated_fft_inv(&mut lhs_ntt[..], len);
         for (i, x) in lhs_ntt.drain(..).enumerate().take(len) {

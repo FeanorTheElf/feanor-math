@@ -61,7 +61,6 @@ fn reduce_to_half(x: u64, bound: u64) -> u64 {
 /// ```rust
 /// # use feanor_math::assert_el_eq;
 /// # use feanor_math::prelude::*;
-
 /// # use feanor_math::ring_impls::zn::*;
 /// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// let zn = Zn64B::new(7);

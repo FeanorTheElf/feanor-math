@@ -413,7 +413,7 @@ impl DivisibilityRing for Zn64MBase {
         super::generic_impls::checked_div(RingRef::from(self), lhs, rhs)
     }
 
-    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData { () }
+    fn prepare_divisor(&self, _: &Self::Element) -> Self::PreparedDivisorData {}
 }
 
 impl<I: ?Sized + IntegerRing> CanHomFrom<I> for Zn64MBase {
