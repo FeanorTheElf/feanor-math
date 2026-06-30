@@ -123,9 +123,9 @@ where
                 if ZZbig.is_lt(
                     &ZZbig.mul(
                         binomial(
+                            ZZbig,
                             int_cast(d + TryInto::<i64>::try_into(variable_count).unwrap() - 1, ZZbig, ZZi64),
                             &k,
-                            ZZbig,
                         ),
                         int_cast(*d, ZZbig, ZZi64),
                     ),
@@ -1083,7 +1083,7 @@ where
 /// Computes the "cumulative binomial function" `sum_(0 <= l <= k) binomial(n + l, n)`
 fn compute_cum_binomial(n: usize, k: usize) -> u64 {
     ZZi64.sum((0..(k + 1)).map(|l| {
-        binomial((n + l) as i128, &(n as i128), StaticRing::<i128>::RING)
+        binomial(StaticRing::<i128>::RING, (n + l) as i128, &(n as i128))
             .try_into()
             .unwrap()
     })) as u64

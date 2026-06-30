@@ -38,9 +38,7 @@ pub trait OrderedRing: RingBase {
     fn is_pos(&self, value: &Self::Element) -> bool { self.is_gt(value, &self.zero()) }
 
     /// Returns the absolute value of `value`, i.e. `value` if `value >= 0` and `-value` otherwise.
-    fn abs(&self, value: Self::Element) -> Self::Element {
-        if self.is_neg(&value) { self.neg(value) } else { value }
-    }
+    fn abs(&self, value: Self::Element) -> Self::Element { if self.is_neg(&value) { self.neg(value) } else { value } }
 
     /// Returns the larger one of `fst` and `snd`.
     fn max<'a>(&self, fst: &'a Self::Element, snd: &'a Self::Element) -> &'a Self::Element {

@@ -12,9 +12,11 @@ use feanor_serde::impl_deserialize_seed_for_dependent_struct;
 use feanor_serde::map::DeserializeSeedMapped;
 use feanor_serde::newtype_struct::{DeserializeSeedNewtypeStruct, SerializableNewtypeStruct};
 use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
+use oorandom::Rand64;
 use serde::{Deserialize, Serialize};
 use tracing::instrument;
 
+use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::int_bisect::root_floor;
 use crate::algorithms::int_factor::factor;
 use crate::algorithms::lattices::*;
@@ -916,50 +918,65 @@ where
     R: RingStore,
     R::Ring: ZnRing + HashableElRing + DivisibilityRing,
 {
-    /// Creates a subgroup of the given multiplicative group of a quotient of the integers.
+    /// Creates a [`Subgroup`] of the given multiplicative group of a given ring `Z/nZ`.
+    ///
+    /// This will factor the modulus `n` and (p - 1) for each p|n, which may be expensive.
     #[stability::unstable(feature = "enable")]
     pub fn for_zn(group: MultGroup<R>, generators: Vec<GEl<MultGroup<R>>>) -> Self {
-        let n = generators.len();
-        if n == 0 {
-            let n_factorization = factor(ZZbig, group.underlying_ring().size(ZZbig).unwrap());
-            let max_order_factorization = n_factorization
-                .into_iter()
-                .map(|(p, e)| {
-                    let mut factorization = factor(ZZbig, ZZbig.sub_ref_fst(&p, ZZbig.one()))
-                        .into_iter()
-                        .chain([(p, e - 1)].into_iter())
-                        .filter(|(_, e)| *e > 0)
-                        .collect::<Vec<_>>();
-                    factorization.sort_unstable_by(|(l, _), (r, _)| ZZbig.cmp(l, r));
-                    return factorization;
-                })
-                .fold(Vec::new(), |lhs: Vec<_>, rhs: Vec<_>| {
-                    let mut result = Vec::new();
-                    let mut lhs_it = lhs.iter().cloned().peekable();
-                    let mut rhs_it = rhs.iter().cloned().peekable();
-                    while let Some((p_l, e_l)) = lhs_it.peek()
-                        && let Some((p_r, e_r)) = rhs_it.peek()
-                    {
-                        match ZZbig.cmp(p_l, p_r) {
-                            Ordering::Less => {
-                                result.push(lhs_it.next().unwrap());
-                            }
-                            Ordering::Greater => {
-                                result.push(rhs_it.next().unwrap());
-                            }
-                            Ordering::Equal => {
-                                let e = usize::max(*e_l, *e_r);
-                                let p = lhs_it.next().unwrap().0;
-                                _ = rhs_it.next().unwrap();
-                                result.push((p, e));
-                            }
+        let mut result = Self::for_zn_with_factorization(group).0;
+        let order = result.order_multiple().clone();
+        for g in generators {
+            result = result.add_generator(g, &order);
+        }
+        return result;
+    }
+
+    fn for_zn_with_factorization(
+        group: MultGroup<R>,
+    ) -> (Self, Vec<(El<BigIntRing>, usize)>, Vec<Vec<(El<BigIntRing>, usize)>>) {
+        let n_factorization = factor(ZZbig, group.underlying_ring().size(ZZbig).unwrap());
+        let order_factorizations = n_factorization
+            .iter()
+            .map(|(p, e)| {
+                let mut factorization = factor(ZZbig, ZZbig.sub_ref_fst(p, ZZbig.one()))
+                    .into_iter()
+                    .chain([(p.clone(), e - 1)].into_iter())
+                    .filter(|(_, e)| *e > 0)
+                    .collect::<Vec<_>>();
+                factorization.sort_unstable_by(|(l, _), (r, _)| ZZbig.cmp(l, r));
+                return factorization;
+            })
+            .collect::<Vec<_>>();
+        let max_order_factorization = order_factorizations
+            .iter()
+            .fold(Vec::new(), |lhs: Vec<_>, rhs: &Vec<_>| {
+                let mut result = Vec::new();
+                let mut lhs_it = lhs.into_iter().peekable();
+                let mut rhs_it = rhs.iter().cloned().peekable();
+                while let Some((p_l, e_l)) = lhs_it.peek()
+                    && let Some((p_r, e_r)) = rhs_it.peek()
+                {
+                    match ZZbig.cmp(p_l, p_r) {
+                        Ordering::Less => {
+                            result.push(lhs_it.next().unwrap());
+                        }
+                        Ordering::Greater => {
+                            result.push(rhs_it.next().unwrap());
+                        }
+                        Ordering::Equal => {
+                            let e = usize::max(*e_l, *e_r);
+                            let p = lhs_it.next().unwrap().0;
+                            _ = rhs_it.next().unwrap();
+                            result.push((p, e));
                         }
                     }
-                    result.extend(lhs_it);
-                    result.extend(rhs_it);
-                    return result;
-                });
-            return Self::from(SubgroupBase {
+                }
+                result.extend(lhs_it);
+                result.extend(rhs_it);
+                return result;
+            });
+        return (
+            Self::from(SubgroupBase {
                 parent: group,
                 generators: Vec::new(),
                 order_multiple: ZZbig.prod(max_order_factorization.iter().map(|(p, e)| ZZbig.pow(p.clone(), *e))),
@@ -969,15 +986,47 @@ where
                 global_relation_lattice: OnceLock::new(),
                 cyclic_decomposition: OnceLock::new(),
                 subgroup_order: OnceLock::new(),
-            });
-        } else {
-            let mut result = Self::for_zn(group, Vec::new());
-            let order_multiple = result.order_multiple().clone();
-            for g in generators {
+            }),
+            n_factorization,
+            order_factorizations,
+        );
+    }
+
+    /// Creates a [`Subgroup`] that is the full unit group of the given ring `Z/nZ`.
+    ///
+    /// This will factor the modulus `n` and (p - 1) for each p|n, which may be expensive.
+    #[stability::unstable(feature = "enable")]
+    pub fn zn_unit_group(group: MultGroup<R>) -> Self {
+        let (mut result, n_factorization, order_factorizations) = Self::for_zn_with_factorization(group);
+        let order_multiple = result.order_multiple().clone();
+        let two = ZZbig.int_hom().map(2);
+        for ((p, e), order_factorization) in n_factorization.into_iter().zip(order_factorizations) {
+            let ZZ = result.parent().underlying_ring().integer_ring();
+            let n = int_cast(result.parent().underlying_ring().modulus().clone(), ZZbig, ZZ);
+            let pe = ZZbig.pow(p.clone(), e);
+            let rest = ZZbig.checked_div(&n, &pe).unwrap();
+            if ZZbig.eq_el(&p, &two) {
+                let Zn = result.parent().underlying_ring();
+                let g1 = ZZbig.inv_crt([&ZZbig.int_hom().map(5), &ZZbig.one()], [&pe, &rest]);
+                let g1 = result
+                    .parent()
+                    .from_ring_el(Zn.coerce(Zn.integer_ring(), int_cast(g1, Zn.integer_ring(), ZZbig)))
+                    .unwrap();
+                let g2 = result.parent().from_ring_el(Zn.neg_one()).unwrap();
+                result = result.add_generator(g1, &order_multiple);
+                result = result.add_generator(g2, &order_multiple);
+            } else {
+                let g = generator_mod_pe(p, e, &order_factorization);
+                let g = ZZbig.inv_crt([&g, &ZZbig.one()], [&pe, &rest]);
+                let Zn = result.parent().underlying_ring();
+                let g = result
+                    .parent()
+                    .from_ring_el(Zn.coerce(Zn.integer_ring(), int_cast(g, Zn.integer_ring(), ZZbig)))
+                    .unwrap();
                 result = result.add_generator(g, &order_multiple);
             }
-            return result;
         }
+        return result;
     }
 }
 
@@ -1130,6 +1179,32 @@ where
     return None;
 }
 
+fn generator_mod_pe(p: El<BigIntRing>, e: usize, order_factorization: &[(El<BigIntRing>, usize)]) -> El<BigIntRing> {
+    assert!(!ZZbig.eq_el(&p, &ZZbig.int_hom().map(2)));
+    let mut rng = Rand64::new(0);
+    let p_e_neg_1 = ZZbig.pow(p.clone(), e - 1);
+    let pe = ZZbig.mul_ref(&p, &p_e_neg_1);
+    let order = ZZbig.sub_ref_fst(&pe, p_e_neg_1);
+    let Zpe = ZnGB::new(ZZbig, pe.clone());
+    let mut generator = Zpe.random_element(|| rng.rand_u64());
+    let powers = order_factorization
+        .iter()
+        .map(|(p_, _)| ZZbig.checked_div(&order, &p_).unwrap())
+        .collect::<Vec<_>>();
+    for _ in 0..PROBABILISTIC_REPETITIONS {
+        if Zpe.is_one(&Zpe.pow_bigint(generator.clone(), &order))
+            && powers
+                .iter()
+                .all(|power| !Zpe.is_one(&Zpe.pow_bigint(generator.clone(), power)))
+        {
+            return Zpe.smallest_positive_lift(generator);
+        } else {
+            generator = Zpe.random_element(|| rng.rand_u64());
+        }
+    }
+    unreachable!()
+}
+
 #[cfg(test)]
 struct ProdGroupBase<G: AbelianGroupStore, const N: usize>(G);
 
@@ -1174,9 +1249,6 @@ impl<G: AbelianGroupStore, const N: usize> AbelianGroupBase for ProdGroupBase<G,
 
 #[cfg(test)]
 use std::array::from_fn;
-
-#[cfg(test)]
-use oorandom::Rand64;
 
 #[cfg(test)]
 use crate::RANDOM_TEST_INSTANCE_COUNT;
@@ -1226,11 +1298,31 @@ fn test_padic_relation_lattice() {
     };
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![1]);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(-81), subgroup.get_group().padic_relation_lattices[0][4].at(0, 0));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(-27), subgroup.get_group().padic_relation_lattices[0][3].at(0, 0));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(-9), subgroup.get_group().padic_relation_lattices[0][2].at(0, 0));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(-3), subgroup.get_group().padic_relation_lattices[0][1].at(0, 0));
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(-1), subgroup.get_group().padic_relation_lattices[0][0].at(0, 0));
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(-81),
+        subgroup.get_group().padic_relation_lattices[0][4].at(0, 0)
+    );
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(-27),
+        subgroup.get_group().padic_relation_lattices[0][3].at(0, 0)
+    );
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(-9),
+        subgroup.get_group().padic_relation_lattices[0][2].at(0, 0)
+    );
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(-3),
+        subgroup.get_group().padic_relation_lattices[0][1].at(0, 0)
+    );
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(-1),
+        subgroup.get_group().padic_relation_lattices[0][0].at(0, 0)
+    );
 
     let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 6]);
     let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
@@ -1376,6 +1468,34 @@ fn random_test_dlog() {
             println!("has no solution");
         }
     }
+}
+
+#[test]
+fn test_full_subgroup() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = Zn::<153>::RING;
+    let group = MultGroup::new(ring);
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(96),
+        Subgroup::zn_unit_group(group).subgroup_order()
+    );
+
+    let ring = Zn::<1400>::RING;
+    let group = MultGroup::new(ring);
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(16 * 5 * 6),
+        Subgroup::zn_unit_group(group).subgroup_order()
+    );
+
+    let ring = Zn::<257>::RING;
+    let group = MultGroup::new(ring);
+    assert_el_eq!(
+        ZZbig,
+        ZZbig.int_hom().map(256),
+        Subgroup::zn_unit_group(group).subgroup_order()
+    );
 }
 
 #[test]

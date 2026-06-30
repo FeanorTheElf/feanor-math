@@ -536,13 +536,13 @@ pub mod generic_impls {
 ///     multiset_combinations(&[1; 10], 3, |_| ()).count()
 /// );
 /// ```
-pub fn binomial<I>(n: El<I>, k: &El<I>, ring: I) -> El<I>
+pub fn binomial<I>(ring: I, n: El<I>, k: &El<I>) -> El<I>
 where
     I: RingStore + Copy,
     I::Ring: IntegerRing,
 {
     if ring.is_neg(&n) {
-        let mut result = binomial(ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k, ring);
+        let mut result = binomial(ring, ring.sub(ring.sub_ref_fst(&k, n), ring.one()), k);
         if !ring.is_even(k) {
             ring.negate_inplace(&mut result);
         }
@@ -554,7 +554,7 @@ where
         // fits into an integer; thus distinguish this case that k > n/2
         let n_neg_k = ring.sub_ref(&n, &k);
         if ring.is_lt(&n_neg_k, k) {
-            return binomial(n, &n_neg_k, ring);
+            return binomial(ring, n, &n_neg_k);
         }
         let mut result = ring.one();
         let mut i = ring.one();
@@ -568,7 +568,7 @@ where
 }
 
 /// Computes the factorial `n! = 1 * 2 * 3 * ... * (n - 1) * n`.
-pub fn factorial<I>(n: &El<I>, ring: I) -> El<I>
+pub fn factorial<I>(ring: I, n: &El<I>) -> El<I>
 where
     I: RingStore,
     I::Ring: IntegerRing,
@@ -769,41 +769,41 @@ fn test_rounded_div() {
 fn test_binomial() {
     feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i32>::RING;
-    assert_eq!(0, binomial(-4, &-1, ZZ));
-    assert_eq!(1, binomial(-4, &0, ZZ));
-    assert_eq!(-4, binomial(-4, &1, ZZ));
-    assert_eq!(10, binomial(-4, &2, ZZ));
-    assert_eq!(-20, binomial(-4, &3, ZZ));
-    assert_eq!(35, binomial(-4, &4, ZZ));
-    assert_eq!(-56, binomial(-4, &5, ZZ));
+    assert_eq!(0, binomial(ZZ, -4, &-1));
+    assert_eq!(1, binomial(ZZ, -4, &0));
+    assert_eq!(-4, binomial(ZZ, -4, &1));
+    assert_eq!(10, binomial(ZZ, -4, &2));
+    assert_eq!(-20, binomial(ZZ, -4, &3));
+    assert_eq!(35, binomial(ZZ, -4, &4));
+    assert_eq!(-56, binomial(ZZ, -4, &5));
 
-    assert_eq!(0, binomial(3, &-1, ZZ));
-    assert_eq!(1, binomial(3, &0, ZZ));
-    assert_eq!(3, binomial(3, &1, ZZ));
-    assert_eq!(3, binomial(3, &2, ZZ));
-    assert_eq!(1, binomial(3, &3, ZZ));
-    assert_eq!(0, binomial(3, &4, ZZ));
+    assert_eq!(0, binomial(ZZ, 3, &-1));
+    assert_eq!(1, binomial(ZZ, 3, &0));
+    assert_eq!(3, binomial(ZZ, 3, &1));
+    assert_eq!(3, binomial(ZZ, 3, &2));
+    assert_eq!(1, binomial(ZZ, 3, &3));
+    assert_eq!(0, binomial(ZZ, 3, &4));
 
-    assert_eq!(0, binomial(8, &-1, ZZ));
-    assert_eq!(1, binomial(8, &0, ZZ));
-    assert_eq!(8, binomial(8, &1, ZZ));
-    assert_eq!(28, binomial(8, &2, ZZ));
-    assert_eq!(56, binomial(8, &3, ZZ));
-    assert_eq!(70, binomial(8, &4, ZZ));
+    assert_eq!(0, binomial(ZZ, 8, &-1));
+    assert_eq!(1, binomial(ZZ, 8, &0));
+    assert_eq!(8, binomial(ZZ, 8, &1));
+    assert_eq!(28, binomial(ZZ, 8, &2));
+    assert_eq!(56, binomial(ZZ, 8, &3));
+    assert_eq!(70, binomial(ZZ, 8, &4));
 
     // a naive computation would overflow
-    assert_eq!(145422675, binomial(30, &14, ZZ));
+    assert_eq!(145422675, binomial(ZZ, 30, &14));
 }
 
 #[test]
 fn test_factorial() {
     feanor_tracing::DelayedLogger::init_test();
     let ZZ = StaticRing::<i32>::RING;
-    assert_eq!(1, factorial(&0, ZZ));
-    assert_eq!(1, factorial(&1, ZZ));
-    assert_eq!(2, factorial(&2, ZZ));
-    assert_eq!(6, factorial(&3, ZZ));
-    assert_eq!(24, factorial(&4, ZZ));
+    assert_eq!(1, factorial(ZZ, &0));
+    assert_eq!(1, factorial(ZZ, &1));
+    assert_eq!(2, factorial(ZZ, &2));
+    assert_eq!(6, factorial(ZZ, &3));
+    assert_eq!(24, factorial(ZZ, &4));
 }
 
 #[test]
