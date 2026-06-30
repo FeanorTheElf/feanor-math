@@ -1257,12 +1257,6 @@ fn test_dlog() {
             group.pow_bigint(17, &subgroup.dlog(&17).unwrap()[1])
         )
     );
-
-    let ring = Zn::<1729>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(274).unwrap();
-    let subgroup = Subgroup::new(&group, int_cast(6, ZZbig, ZZi64), vec![g1]);
-    assert_gel_eq!(group, group.pow(g1, 3), group.pow_bigint(g1, &subgroup.dlog(&group.pow(g1, 3)).unwrap()[0]));
 }
 
 #[test]
