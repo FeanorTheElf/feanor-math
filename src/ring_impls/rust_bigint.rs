@@ -137,14 +137,6 @@ impl<A: Allocator + Send + Sync + Clone> Debug for RustBigIntRingBase<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "ZZ") }
 }
 
-impl<A: Allocator + Send + Sync + Clone> Debug for RustBigInt<A> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("RustBigInt")
-            .field(&format!("{}", RustBigIntRing::RING.formatted_el(self)))
-            .finish()
-    }
-}
-
 impl<A: Allocator + Send + Sync + Clone> PartialEq for RustBigIntRingBase<A> {
     fn eq(&self, _other: &Self) -> bool {
         // it is perfectly valid to swap elements between two different `RustBigintRing`s,

@@ -709,7 +709,7 @@ impl<G: AbelianGroupStore> PartialEq for SubgroupBase<G> {
 impl<G: AbelianGroupStore> Debug for SubgroupBase<G> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<")?;
-        let mut gen_iter = self.generators();
+        let mut gen_iter = self.generators().iter();
         if let Some(g) = gen_iter.next() {
             write!(f, "{}", self.parent().formatted_el(g))?;
         }
@@ -1257,6 +1257,12 @@ fn test_dlog() {
             group.pow_bigint(17, &subgroup.dlog(&17).unwrap()[1])
         )
     );
+
+    let ring = Zn::<1729>::RING;
+    let group = MultGroup::new(ring);
+    let g1 = group.from_ring_el(274).unwrap();
+    let subgroup = Subgroup::new(&group, int_cast(6, ZZbig, ZZi64), vec![g1]);
+    assert_gel_eq!(group, group.pow(g1, 3), group.pow_bigint(g1, &subgroup.dlog(&group.pow(g1, 3)).unwrap()[0]));
 }
 
 #[test]
