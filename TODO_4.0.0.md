@@ -8,3 +8,5 @@
  - Either make Buchberger compatible with TransformTarget, or introduce a BuchbergerStrategy trait
  - expose `minpoly()` and others through RingStore
  - a better fast xgcd algorithm (probably going to be textbook half-gcd), or rather one that I can prove correct
+ - Consequently implement `base_change()` which takes a homomorphism and performs the corresponding base change (this should replace `change_ring()`)
+ - Think about if there is a way to replace the underlying ring store with another one storing the same ring base; a solution that allows going from &R to R without requiring a copy of R would be nice, but seems difficult

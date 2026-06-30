@@ -283,6 +283,9 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
     #[instrument(skip_all, level = "trace")]
     pub fn dlog(&self, target: &GEl<G>) -> Option<Vec<El<BigIntRing>>> {
         let group = &self.parent;
+        if !group.is_identity(&group.pow_bigint(target.clone(), &self.order_multiple)) {
+            return None;
+        }
 
         let n = self.generators.len();
         if n == 0 {
@@ -1233,6 +1236,20 @@ fn test_padic_relation_lattice() {
 }
 
 #[test]
+fn test_dlog() {
+    feanor_tracing::DelayedLogger::init_test();
+    let ring = Zn::<153>::RING;
+    let group = AddGroup::new(ring);
+    let subgroup = Subgroup::new(group, int_cast(3 * 17, ZZbig, ZZi64), vec![3]);
+    assert!(subgroup.dlog(&1).is_none());
+    assert!(subgroup.dlog(&17).is_none());
+    assert_el_eq!(ZZbig, ZZbig.one(), subgroup.dlog(&3).unwrap()[0]);
+    let subgroup = subgroup.add_generator(17, &int_cast(9, ZZbig, ZZi64));
+    assert_el_eq!(ZZbig, ZZbig.zero(), subgroup.dlog(&17).unwrap()[0]);
+    assert_el_eq!(ZZbig, ZZbig.one(), subgroup.dlog(&17).unwrap()[1]);
+}
+
+#[test]
 fn random_test_dlog() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Zn::<1400>::RING;
@@ -1362,6 +1379,7 @@ fn test_zn_subgroup_size() {
 
 #[test]
 fn test_global_relation_lattice() {
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn::<153>::RING;
     let group = MultGroup::new(ring);
     let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
@@ -1381,6 +1399,7 @@ fn test_global_relation_lattice() {
 
 #[test]
 fn test_intersection() {
+    feanor_tracing::DelayedLogger::init_test();
     let ring = Zn::<7>::RING;
     let group = MultGroup::new(ring);
     let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
