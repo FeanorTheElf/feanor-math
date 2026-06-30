@@ -26,45 +26,6 @@ pub trait PolyModulus<R: RingStore> {
     /// necessarily zero!
     fn perform_reduction(&self, operand: &mut [El<R>]);
 }
-
-pub struct SchoolbookPolyModulus<R: RingStore> {
-    ring: R,
-    x_pow_rank: Vec<El<R>>,
-}
-
-impl<R: RingStore> SchoolbookPolyModulus<R> {
-    pub fn new(ring: R, x_pow_rank: Vec<El<R>>) -> Self { Self { ring, x_pow_rank } }
-}
-
-impl<R: RingStore> Clone for SchoolbookPolyModulus<R> {
-    fn clone(&self) -> Self {
-        Self {
-            ring: self.ring.clone(),
-            x_pow_rank: self.x_pow_rank.clone(),
-        }
-    }
-}
-
-impl<R: RingStore> PolyModulus<R> for SchoolbookPolyModulus<R> {
-    fn degree(&self) -> usize { self.x_pow_rank.len() }
-
-    fn ring(&self) -> &R { &self.ring }
-
-    fn supported_operand_degree(&self) -> usize { usize::MAX }
-
-    fn x_pow_rank(&self) -> &[El<R>] { &self.x_pow_rank }
-
-    #[instrument(skip_all, level = "trace")]
-    fn perform_reduction(&self, operand: &mut [El<R>]) {
-        for i in (self.degree()..operand.len()).rev() {
-            for j in 0..self.x_pow_rank.len() {
-                let add = self.ring().mul_ref(&self.x_pow_rank[j], &operand[i]);
-                self.ring().add_assign(&mut operand[i - self.degree() + j], add);
-            }
-        }
-    }
-}
-
 pub struct SparsePolyModulus<R: RingStore> {
     ring: R,
     x_pow_rank_coeffs: Vec<(usize, El<R>)>,

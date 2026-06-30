@@ -463,9 +463,9 @@ fn test_ec_factor_large() {
 fn test_compute_partial_factorization() {
     feanor_tracing::DelayedLogger::init_test();
     let n = int_cast(
-        RustBigintRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
+        RustBigIntRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
         ZZbig,
-        RustBigintRing::RING
+        RustBigIntRing::RING
     );
 
     let Zn = zn_big::ZnGB::new(ZZbig, n.clone());

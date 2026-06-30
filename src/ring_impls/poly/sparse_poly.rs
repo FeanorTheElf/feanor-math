@@ -72,7 +72,7 @@ where
     R::Ring: Debug,
 {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-        write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
+        write!(f, "({:?})[{}]", self.base_ring.get_ring(), self.unknown_name)
     }
 }
 
@@ -182,7 +182,7 @@ impl<R: RingStore> RingBase for SparsePolyRingBase<R> {
     }
 
     fn fmt_el_within<'a>(&self, value: &Self::Element, out: &mut Formatter<'a>, env: EnvBindingStrength) -> Result {
-        super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
+        super::generic_impls::fmt_poly(self, value, out, self.unknown_name, env)
     }
 
     fn fmt_el<'a>(&self, value: &Self::Element, out: &mut Formatter<'a>) -> Result {
@@ -230,7 +230,7 @@ impl<R: RingStore> Debug for SparsePolyRingEl<R>
 where
     El<R>: Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> Result { self.data.fmt(f) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> Result { f.debug_tuple("SparsePolyRingEl").field(&self.data).finish() }
 }
 
 impl<R: RingStore> Clone for SparsePolyRingEl<R> {

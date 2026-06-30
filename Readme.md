@@ -468,10 +468,12 @@ As a result, types like `PolyRing<R>`, `PolyRing<&&R>` and `PolyRing<Box<R>>` ca
    If your object is generic, it should be generic in `R: RingStore` in the self-contained object case, and generic in the ring element type `T` in the ring-dependent object case.
    Since there is no common supertrait for ring elements, this means that a ring-dependent object will be generic in some unconstraint type `T`, and each function will take some parameter of generic type `R: RingStore, R::Type: RingBase<Element = T>`.
  - In many cases, I'm still unsure which of those two to opt for. Currently, I'm more in favour of making most higher-level objects to store the rings, in particular, since I already made the decision to do this for homomorphisms.
- - Tracing events will usually be emitted at level `TRACE`; I found that more fine-grained levels are less usable than they sound, because of the deep call stacks and different user environments often consider very different things important. Furthermore, it avoids the mental load of thinking about the concrete level at every place.
+ - Tracing events will usually be emitted at level `TRACE`; I found that more fine-grained levels are less usable than they sound, because of the deep call stacks and different user environments often consider very different things important. 
+   Furthermore, it avoids the mental load of thinking about the concrete level at every place.
  - When implementing logging for algorithm, the `span!()` and `event!()` statements should be at the function that actually performs the algorithm, since they are supposed to give information about the execution and progress of the concrete algorithm.
    In particular, many algorithms are implemented as global functions, but then called through a trait.
    Thus, the implementation of the trait contains only delegation calls, and should not be annotated with explicit tracing statements.
+ - Rings have to implement `Debug` and should render to a mathematically-inspired, short string representation that gives users a good idea of the ring. Ring elements should, preferrably, be printed via `ring.formatted_el(element)`. Optionally, they may implement Debug, in which case I usually opt for a standard struct-style representation, as also created by `#[derive(Debug)]`.
 
 # Performance
 

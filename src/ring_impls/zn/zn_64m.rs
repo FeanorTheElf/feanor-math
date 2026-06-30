@@ -444,7 +444,7 @@ impl Serialize for Zn64MBase {
     where
         S: Serializer,
     {
-        SerializableNewtypeStruct::new("Zn", *self.modulus()).serialize(serializer)
+        SerializableNewtypeStruct::new("Zn64M", *self.modulus()).serialize(serializer)
     }
 }
 
@@ -453,7 +453,7 @@ impl<'de> Deserialize<'de> for Zn64MBase {
     where
         D: Deserializer<'de>,
     {
-        DeserializeSeedNewtypeStruct::new("Zn", PhantomData::<i64>)
+        DeserializeSeedNewtypeStruct::new("Zn64M", PhantomData::<i64>)
             .deserialize(deserializer)
             .map(|n| Zn64MBase::new(n as u64))
     }

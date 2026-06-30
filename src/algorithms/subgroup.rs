@@ -709,8 +709,12 @@ impl<G: AbelianGroupStore> PartialEq for SubgroupBase<G> {
 impl<G: AbelianGroupStore> Debug for SubgroupBase<G> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "<")?;
-        for g in self.generators() {
-            write!(f, "{}, ", self.parent().formatted_el(g))?;
+        let mut gen_iter = self.generators();
+        if let Some(g) = gen_iter.next() {
+            write!(f, "{}", self.parent().formatted_el(g))?;
+        }
+        for g in gen_iter {
+            write!(f, ", {}", self.parent().formatted_el(g))?;
         }
         write!(f, ">")?;
         return Ok(());

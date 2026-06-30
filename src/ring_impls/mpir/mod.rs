@@ -387,7 +387,7 @@ impl Serialize for MPZBase {
     where
         S: Serializer,
     {
-        SerializableNewtypeStruct::new("IntegerRing(MPZ)", ()).serialize(serializer)
+        SerializableNewtypeStruct::new("MpirIntegerRing", ()).serialize(serializer)
     }
 }
 
@@ -396,7 +396,7 @@ impl<'de> Deserialize<'de> for MPZBase {
     where
         D: Deserializer<'de>,
     {
-        DeserializeSeedNewtypeStruct::new("IntegerRing(MPZ)", PhantomData::<()>)
+        DeserializeSeedNewtypeStruct::new("MpirIntegerRing", PhantomData::<()>)
             .deserialize(deserializer)
             .map(|()| MPZ::RING.into())
     }
@@ -408,9 +408,9 @@ impl SerializableElementRing for MPZBase {
         D: Deserializer<'de>,
     {
         if deserializer.is_human_readable() {
-            return DeserializeWithRing::new(RustBigintRing::RING)
+            return DeserializeWithRing::new(RustBigIntRing::RING)
                 .deserialize(deserializer)
-                .map(|n| int_cast(n, RingRef::new(self), RustBigintRing::RING));
+                .map(|n| int_cast(n, RingRef::new(self), RustBigIntRing::RING));
         } else {
             let (negative, mut result) = deserialize_bigint_from_bytes(deserializer, |data| {
                 let mut result = self.zero();
@@ -429,8 +429,10 @@ impl SerializableElementRing for MPZBase {
         S: Serializer,
     {
         if serializer.is_human_readable() {
-            SerializableNewtypeStruct::new("BigInt", format!("{}", RingRef::new(self).formatted_el(el)).as_str())
-                .serialize(serializer)
+            return SerializeWithRing(
+                &RustBigIntRing::RING,
+                int_cast(el.clone(), RustBigIntRing::RING, MPZ::RING),
+            );
         } else {
             let len = self.to_le_bytes_len(el);
             let mut data = Vec::with_capacity(len);

@@ -159,7 +159,9 @@ where
     El<I>: Clone + Debug,
     I::Ring: IntegerRing,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { f.debug_tuple("ZnEl").field(&self.0).finish() }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("ZnGBEl").field(&self.0).finish()
+    }
 }
 
 impl<I: RingStore> Clone for ZnGBEl<I>
@@ -624,7 +626,7 @@ where
         S: Serializer,
     {
         SerializableNewtypeStruct::new(
-            "Zn",
+            "ZnGB",
             (
                 self.integer_ring(),
                 SerializeWithRing::new(self.modulus(), self.integer_ring()),
@@ -646,7 +648,7 @@ where
         let ring_cell = OnceCell::new();
         let modulus = <_ as DeserializeSeed<'de>>::deserialize(
             DeserializeSeedNewtypeStruct::new(
-                "Zn",
+                "ZnGB",
                 DeserializeSeedDependentTuple::new(PhantomData::<I>, |ring| {
                     ring_cell.set(ring).ok().unwrap();
                     DeserializeWithRing::new(ring_cell.get().unwrap())
@@ -938,7 +940,7 @@ fn test_unreduced() {
         )
         .unwrap();
 
-    let x: ZnGBEl<RustBigintRing> = ZnGBEl(value);
+    let x: ZnGBEl<RustBigIntRing> = ZnGBEl(value);
     // this means this is a valid representative, although it is > ring.modulus()
     assert!(ZZbig.is_lt(&x.0, &ring.get_ring().twice_modulus));
 

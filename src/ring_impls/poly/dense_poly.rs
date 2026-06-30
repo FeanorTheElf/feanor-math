@@ -222,7 +222,7 @@ impl<R: RingStore, A: Allocator + Clone + Send + Sync, C: ConvolutionAlgorithm<R
         out: &mut std::fmt::Formatter<'a>,
         env: EnvBindingStrength,
     ) -> std::fmt::Result {
-        super::generic_impls::dbg_poly(self, value, out, self.unknown_name, env)
+        super::generic_impls::fmt_poly(self, value, out, self.unknown_name, env)
     }
 
     fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
@@ -301,7 +301,7 @@ where
     R::Ring: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{:?}[{}]", self.base_ring.get_ring(), self.unknown_name)
+        write!(f, "({:?})[{}]", self.base_ring.get_ring(), self.unknown_name)
     }
 }
 
@@ -311,7 +311,9 @@ where
     A: Allocator + Clone + Send + Sync,
     El<R>: Debug,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("DensePolyRingEl").field(&self.data).finish()
+    }
 }
 
 impl<R, A> Clone for DensePolyRingEl<R, A>

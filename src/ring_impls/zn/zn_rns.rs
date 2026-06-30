@@ -50,7 +50,7 @@ use crate::seq::VectorView;
 /// );
 /// assert!(R.eq_el(&z, &y));
 /// ```
-/// 
+///
 /// # Canonical mappings
 /// This ring has a canonical isomorphism to Barett-reduction based Zn
 /// ```rust
@@ -280,7 +280,7 @@ where
     El<C>: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("ZnEl").field("congruences", &self.data).finish()
+        f.debug_struct("ZnRNSEl").field("congruences", &self.data).finish()
     }
 }
 
@@ -838,7 +838,7 @@ where
         } else {
             let el_congruence = self.get_congruence(el);
             SerializableNewtypeStruct::new(
-                "RNSZnEl",
+                "ZnRNSEl",
                 SerializableSeq::new_with_len(
                     (0..self.len()).map(|i| SerializeWithRing::new(el_congruence.at(i), self.at(i))),
                     self.len(),
@@ -860,7 +860,7 @@ where
         } else {
             let dummy_ring = self.at(0);
             DeserializeSeedNewtypeStruct::new(
-                "RNSZnEl",
+                "ZnRNSEl",
                 DeserializeSeedSeq::new(
                     self.as_iter()
                         .map(|ring| DeserializeWithRing::new(ring))

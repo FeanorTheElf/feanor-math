@@ -18,7 +18,7 @@ pub type BigIntRing = crate::ring_impls::mpir::MPZ;
 /// The type this points to may change when features or other compilation parameters
 /// change.
 #[cfg(not(feature = "mpir"))]
-pub type BigIntRing = crate::ring_impls::rust_bigint::RustBigintRing;
+pub type BigIntRing = crate::ring_impls::rust_bigint::RustBigIntRing;
 /// Type alias for the current default used big integer ring implementation.
 ///
 /// The type this points to may change when features or other compilation parameters
@@ -30,7 +30,7 @@ pub type BigIntRingBase = crate::ring_impls::mpir::MPZBase;
 /// The type this points to may change when features or other compilation parameters
 /// change.
 #[cfg(not(feature = "mpir"))]
-pub type BigIntRingBase = crate::ring_impls::rust_bigint::RustBigintRingBase;
+pub type BigIntRingBase = crate::ring_impls::rust_bigint::RustBigIntRingBase;
 
 /// Singleton constant of [`BigIntRing`].
 pub const ZZbig: BigIntRing = BigIntRing::RING;

@@ -18,7 +18,7 @@ use crate::homomorphism::*;
 use crate::matrix::OwnedMatrix;
 use crate::prelude::*;
 use crate::ring::{EnvBindingStrength, HashableElRing};
-use crate::ring_impls::extension::poly_modulus::{PolyModulus, SchoolbookPolyModulus, SparsePolyModulus};
+use crate::ring_impls::extension::poly_modulus::{PolyModulus, SparsePolyModulus};
 use crate::ring_impls::extension::{MonogenicExtension, MonogenicExtensionStore};
 use crate::ring_impls::poly::PolyRingStore;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
@@ -321,7 +321,9 @@ where
     A: Allocator + Clone + Send + Sync,
     El<R>: Debug,
 {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", &self.values) }
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("MonogenicExtensionImplEl").field(&self.values).finish()
+    }
 }
 
 impl<R, A> Clone for MonogenicExtensionImplEl<R, A>
@@ -637,7 +639,7 @@ where
         let poly_ring = DensePolyRing::new(self.base_ring(), self.gen_name);
         write!(
             f,
-            "{:?}[{}]/({})",
+            "({:?})[{}]/({})",
             self.base_ring().get_ring(),
             self.gen_name,
             poly_ring.formatted_el(&RingRef::from(self).generating_poly(&poly_ring, self.base_ring().identity()))
@@ -707,43 +709,6 @@ where
     }
 }
 
-impl<'de, 'conv, R> Deserialize<'de>
-    for MonogenicExtensionImplBase<R, SchoolbookPolyModulus<R>, DynConvolution<'conv, R::Ring>, Global>
-where
-    R: RingStore + 'conv + Deserialize<'de>,
-    R::Ring: SerializableElementRing,
-{
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: Deserializer<'de>,
-    {
-        let ring_cell = OnceCell::new();
-        let poly = <_ as DeserializeSeed<'de>>::deserialize(
-            DeserializeSeedNewtypeStruct::new(
-                "MonogenicExtensionSparse",
-                DeserializeSeedDependentTuple::new(PhantomData::<R>, |ring| {
-                    let poly_ring = DensePolyRing::new(ring, "X");
-                    ring_cell.set(poly_ring).ok().unwrap();
-                    DeserializeWithRing::new(ring_cell.get().unwrap())
-                }),
-            ),
-            deserializer,
-        )?;
-        let poly_ring = ring_cell.into_inner().unwrap();
-        assert!(poly_ring.base_ring().is_one(poly_ring.lc(&poly).unwrap()));
-        let rank = poly_ring.degree(&poly).unwrap();
-        let x_pow_rank = (0..rank)
-            .map(|i| poly_ring.base_ring().negate(poly_ring.coefficient_at(&poly, i).clone()))
-            .collect::<Vec<_>>();
-        let base_ring = poly_ring.into().into_base_ring();
-        let log2_padded_len = ZZi64.abs_log2_ceil(&rank.try_into().unwrap()).unwrap();
-        let len_range = (2 << log2_padded_len)..((2 << log2_padded_len) + 1);
-        let convolution = <R::Ring>::create_default_convolution(base_ring.clone(), Some(len_range));
-        let modulus = SchoolbookPolyModulus::new(base_ring, x_pow_rank);
-        return Ok(MonogenicExtensionImplBase::create(modulus, "θ", Global, convolution).into());
-    }
-}
-
 impl<R, M, C, A> SerializableElementRing for MonogenicExtensionImplBase<R, M, C, A>
 where
     R: RingStore,
@@ -756,9 +721,8 @@ where
     where
         D: Deserializer<'de>,
     {
-        // TODO: find better serialization name
         DeserializeSeedNewtypeStruct::new(
-            "ExtensionRingEl",
+            "MonogenicExtensionEl",
             DeserializeSeedSeq::new(
                 std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(self.rank() + 1),
                 Vec::with_capacity_in(1 << self.log2_padded_len, self.element_allocator.clone()),
@@ -783,7 +747,7 @@ where
     {
         debug_assert_eq!(1 << self.log2_padded_len, el.values.len());
         SerializableNewtypeStruct::new(
-            "ExtensionRingEl",
+            "MonogenicExtensionEl",
             SerializableSeq::new_with_len(
                 (0..self.rank()).map(|i| SerializeWithRing::new(&el.values[i], self.base_ring())),
                 self.rank(),

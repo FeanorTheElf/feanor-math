@@ -495,7 +495,7 @@ impl<T: PrimitiveInt> Serialize for StaticRingBase<T> {
     where
         S: Serializer,
     {
-        SerializableNewtypeStruct::new("IntegerRing(primitive int)", ()).serialize(serializer)
+        SerializableNewtypeStruct::new("PrimitiveIntegerRing", ()).serialize(serializer)
     }
 }
 
@@ -504,7 +504,7 @@ impl<'de, T: PrimitiveInt> Deserialize<'de> for StaticRingBase<T> {
     where
         D: Deserializer<'de>,
     {
-        DeserializeSeedNewtypeStruct::new("IntegerRing(primitive int)", PhantomData::<()>)
+        DeserializeSeedNewtypeStruct::new("PrimitiveIntegerRing", PhantomData::<()>)
             .deserialize(deserializer)
             .map(|()| StaticRing::<T>::RING.into())
     }

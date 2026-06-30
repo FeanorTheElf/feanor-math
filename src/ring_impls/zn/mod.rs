@@ -147,7 +147,7 @@ pub mod generic_impls {
     where
         I: ?Sized + IntegerRing,
         J: ?Sized + IntegerRing,
-        R: ?Sized + ZnRing
+        R: ?Sized + ZnRing,
     {
         if let Some(bound) = bounded_reduce_bound {
             Some(BigIntToZnHom {
@@ -300,10 +300,7 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn interpolation_ring<'conv, R>(
-        ring: R,
-        count: usize,
-    ) -> GaloisFieldOver<R, DynConvolution<'conv, R::Ring>>
+    pub fn interpolation_ring<'conv, R>(ring: R, count: usize) -> GaloisFieldOver<R, DynConvolution<'conv, R::Ring>>
     where
         R: 'conv + Clone + RingStore,
         R::Ring: 'conv + ZnRing + Field + SelfIso + CanHomFrom<StaticRingBase<i64>>,

@@ -512,7 +512,7 @@ pub mod generic_impls {
     }
 
     #[stability::unstable(feature = "enable")]
-    pub fn dbg_poly<P: PolyRing>(
+    pub fn fmt_poly<P: PolyRing>(
         ring: &P,
         el: &P::Element,
         out: &mut std::fmt::Formatter,
@@ -811,7 +811,7 @@ fn test_dbg_poly() {
         }
         impl<'a> Display for DisplayEl<'a> {
             fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                generic_impls::dbg_poly(self.ring.get_ring(), self.f, f, "X", self.env)
+                generic_impls::fmt_poly(self.ring.get_ring(), self.f, f, "X", self.env)
             }
         }
         return format!("{}", DisplayEl { ring, f, env });

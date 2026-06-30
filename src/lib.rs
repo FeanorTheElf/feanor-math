@@ -46,12 +46,6 @@ pub mod prelude;
 /// ring framework in this library.
 #[macro_use]
 pub mod ring;
-/// A collection of various more complicated ring traits and implementations, in particular
-/// arbitrary-precision integer rings, the integer quotients `Z/nZ` or polynomial rings.
-pub mod ring_impls;
-/// Collection of traits that represent special properties of rings, like
-/// [`ring_properties::field::Field`] and [`ring_properties::pid::PrincipalIdealRing`].
-pub mod ring_properties;
 pub mod algorithms;
 /// Contains the trait [`delegate::DelegateRing`] that simplifies implementing the
 /// newtype-pattern for rings.
@@ -72,6 +66,12 @@ pub mod iters;
 /// particular, we use [`matrix::Submatrix`] and [`matrix::SubmatrixMut`] for matrices that don't
 /// own their data.
 pub mod matrix;
+/// A collection of various more complicated ring traits and implementations, in particular
+/// arbitrary-precision integer rings, the integer quotients `Z/nZ` or polynomial rings.
+pub mod ring_impls;
+/// Collection of traits that represent special properties of rings, like
+/// [`ring_properties::field::Field`] and [`ring_properties::pid::PrincipalIdealRing`].
+pub mod ring_properties;
 /// Contains different traits for sequences of elements, namely [`seq::VectorView`] and
 /// [`seq::VectorFn`]. They all have some functional overlap with [`ExactSizeIterator`], but differ
 /// in how they allow access to the elements of the sequence.

@@ -204,7 +204,7 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::rust_bigint::RustBigintRing;
+use crate::ring_impls::rust_bigint::RustBigIntRing;
 
 #[test]
 fn test_is_prime() {
@@ -228,8 +228,8 @@ fn test_is_prime() {
     assert!(!is_prime(StaticRing::<i128>::RING, &347584, 5));
 
     assert!(is_prime(
-        RustBigintRing::RING,
-        &RustBigintRing::RING
+        RustBigIntRing::RING,
+        &RustBigIntRing::RING
             .get_ring()
             .parse("170141183460469231731687303715884105727", 10)
             .unwrap(),

@@ -570,7 +570,7 @@ macro_rules! debug_assert_el_eq {
 /// assert_el_eq!(ring, 7, add_in_ring(&ring, 3, 4));
 /// assert_el_eq!(ring, 7, add_in_ring(Arc::new(ring), 3, 4));
 /// ```
-/// 
+///
 /// # What does this do?
 ///
 /// We need a framework that allows nesting rings, e.g. to provide a polynomial ring

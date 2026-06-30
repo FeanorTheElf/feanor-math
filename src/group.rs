@@ -385,6 +385,14 @@ where
     fn clone(&self) -> Self { Self(self.0.clone()) }
 }
 
+impl<R> Copy for MultGroupEl<R>
+where
+    R: RingStore,
+    R::Ring: HashableElRing + DivisibilityRing,
+    El<R>: Copy,
+{
+}
+
 impl<R> Debug for MultGroupEl<R>
 where
     R: RingStore,

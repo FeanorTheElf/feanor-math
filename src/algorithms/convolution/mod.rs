@@ -387,7 +387,8 @@ impl<R: ?Sized + RingBase> ConvolutionAlgorithm<R> for SchoolbookConvolution {
         _: &[R::Element],
         _: Option<usize>,
         _: &R,
-    ) -> Self::PreparedConvolutionOperand {}
+    ) -> Self::PreparedConvolutionOperand {
+    }
 
     fn supports_ring(&self, _: &R) -> bool { true }
 }

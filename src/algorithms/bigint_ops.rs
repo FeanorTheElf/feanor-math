@@ -665,12 +665,12 @@ where
 #[cfg(test)]
 fn parse(s: &str, base: u32) -> Vec<BlockInt> {
     use crate::prelude::*;
-    use crate::ring_impls::rust_bigint::RustBigintRing;
+    use crate::ring_impls::rust_bigint::RustBigIntRing;
 
     truncate_zeros(
-        RustBigintRing::RING
+        RustBigIntRing::RING
             .get_ring()
-            .abs_base_u64_repr(&RustBigintRing::RING.parse(s, base).unwrap())
+            .abs_base_u64_repr(&RustBigIntRing::RING.parse(s, base).unwrap())
             .collect::<Vec<_>>(),
     )
 }

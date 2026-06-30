@@ -410,7 +410,9 @@ where
     El<R>: Debug,
     A: Allocator + Clone,
 {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "{:?}", self.data) }
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("MultivariatePolyRingEl").field(&self.data).finish()
+    }
 }
 
 impl<R, A> Clone for MultivariatePolyRingEl<R, A>

@@ -455,7 +455,7 @@ where
         D: Deserializer<'de>,
     {
         DeserializeSeedNewtypeStruct::new(
-            "Rational",
+            "RationalFieldEl",
             DeserializeSeedSeq::new(
                 std::iter::repeat(DeserializeWithRing::new(self.base_ring())).take(3),
                 (None, None),
@@ -480,7 +480,7 @@ where
         S: Serializer,
     {
         SerializableNewtypeStruct::new(
-            "Rational",
+            "RationalFieldEl",
             SerializableSeq::new_with_len(
                 [
                     SerializeWithRing::new(&el.0, self.base_ring()),
