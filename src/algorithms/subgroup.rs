@@ -54,12 +54,12 @@ pub struct SubgroupBase<G: AbelianGroupStore> {
     order_multiple: El<BigIntRing>,
     /// factorization of [`SubgroupBase::order_multiple`]
     order_factorization: Vec<(El<BigIntRing>, usize)>,
-    /// the `(i, j)`-th entry has rows that form a basis of the relation lattice of
+    /// the `(i, j)`-th entry has columns that form a basis of the relation lattice of
     /// the set `n/pi^j g1, ..., n/pi^j gk` (where `n` is [`SubgroupBase::order_multiple`],
     /// and the `pi^ei` are its prime power factors).
     padic_relation_lattices: Vec<Vec<OwnedMatrix<El<BigIntRing>>>>,
-    /// the `(i, j, k)`-th entry contains `sum_l row[l] n/pi^(j + 1) gl`, where
-    /// `row` is the `k`-th row of `scaled_relation_lattice[i, j]`; These values
+    /// the `(i, j, k)`-th entry contains `sum_l col[l] n/pi^(j + 1) gl`, where
+    /// `col` is the `k`-th column of `scaled_relation_lattice[i, j]`; These values
     /// are important, since they form a basis of the `p`-torsion subgroup of
     /// `< n/pi^(j + 1) g1, ..., n/pi^(j + 1) gk >`
     padic_generating_sets: Vec<Vec<Vec<GEl<G>>>>,
@@ -562,6 +562,19 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
 
     /// Returns (g1, n1), ..., (gr, nr) such that we have the isomorphism
     /// ```text
+    ///   C_n1 x ... x C_nr -> G,    ei -> gi
+    /// ```
+    pub fn cyclic_decomposition(&self) -> &[(GEl<G>, El<BigIntRing>)]
+    where
+        G: Clone,
+    {
+        self.cyclic_decomposition.get_or_init(|| {
+            self.quotient_cyclic_decomposition(Subgroup::new(&self.parent, ZZbig.one(), Vec::new()).get_group())
+        })
+    }
+
+    /// Returns (g1, n1), ..., (gr, nr) such that we have the isomorphism
+    /// ```text
     ///   C_n1 x ... x C_nr -> G / H,    ei -> gi mod H
     /// ```
     /// Requires that H is contained in this subgroup.
@@ -592,19 +605,6 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             .collect::<Vec<_>>();
     }
 
-    /// Returns (g1, n1), ..., (gr, nr) such that we have the isomorphism
-    /// ```text
-    ///   C_n1 x ... x C_nr -> G,    ei -> gi
-    /// ```
-    pub fn cyclic_decomposition(&self) -> &[(GEl<G>, El<BigIntRing>)]
-    where
-        G: Clone,
-    {
-        self.cyclic_decomposition.get_or_init(|| {
-            self.quotient_cyclic_decomposition(Subgroup::new(&self.parent, ZZbig.one(), Vec::new()).get_group())
-        })
-    }
-
     /// Computes a cyclic decomposition of the order-p part of this group, modulo the subgroup
     /// spanned by the last `(generators.len() - project_onto)` generators.
     #[instrument(skip_all, level = "trace")]
@@ -627,10 +627,10 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
             .restrict_rows(0..project_onto)
             .to_owned()
             .map(|x| mod_pe.map(x));
-        let mut L = OwnedMatrix::identity(project_onto, project_onto, &Zpe);
+        let mut L_negT = OwnedMatrix::identity(project_onto, project_onto, &Zpe);
         pre_smith(
             &Zpe,
-            &mut InvertTransform::new(TransposeTransform::new(TransformRows::new(L.data_mut()))),
+            &mut InvertTransform::new(TransposeTransform::new(TransformRows::new(L_negT.data_mut()))),
             &mut (),
             A.data_mut(),
         );
@@ -643,7 +643,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 diagonal.push(order);
                 debug_assert!(Zpe.is_unit(&factor));
                 for j in 0..project_onto {
-                    Zpe.mul_assign_ref(L.at_mut(i, j), &factor);
+                    Zpe.mul_assign_ref(L_negT.at_mut(i, j), &factor);
                 }
             } else {
                 diagonal.push(order);
@@ -660,7 +660,7 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
                 })
                 .fold(group.identity(), |x, y| group.op(x, y))
         };
-        return L
+        return L_negT
             .data()
             .row_iter()
             .zip(diagonal)
@@ -1598,7 +1598,7 @@ fn test_enumerate_elements() {
 }
 
 #[test]
-fn test_cyclic_decomposition_quotient() {
+fn test_quotient_cyclic_decomposition() {
     feanor_tracing::DelayedLogger::init_test();
     let ring = Zn::<45>::RING;
     let group = AddGroup::new(ring);
@@ -1622,6 +1622,58 @@ fn test_cyclic_decomposition_quotient() {
     assert!(!group.is_identity(&h1));
     assert!(!group.is_identity(&h2));
     let elements = [group.identity(), h1, h2, group.op(h1, h2)];
+    for a in &elements {
+        for b in &elements {
+            assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+        }
+    }
+
+    let ring = Zn::<91>::RING;
+    let group = MultGroup::new(ring);
+    let g1 = group.from_ring_el(ring.int_hom().map(66)).unwrap();
+    let g2 = group.from_ring_el(ring.int_hom().map(50)).unwrap();
+    let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+    let G = Subgroup::for_zn(group, vec![g1, g2]);
+    let H = Subgroup::for_zn(group, vec![g3]);
+    let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), n2);
+    assert!(!group.is_identity(&h1));
+    assert!(!group.is_identity(&h2));
+    let elements = [
+        group.identity(),
+        h1,
+        h2,
+        group.op(h1, h2),
+        group.op(h2, h2),
+        group.op(h1, group.op(h2, h2)),
+    ];
+    for a in &elements {
+        for b in &elements {
+            assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+        }
+    }
+
+    let ring = Zn::<1729>::RING;
+    let group = MultGroup::new(ring);
+    let g1 = group.from_ring_el(ring.int_hom().map(248)).unwrap();
+    let g2 = group.from_ring_el(ring.int_hom().map(1597)).unwrap();
+    let g3 = group.from_ring_el(ring.int_hom().map(457)).unwrap();
+    let G = Subgroup::for_zn(group, vec![g1, g2]);
+    let H = Subgroup::for_zn(group, vec![g3]);
+    let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
+    assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), n2);
+    assert!(!group.is_identity(&h1));
+    assert!(!group.is_identity(&h2));
+    let elements = [
+        group.identity(),
+        h1,
+        h2,
+        group.op(h1, h2),
+        group.op(h2, h2),
+        group.op(h1, group.op(h2, h2)),
+    ];
     for a in &elements {
         for b in &elements {
             assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
