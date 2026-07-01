@@ -588,10 +588,11 @@ impl<G: AbelianGroupStore> SubgroupBase<G> {
         let group = self.parent();
 
         // common case: the generators of H are a suffix of the generators of self
-        if !self.generators[(self.generators.len() - H.generators.len())..]
-            .iter()
-            .zip(&H.generators)
-            .all(|(x, y)| group.eq_el(x, y))
+        if self.generators.len() < H.generators.len()
+            || !self.generators[(self.generators.len() - H.generators.len())..]
+                .iter()
+                .zip(&H.generators)
+                .all(|(x, y)| group.eq_el(x, y))
         {
             let sum_group = self.sum(H);
             assert!(
@@ -1609,6 +1610,10 @@ fn test_quotient_cyclic_decomposition() {
     assert_el_eq!(ZZbig, ZZbig.int_hom().map(5), n);
     assert!(g % 3 == 0);
     assert!(g % 5 != 0);
+
+    let G = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![6]);
+    let H = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![0, 6]);
+    let [] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
 
     let ring = Zn::<153>::RING;
     let group = MultGroup::new(ring);
