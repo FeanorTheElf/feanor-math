@@ -260,6 +260,7 @@ where
 
     #[stability::unstable(feature = "enable")]
     pub fn restrict_cols(mut self, cols: Range<usize>) -> Self {
+        assert!(cols.start <= cols.end);
         assert!(cols.end <= self.col_count);
         self.col_count = cols.end - cols.start;
         self.col_start += cols.start;
@@ -1521,7 +1522,6 @@ fn test_submatrix_maybe_uninit<V: AsPointerToSlice<NonZeroI64> + AsPointerToSlic
 
 #[test]
 fn test_submatrix_maybe_uninit_wrapper() {
-    feanor_tracing::DelayedLogger::init_test();
     with_testmatrix_vec_maybe_uninit(test_submatrix_maybe_uninit);
     with_testmatrix_linmem_maybe_uninit(test_submatrix_maybe_uninit);
 }

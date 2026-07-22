@@ -110,8 +110,8 @@ fn test_solve() {
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible
     // mod 5
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
-    let el = |x0: u64, x1: u64, x2: u64| ring.from_power_basis([x0, x1, x2]);
+    let ring = FreeAlgebraImpl::new(base_ring, 3, vec![14, 0, 14]);
+    let el = |x0: u64, x1: u64, x2: u64| ring.from_canonical_basis([x0, x1, x2]);
 
     let data_A = [
         vec![el(1, 0, 0), el(0, 0, 0)],
@@ -132,7 +132,7 @@ fn test_solve() {
         TransposableSubmatrix::from(A.data()),
         TransposableSubmatrix::from(sol.data()),
         TransposableSubmatrixMut::from(prod.data_mut()),
-        ring,
+        &ring,
     );
 
     assert_matrix_eq!(&ring, &B, &prod);
