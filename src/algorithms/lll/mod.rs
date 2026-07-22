@@ -166,8 +166,8 @@ fn test_assert_lattice_isomorphic() {
     feanor_tracing::DelayedLogger::init_test();
     let ZZ = ZZi64;
 
-    let lhs = [DerefArray::from([1, 2, 0]), DerefArray::from([1, 2, 4])];
-    let rhs = [DerefArray::from([1, -2]), DerefArray::from([1, 2])];
+    let lhs = [vec![1, 2, 0], vec![1, 2, 4]];
+    let rhs = [vec![1, -2], vec![1, 2]];
     assert_lattice_isomorphic(ZZ, ZZ, Submatrix::from_2d(&lhs), Submatrix::from_2d(&rhs));
 }
 
@@ -176,7 +176,7 @@ fn test_assert_lattice_isomorphic() {
 fn test_assert_lattice_not_isomorphic() {
     let ZZ = ZZi64;
 
-    let lhs = [DerefArray::from([1, 2, 0]), DerefArray::from([1, 3, 4])];
-    let rhs = [DerefArray::from([1, -2]), DerefArray::from([1, 2])];
+    let lhs = [vec![1, 2, 0], vec![1, 3, 4]];
+    let rhs = [vec![1, -2], vec![1, 2]];
     assert_lattice_isomorphic(ZZ, ZZ, Submatrix::from_2d(&lhs), Submatrix::from_2d(&rhs));
 }

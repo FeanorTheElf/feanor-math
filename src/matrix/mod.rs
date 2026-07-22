@@ -97,9 +97,34 @@ pub mod matrix_compare {
         fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
     }
 
+    #[allow(deprecated)]
     impl<T, const ROWS: usize, const COLS: usize> MatrixCompare<T> for [DerefArray<T, COLS>; ROWS] {
         fn col_count(&self) -> usize { COLS }
         fn row_count(&self) -> usize { ROWS }
+        fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
+    }
+
+    impl<T, const COLS: usize> MatrixCompare<T> for [[T; COLS]] {
+        fn col_count(&self) -> usize { COLS }
+        fn row_count(&self) -> usize { self.len() }
+        fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
+    }
+
+    impl<T> MatrixCompare<T> for [Vec<T>] {
+        fn col_count(&self) -> usize {
+            assert!(self.iter().all(|x| x.len() == self[0].len()));
+            self[0].len()
+        }
+        fn row_count(&self) -> usize { self.len() }
+        fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
+    }
+
+    impl<T, const ROWS: usize> MatrixCompare<T> for [Vec<T>; ROWS] {
+        fn col_count(&self) -> usize {
+            assert!(self.iter().all(|x| x.len() == self[0].len()));
+            self[0].len()
+        }
+        fn row_count(&self) -> usize { self.len() }
         fn at(&self, i: usize, j: usize) -> &T { &self[i][j] }
     }
 

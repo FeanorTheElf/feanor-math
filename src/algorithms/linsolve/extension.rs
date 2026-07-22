@@ -113,18 +113,14 @@ fn test_solve() {
     let base_ring = zn_static::Zn::<15>::RING;
     // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
     let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
-    let el = |coeffs: [u64; 3]| ring.from_power_basis(coeffs);
+    let el = |x0: u64, x1: u64, x2: u64| ring.from_power_basis([x0, x1, x2]);
 
     let data_A = [
-        DerefArray::from([el([1, 0, 0]), el([0, 0, 0])]),
-        DerefArray::from([el([2, 1, 0]), el([0, 0, 0])]),
-        DerefArray::from([el([0, 0, 0]), el([0, 1, 0])]),
+        vec![el(1, 0, 0), el(0, 0, 0)],
+        vec![el(2, 1, 0), el(0, 0, 0)],
+        vec![el(0, 0, 0), el(0, 1, 0)],
     ];
-    let data_B = [
-        DerefArray::from([el([10, 10, 5])]),
-        DerefArray::from([el([0, 0, 0])]),
-        DerefArray::from([el([1, 0, 0])]),
-    ];
+    let data_B = [vec![el(10, 10, 5)], vec![el(0, 0, 0)], vec![el(1, 0, 0)]];
     let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
     let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
@@ -143,11 +139,7 @@ fn test_solve() {
 
     assert_matrix_eq!(&ring, &B, &prod);
 
-    let data_B = [
-        DerefArray::from([el([8, 8, 3])]),
-        DerefArray::from([el([0, 0, 0])]),
-        DerefArray::from([el([1, 0, 0])]),
-    ];
+    let data_B = [vec![el(8, 8, 3)], vec![el(0, 0, 0)], vec![el(1, 0, 0)]];
     let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
     let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
     let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
