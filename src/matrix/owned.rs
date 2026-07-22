@@ -189,6 +189,7 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
 }
 
 impl<T> OwnedMatrix<MaybeUninit<T>> {
+    #[stability::unstable(feature = "enable")]
     pub fn uninit(row_count: usize, col_count: usize) -> Self { Self::uninit_in(row_count, col_count, Global) }
 }
 
@@ -205,6 +206,7 @@ impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
     }
 
     /// This is safe as long as every element in the matrix is initialized
+    #[stability::unstable(feature = "enable")]
     pub unsafe fn assume_init(self) -> OwnedMatrix<T, A> {
         let (ptr, len, cap, alloc) = self.data.into_raw_parts_with_alloc();
         // SAFETY: MaybeUninit<T> has the same size and alignment as T, so the
