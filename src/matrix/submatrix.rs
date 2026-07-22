@@ -1,5 +1,8 @@
 use std::fmt::{Debug, Formatter};
 use std::marker::PhantomData;
+use std::mem::MaybeUninit;
+#[cfg(test)]
+use std::num::NonZeroI64;
 use std::ops::{Deref, Range};
 use std::ptr::{NonNull, addr_of_mut};
 
@@ -10,19 +13,21 @@ use crate::seq::{SwappableVectorViewMut, VectorView, VectorViewMut};
 
 /// Trait for objects that can be considered a contiguous part of memory. In particular,
 /// the pointer returned by `get_pointer()` should be interpreted as the pointer to the first
-/// element of a range of elements of type `T` (basically a C-style array). In some
-/// sense, this is thus the unsafe equivalent of `Deref<Target = [T]>`.
+/// element of a range of elements of type `MaybeUninit<T>` (basically a C-style array). In some
+/// sense, this is thus the unsafe equivalent of `Deref<Target = [MaybeUninit<T>]>`.
 ///
 /// # Safety
 ///
 /// Since we use this to provide iterators that do not follow the natural layout of
 /// the data, the following restrictions are necessary:
 ///  - Calling multiple times `get_pointer()` on the same reference is valid, and all resulting
-///    pointers are valid to be dereferenced.
+///    pointers are valid to be dereferenced, if the target is initialized.
 ///  - In the above situation, we may also keep multiple mutable references that were obtained by
 ///    dereferencing the pointers, *as long as they don't alias, i.e. refer to different elements*.
 ///  - If `Self: Sync` then `T: Send` and the above situation should be valid even if the pointers
 ///    returned by `get_pointer()` are produced and used from different threads.
+///  - If `Self` also implements `Deref<Target = [T]>`, then `self.len()` must be the actual length
+///    such that the pointer offset by some value within this length may be dereferenced.
 pub unsafe trait AsPointerToSlice<T> {
     /// Returns a pointer to the first element of multiple, contiguous `T`s.
     ///
@@ -41,12 +46,21 @@ pub unsafe trait AsPointerToSlice<T> {
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T>;
 }
 
+unsafe impl<T> AsPointerToSlice<T> for Vec<MaybeUninit<T>> {
+    unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
+        // Safe, because "This method guarantees that for the purpose of the aliasing model, this
+        // method does not materialize a reference to the underlying slice" (quote from the doc of
+        // [`Vec::as_mut_ptr()`])
+        unsafe { NonNull::new((*self_.as_ptr()).as_mut_ptr() as *mut T).unwrap() }
+    }
+}
+
 unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
         // Safe, because "This method guarantees that for the purpose of the aliasing model, this
         // method does not materialize a reference to the underlying slice" (quote from the doc of
         // [`Vec::as_mut_ptr()`])
-        unsafe { NonNull::new((*self_.as_ptr()).as_mut_ptr()).unwrap() }
+        unsafe { NonNull::new((*self_.as_ptr()).as_mut_ptr() as *mut T).unwrap() }
     }
 }
 
@@ -55,34 +69,41 @@ unsafe impl<T> AsPointerToSlice<T> for Vec<T> {
 ///
 /// This is necessary, since [`Submatrix::from_2d`] requires that `V: Deref<Target = [T]>`.
 #[repr(transparent)]
+#[deprecated]
 #[derive(Clone, Copy, PartialEq, Eq)]
 pub struct DerefArray<T, const SIZE: usize> {
     /// The wrapped array
     pub data: [T; SIZE],
 }
 
+#[allow(deprecated)]
 impl<T: std::fmt::Debug, const SIZE: usize> std::fmt::Debug for DerefArray<T, SIZE> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
 }
 
+#[allow(deprecated)]
 impl<T, const SIZE: usize> From<[T; SIZE]> for DerefArray<T, SIZE> {
     fn from(value: [T; SIZE]) -> Self { Self { data: value } }
 }
 
+#[allow(deprecated)]
 impl<'a, T, const SIZE: usize> From<&'a [T; SIZE]> for &'a DerefArray<T, SIZE> {
     fn from(value: &'a [T; SIZE]) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
+#[allow(deprecated)]
 impl<'a, T, const SIZE: usize> From<&'a mut [T; SIZE]> for &'a mut DerefArray<T, SIZE> {
     fn from(value: &'a mut [T; SIZE]) -> Self { unsafe { std::mem::transmute(value) } }
 }
 
+#[allow(deprecated)]
 impl<T, const SIZE: usize> Deref for DerefArray<T, SIZE> {
     type Target = [T];
 
     fn deref(&self) -> &Self::Target { &self.data[..] }
 }
 
+#[allow(deprecated)]
 unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> {
         unsafe {
@@ -100,6 +121,10 @@ unsafe impl<T, const SIZE: usize> AsPointerToSlice<T> for DerefArray<T, SIZE> {
 pub struct AsFirstElement<T>(T);
 
 unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<T> {
+    unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> { unsafe { std::mem::transmute(self_) } }
+}
+
+unsafe impl<'a, T> AsPointerToSlice<T> for AsFirstElement<MaybeUninit<T>> {
     unsafe fn get_pointer(self_: NonNull<Self>) -> NonNull<T> { unsafe { std::mem::transmute(self_) } }
 }
 
@@ -274,6 +299,45 @@ where
         let row_ref = unsafe { V::get_pointer(self.rows.offset(row as isize * self.row_step)) };
         // similarly safe by constructor requirements
         unsafe { row_ref.offset(self.col_start as isize + col as isize) }
+    }
+}
+
+impl<V, T> SubmatrixRaw<V, MaybeUninit<T>>
+where
+    V: AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>>,
+{
+    /// Converts a `SubmatrixRaw<V, MaybeUninit<T>>` to a `SubmatrixRaw<V, T>`.
+    /// This is only safe if all elements referenced by the [`SubmatrixRaw`] are
+    /// indeed initialized.
+    #[stability::unstable(feature = "enable")]
+    pub unsafe fn assume_init(self) -> SubmatrixRaw<V, T> {
+        SubmatrixRaw {
+            entry: PhantomData,
+            rows: self.rows,
+            row_count: self.row_count,
+            row_step: self.row_step,
+            col_start: self.col_start,
+            col_count: self.col_count,
+        }
+    }
+}
+
+impl<V, T> SubmatrixRaw<V, T>
+where
+    V: AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>>,
+{
+    /// Reverse of [`SubmatrixRaw::assume_init()`]. This is always safe, since we can always
+    /// interpret an uninitialized value as initialized.
+    #[stability::unstable(feature = "enable")]
+    pub fn assume_uninit(self) -> SubmatrixRaw<V, MaybeUninit<T>> {
+        SubmatrixRaw {
+            entry: PhantomData,
+            rows: self.rows,
+            row_count: self.row_count,
+            row_step: self.row_step,
+            col_start: self.col_start,
+            col_count: self.col_count,
+        }
     }
 }
 
@@ -635,6 +699,37 @@ where
     pub fn row_count(&self) -> usize { self.raw_data.row_count }
 }
 
+impl<'a, V, T> Submatrix<'a, V, MaybeUninit<T>>
+where
+    V: 'a + AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>>,
+{
+    /// Assumes that all elements in this [`Submatrix`] are initialized, and converts the submatrix
+    /// from `Submatrix<V, MaybeUninit<T>>` to `Submatrix<V, T>`.
+    pub unsafe fn assume_init(self) -> Submatrix<'a, V, T> {
+        // safe by function safety contract: all elements are initialized
+        let data_new = unsafe { self.raw_data.assume_init() };
+        Submatrix {
+            entry: PhantomData,
+            raw_data: data_new,
+        }
+    }
+}
+
+impl<'a, V, T> Submatrix<'a, V, T>
+where
+    V: 'a + AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>>,
+{
+    /// Reverse of [`Submatrix::assume_init()`]. This is always safe, since we can always
+    /// interpret an uninitialized value as initialized.
+    #[stability::unstable(feature = "enable")]
+    pub fn assume_uninit(self) -> Submatrix<'a, V, MaybeUninit<T>> {
+        Submatrix {
+            entry: PhantomData,
+            raw_data: self.raw_data.assume_uninit(),
+        }
+    }
+}
+
 impl<'a, V, T: Debug> Debug for Submatrix<'a, V, T>
 where
     V: 'a + AsPointerToSlice<T>,
@@ -827,6 +922,37 @@ where
     pub fn row_count(&self) -> usize { self.raw_data.row_count }
 }
 
+impl<'a, V, T> SubmatrixMut<'a, V, MaybeUninit<T>>
+where
+    V: 'a + AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>>,
+{
+    /// Assumes that all elements in this [`SubmatrixMut`] are initialized, and converts the
+    /// submatrix from `SubmatrixMut<V, MaybeUninit<T>>` to `SubmatrixMut<V, T>`.
+    pub unsafe fn assume_init(self) -> SubmatrixMut<'a, V, T> {
+        // safe by function safety contract: all elements are initialized
+        let data_new = unsafe { self.raw_data.assume_init() };
+        SubmatrixMut {
+            entry: PhantomData,
+            raw_data: data_new,
+        }
+    }
+}
+
+impl<'a, V, T> SubmatrixMut<'a, V, T>
+where
+    V: 'a + AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>>,
+{
+    /// Reverse of [`SubmatrixMut::assume_init()`]. This is always safe, since we can always
+    /// interpret an uninitialized value as initialized.
+    #[stability::unstable(feature = "enable")]
+    pub fn assume_uninit(self) -> SubmatrixMut<'a, V, MaybeUninit<T>> {
+        SubmatrixMut {
+            entry: PhantomData,
+            raw_data: self.raw_data.assume_uninit(),
+        }
+    }
+}
+
 impl<'a, V, T: Debug> Debug for SubmatrixMut<'a, V, T>
 where
     V: 'a + AsPointerToSlice<T>,
@@ -947,6 +1073,33 @@ impl<'a, V: AsPointerToSlice<T> + Deref<Target = [T]>, T> Submatrix<'a, V, T> {
     }
 }
 
+impl<'a, V: AsPointerToSlice<T> + AsPointerToSlice<MaybeUninit<T>> + Deref<Target = [T]>, T>
+    Submatrix<'a, V, MaybeUninit<T>>
+{
+    /// Interprets the given slice of slices as a matrix, by using the elements
+    /// of the outer slice as the rows of the matrix.
+    pub fn from_2d_maybe_uninit(data: &'a [V]) -> Self {
+        assert!(data.len() > 0);
+        let row_count = data.len();
+        let col_count = data[0].len();
+        for row in data.iter() {
+            assert_eq!(col_count, row.len());
+        }
+        unsafe {
+            Self {
+                entry: PhantomData,
+                raw_data: SubmatrixRaw::new(
+                    NonNull::new(data.as_ptr() as *mut _).unwrap_unchecked(),
+                    row_count,
+                    1,
+                    0,
+                    col_count,
+                ),
+            }
+        }
+    }
+}
+
 #[cfg(test)]
 fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: usize, const M: usize>(
     expected: [[T; M]; N],
@@ -963,6 +1116,38 @@ fn assert_submatrix_eq<V: AsPointerToSlice<T>, T: PartialEq + Debug, const N: us
 }
 
 #[cfg(test)]
+fn with_testmatrix_vec_maybe_uninit<F>(f: F)
+where
+    F: FnOnce(SubmatrixMut<Vec<MaybeUninit<NonZeroI64>>, NonZeroI64>),
+{
+    let mut data = vec![vec![1, 2, 3, 4, 5], vec![6, 7, 8, 9, 10], vec![11, 12, 13, 14, 15]]
+        .into_iter()
+        .map(|x| {
+            x.into_iter()
+                .map(|x| MaybeUninit::new(NonZeroI64::new(x).unwrap()))
+                .collect::<Vec<_>>()
+        })
+        .collect::<Vec<_>>();
+    let matrix = SubmatrixMut::<Vec<MaybeUninit<NonZeroI64>>, MaybeUninit<NonZeroI64>>::from_2d(&mut data[..]);
+    let matrix = unsafe { matrix.assume_init() };
+    f(matrix)
+}
+
+#[cfg(test)]
+fn with_testmatrix_linmem_maybe_uninit<F>(f: F)
+where
+    F: FnOnce(SubmatrixMut<AsFirstElement<MaybeUninit<NonZeroI64>>, NonZeroI64>),
+{
+    let mut data = vec![1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15]
+        .into_iter()
+        .map(|x| MaybeUninit::new(NonZeroI64::new(x).unwrap()))
+        .collect::<Vec<_>>();
+    let matrix = SubmatrixMut::<AsFirstElement<_>, _>::from_1d(&mut data[..], 3, 5);
+    let matrix = unsafe { matrix.assume_init() };
+    f(matrix)
+}
+
+#[cfg(test)]
 fn with_testmatrix_vec<F>(f: F)
 where
     F: FnOnce(SubmatrixMut<Vec<i64>, i64>),
@@ -973,6 +1158,7 @@ where
 }
 
 #[cfg(test)]
+#[allow(deprecated)]
 fn with_testmatrix_array<F>(f: F)
 where
     F: FnOnce(SubmatrixMut<DerefArray<i64, 5>, i64>),
@@ -1250,6 +1436,94 @@ fn test_submatrix_col_at_wrapper() {
     with_testmatrix_array(test_submatrix_col_at);
     with_testmatrix_linmem(test_submatrix_col_at);
     with_testmatrix_ndarray(test_submatrix_col_at);
+}
+
+#[cfg(test)]
+fn test_submatrix_maybe_uninit<V: AsPointerToSlice<NonZeroI64> + AsPointerToSlice<MaybeUninit<NonZeroI64>>>(
+    matrix: SubmatrixMut<V, NonZeroI64>,
+) {
+    assert_eq!(3, matrix.row_count());
+    assert_eq!(5, matrix.col_count());
+
+    let mut matrix = matrix.assume_uninit();
+    for i in 0..matrix.row_count() {
+        for j in 0..matrix.col_count() {
+            *matrix.at_mut(i, j) = MaybeUninit::zeroed();
+        }
+    }
+
+    let mut submatrix = matrix.reborrow().submatrix(1..2, 1..2);
+    *submatrix.at_mut(0, 0) = MaybeUninit::new(NonZeroI64::new(1).unwrap());
+    // safe since we just initialized it
+    let mut submatrix = unsafe { submatrix.assume_init() };
+    assert_submatrix_eq([[NonZeroI64::new(1).unwrap()]], &mut submatrix);
+
+    let mut submatrix = matrix.reborrow().submatrix(1..3, 0..4);
+    for i in 0..submatrix.row_count() {
+        for j in 0..submatrix.col_count() {
+            *submatrix.at_mut(i, j) = MaybeUninit::new(NonZeroI64::new((i + j + 1) as i64).unwrap());
+        }
+    }
+    // safe since we just initialized it
+    let mut submatrix = unsafe { submatrix.assume_init() };
+    assert_submatrix_eq(
+        [
+            [
+                NonZeroI64::new(1).unwrap(),
+                NonZeroI64::new(2).unwrap(),
+                NonZeroI64::new(3).unwrap(),
+                NonZeroI64::new(4).unwrap(),
+            ],
+            [
+                NonZeroI64::new(2).unwrap(),
+                NonZeroI64::new(3).unwrap(),
+                NonZeroI64::new(4).unwrap(),
+                NonZeroI64::new(5).unwrap(),
+            ],
+        ],
+        &mut submatrix,
+    );
+
+    for j in 0..matrix.col_count() {
+        *matrix.at_mut(0, j) = MaybeUninit::new(NonZeroI64::new(1).unwrap());
+    }
+    for i in 0..matrix.row_count() {
+        *matrix.at_mut(i, 4) = MaybeUninit::new(NonZeroI64::new(1).unwrap());
+    }
+    let mut matrix = unsafe { matrix.assume_init() };
+    assert_submatrix_eq(
+        [
+            [
+                NonZeroI64::new(1).unwrap(),
+                NonZeroI64::new(1).unwrap(),
+                NonZeroI64::new(1).unwrap(),
+                NonZeroI64::new(1).unwrap(),
+                NonZeroI64::new(1).unwrap(),
+            ],
+            [
+                NonZeroI64::new(1).unwrap(),
+                NonZeroI64::new(2).unwrap(),
+                NonZeroI64::new(3).unwrap(),
+                NonZeroI64::new(4).unwrap(),
+                NonZeroI64::new(1).unwrap(),
+            ],
+            [
+                NonZeroI64::new(2).unwrap(),
+                NonZeroI64::new(3).unwrap(),
+                NonZeroI64::new(4).unwrap(),
+                NonZeroI64::new(5).unwrap(),
+                NonZeroI64::new(1).unwrap(),
+            ],
+        ],
+        &mut matrix,
+    );
+}
+
+#[test]
+fn test_submatrix_maybe_uninit_wrapper() {
+    feanor_tracing::DelayedLogger::init_test();
+    with_testmatrix_vec_maybe_uninit(test_submatrix_maybe_uninit);
+    with_testmatrix_linmem_maybe_uninit(test_submatrix_maybe_uninit);
 }
 
 #[cfg(test)]

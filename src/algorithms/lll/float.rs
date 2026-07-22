@@ -511,9 +511,9 @@ use crate::rings::approx_real::float::*;
 #[test]
 fn test_compute_cholesky_column_without_pivot() {
     let RR = Real64::RING;
-    let mut quadratic_form = [DerefArray::from([4.0, 5.0]), DerefArray::from([5.0, 12.0])];
-    let mut cholesky = [DerefArray::from([2.0, 0.0]), DerefArray::from([0.0, 0.0])];
-    let mut errors = [DerefArray::from([0.0, 0.0]), DerefArray::from([0.0, 0.0])];
+    let mut quadratic_form = [vec![4.0, 5.0], vec![5.0, 12.0]];
+    let mut cholesky = [vec![2.0, 0.0], vec![0.0, 0.0]];
+    let mut errors = [vec![0.0, 0.0], vec![0.0, 0.0]];
     let mut gso = GSOMatrix {
         quadratic_form: SubmatrixMut::from_2d(&mut quadratic_form),
         cholesky: SubmatrixMut::from_2d(&mut cholesky),
@@ -524,21 +524,13 @@ fn test_compute_cholesky_column_without_pivot() {
     assert!(errors[0][1] <= 5.0 * f64::EPSILON);
     assert!((cholesky[0][1] - 2.5).abs() <= errors[0][1]);
 
-    let mut quadratic_form = [
-        DerefArray::from([16.0, 6.0, 4.0]),
-        DerefArray::from([6.0, 11.0, 2.5]),
-        DerefArray::from([4.0, 2.5, 2.0]),
-    ];
+    let mut quadratic_form = [vec![16.0, 6.0, 4.0], vec![6.0, 11.0, 2.5], vec![4.0, 2.5, 2.0]];
     let mut cholesky = [
-        DerefArray::from([4.0, 1.5, 0.0]),
-        DerefArray::from([0.0, 2.9580398915498080212836641, 0.0]),
-        DerefArray::from([0.0, 0.0, 0.0]),
+        vec![4.0, 1.5, 0.0],
+        vec![0.0, 2.9580398915498080212836641, 0.0],
+        vec![0.0, 0.0, 0.0],
     ];
-    let mut errors = [
-        DerefArray::from([0.0, 0.0, 0.0]),
-        DerefArray::from([0.0, f64::EPSILON, 0.0]),
-        DerefArray::from([0.0, 0.0, 0.0]),
-    ];
+    let mut errors = [vec![0.0, 0.0, 0.0], vec![0.0, f64::EPSILON, 0.0], vec![0.0, 0.0, 0.0]];
     let mut gso = GSOMatrix {
         quadratic_form: SubmatrixMut::from_2d(&mut quadratic_form),
         cholesky: SubmatrixMut::from_2d(&mut cholesky),
@@ -556,8 +548,8 @@ fn test_compute_cholesky_column_without_pivot() {
 fn test_lll_float_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let RR = Real64::RING;
-    let original = [DerefArray::from([146, 265]), DerefArray::from([265, 481])];
-    let mut reduced = original;
+    let original = [vec![146, 265], vec![265, 481]];
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     let mut transform_matrix = OwnedMatrix::identity(2, 2, ZZ);
     lll_quadratic_form(
@@ -570,7 +562,7 @@ fn test_lll_float_2d() {
     .unwrap();
     assert_matrix_eq!(ZZ, OwnedMatrix::identity(2, 2, ZZ), reduced_matrix);
 
-    let mut tmp = original;
+    let mut tmp = original.clone();
     let mut tmp_matrix = SubmatrixMut::from_2d(&mut tmp);
     STANDARD_MATMUL.matmul(
         TransposableSubmatrix::from(transform_matrix.data()).transpose(),
@@ -578,7 +570,7 @@ fn test_lll_float_2d() {
         TransposableSubmatrixMut::from(tmp_matrix.reborrow()),
         ZZ,
     );
-    let mut check = original;
+    let mut check = original.clone();
     let mut check_matrix = SubmatrixMut::from_2d(&mut check);
     STANDARD_MATMUL.matmul(
         TransposableSubmatrix::from(tmp_matrix.as_const()),
@@ -588,10 +580,10 @@ fn test_lll_float_2d() {
     );
     assert_matrix_eq!(ZZ, reduced_matrix, check_matrix);
 
-    let original = [DerefArray::from([10, 8]), DerefArray::from([27, 22])];
-    let mut reduced = original;
+    let original = [vec![10, 8], vec![27, 22]];
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -619,15 +611,11 @@ fn test_lll_float_3d() {
     let RR = Real64::RING;
     // in this case, the shortest vector is shorter than half the second successive minimum,
     // so LLL will find it (for delta = 0.9 > 0.75)
-    let original = [
-        DerefArray::from([72, 0, 0]),
-        DerefArray::from([0, 9, 0]),
-        DerefArray::from([8432, 7344, 16864]),
-    ];
+    let original = [vec![72, 0, 0], vec![0, 9, 0], vec![8432, 7344, 16864]];
 
-    let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 3>, _>::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut reduced = original.clone();
+    let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -661,16 +649,16 @@ fn test_lll_precision() {
     let ZZ = StaticRing::<i128>::RING;
     let RR = Real64::RING;
     let original = [
-        DerefArray::from([1, 0, 0, 0, 0]),
-        DerefArray::from([65208, 1, 0, 0, 0]),
-        DerefArray::from([0, 65208, 1, 0, 0]),
-        DerefArray::from([0, 0, 65208, 1, 0]),
-        DerefArray::from([0, 0, 0, 65208, 999769]),
+        vec![1, 0, 0, 0, 0],
+        vec![65208, 1, 0, 0, 0],
+        vec![0, 65208, 1, 0, 0],
+        vec![0, 0, 65208, 1, 0],
+        vec![0, 0, 0, 65208, 999769],
     ];
 
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -696,16 +684,16 @@ fn test_lll_precision() {
 
     let ZZ = StaticRing::<i64>::RING;
     let original = [
-        DerefArray::from([1, 0, 0, 0, 0]),
-        DerefArray::from([-3085729, 1, 0, 0, 0]),
-        DerefArray::from([0, -3085729, 1, 0, 0]),
-        DerefArray::from([0, 0, -3085729, 1, 0]),
-        DerefArray::from([0, 0, 0, -3085729, 23068673]),
+        vec![1, 0, 0, 0, 0],
+        vec![-3085729, 1, 0, 0, 0],
+        vec![0, -3085729, 1, 0, 0],
+        vec![0, 0, -3085729, 1, 0],
+        vec![0, 0, 0, -3085729, 23068673],
     ];
 
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -731,16 +719,16 @@ fn test_lll_precision() {
 
     let ZZ = StaticRing::<i128>::RING;
     let original = [
-        DerefArray::from([1, 0, 0, 0, 0]),
-        DerefArray::from([207432708, 1, 0, 0, 0]),
-        DerefArray::from([0, 207432708, 1, 0, 0]),
-        DerefArray::from([0, 0, 207432708, 1, 0]),
-        DerefArray::from([0, 0, 0, 207432708, 447741953]),
+        vec![1, 0, 0, 0, 0],
+        vec![207432708, 1, 0, 0, 0],
+        vec![0, 207432708, 1, 0, 0],
+        vec![0, 0, 207432708, 1, 0],
+        vec![0, 0, 0, 207432708, 447741953],
     ];
 
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -770,14 +758,14 @@ fn test_lll_generating_set() {
     let RR = Real64::RING;
     let ZZ = StaticRing::<i128>::RING;
     let original = [
-        DerefArray::from([-6, -1, 6, 116, -2]),
-        DerefArray::from([-14, -12, 8, 232, -2]),
-        DerefArray::from([-10, 2, 12, 0, 2]),
+        vec![-6, -1, 6, 116, -2],
+        vec![-14, -12, 8, 232, -2],
+        vec![-10, 2, 12, 0, 2],
     ];
 
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -802,15 +790,15 @@ fn test_lll_generating_set() {
     assert_el_eq!(ZZ, 12, norm_squared(ZZ, &reduced_matrix.as_const().col_at(4)));
 
     let original = [
-        DerefArray::from([-4, 8, -54, -1, 42, 15, -23, -259]),
-        DerefArray::from([-3, 10, -36, 18, -48, -473, -1200, -6493]),
-        DerefArray::from([5, -13, 62, -15, 17, 398, 1043, 5721]),
-        DerefArray::from([-8, 10, -68, 18, -18, -434, -1118, -6126]),
-        DerefArray::from([11, -5, 90, 26, -215, -910, -2227, -11637]),
+        vec![-4, 8, -54, -1, 42, 15, -23, -259],
+        vec![-3, 10, -36, 18, -48, -473, -1200, -6493],
+        vec![5, -13, 62, -15, 17, 398, 1043, 5721],
+        vec![-8, 10, -68, 18, -18, -434, -1118, -6126],
+        vec![11, -5, 90, 26, -215, -910, -2227, -11637],
     ];
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),
@@ -838,7 +826,7 @@ fn test_lll_generating_set() {
     assert_el_eq!(ZZ, 40, norm_squared(ZZ, &reduced_matrix.as_const().col_at(7)));
 
     let original = [
-        DerefArray::from([
+        vec![
             -60725263117,
             -448122081513,
             -218368759847,
@@ -847,8 +835,8 @@ fn test_lll_generating_set() {
             -3137996709827,
             14835704835919,
             67504381450573,
-        ]),
-        DerefArray::from([
+        ],
+        vec![
             -1310716961940,
             -9682451257943,
             -4729935920987,
@@ -857,8 +845,8 @@ fn test_lll_generating_set() {
             -67791459966817,
             320528485599331,
             1458334256347773,
-        ]),
-        DerefArray::from([
+        ],
+        vec![
             1159398893231,
             8564380015666,
             4183444050825,
@@ -867,8 +855,8 @@ fn test_lll_generating_set() {
             59963582382418,
             -283516375460965,
             -1289940218804617,
-        ]),
-        DerefArray::from([
+        ],
+        vec![
             -1236320093452,
             -9132639612642,
             -4461079566742,
@@ -877,8 +865,8 @@ fn test_lll_generating_set() {
             -63942205977848,
             302328006373120,
             1375528654002990,
-        ]),
-        DerefArray::from([
+        ],
+        vec![
             -2344979577397,
             -17323890604545,
             -8464219959177,
@@ -887,11 +875,11 @@ fn test_lll_generating_set() {
             -121291584595649,
             573488494361461,
             2609233431319737,
-        ]),
+        ],
     ];
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    let mut transformed = original;
+    let mut transformed = original.clone();
     let transformed_matrix = SubmatrixMut::from_2d(&mut transformed);
     lll(
         reduced_matrix.reborrow(),

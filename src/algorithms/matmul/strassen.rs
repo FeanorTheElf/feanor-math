@@ -822,21 +822,18 @@ use crate::assert_matrix_eq;
 #[test]
 fn test_dispatch_strassen_one_level() {
     {
-        let a = [DerefArray::from([1, 2]), DerefArray::from([3, 4])];
-        let b = [DerefArray::from([2, 1]), DerefArray::from([-1, -2])];
-        let mut result = [
-            DerefArray::from([i32::MIN, i32::MIN]),
-            DerefArray::from([i32::MIN, i32::MIN]),
-        ];
-        let expected = [DerefArray::from([0, -3]), DerefArray::from([2, -5])];
+        let a = [vec![1, 2], vec![3, 4]];
+        let b = [vec![2, 1], vec![-1, -2]];
+        let mut result = [vec![i32::MIN, i32::MIN], vec![i32::MIN, i32::MIN]];
+        let expected = [vec![0, -3], vec![2, -5]];
         let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
 
         dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
             1,
             0,
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
             StaticRing::<i32>::RING,
             &mut memory,
         );
@@ -846,21 +843,18 @@ fn test_dispatch_strassen_one_level() {
         assert!(memory.iter().all(|x| *x != i32::MIN));
     }
     {
-        let a = [DerefArray::from([1, 0]), DerefArray::from([7, 2])];
-        let b = [DerefArray::from([-3, -3]), DerefArray::from([3, 1])];
-        let mut result = [
-            DerefArray::from([i32::MIN, i32::MIN]),
-            DerefArray::from([i32::MIN, i32::MIN]),
-        ];
-        let expected = [DerefArray::from([-3, -3]), DerefArray::from([-15, -19])];
+        let a = [vec![1, 0], vec![7, 2]];
+        let b = [vec![-3, -3], vec![3, 1]];
+        let mut result = [vec![i32::MIN, i32::MIN], vec![i32::MIN, i32::MIN]];
+        let expected = [vec![-3, -3], vec![-15, -19]];
         let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
 
         dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
             1,
             0,
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
             StaticRing::<i32>::RING,
             &mut memory,
         );
@@ -873,18 +867,18 @@ fn test_dispatch_strassen_one_level() {
 #[test]
 fn test_dispatch_strassen_add_assign_one_level() {
     {
-        let a = [DerefArray::from([1, 2]), DerefArray::from([3, 4])];
-        let b = [DerefArray::from([2, 1]), DerefArray::from([-1, -2])];
-        let mut result = [DerefArray::from([10, 20]), DerefArray::from([30, 40])];
-        let expected = [DerefArray::from([10, 17]), DerefArray::from([32, 35])];
+        let a = [vec![1, 2], vec![3, 4]];
+        let b = [vec![2, 1], vec![-1, -2]];
+        let mut result = [vec![10, 20], vec![30, 40]];
+        let expected = [vec![10, 17], vec![32, 35]];
         let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
 
         dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
             1,
             0,
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
             StaticRing::<i32>::RING,
             &mut memory,
         );
@@ -894,18 +888,18 @@ fn test_dispatch_strassen_add_assign_one_level() {
         assert!(memory.iter().all(|x| *x != i32::MIN));
     }
     {
-        let a = [DerefArray::from([1, 0]), DerefArray::from([7, 2])];
-        let b = [DerefArray::from([-3, -3]), DerefArray::from([3, 1])];
-        let mut result = [DerefArray::from([100, 100]), DerefArray::from([0, 0])];
-        let expected = [DerefArray::from([97, 97]), DerefArray::from([-15, -19])];
+        let a = [vec![1, 0], vec![7, 2]];
+        let b = [vec![-3, -3], vec![3, 1]];
+        let mut result = [vec![100, 100], vec![0, 0]];
+        let expected = [vec![97, 97], vec![-15, -19]];
         let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
 
         dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
             1,
             0,
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<DerefArray<_, 2>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut result)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
             StaticRing::<i32>::RING,
             &mut memory,
         );

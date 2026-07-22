@@ -484,13 +484,13 @@ macro_rules! matrix {
             ]
         }
     };
-    ($hom:expr,$(DerefArray::from([$($num:literal $(/ $den:literal)?),*])),*) => {
+    ($hom:expr, $(vec[$($num:literal $(/ $den:literal)?),*]),*) => {
         {
             let ZZ_to_ring = $hom;
             [
-                $(DerefArray::from([$(
+                $(vec![$(
                     matrix!(# ZZ_to_ring; $num $(, $den)?)
-                ),*])),*
+                ),*]),*
             ]
         }
     };
@@ -502,9 +502,9 @@ fn test_ldl() {
     let QQ = RationalField::new(ZZ);
     let mut data = matrix!(
         QQ.inclusion(),
-        DerefArray::from([1, 2, 1]),
-        DerefArray::from([2, 5, 0]),
-        DerefArray::from([1, 0, 7])
+        vec[1, 2, 1],
+        vec[2, 5, 0],
+        vec[1, 0, 7]
     );
     let mut matrix = SubmatrixMut::from_2d(&mut data);
     let mut expected = matrix!(QQ.inclusion(), [1, 2, 1], [0, 1, -2], [0, 0, 2]);
@@ -524,9 +524,9 @@ fn test_swap_gso_cols() {
     let QQ = RationalField::new(ZZ);
     let mut matrix = matrix!(
         QQ.inclusion(),
-        DerefArray::from([2, 1 / 2, 2 / 5]),
-        DerefArray::from([0, 3 / 2, 1 / 4]),
-        DerefArray::from([0, 0, 1])
+        vec[2, 1 / 2, 2 / 5],
+        vec[0, 3 / 2, 1 / 4],
+        vec[0, 0, 1]
     );
     let expected = matrix!(QQ.inclusion(), [2, 1 / 2, 31 / 80], [0, 3 / 2, 11 / 40], [0, 0, 1]);
     let matrix_view = SubmatrixMut::from_2d(&mut matrix);
@@ -540,9 +540,9 @@ fn test_swap_gso_cols() {
 fn test_lll_2d() {
     let ZZ = StaticRing::<i64>::RING;
     let QQ = RationalField::new(ZZ);
-    let original = matrix!(QQ.inclusion(), DerefArray::from([5, 9]), DerefArray::from([11, 20]));
-    let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
+    let original = matrix!(QQ.inclusion(), vec[5, 9], vec[11, 20]);
+    let mut reduced = original.clone();
+    let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
     lll(
         reduced_matrix.reborrow(),
         QQ.identity(),
@@ -568,9 +568,9 @@ fn test_lll_2d() {
         norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
     );
 
-    let original = matrix!(QQ.inclusion(), DerefArray::from([10, 8]), DerefArray::from([27, 22]));
-    let mut reduced = original;
-    let mut reduced_matrix = SubmatrixMut::<DerefArray<_, 2>, _>::from_2d(&mut reduced);
+    let original = matrix!(QQ.inclusion(), vec[10, 8], vec[27, 22]);
+    let mut reduced = original.clone();
+    let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
     lll(
         reduced_matrix.reborrow(),
         QQ.identity(),
@@ -605,12 +605,12 @@ fn test_lll_3d() {
     // so LLL will find it (for delta = 0.9 > 0.75)
     let original = matrix!(
         QQ.inclusion(),
-        DerefArray::from([72, 0, 0]),
-        DerefArray::from([0, 9, 0]),
-        DerefArray::from([8432, 7344, 16864])
+        vec[72, 0, 0],
+        vec[0, 9, 0],
+        vec[8432, 7344, 16864]
     );
 
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll(
         reduced_matrix.reborrow(),
@@ -650,12 +650,12 @@ fn test_lll_generating_set() {
 
     let original = matrix!(
         QQ.inclusion(),
-        DerefArray::from([-6, -1, 6, 116, -2]),
-        DerefArray::from([-14, -12, 8, 232, -2]),
-        DerefArray::from([-10, 2, 12, 0, 2])
+        vec[-6, -1, 6, 116, -2],
+        vec[-14, -12, 8, 232, -2],
+        vec[-10, 2, 12, 0, 2]
     );
 
-    let mut reduced = original;
+    let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
     lll(
         reduced_matrix.reborrow(),
@@ -692,12 +692,13 @@ fn test_lll_generating_set() {
     let ZZ = BigIntRing::RING;
     let QQ = RationalField::new(ZZ);
     let original = matrix!(
-        QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
-        DerefArray::from([-4, 8, -54, -1, 42, 15, -23, -259]),
-        DerefArray::from([-3, 10, -36, 18, -48, -473, -1200, -6493]),
-        DerefArray::from([5, -13, 62, -15, 17, 398, 1043, 5721]),
-        DerefArray::from([-8, 10, -68, 18, -18, -434, -1118, -6126]),
-        DerefArray::from([11, -5, 90, 26, -215, -910, -2227, -11637])
+        QQ.inclusion()
+            .compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
+            vec[-4, 8, -54, -1, 42, 15, -23, -259],
+            vec[-3, 10, -36, 18, -48, -473, -1200, -6493],
+            vec[5, -13, 62, -15, 17, 398, 1043, 5721],
+            vec[-8, 10, -68, 18, -18, -434, -1118, -6126],
+            vec[11, -5, 90, 26, -215, -910, -2227, -11637]
     );
     let mut reduced = original.clone();
     let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
@@ -846,19 +847,18 @@ fn bench_lll_10d(bencher: &mut Bencher) {
 
     bencher.iter(|| {
         let original = matrix!(
-            QQ.inclusion().compose(ZZ.can_hom(&StaticRing::<i128>::RING).unwrap()),
-            DerefArray::from([1, 0, 0, 0, 0, 0, 0, 0, 0, 0]),
-            DerefArray::from([0, 1, 0, 0, 0, 0, 0, 0, 0, 0]),
-            DerefArray::from([0, 0, 1, 0, 0, 0, 0, 0, 0, 0]),
-            DerefArray::from([0, 0, 0, 1, 0, 0, 0, 0, 0, 0]),
-            DerefArray::from([0, 0, 0, 0, 1, 0, 0, 0, 0, 0]),
-            DerefArray::from([0, 0, 0, 0, 0, 1, 0, 0, 0, 0]),
-            DerefArray::from([0, 0, 0, 0, 0, 0, 1, 0, 0, 0]),
-            DerefArray::from([2, 2, 2, 2, 0, 0, 1, 4, 0, 0]),
-            DerefArray::from([4, 3, 3, 3, 1, 2, 1, 0, 5, 0]),
-            DerefArray::from([
-                3433883, 14315221, 24549008, 6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304
-            ])
+            QQ.inclusion()
+                .compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
+            vec[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec[0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+            vec[0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+            vec[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+            vec[0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+            vec[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+            vec[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+            vec[2, 2, 2, 2, 0, 0, 1, 4, 0, 0],
+            vec[4, 3, 3, 3, 1, 2, 1, 0, 5, 0],
+            vec[3433883, 14315221, 24549008, 6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
         );
         let mut reduced = original.clone();
         let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
