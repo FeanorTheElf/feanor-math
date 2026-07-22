@@ -1,5 +1,6 @@
 use std::alloc::{Allocator, Global};
 use std::fmt::{Debug, Formatter, Result};
+use std::mem::MaybeUninit;
 
 use self::submatrix::{AsFirstElement, Submatrix, SubmatrixMut};
 use super::*;
@@ -184,6 +185,38 @@ impl<T, A: Allocator> OwnedMatrix<T, A> {
         F: FnMut() -> T,
     {
         self.data.resize_with(new_count * self.col_count(), new_entries);
+    }
+}
+
+impl<T> OwnedMatrix<MaybeUninit<T>> {
+    pub fn uninit(row_count: usize, col_count: usize) -> Self { Self::uninit_in(row_count, col_count, Global) }
+}
+
+impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
+    #[stability::unstable(feature = "enable")]
+    pub fn uninit_in(row_count: usize, col_count: usize, allocator: A) -> Self {
+        let mut data = Vec::with_capacity_in(row_count * col_count, allocator);
+        data.resize_with(row_count * col_count, || MaybeUninit::uninit());
+        return Self {
+            data,
+            row_count,
+            col_count,
+        };
+    }
+
+    /// This is safe as long as every element in the matrix is initialized
+    pub unsafe fn assume_init(self) -> OwnedMatrix<T, A> {
+        let (ptr, len, cap, alloc) = self.data.into_raw_parts_with_alloc();
+        // SAFETY: MaybeUninit<T> has the same size and alignment as T, so the
+        // allocation is valid for T; the caller guarantees all `len` elements
+        // are initialized.
+        let new_vec = unsafe { Vec::from_raw_parts_in(ptr.cast::<T>(), len, cap, alloc) };
+
+        OwnedMatrix {
+            data: new_vec,
+            col_count: self.col_count,
+            row_count: self.row_count,
+        }
     }
 }
 
