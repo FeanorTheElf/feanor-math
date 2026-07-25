@@ -220,6 +220,46 @@ impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
             row_count: self.row_count,
         }
     }
+
+    /// Initializes the elements of the matrix using the given closure.
+    /// 
+    /// # Panics
+    /// 
+    /// This function panics if the given closure did not initialize all of the matrix, i.e.
+    /// returns a smaller submatrix.
+    #[stability::unstable(feature = "enable")]
+    pub fn init<F>(mut self, initialize: F) -> OwnedMatrix<T, A>
+        where F: for<'a> FnOnce(SubmatrixMut<'a, AsFirstElement<MaybeUninit<T>>, MaybeUninit<T>>) -> SubmatrixMut<'a, AsFirstElement<MaybeUninit<T>>, T>
+    {
+        let raw_parts = self.data().into_raw().into_raw_parts();
+        let row_count = self.data().row_count();
+        let col_count = self.data().col_count();
+
+        let witness: SubmatrixMut<_, T> = initialize(self.data_mut());
+        let witness_raw_parts = witness.into_raw().into_raw_parts();
+
+        assert_eq!(raw_parts.1, witness_raw_parts.1, "initialize returned wrong number of rows");
+        assert_eq!(raw_parts.2, witness_raw_parts.2, "initialize returned wrong row stride");
+        assert_eq!(raw_parts.3, witness_raw_parts.3, "initialize returned wrong column offset");
+        assert_eq!(raw_parts.4, witness_raw_parts.4, "initialize returned wrong number of columns");
+        if row_count != 0 && col_count != 0 {
+            assert_eq!(
+                raw_parts.0, witness_raw_parts.0.cast(),
+                "initialize returned a pointer into a different buffer",
+            );
+        }
+
+        let (ptr, length, capacity, alloc) = self.data.into_raw_parts_with_alloc();
+
+        // SAFETY:
+        // * ptr/capacity/alloc come straight from a live Vec, so they're mutually consistent.
+        // * MaybeUninit<T> and T share size and alignment, so the ptr cast preserves the
+        //   allocation's layout requirements for T.
+        // * The elements referenced by the matrix are init T: the checks proved the caller's
+        //   valid SubmatrixMut<T> covers exactly [base, base + len).
+        let result_data = unsafe { Vec::from_raw_parts_in(ptr as *mut T, length, capacity, alloc) };
+        return OwnedMatrix::new_with_shape(result_data, row_count, col_count);
+    }
 }
 
 impl<T: Debug, A: Allocator> Debug for OwnedMatrix<T, A> {
