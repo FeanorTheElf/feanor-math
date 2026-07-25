@@ -301,6 +301,12 @@ where
         // similarly safe by constructor requirements
         unsafe { row_ref.offset(self.col_start as isize + col as isize) }
     }
+    
+    /// Returns `(pointer_to_first_row, row_count, row_stride, col_offset, col_count)`.
+    #[stability::unstable(feature = "enable")]
+    pub fn into_raw_parts(self) -> (NonNull<V>, usize, isize, usize, usize) {
+        (self.rows, self.row_count, self.row_step, self.col_start, self.col_count)
+    }
 }
 
 impl<V, T> SubmatrixRaw<V, MaybeUninit<T>>
@@ -710,6 +716,11 @@ where
     {
         OwnedMatrix::from_fn(self.row_count(), self.col_count(), |i, j| self.at(i, j).clone())
     }
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn into_raw(self) -> SubmatrixRaw<V, T> {
+        self.raw_data
+    }
 }
 
 impl<'a, V, T> Submatrix<'a, V, MaybeUninit<T>>
@@ -940,6 +951,11 @@ where
         T: Clone,
     {
         self.as_const().to_owned()
+    }
+    
+    #[stability::unstable(feature = "enable")]
+    pub fn into_raw(self) -> SubmatrixRaw<V, T> {
+        self.raw_data
     }
 }
 
