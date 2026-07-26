@@ -301,7 +301,7 @@ where
         // similarly safe by constructor requirements
         unsafe { row_ref.offset(self.col_start as isize + col as isize) }
     }
-    
+
     /// Returns `(pointer_to_first_row, row_count, row_stride, col_offset, col_count)`.
     #[stability::unstable(feature = "enable")]
     pub fn into_raw_parts(self) -> (NonNull<V>, usize, isize, usize, usize) {
@@ -704,11 +704,9 @@ where
 
     /// Returns the number of rows of this matrix.
     pub fn row_count(&self) -> usize { self.raw_data.row_count }
-    
+
     #[stability::unstable(feature = "enable")]
-    pub fn into_raw(self) -> SubmatrixRaw<V, T> {
-        self.raw_data
-    }
+    pub fn into_raw(self) -> SubmatrixRaw<V, T> { self.raw_data }
 }
 
 impl<'a, V, T> Submatrix<'a, V, MaybeUninit<T>>
@@ -934,9 +932,7 @@ where
     pub fn row_count(&self) -> usize { self.raw_data.row_count }
 
     #[stability::unstable(feature = "enable")]
-    pub fn into_raw(self) -> SubmatrixRaw<V, T> {
-        self.raw_data
-    }
+    pub fn into_raw(self) -> SubmatrixRaw<V, T> { self.raw_data }
 }
 
 impl<'a, V, T> SubmatrixMut<'a, V, MaybeUninit<T>>
