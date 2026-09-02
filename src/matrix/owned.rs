@@ -211,7 +211,7 @@ impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
     /// This is safe as long as every element in the matrix is initialized
     #[stability::unstable(feature = "enable")]
     pub unsafe fn assume_init(self) -> OwnedMatrix<T, A> {
-        let (ptr, len, cap, alloc) = self.data.into_raw_parts_with_alloc();
+        let (ptr, len, cap, alloc) = self.data.into_raw_parts_with_allocator();
         // SAFETY: MaybeUninit<T> has the same size and alignment as T, so the
         // allocation is valid for T; the caller guarantees all `len` elements
         // are initialized.
@@ -265,7 +265,7 @@ impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
             );
         }
 
-        let (ptr, length, capacity, alloc) = self.data.into_raw_parts_with_alloc();
+        let (ptr, length, capacity, alloc) = self.data.into_raw_parts_with_allocator();
 
         // SAFETY:
         // * ptr/capacity/alloc come straight from a live Vec, so they're mutually consistent.

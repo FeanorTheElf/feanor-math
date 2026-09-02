@@ -26,7 +26,6 @@ use crate::divisibility::*;
 use crate::integer::*;
 use crate::pid::*;
 use crate::reduce_lift::poly_factor_gcd::*;
-use crate::ring::*;
 use crate::rings::extension::extension_impl::*;
 use crate::rings::extension::number_field::newton::find_approximate_complex_root;
 use crate::rings::extension::sparse::SparseMapVector;

@@ -11,7 +11,6 @@ use crate::integer::*;
 use crate::iters::multiset_combinations;
 use crate::ordered::OrderedRingStore;
 use crate::primitive_int::StaticRing;
-use crate::ring::*;
 use crate::rings::multivariate::*;
 use crate::seq::{VectorFn, VectorView};
 

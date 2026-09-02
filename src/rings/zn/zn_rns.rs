@@ -8,7 +8,6 @@ use serde::de::DeserializeSeed;
 
 use crate::algorithms::matmul::ComputeInnerProduct;
 use crate::divisibility::DivisibilityRingStore;
-use crate::integer::*;
 use crate::iters::{MultiProduct, multi_cartesian_product};
 use crate::primitive_int::*;
 use crate::rings::zn::*;

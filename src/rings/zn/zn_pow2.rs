@@ -2,11 +2,7 @@ use smallvec::SmallVec;
 
 use crate::delegate::DelegateRing;
 use crate::divisibility::DivisibilityRing;
-use crate::homomorphism::*;
-use crate::integer::*;
-use crate::pid::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
-use crate::ring::*;
 use crate::rings::rust_bigint::{RustBigintRing, RustBigintRingBase};
 use crate::rings::zn::*;
 use crate::specialization::*;

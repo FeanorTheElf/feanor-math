@@ -109,7 +109,6 @@ pub mod generic_impls {
     use crate::divisibility::DivisibilityRingStore;
     use crate::field::*;
     use crate::integer::{IntegerRing, IntegerRingStore};
-    use crate::ordered::*;
     use crate::primitive_int::{StaticRing, StaticRingBase};
     use crate::rings::extension::galois_field::{GaloisField, GaloisFieldOver};
     use crate::rings::zn::*;

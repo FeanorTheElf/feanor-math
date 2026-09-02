@@ -1,7 +1,6 @@
 use std::collections::hash_map::Entry;
 use std::collections::{HashMap, hash_map};
 
-use crate::ring::*;
 use crate::seq::*;
 
 pub struct SparseMapVector<R: RingStore> {

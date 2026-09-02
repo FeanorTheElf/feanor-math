@@ -1,5 +1,3 @@
-use core::f64;
-
 use crate::algorithms::convolution::KaratsubaHint;
 use crate::algorithms::matmul::StrassenHint;
 use crate::divisibility::{DivisibilityRing, Domain};

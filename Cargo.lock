@@ -113,13 +113,12 @@ checksum = "edd0f118536f44f5ccd48bcb8b111bdc3de888b58c74639dfb034a357d0f206d"
 
 [[package]]
 name = "feanor-math"
-version = "3.5.24"
+version = "3.6.0"
 dependencies = [
  "append-only-vec",
  "atomicbox",
  "bytemuck",
  "debugit",
- "feanor-mempool",
  "feanor-serde",
  "libc",
  "ndarray",
@@ -132,15 +131,6 @@ dependencies = [
  "serde_json",
  "smallvec",
  "stability",
- "thread_local",
-]
-
-[[package]]
-name = "feanor-mempool"
-version = "2.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "818891a937efd69a09c8c304e2bc86b5f188a48ad0ba845d31aa8b9dacddae26"
-dependencies = [
  "thread_local",
 ]
 
