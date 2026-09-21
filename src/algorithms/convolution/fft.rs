@@ -6,8 +6,7 @@ use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::ConvolutionAlgorithm;
-use crate::algorithms::fft::FFTAlgorithm;
-use crate::algorithms::fft::complex_fft::FFTErrorEstimate;
+use crate::algorithms::fft::{FFTAlgorithm, FFTErrorEstimate};
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
 use crate::homomorphism::*;
 use crate::prelude::*;

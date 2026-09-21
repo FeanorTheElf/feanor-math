@@ -15,7 +15,6 @@ use crate::algorithms::convolution::ntt::NTTConvolution;
 use crate::algorithms::convolution::*;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
-use crate::algorithms::fft::radix3::CooleyTukeyRadix3Butterfly;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
@@ -1113,80 +1112,6 @@ impl CooleyTuckeyButterfly<Zn64BFastmulBase> for Zn64BBase {
     }
 }
 
-impl CooleyTukeyRadix3Butterfly<Zn64BFastmulBase> for Zn64BBase {
-    fn butterfly<H: Homomorphism<Zn64BFastmulBase, Self>>(
-        hom: H,
-        a: &mut Self::Element,
-        b: &mut Self::Element,
-        c: &mut Self::Element,
-        z: &ZnFastmulEl,
-        t: &ZnFastmulEl,
-        t_sqr_z_sqr: &ZnFastmulEl,
-    ) {
-        let self_ = hom.codomain().get_ring();
-
-        hom.mul_assign_ref_map(b, t);
-        hom.mul_assign_ref_map(c, t_sqr_z_sqr);
-        let b_ = hom.mul_ref_map(b, z);
-        let c_ = hom.mul_ref_map(c, z);
-
-        let mut s1 = b.0 + c_.0;
-        let mut s2 = b_.0 + c.0;
-        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
-        s1 = reduce_to_half(s1, self_.modulus_times_three);
-        s2 = reduce_to_half(s2, self_.modulus_times_three);
-
-        let mut s3 = s1 + s2;
-        s3 = reduce_to_half(s3, self_.modulus_times_three);
-
-        b.0 = a.0 + s2;
-        c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
-    }
-
-    fn inv_butterfly<H: Homomorphism<Zn64BFastmulBase, Self>>(
-        hom: H,
-        a: &mut Self::Element,
-        b: &mut Self::Element,
-        c: &mut Self::Element,
-        z: &ZnFastmulEl,
-        t: &ZnFastmulEl,
-        t_sqr: &ZnFastmulEl,
-    ) {
-        let self_ = hom.codomain().get_ring();
-
-        // we assume that a, b, c are already at most `self.modulus_times_three`
-
-        let b_ = hom.mul_ref_map(b, z);
-        let mut s1 = b.0 + c.0;
-        s1 = reduce_to_half(s1, self_.modulus_times_three);
-
-        let s2 = b_.0 + c.0;
-        let s2_ = hom.mul_ref_snd_map(self_.from_u64_promise_reduced(s2), z);
-
-        let mut s3 = s1 + s2_.0;
-        s3 = reduce_to_half(s3, self_.modulus_times_three);
-
-        b.0 = a.0 + s2_.0;
-        c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
-
-        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
-        hom.mul_assign_ref_map(b, t);
-        hom.mul_assign_ref_map(c, t_sqr);
-    }
-
-    #[inline(always)]
-    fn prepare_for_fft(&self, _value: &mut Self::Element) {}
-
-    #[inline(always)]
-    fn prepare_for_inv_fft(&self, value: &mut Self::Element) {
-        if value.0 >= self.modulus_times_three {
-            value.0 -= self.modulus_times_three
-        }
-    }
-}
-
 impl CooleyTuckeyButterfly<Zn64BBase> for Zn64BBase {
     #[inline(always)]
     fn butterfly_new<H: Homomorphism<Self, Self>>(hom: H, a: &mut Zn64BEl, b: &mut Zn64BEl, twiddle: &Zn64BEl) {
@@ -1211,79 +1136,6 @@ impl CooleyTuckeyButterfly<Zn64BBase> for Zn64BBase {
     fn prepare_for_inv_fft(&self, value: &mut Self::Element) {
         if value.0 >= self.modulus_times_three {
             value.0 -= self.modulus_times_three;
-        }
-    }
-}
-
-impl CooleyTukeyRadix3Butterfly<Zn64BBase> for Zn64BBase {
-    fn butterfly<H: Homomorphism<Zn64BBase, Self>>(
-        hom: H,
-        a: &mut Self::Element,
-        b: &mut Self::Element,
-        c: &mut Self::Element,
-        z: &Zn64BEl,
-        t: &Zn64BEl,
-        t_sqr_z_sqr: &Zn64BEl,
-    ) {
-        let self_ = hom.codomain().get_ring();
-
-        hom.mul_assign_ref_map(b, t);
-        hom.mul_assign_ref_map(c, t_sqr_z_sqr);
-        let b_ = hom.mul_ref_map(b, z);
-        let c_ = hom.mul_ref_map(c, z);
-
-        let mut s1 = b.0 + c_.0;
-        let mut s2 = b_.0 + c.0;
-        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
-        s1 = reduce_to_half(s1, self_.modulus_times_three);
-        s2 = reduce_to_half(s2, self_.modulus_times_three);
-        let mut s3 = s1 + s2;
-        s3 = reduce_to_half(s3, self_.modulus_times_three);
-
-        b.0 = a.0 + s2;
-        c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
-    }
-
-    fn inv_butterfly<H: Homomorphism<Zn64BBase, Self>>(
-        hom: H,
-        a: &mut Self::Element,
-        b: &mut Self::Element,
-        c: &mut Self::Element,
-        z: &Zn64BEl,
-        t: &Zn64BEl,
-        t_sqr: &Zn64BEl,
-    ) {
-        let self_ = hom.codomain().get_ring();
-
-        // we assume that a, b, c are already at most `self.modulus_times_three`
-
-        let b_ = hom.mul_ref_map(b, z);
-        let mut s1 = b.0 + c.0;
-        s1 = reduce_to_half(s1, self_.modulus_times_three);
-
-        let s2 = b_.0 + c.0;
-        let s2_ = hom.mul_ref_snd_map(self_.from_u64_promise_reduced(s2), z);
-
-        let mut s3 = s1 + s2_.0;
-        s3 = reduce_to_half(s3, self_.modulus_times_three);
-
-        b.0 = a.0 + s2_.0;
-        c.0 = a.0 + self_.modulus_times_three - s3;
-        a.0 = a.0 + s1;
-        a.0 = reduce_to_half(a.0, self_.modulus_times_three);
-
-        hom.mul_assign_ref_map(b, t);
-        hom.mul_assign_ref_map(c, t_sqr);
-    }
-
-    #[inline(always)]
-    fn prepare_for_fft(&self, _value: &mut Self::Element) {}
-
-    #[inline(always)]
-    fn prepare_for_inv_fft(&self, value: &mut Self::Element) {
-        if value.0 >= self.modulus_times_three {
-            value.0 -= self.modulus_times_three
         }
     }
 }

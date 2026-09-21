@@ -4,7 +4,6 @@ use std::ops::Range;
 
 use tracing::instrument;
 
-use super::complex_fft::*;
 use crate::algorithms::cyclotomic::{get_prim_root_of_unity_pow2, is_prim_root_of_unity_pow2};
 use crate::algorithms::fft::*;
 use crate::homomorphism::*;

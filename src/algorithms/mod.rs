@@ -84,5 +84,3 @@ pub mod resultant;
 /// Contains [`sqr_mul::generic_abs_square_and_multiply()`] and other functions
 /// for computing a power of an element in a generic monoid.
 pub mod sqr_mul;
-/// Contains various algorithms for computing discrete logarithms over generic monoids.
-pub mod subgroup;

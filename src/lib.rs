@@ -51,10 +51,6 @@ pub mod algorithms;
 /// newtype-pattern for rings.
 pub mod delegate;
 pub mod function;
-/// Contains the traits [`group::AbelianGroupBase`] and [`group::AbelianGroupStore`], which (in
-/// analogue to [`ring::RingBase`] and [`ring::RingStore`]) model groups. These are much less
-/// central to this library than the ring traits, however.
-pub mod group;
 /// Contains the trait [`homomorphism::Homomorphism`], [`homomorphism::CanHomFrom`] and
 /// others that are the foundation of the homomorphism framework, that enables mapping
 /// elements between different rings.
