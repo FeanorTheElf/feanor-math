@@ -1,4 +1,8 @@
 {
+    "rust-analyzer.cargo.features": [
+        "unstable-enable",
+        "generic_tests"
+    ],
     "rust-analyzer.showUnlinkedFileNotification": false,
     "spellright.language": [
         "en-US-10-1."
