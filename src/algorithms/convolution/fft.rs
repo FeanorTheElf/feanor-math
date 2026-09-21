@@ -526,35 +526,38 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+mod tests {
+    use super::*;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_convolution_zn() {
-    feanor_tracing::DelayedLogger::init_test();
-    let convolution: FFTConvolutionZn = FFTConvolution::new().into();
-    let ring = Zn64B::new(17 * 257);
+    #[test]
+    fn test_convolution_zn() {
+        feanor_tracing::DelayedLogger::init_test();
+        let convolution: FFTConvolutionZn = FFTConvolution::new().into();
+        let ring = Zn64B::new(17 * 257);
 
-    super::generic_tests::test_convolution(&convolution, &ring, ring.one());
-}
+        super::super::generic_tests::test_convolution(&convolution, &ring, ring.one());
+    }
 
-#[test]
-fn test_convolution_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let convolution: FFTConvolution = FFTConvolution::new();
-    let ring = ZZi64;
+    #[test]
+    fn test_convolution_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let convolution: FFTConvolution = FFTConvolution::new();
+        let ring = ZZi64;
 
-    super::generic_tests::test_convolution(&convolution, &ring, ring.one());
-}
+        super::super::generic_tests::test_convolution(&convolution, &ring, ring.one());
+    }
 
-#[test]
-#[should_panic(expected = "precision")]
-fn test_fft_convolution_not_enough_precision() {
-    let convolution_algorithm: FFTConvolutionZn = FFTConvolution::new().into();
+    #[test]
+    #[should_panic(expected = "precision")]
+    fn test_fft_convolution_not_enough_precision() {
+        let convolution_algorithm: FFTConvolutionZn = FFTConvolution::new().into();
 
-    let ring = Zn64B::new(1099511627791);
-    let lhs = (0..1024).map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
-    let rhs = (0..1024).map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
-    let mut actual = (0..(lhs.len() + rhs.len())).map(|_| ring.zero()).collect::<Vec<_>>();
+        let ring = Zn64B::new(1099511627791);
+        let lhs = (0..1024).map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
+        let rhs = (0..1024).map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
+        let mut actual = (0..(lhs.len() + rhs.len())).map(|_| ring.zero()).collect::<Vec<_>>();
 
-    convolution_algorithm.compute_convolution(&lhs, None, &rhs, None, &mut actual, ring.get_ring());
+        convolution_algorithm.compute_convolution(&lhs, None, &rhs, None, &mut actual, ring.get_ring());
+    }
 }

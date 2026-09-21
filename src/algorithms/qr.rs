@@ -321,247 +321,239 @@ impl<R: ApproxRealField + SqrtRing> QRDecompositionField for R {
 }
 
 #[cfg(test)]
-use crate::algorithms::matmul::MatmulAlgorithm;
-#[cfg(test)]
-use crate::algorithms::matmul::STANDARD_MATMUL;
-#[cfg(test)]
-use crate::assert_matrix_eq;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
-#[cfg(test)]
-use crate::matrix::format_matrix;
-#[cfg(test)]
-use crate::matrix::{TransposableSubmatrix, TransposableSubmatrixMut};
-#[cfg(test)]
-use crate::ring_impls::approx_real::float::Real64;
-#[cfg(test)]
-use crate::ring_impls::fraction::FractionFieldStore;
+mod tests {
+    use super::*;
+    use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
+    use crate::assert_matrix_eq;
+    use crate::homomorphism::Homomorphism;
+    use crate::matrix::{TransposableSubmatrix, TransposableSubmatrixMut, format_matrix};
+    use crate::ring_impls::approx_real::float::Real64;
+    use crate::ring_impls::fraction::FractionFieldStore;
 
-#[cfg(test)]
-fn assert_is_correct_qr<V1, V2, V3>(original: Submatrix<V1, f64>, q: Submatrix<V2, f64>, r: Submatrix<V3, f64>)
-where
-    V1: AsPointerToSlice<f64>,
-    V2: AsPointerToSlice<f64>,
-    V3: AsPointerToSlice<f64>,
-{
-    let m = q.row_count();
-    let n = r.col_count();
-    assert_eq!(m, original.row_count());
-    assert_eq!(n, original.col_count());
-    assert_eq!(m, r.row_count());
-    let mut product = OwnedMatrix::zero(m, n, Real64::RING);
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(q),
-        TransposableSubmatrix::from(r),
-        TransposableSubmatrixMut::from(product.data_mut()),
-        Real64::RING,
-    );
-    for i in 0..m {
+    fn assert_is_correct_qr<V1, V2, V3>(original: Submatrix<V1, f64>, q: Submatrix<V2, f64>, r: Submatrix<V3, f64>)
+    where
+        V1: AsPointerToSlice<f64>,
+        V2: AsPointerToSlice<f64>,
+        V3: AsPointerToSlice<f64>,
+    {
+        let m = q.row_count();
+        let n = r.col_count();
+        assert_eq!(m, original.row_count());
+        assert_eq!(n, original.col_count());
+        assert_eq!(m, r.row_count());
+        let mut product = OwnedMatrix::zero(m, n, Real64::RING);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(q),
+            TransposableSubmatrix::from(r),
+            TransposableSubmatrixMut::from(product.data_mut()),
+            Real64::RING,
+        );
+        for i in 0..m {
+            for j in 0..n {
+                if !(Real64::RING
+                    .get_ring()
+                    .is_approx_eq(*original.at(i, j), *product.at(i, j), 100))
+                {
+                    println!("product does not match; Q, R are");
+                    println!("{}", format_matrix(m, m, |i, j| q.at(i, j), Real64::RING));
+                    println!("and");
+                    println!("{}", format_matrix(m, n, |i, j| r.at(i, j), Real64::RING));
+                    println!("the product is");
+                    println!("{}", format_matrix(m, n, |i, j| product.at(i, j), Real64::RING));
+                    panic!();
+                }
+            }
+        }
+        let mut product = OwnedMatrix::zero(m, m, Real64::RING);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(q).transpose(),
+            TransposableSubmatrix::from(q),
+            TransposableSubmatrixMut::from(product.data_mut()),
+            Real64::RING,
+        );
+        for i in 0..m {
+            for j in 0..m {
+                let expected = if i == j { 1.0 } else { 0.0 };
+                if !(Real64::RING.get_ring().is_approx_eq(expected, *product.at(i, j), 100)) {
+                    println!("Q is not orthogonal");
+                    println!("{}", format_matrix(m, m, |i, j| q.at(i, j), Real64::RING));
+                    panic!();
+                }
+            }
+        }
+
         for j in 0..n {
-            if !(Real64::RING
-                .get_ring()
-                .is_approx_eq(*original.at(i, j), *product.at(i, j), 100))
-            {
-                println!("product does not match; Q, R are");
-                println!("{}", format_matrix(m, m, |i, j| q.at(i, j), Real64::RING));
-                println!("and");
-                println!("{}", format_matrix(m, n, |i, j| r.at(i, j), Real64::RING));
-                println!("the product is");
-                println!("{}", format_matrix(m, n, |i, j| product.at(i, j), Real64::RING));
-                panic!();
-            }
-        }
-    }
-    let mut product = OwnedMatrix::zero(m, m, Real64::RING);
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(q).transpose(),
-        TransposableSubmatrix::from(q),
-        TransposableSubmatrixMut::from(product.data_mut()),
-        Real64::RING,
-    );
-    for i in 0..m {
-        for j in 0..m {
-            let expected = if i == j { 1.0 } else { 0.0 };
-            if !(Real64::RING.get_ring().is_approx_eq(expected, *product.at(i, j), 100)) {
-                println!("Q is not orthogonal");
-                println!("{}", format_matrix(m, m, |i, j| q.at(i, j), Real64::RING));
-                panic!();
+            for i in (j + 1)..m {
+                if !(Real64::RING.get_ring().is_approx_eq(0.0, *r.at(i, j), 100)) {
+                    println!("R is not upper triangular");
+                    println!("{}", format_matrix(m, n, |i, j| r.at(i, j), Real64::RING));
+                    panic!();
+                }
             }
         }
     }
 
-    for j in 0..n {
-        for i in (j + 1)..m {
-            if !(Real64::RING.get_ring().is_approx_eq(0.0, *r.at(i, j), 100)) {
-                println!("R is not upper triangular");
-                println!("{}", format_matrix(m, n, |i, j| r.at(i, j), Real64::RING));
-                panic!();
+    fn assert_is_correct_ldl<V1, V2>(original: Submatrix<V1, f64>, l: Submatrix<V2, f64>, d: &[f64])
+    where
+        V1: AsPointerToSlice<f64>,
+        V2: AsPointerToSlice<f64>,
+    {
+        let n = l.col_count();
+        assert_eq!(n, l.row_count());
+        assert_eq!(n, original.col_count());
+        assert_eq!(n, original.row_count());
+        let l_scaled = OwnedMatrix::from_fn(n, n, |i, j| *l.at(i, j) * d[j]);
+        let mut product = OwnedMatrix::zero(n, n, Real64::RING);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(l_scaled.data()),
+            TransposableSubmatrix::from(l).transpose(),
+            TransposableSubmatrixMut::from(product.data_mut()),
+            Real64::RING,
+        );
+        for i in 0..n {
+            for j in 0..n {
+                if !(Real64::RING
+                    .get_ring()
+                    .is_approx_eq(*original.at(i, j), *product.at(i, j), 100))
+                {
+                    println!("product does not match; L is");
+                    println!("{}", format_matrix(n, n, |i, j| l.at(i, j), Real64::RING));
+                    println!("D is diag{:?} and the product LDL^T is", d);
+                    println!("{}", format_matrix(n, n, |i, j| product.at(i, j), Real64::RING));
+                    panic!();
+                }
+            }
+        }
+        for i in 0..n {
+            for j in (i + 1)..n {
+                if !(Real64::RING.get_ring().is_approx_eq(0.0, *l.at(i, j), 100)) {
+                    println!("L is not lower triangular");
+                    println!("{}", format_matrix(n, n, |i, j| l.at(i, j), Real64::RING));
+                    panic!();
+                }
             }
         }
     }
-}
 
-#[cfg(test)]
-fn assert_is_correct_ldl<V1, V2>(original: Submatrix<V1, f64>, l: Submatrix<V2, f64>, d: &[f64])
-where
-    V1: AsPointerToSlice<f64>,
-    V2: AsPointerToSlice<f64>,
-{
-    let n = l.col_count();
-    assert_eq!(n, l.row_count());
-    assert_eq!(n, original.col_count());
-    assert_eq!(n, original.row_count());
-    let l_scaled = OwnedMatrix::from_fn(n, n, |i, j| *l.at(i, j) * d[j]);
-    let mut product = OwnedMatrix::zero(n, n, Real64::RING);
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(l_scaled.data()),
-        TransposableSubmatrix::from(l).transpose(),
-        TransposableSubmatrixMut::from(product.data_mut()),
-        Real64::RING,
-    );
-    for i in 0..n {
-        for j in 0..n {
-            if !(Real64::RING
-                .get_ring()
-                .is_approx_eq(*original.at(i, j), *product.at(i, j), 100))
-            {
-                println!("product does not match; L is");
-                println!("{}", format_matrix(n, n, |i, j| l.at(i, j), Real64::RING));
-                println!("D is diag{:?} and the product LDL^T is", d);
-                println!("{}", format_matrix(n, n, |i, j| product.at(i, j), Real64::RING));
-                panic!();
+    #[test]
+    fn test_float_qr() {
+        feanor_tracing::DelayedLogger::init_test();
+        let RR = Real64::RING;
+        let a = OwnedMatrix::new(vec![0.0, 1.0, 1.0, 0.0], 2, 2);
+        let mut r = a.clone();
+        let mut q = OwnedMatrix::zero(2, 2, RR);
+        RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
+        assert_is_correct_qr(a.data(), q.data(), r.data());
+
+        let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
+        let mut r = a.clone();
+        let mut q = OwnedMatrix::zero(3, 3, RR);
+        RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
+        assert_is_correct_qr(a.data(), q.data(), r.data());
+
+        let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
+        let mut r = a.clone();
+        let mut q = OwnedMatrix::zero(2, 2, RR);
+        RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
+        assert_is_correct_qr(a.data(), q.data(), r.data());
+
+        let a = OwnedMatrix::new(vec![1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 0.0, 0.0, 1.0], 3, 3);
+        let mut r = a.clone();
+        let mut q = OwnedMatrix::zero(3, 3, RR);
+        RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
+        assert_is_correct_qr(a.data(), q.data(), r.data());
+
+        let a = OwnedMatrix::new(
+            (1..31)
+                .map(|x| x as f64 * if x % 2 == 0 { -1.0 } else { 1.0 })
+                .collect::<Vec<_>>(),
+            6,
+            5,
+        );
+        let mut r = a.clone();
+        let mut q = OwnedMatrix::zero(6, 6, RR);
+        RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
+        assert_is_correct_qr(a.data(), q.data(), r.data());
+    }
+
+    #[test]
+    fn test_float_qdr() {
+        feanor_tracing::DelayedLogger::init_test();
+        let RR = Real64::RING;
+        let a = OwnedMatrix::new((1..10).map(|c| c as f64).collect(), 3, 3);
+        let mut r = a.clone();
+        let mut q = OwnedMatrix::zero(3, 3, RR);
+        let diags = RR.get_ring().scaled_qr_decomposition(r.data_mut(), q.data_mut());
+        for i in 0..3 {
+            for j in 0..3 {
+                if i == j {
+                    assert!(RR.get_ring().is_approx_eq(1.0, *r.at(i, j), 100));
+                }
+                RR.mul_assign(r.at_mut(i, j), diags[i].sqrt());
+                RR.mul_assign(q.at_mut(i, j), 1.0 / diags[j].sqrt());
             }
         }
+        assert_is_correct_qr(a.data(), q.data(), r.data());
     }
-    for i in 0..n {
-        for j in (i + 1)..n {
-            if !(Real64::RING.get_ring().is_approx_eq(0.0, *l.at(i, j), 100)) {
-                println!("L is not lower triangular");
-                println!("{}", format_matrix(n, n, |i, j| l.at(i, j), Real64::RING));
-                panic!();
-            }
-        }
+
+    #[test]
+    fn test_float_ldl() {
+        feanor_tracing::DelayedLogger::init_test();
+        let RR = Real64::RING;
+        let a = OwnedMatrix::new(vec![5.0, 1.0, 1.0, 5.0], 2, 2);
+        let mut l = a.clone();
+        let d = RR.get_ring().ldl_decomposition(l.data_mut());
+        assert_is_correct_ldl(a.data(), l.data(), &d);
+
+        let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, 20.0], 3, 3);
+        let mut l = a.clone();
+        let d = RR.get_ring().ldl_decomposition(l.data_mut());
+        assert_is_correct_ldl(a.data(), l.data(), &d);
+
+        let mut a = OwnedMatrix::zero(5, 5, RR);
+        let factor = OwnedMatrix::new((0..25).map(|c| (c as f64).powi(2)).collect(), 5, 5);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(factor.data()),
+            TransposableSubmatrix::from(factor.data()).transpose(),
+            TransposableSubmatrixMut::from(a.data_mut()),
+            RR,
+        );
+        let mut l = a.clone();
+        let d = RR.get_ring().ldl_decomposition(l.data_mut());
+        assert_is_correct_ldl(a.data(), l.data(), &d);
+
+        let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, -20.0], 3, 3);
+        let mut l = a.clone();
+        let d = RR.get_ring().ldl_decomposition(l.data_mut());
+        assert_is_correct_ldl(a.data(), l.data(), &d);
     }
-}
 
-#[test]
-fn test_float_qr() {
-    feanor_tracing::DelayedLogger::init_test();
-    let RR = Real64::RING;
-    let a = OwnedMatrix::new(vec![0.0, 1.0, 1.0, 0.0], 2, 2);
-    let mut r = a.clone();
-    let mut q = OwnedMatrix::zero(2, 2, RR);
-    RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
-    assert_is_correct_qr(a.data(), q.data(), r.data());
+    #[test]
+    fn test_rational_qdr() {
+        feanor_tracing::DelayedLogger::init_test();
+        let QQ = RationalField::new(ZZi64);
+        let mut actual_r = OwnedMatrix::new((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
+        let mut actual_q = OwnedMatrix::zero(3, 3, &QQ);
+        let diags = QQ
+            .get_ring()
+            .scaled_qr_decomposition(actual_r.data_mut(), actual_q.data_mut());
+        assert_el_eq!(&QQ, QQ.from_fraction(2658, 1), &diags[0]);
+        assert_el_eq!(&QQ, QQ.from_fraction(9891, 443), &diags[1]);
+        assert_el_eq!(&QQ, QQ.from_fraction(864, 1099), &diags[2]);
 
-    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 3, 2);
-    let mut r = a.clone();
-    let mut q = OwnedMatrix::zero(3, 3, RR);
-    RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
-    assert_is_correct_qr(a.data(), q.data(), r.data());
+        let mut expected_r = OwnedMatrix::identity(3, 3, &QQ);
+        *expected_r.at_mut(0, 1) = QQ.from_fraction(590, 443);
+        *expected_r.at_mut(0, 2) = QQ.from_fraction(759, 443);
+        *expected_r.at_mut(1, 2) = QQ.from_fraction(2700, 1099);
+        assert_matrix_eq!(&QQ, expected_r, actual_r);
 
-    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 4.0, 5.0, 6.0], 2, 3);
-    let mut r = a.clone();
-    let mut q = OwnedMatrix::zero(2, 2, RR);
-    RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
-    assert_is_correct_qr(a.data(), q.data(), r.data());
-
-    let a = OwnedMatrix::new(vec![1.0, 1.0, 1.0, 2.0, 2.0, 3.0, 0.0, 0.0, 1.0], 3, 3);
-    let mut r = a.clone();
-    let mut q = OwnedMatrix::zero(3, 3, RR);
-    RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
-    assert_is_correct_qr(a.data(), q.data(), r.data());
-
-    let a = OwnedMatrix::new(
-        (1..31)
-            .map(|x| x as f64 * if x % 2 == 0 { -1.0 } else { 1.0 })
-            .collect::<Vec<_>>(),
-        6,
-        5,
-    );
-    let mut r = a.clone();
-    let mut q = OwnedMatrix::zero(6, 6, RR);
-    RR.get_ring().qr_decomposition(r.data_mut(), q.data_mut());
-    assert_is_correct_qr(a.data(), q.data(), r.data());
-}
-
-#[test]
-fn test_float_qdr() {
-    feanor_tracing::DelayedLogger::init_test();
-    let RR = Real64::RING;
-    let a = OwnedMatrix::new((1..10).map(|c| c as f64).collect(), 3, 3);
-    let mut r = a.clone();
-    let mut q = OwnedMatrix::zero(3, 3, RR);
-    let diags = RR.get_ring().scaled_qr_decomposition(r.data_mut(), q.data_mut());
-    for i in 0..3 {
-        for j in 0..3 {
-            if i == j {
-                assert!(RR.get_ring().is_approx_eq(1.0, *r.at(i, j), 100));
-            }
-            RR.mul_assign(r.at_mut(i, j), diags[i].sqrt());
-            RR.mul_assign(q.at_mut(i, j), 1.0 / diags[j].sqrt());
-        }
+        let expected_q_num = [
+            [486857, 1299018, 356172],
+            [7789712, 1796865, -233904],
+            [23855993, -613242, 69108],
+        ];
+        let expected_q_den = 443 * 1099;
+        let expected_q = OwnedMatrix::from_fn(3, 3, |i, j| QQ.from_fraction(expected_q_num[i][j], expected_q_den));
+        assert_matrix_eq!(&QQ, expected_q, actual_q);
     }
-    assert_is_correct_qr(a.data(), q.data(), r.data());
-}
-
-#[test]
-fn test_float_ldl() {
-    feanor_tracing::DelayedLogger::init_test();
-    let RR = Real64::RING;
-    let a = OwnedMatrix::new(vec![5.0, 1.0, 1.0, 5.0], 2, 2);
-    let mut l = a.clone();
-    let d = RR.get_ring().ldl_decomposition(l.data_mut());
-    assert_is_correct_ldl(a.data(), l.data(), &d);
-
-    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, 20.0], 3, 3);
-    let mut l = a.clone();
-    let d = RR.get_ring().ldl_decomposition(l.data_mut());
-    assert_is_correct_ldl(a.data(), l.data(), &d);
-
-    let mut a = OwnedMatrix::zero(5, 5, RR);
-    let factor = OwnedMatrix::new((0..25).map(|c| (c as f64).powi(2)).collect(), 5, 5);
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(factor.data()),
-        TransposableSubmatrix::from(factor.data()).transpose(),
-        TransposableSubmatrixMut::from(a.data_mut()),
-        RR,
-    );
-    let mut l = a.clone();
-    let d = RR.get_ring().ldl_decomposition(l.data_mut());
-    assert_is_correct_ldl(a.data(), l.data(), &d);
-
-    let a = OwnedMatrix::new(vec![1.0, 2.0, 3.0, 2.0, 6.0, 5.0, 3.0, 5.0, -20.0], 3, 3);
-    let mut l = a.clone();
-    let d = RR.get_ring().ldl_decomposition(l.data_mut());
-    assert_is_correct_ldl(a.data(), l.data(), &d);
-}
-
-#[test]
-fn test_rational_qdr() {
-    feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZi64);
-    let mut actual_r = OwnedMatrix::new((1..10).map(|x| QQ.pow(QQ.int_hom().map(x), 2)).collect(), 3, 3);
-    let mut actual_q = OwnedMatrix::zero(3, 3, &QQ);
-    let diags = QQ
-        .get_ring()
-        .scaled_qr_decomposition(actual_r.data_mut(), actual_q.data_mut());
-    assert_el_eq!(&QQ, QQ.from_fraction(2658, 1), &diags[0]);
-    assert_el_eq!(&QQ, QQ.from_fraction(9891, 443), &diags[1]);
-    assert_el_eq!(&QQ, QQ.from_fraction(864, 1099), &diags[2]);
-
-    let mut expected_r = OwnedMatrix::identity(3, 3, &QQ);
-    *expected_r.at_mut(0, 1) = QQ.from_fraction(590, 443);
-    *expected_r.at_mut(0, 2) = QQ.from_fraction(759, 443);
-    *expected_r.at_mut(1, 2) = QQ.from_fraction(2700, 1099);
-    assert_matrix_eq!(&QQ, expected_r, actual_r);
-
-    let expected_q_num = [
-        [486857, 1299018, 356172],
-        [7789712, 1796865, -233904],
-        [23855993, -613242, 69108],
-    ];
-    let expected_q_den = 443 * 1099;
-    let expected_q = OwnedMatrix::from_fn(3, 3, |i, j| QQ.from_fraction(expected_q_num[i][j], expected_q_den));
-    assert_matrix_eq!(&QQ, expected_q, actual_q);
 }

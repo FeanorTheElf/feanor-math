@@ -216,98 +216,100 @@ impl<V: VectorFn<T>, T> SelfSubvectorFn<T> for SubvectorFn<V, T> {
 }
 
 #[cfg(test)]
-use super::sparse::SparseMapVector;
-#[cfg(test)]
-use crate::prelude::*;
+mod tests {
+    use super::super::sparse::SparseMapVector;
+    use super::*;
+    use crate::prelude::*;
 
-#[test]
-fn test_subvector_ranges() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = SubvectorView::new([0, 1, 2, 3, 4]);
-    assert_eq!(3, a.restrict(0..3).len());
-    assert_eq!(3, a.restrict(0..=2).len());
-    assert_eq!(5, a.restrict(0..).len());
-    assert_eq!(5, a.restrict(..).len());
-    assert_eq!(2, a.restrict(3..).len());
-}
-
-#[test]
-fn test_subvector_subvector() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = SubvectorView::new([0, 1, 2, 3, 4]);
-    let b = a.restrict(1..4);
-    assert_eq!(3, b.len());
-    assert_eq!(1, *b.at(0));
-    assert_eq!(2, *b.at(1));
-    assert_eq!(3, *b.at(2));
-}
-
-#[test]
-#[should_panic]
-fn test_subvector_subvector_oob() {
-    let a = SubvectorView::new([0, 1, 2, 3, 4]);
-    let b = a.restrict(1..4);
-    _ = b.restrict(0..4);
-}
-
-#[test]
-fn test_subvector_fn_ranges() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
-    assert_eq!(3, a.restrict(0..3).len());
-    assert_eq!(3, a.restrict(0..=2).len());
-    assert_eq!(5, a.restrict(0..).len());
-    assert_eq!(5, a.restrict(..).len());
-    assert_eq!(2, a.restrict(3..).len());
-}
-
-#[test]
-fn test_subvector_fn_subvector() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
-    let b = a.restrict(1..4);
-    assert_eq!(3, b.len());
-    assert_eq!(1, b.at(0));
-    assert_eq!(2, b.at(1));
-    assert_eq!(3, b.at(2));
-}
-
-#[test]
-#[should_panic]
-fn test_subvector_fn_subvector_oob() {
-    let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
-    let b = a.restrict(1..4);
-    _ = b.restrict(0..4);
-}
-
-#[test]
-fn test_subvector_sparse() {
-    feanor_tracing::DelayedLogger::init_test();
-    let mut sparse_vector = SparseMapVector::new(1000, ZZi64);
-    *sparse_vector.at_mut(6) = 6;
-    *sparse_vector.at_mut(20) = 20;
-    *sparse_vector.at_mut(256) = 256;
-    *sparse_vector.at_mut(257) = 257;
-
-    let subvector = SubvectorView::new(sparse_vector).restrict(20..=256);
-
-    struct Verify(SubvectorView<SparseMapVector<StaticRing<i64>>, i64>);
-
-    impl SparseVectorViewOperation<i64, SubvectorView<SparseMapVector<StaticRing<i64>>, i64>> for Verify {
-        type Output = ();
-
-        fn execute(self) -> Self::Output
-        where
-            SubvectorView<SparseMapVector<StaticRing<i64>>, i64>: VectorViewSparse<i64>,
-        {
-            assert!(
-                vec![(20, &20), (256, &256)] == self.0.nontrivial_entries().collect::<Vec<_>>()
-                    || vec![(256, &256), (20, &20)] == self.0.nontrivial_entries().collect::<Vec<_>>()
-            );
-        }
-
-        fn fallback(self) -> Self::Output { unreachable!() }
+    #[test]
+    fn test_subvector_ranges() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = SubvectorView::new([0, 1, 2, 3, 4]);
+        assert_eq!(3, a.restrict(0..3).len());
+        assert_eq!(3, a.restrict(0..=2).len());
+        assert_eq!(5, a.restrict(0..).len());
+        assert_eq!(5, a.restrict(..).len());
+        assert_eq!(2, a.restrict(3..).len());
     }
 
-    VectorView::specialize_sparse(Verify(subvector));
+    #[test]
+    fn test_subvector_subvector() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = SubvectorView::new([0, 1, 2, 3, 4]);
+        let b = a.restrict(1..4);
+        assert_eq!(3, b.len());
+        assert_eq!(1, *b.at(0));
+        assert_eq!(2, *b.at(1));
+        assert_eq!(3, *b.at(2));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_subvector_subvector_oob() {
+        let a = SubvectorView::new([0, 1, 2, 3, 4]);
+        let b = a.restrict(1..4);
+        _ = b.restrict(0..4);
+    }
+
+    #[test]
+    fn test_subvector_fn_ranges() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
+        assert_eq!(3, a.restrict(0..3).len());
+        assert_eq!(3, a.restrict(0..=2).len());
+        assert_eq!(5, a.restrict(0..).len());
+        assert_eq!(5, a.restrict(..).len());
+        assert_eq!(2, a.restrict(3..).len());
+    }
+
+    #[test]
+    fn test_subvector_fn_subvector() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
+        let b = a.restrict(1..4);
+        assert_eq!(3, b.len());
+        assert_eq!(1, b.at(0));
+        assert_eq!(2, b.at(1));
+        assert_eq!(3, b.at(2));
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_subvector_fn_subvector_oob() {
+        let a = SubvectorFn::new([0, 1, 2, 3, 4].clone_els_by(|x| *x));
+        let b = a.restrict(1..4);
+        _ = b.restrict(0..4);
+    }
+
+    #[test]
+    fn test_subvector_sparse() {
+        feanor_tracing::DelayedLogger::init_test();
+        let mut sparse_vector = SparseMapVector::new(1000, ZZi64);
+        *sparse_vector.at_mut(6) = 6;
+        *sparse_vector.at_mut(20) = 20;
+        *sparse_vector.at_mut(256) = 256;
+        *sparse_vector.at_mut(257) = 257;
+
+        let subvector = SubvectorView::new(sparse_vector).restrict(20..=256);
+
+        struct Verify(SubvectorView<SparseMapVector<StaticRing<i64>>, i64>);
+
+        impl SparseVectorViewOperation<i64, SubvectorView<SparseMapVector<StaticRing<i64>>, i64>> for Verify {
+            type Output = ();
+
+            fn execute(self) -> Self::Output
+            where
+                SubvectorView<SparseMapVector<StaticRing<i64>>, i64>: VectorViewSparse<i64>,
+            {
+                assert!(
+                    vec![(20, &20), (256, &256)] == self.0.nontrivial_entries().collect::<Vec<_>>()
+                        || vec![(256, &256), (20, &20)] == self.0.nontrivial_entries().collect::<Vec<_>>()
+                );
+            }
+
+            fn fallback(self) -> Self::Output { unreachable!() }
+        }
+
+        VectorView::specialize_sparse(Verify(subvector));
+    }
 }

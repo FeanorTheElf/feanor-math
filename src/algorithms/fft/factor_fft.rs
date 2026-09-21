@@ -401,204 +401,203 @@ where
 }
 
 #[cfg(test)]
-use std::alloc::Global;
+mod tests {
+    use std::alloc::Global;
 
-#[cfg(test)]
-use crate::algorithms::fft::bluestein::BluesteinFFT;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::{Fp, Zn};
+    use super::*;
+    use crate::algorithms::fft::bluestein::BluesteinFFT;
+    use crate::ring_impls::zn::zn_64b;
+    use crate::ring_impls::zn::zn_static::{Fp, Zn};
 
-#[test]
-fn test_fft_basic() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<97>::RING;
-    let z = ring.int_hom().map(39);
-    let fft = GeneralCooleyTukeyFFT::new(
-        ring,
-        ring.pow(z, 16),
-        CooleyTuckeyFFT::new(ring, ring.pow(z, 48), 1),
-        BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
-    );
-    let mut values = [1, 0, 0, 1, 0, 1];
-    let expected = [3, 62, 63, 96, 37, 36];
-    let mut permuted_expected = [0; 6];
-    for i in 0..6 {
-        permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
-    }
-
-    fft.unordered_fft(&mut values, ring);
-    assert_eq!(values, permuted_expected);
-}
-
-#[test]
-fn test_fft_long() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Fp::<97>::RING;
-    let z = ring.int_hom().map(39);
-    let fft = GeneralCooleyTukeyFFT::new(
-        ring,
-        ring.pow(z, 4),
-        CooleyTuckeyFFT::new(ring, ring.pow(z, 12), 3),
-        BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
-    );
-    let mut values = [1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 2, 2, 0, 2, 0, 1, 2, 3, 4];
-    let expected = [
-        26, 0, 75, 47, 41, 31, 28, 62, 39, 93, 53, 27, 0, 54, 74, 61, 65, 81, 63, 38, 53, 94, 89, 91,
-    ];
-    let mut permuted_expected = [0; 24];
-    for i in 0..24 {
-        permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
-    }
-
-    fft.unordered_fft(&mut values, ring);
-    assert_eq!(values, permuted_expected);
-}
-
-#[test]
-fn test_fft_unordered() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Fp::<1409>::RING;
-    let z = get_prim_root_of_unity_zn(ring, 64 * 11).unwrap();
-    let fft = GeneralCooleyTukeyFFT::new(
-        ring,
-        ring.pow(z, 4),
-        CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
-        BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
-    );
-    const LEN: usize = 16 * 11;
-    let mut values = [0; LEN];
-    for i in 0..LEN {
-        values[i] = ring.int_hom().map(i as i32);
-    }
-    let original = values;
-
-    fft.unordered_fft(&mut values, ring);
-
-    let mut ordered_fft = [0; LEN];
-    for i in 0..LEN {
-        ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
-    }
-
-    fft.unordered_inv_fft(&mut values, ring);
-    assert_eq!(values, original);
-
-    fft.inv_fft(&mut ordered_fft, ring);
-    assert_eq!(ordered_fft, original);
-}
-
-#[test]
-fn test_unordered_fft_permutation_inv() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Fp::<1409>::RING;
-    let z = get_prim_root_of_unity_zn(ring, 64 * 11).unwrap();
-    let fft = GeneralCooleyTukeyFFT::new(
-        ring,
-        ring.pow(z, 4),
-        CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
-        BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
-    );
-    for i in 0..(16 * 11) {
-        assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
-        assert_eq!(fft.unordered_fft_permutation(fft.unordered_fft_permutation_inv(i)), i);
-    }
-
-    let fft = GeneralCooleyTukeyFFT::new(
-        ring,
-        ring.pow(z, 4),
-        BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
-        CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
-    );
-    for i in 0..(16 * 11) {
-        assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
-        assert_eq!(fft.unordered_fft_permutation(fft.unordered_fft_permutation_inv(i)), i);
-    }
-}
-
-#[test]
-fn test_inv_fft() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Fp::<97>::RING;
-    let z = ring.int_hom().map(39);
-    let fft = GeneralCooleyTukeyFFT::new(
-        ring,
-        ring.pow(z, 16),
-        CooleyTuckeyFFT::new(ring, ring.pow(z, 16 * 3), 1),
-        BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
-    );
-    let mut values = [3, 62, 63, 96, 37, 36];
-    let expected = [1, 0, 0, 1, 0, 1];
-
-    fft.inv_fft(&mut values, ring);
-    assert_eq!(values, expected);
-}
-
-#[test]
-fn test_approximate_fft() {
-    feanor_tracing::DelayedLogger::init_test();
-    let CC = Complex64::RING;
-    for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
-        let fft = GeneralCooleyTukeyFFT::new_with_pows(
-            CC,
-            |i| CC.root_of_unity(i, TryInto::<i64>::try_into(p).unwrap() << log2_n),
-            BluesteinFFT::for_complex(CC, p, Global),
-            CooleyTuckeyFFT::for_complex(CC, log2_n),
+    #[test]
+    fn test_fft_basic() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<97>::RING;
+        let z = ring.int_hom().map(39);
+        let fft = GeneralCooleyTukeyFFT::new(
+            ring,
+            ring.pow(z, 16),
+            CooleyTuckeyFFT::new(ring, ring.pow(z, 48), 1),
+            BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
         );
-        let mut array = (0..(p << log2_n))
-            .map(|i| CC.root_of_unity(i.try_into().unwrap(), TryInto::<i64>::try_into(p).unwrap() << log2_n))
-            .collect::<Vec<_>>();
-        fft.fft(&mut array, CC);
-        let err = fft.expected_absolute_error(1.0, 0.0);
-        assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
-        assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
-        for i in 2..fft.len() {
-            assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+        let mut values = [1, 0, 0, 1, 0, 1];
+        let expected = [3, 62, 63, 96, 37, 36];
+        let mut permuted_expected = [0; 6];
+        for i in 0..6 {
+            permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
+        }
+
+        fft.unordered_fft(&mut values, ring);
+        assert_eq!(values, permuted_expected);
+    }
+
+    #[test]
+    fn test_fft_long() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Fp::<97>::RING;
+        let z = ring.int_hom().map(39);
+        let fft = GeneralCooleyTukeyFFT::new(
+            ring,
+            ring.pow(z, 4),
+            CooleyTuckeyFFT::new(ring, ring.pow(z, 12), 3),
+            BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
+        );
+        let mut values = [1, 0, 0, 1, 0, 1, 1, 1, 0, 1, 1, 0, 1, 1, 1, 2, 2, 0, 2, 0, 1, 2, 3, 4];
+        let expected = [
+            26, 0, 75, 47, 41, 31, 28, 62, 39, 93, 53, 27, 0, 54, 74, 61, 65, 81, 63, 38, 53, 94, 89, 91,
+        ];
+        let mut permuted_expected = [0; 24];
+        for i in 0..24 {
+            permuted_expected[i] = expected[fft.unordered_fft_permutation(i)];
+        }
+
+        fft.unordered_fft(&mut values, ring);
+        assert_eq!(values, permuted_expected);
+    }
+
+    #[test]
+    fn test_fft_unordered() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Fp::<1409>::RING;
+        let z = get_prim_root_of_unity_zn(ring, 64 * 11).unwrap();
+        let fft = GeneralCooleyTukeyFFT::new(
+            ring,
+            ring.pow(z, 4),
+            CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
+            BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
+        );
+        const LEN: usize = 16 * 11;
+        let mut values = [0; LEN];
+        for i in 0..LEN {
+            values[i] = ring.int_hom().map(i as i32);
+        }
+        let original = values;
+
+        fft.unordered_fft(&mut values, ring);
+
+        let mut ordered_fft = [0; LEN];
+        for i in 0..LEN {
+            ordered_fft[fft.unordered_fft_permutation(i)] = values[i];
+        }
+
+        fft.unordered_inv_fft(&mut values, ring);
+        assert_eq!(values, original);
+
+        fft.inv_fft(&mut ordered_fft, ring);
+        assert_eq!(ordered_fft, original);
+    }
+
+    #[test]
+    fn test_unordered_fft_permutation_inv() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Fp::<1409>::RING;
+        let z = get_prim_root_of_unity_zn(ring, 64 * 11).unwrap();
+        let fft = GeneralCooleyTukeyFFT::new(
+            ring,
+            ring.pow(z, 4),
+            CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
+            BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
+        );
+        for i in 0..(16 * 11) {
+            assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
+            assert_eq!(fft.unordered_fft_permutation(fft.unordered_fft_permutation_inv(i)), i);
+        }
+
+        let fft = GeneralCooleyTukeyFFT::new(
+            ring,
+            ring.pow(z, 4),
+            BluesteinFFT::new(ring, ring.pow(z, 32), ring.pow(z, 22), 11, 5, Global),
+            CooleyTuckeyFFT::new(ring, ring.pow(z, 44), 4),
+        );
+        for i in 0..(16 * 11) {
+            assert_eq!(fft.unordered_fft_permutation_inv(fft.unordered_fft_permutation(i)), i);
+            assert_eq!(fft.unordered_fft_permutation(fft.unordered_fft_permutation_inv(i)), i);
         }
     }
-}
 
-#[cfg(test)]
-const BENCH_N1: usize = 31;
-#[cfg(test)]
-const BENCH_N2: usize = 601;
+    #[test]
+    fn test_inv_fft() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Fp::<97>::RING;
+        let z = ring.int_hom().map(39);
+        let fft = GeneralCooleyTukeyFFT::new(
+            ring,
+            ring.pow(z, 16),
+            CooleyTuckeyFFT::new(ring, ring.pow(z, 16 * 3), 1),
+            BluesteinFFT::new(ring, ring.pow(z, 16), ring.pow(z, 12), 3, 3, Global),
+        );
+        let mut values = [3, 62, 63, 96, 37, 36];
+        let expected = [1, 0, 0, 1, 0, 1];
 
-#[bench]
-fn bench_factor_fft(bencher: &mut test::Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(1602564097);
-    let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
-    let embedding = ring.can_hom(&fastmul_ring).unwrap();
-    let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * 31 * 601).unwrap());
-    let fft = GeneralCooleyTukeyFFT::new_with_hom(
-        embedding.clone(),
-        fastmul_ring.pow(root_of_unity, 2),
-        BluesteinFFT::new_with_hom(
+        fft.inv_fft(&mut values, ring);
+        assert_eq!(values, expected);
+    }
+
+    #[test]
+    fn test_approximate_fft() {
+        feanor_tracing::DelayedLogger::init_test();
+        let CC = Complex64::RING;
+        for (p, log2_n) in [(5, 3), (53, 5), (101, 8), (503, 10)] {
+            let fft = GeneralCooleyTukeyFFT::new_with_pows(
+                CC,
+                |i| CC.root_of_unity(i, TryInto::<i64>::try_into(p).unwrap() << log2_n),
+                BluesteinFFT::for_complex(CC, p, Global),
+                CooleyTuckeyFFT::for_complex(CC, log2_n),
+            );
+            let mut array = (0..(p << log2_n))
+                .map(|i| CC.root_of_unity(i.try_into().unwrap(), TryInto::<i64>::try_into(p).unwrap() << log2_n))
+                .collect::<Vec<_>>();
+            fft.fft(&mut array, CC);
+            let err = fft.expected_absolute_error(1.0, 0.0);
+            assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
+            assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
+            for i in 2..fft.len() {
+                assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+            }
+        }
+    }
+
+    const BENCH_N1: usize = 31;
+
+    const BENCH_N2: usize = 601;
+
+    #[bench]
+    fn bench_factor_fft(bencher: &mut test::Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(1602564097);
+        let fastmul_ring = zn_64b::Zn64BFastmul::new(ring).unwrap();
+        let embedding = ring.can_hom(&fastmul_ring).unwrap();
+        let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * 31 * 601).unwrap());
+        let fft = GeneralCooleyTukeyFFT::new_with_hom(
             embedding.clone(),
-            fastmul_ring.pow(root_of_unity, BENCH_N1),
-            get_prim_root_of_unity_zn(&fastmul_ring, 1 << 11).unwrap(),
-            BENCH_N2,
-            11,
-            Global,
-        ),
-        BluesteinFFT::new_with_hom(
-            embedding,
-            fastmul_ring.pow(root_of_unity, BENCH_N2),
-            get_prim_root_of_unity_zn(&fastmul_ring, 1 << 6).unwrap(),
-            BENCH_N1,
-            6,
-            Global,
-        ),
-    );
-    let data = (0..(BENCH_N1 * BENCH_N2))
-        .map(|i| ring.int_hom().map(i as i32))
-        .collect::<Vec<_>>();
-    let mut copy = Vec::with_capacity(BENCH_N1 * BENCH_N2);
-    bencher.iter(|| {
-        copy.clear();
-        copy.extend(data.iter().map(|x| x.clone()));
-        fft.unordered_fft(&mut copy[..], &ring);
-        fft.unordered_inv_fft(&mut copy[..], &ring);
-        assert_el_eq!(ring, copy[0], data[0]);
-    });
+            fastmul_ring.pow(root_of_unity, 2),
+            BluesteinFFT::new_with_hom(
+                embedding.clone(),
+                fastmul_ring.pow(root_of_unity, BENCH_N1),
+                get_prim_root_of_unity_zn(&fastmul_ring, 1 << 11).unwrap(),
+                BENCH_N2,
+                11,
+                Global,
+            ),
+            BluesteinFFT::new_with_hom(
+                embedding,
+                fastmul_ring.pow(root_of_unity, BENCH_N2),
+                get_prim_root_of_unity_zn(&fastmul_ring, 1 << 6).unwrap(),
+                BENCH_N1,
+                6,
+                Global,
+            ),
+        );
+        let data = (0..(BENCH_N1 * BENCH_N2))
+            .map(|i| ring.int_hom().map(i as i32))
+            .collect::<Vec<_>>();
+        let mut copy = Vec::with_capacity(BENCH_N1 * BENCH_N2);
+        bencher.iter(|| {
+            copy.clear();
+            copy.extend(data.iter().map(|x| x.clone()));
+            fft.unordered_fft(&mut copy[..], &ring);
+            fft.unordered_inv_fft(&mut copy[..], &ring);
+            assert_el_eq!(ring, copy[0], data[0]);
+        });
+    }
 }

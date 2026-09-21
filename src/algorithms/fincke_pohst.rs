@@ -121,143 +121,146 @@ pub fn fincke_pohst<I, R, H, V, F>(
 }
 
 #[cfg(test)]
-use crate::ring_impls::approx_real::float::*;
+mod tests {
+    use super::*;
+    use crate::ring_impls::approx_real::float::*;
 
-#[test]
-fn test_fincke_pohst_2d() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZi64;
-    let RR = Real64::RING;
+    #[test]
+    fn test_fincke_pohst_2d() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZi64;
+        let RR = Real64::RING;
 
-    let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[0.0, 0.0],
-        2.001,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(
-        vec![
-            vec![0, 0],
-            vec![0, 1],
-            vec![0, -1],
-            vec![1, 0],
-            vec![1, 1],
-            vec![1, -1],
-            vec![-1, 0],
-            vec![-1, 1],
-            vec![-1, -1]
-        ],
-        result
-    );
+        let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[0.0, 0.0],
+            2.001,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(
+            vec![
+                vec![0, 0],
+                vec![0, 1],
+                vec![0, -1],
+                vec![1, 0],
+                vec![1, 1],
+                vec![1, -1],
+                vec![-1, 0],
+                vec![-1, 1],
+                vec![-1, -1]
+            ],
+            result
+        );
 
-    let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[0.51, 0.51],
-        0.6,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(vec![vec![1, 1], vec![1, 0], vec![0, 1], vec![0, 0]], result);
+        let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[0.51, 0.51],
+            0.6,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(vec![vec![1, 1], vec![1, 0], vec![0, 1], vec![0, 0]], result);
 
-    let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[10.75, 15.1],
-        0.3,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(vec![vec![11, 15]], result);
+        let quadratic_form = [vec![1.0, 0.0], vec![0.0, 1.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[10.75, 15.1],
+            0.3,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(vec![vec![11, 15]], result);
 
-    let quadratic_form = [vec![2.0, 1.0], vec![1.0, 2.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[0.22, 0.57],
-        0.3,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(vec![vec![0, 1]], result);
+        let quadratic_form = [vec![2.0, 1.0], vec![1.0, 2.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[0.22, 0.57],
+            0.3,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(vec![vec![0, 1]], result);
 
-    let quadratic_form = [vec![2.0, 1.0], vec![1.0, 2.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[4.0, 7.0],
-        2.1,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(
-        vec![
-            vec![4, 7],
-            vec![4, 8],
-            vec![4, 6],
-            vec![5, 7],
-            vec![5, 6],
-            vec![3, 8],
-            vec![3, 7]
-        ],
-        result
-    );
-}
-
-#[test]
-fn test_fincke_pohst_3d() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZi64;
-    let RR = Real64::RING;
-
-    let quadratic_form = [vec![2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0], vec![1.0, 1.0, 2.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[0.0, 0.0, 0.0],
-        2.001,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(13, result.len());
-    for p in &result {
-        assert!(ZZ.pow(p[0] + p[1] + p[2], 2) + ZZ.pow(p[0], 2) + ZZ.pow(p[1], 2) + ZZ.pow(p[2], 2) <= 2);
+        let quadratic_form = [vec![2.0, 1.0], vec![1.0, 2.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[4.0, 7.0],
+            2.1,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(
+            vec![
+                vec![4, 7],
+                vec![4, 8],
+                vec![4, 6],
+                vec![5, 7],
+                vec![5, 6],
+                vec![3, 8],
+                vec![3, 7]
+            ],
+            result
+        );
     }
 
-    let quadratic_form = [vec![2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0], vec![1.0, 1.0, 2.0]];
-    let mut result = Vec::new();
-    fincke_pohst(
-        RR.can_hom(&ZZ).unwrap(),
-        Submatrix::from_2d(&quadratic_form),
-        &[0.3, -2.1, 0.7],
-        0.5,
-        |point| {
-            result.push(point.to_owned());
-            None
-        },
-    );
-    assert_eq!(vec![vec![0, -2, 1]], result);
+    #[test]
+    fn test_fincke_pohst_3d() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZi64;
+        let RR = Real64::RING;
+
+        let quadratic_form = [vec![2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0], vec![1.0, 1.0, 2.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[0.0, 0.0, 0.0],
+            2.001,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(13, result.len());
+        for p in &result {
+            assert!(ZZ.pow(p[0] + p[1] + p[2], 2) + ZZ.pow(p[0], 2) + ZZ.pow(p[1], 2) + ZZ.pow(p[2], 2) <= 2);
+        }
+
+        let quadratic_form = [vec![2.0, 1.0, 1.0], vec![1.0, 2.0, 1.0], vec![1.0, 1.0, 2.0]];
+        let mut result = Vec::new();
+        fincke_pohst(
+            RR.can_hom(&ZZ).unwrap(),
+            Submatrix::from_2d(&quadratic_form),
+            &[0.3, -2.1, 0.7],
+            0.5,
+            |point| {
+                result.push(point.to_owned());
+                None
+            },
+        );
+        assert_eq!(vec![vec![0, -2, 1]], result);
+    }
 }

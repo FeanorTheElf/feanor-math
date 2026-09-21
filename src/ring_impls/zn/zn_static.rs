@@ -320,85 +320,90 @@ pub type Zn<const N: u64> = RingValue<ZnSBase<N, false>>;
 #[stability::unstable(feature = "enable")]
 pub type Fp<const P: u64> = RingValue<ZnSBase<P, true>>;
 
-#[test]
-fn test_is_prime() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(true, is_prime(17));
-    assert_eq!(false, is_prime(49));
-}
-
 #[stability::unstable(feature = "enable")]
 pub const F17: Fp<17> = Fp::<17>::RING;
 
-#[test]
-fn test_finite_field_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&F17);
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn::<128>::RING);
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Fp::<257>::RING);
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn::<256>::RING);
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_zn_el_add() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = F17.int_hom().map(6);
-    let b = F17.int_hom().map(12);
-    assert_eq!(F17.int_hom().map(1), F17.add(a, b));
-}
+    #[test]
+    fn test_is_prime() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(true, is_prime(17));
+        assert_eq!(false, is_prime(49));
+    }
 
-#[test]
-fn test_zn_el_sub() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = F17.int_hom().map(6);
-    let b = F17.int_hom().map(12);
-    assert_eq!(F17.int_hom().map(11), F17.sub(a, b));
-}
+    #[test]
+    fn test_finite_field_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&F17);
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn::<128>::RING);
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Fp::<257>::RING);
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn::<256>::RING);
+    }
 
-#[test]
-fn test_zn_el_mul() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = F17.int_hom().map(6);
-    let b = F17.int_hom().map(12);
-    assert_eq!(F17.int_hom().map(4), F17.mul(a, b));
-}
+    #[test]
+    fn test_zn_el_add() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = F17.int_hom().map(6);
+        let b = F17.int_hom().map(12);
+        assert_eq!(F17.int_hom().map(1), F17.add(a, b));
+    }
 
-#[test]
-fn test_zn_el_div() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = F17.int_hom().map(6);
-    let b = F17.int_hom().map(12);
-    assert_eq!(F17.int_hom().map(9), F17.checked_div(&a, &b).unwrap());
-}
+    #[test]
+    fn test_zn_el_sub() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = F17.int_hom().map(6);
+        let b = F17.int_hom().map(12);
+        assert_eq!(F17.int_hom().map(11), F17.sub(a, b));
+    }
 
-#[test]
-fn fn_test_div_impossible() {
-    feanor_tracing::DelayedLogger::init_test();
-    let _a = Zn::<22>::RING.int_hom().map(4);
-    // the following line should give a compiler error
-    // Zn::<22>::RING.div(_a, _a);
-}
+    #[test]
+    fn test_zn_el_mul() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = F17.int_hom().map(6);
+        let b = F17.int_hom().map(12);
+        assert_eq!(F17.int_hom().map(4), F17.mul(a, b));
+    }
 
-#[test]
-fn test_zn_ring_axioms_znbase() {
-    feanor_tracing::DelayedLogger::init_test();
-    super::generic_tests::test_zn_axioms(Zn::<17>::RING);
-    super::generic_tests::test_zn_axioms(Zn::<63>::RING);
-}
+    #[test]
+    fn test_zn_el_div() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = F17.int_hom().map(6);
+        let b = F17.int_hom().map(12);
+        assert_eq!(F17.int_hom().map(9), F17.checked_div(&a, &b).unwrap());
+    }
 
-#[test]
-fn test_divisibility_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, 0..17);
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, 0..8);
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, 0..12);
-}
+    #[test]
+    fn fn_test_div_impossible() {
+        feanor_tracing::DelayedLogger::init_test();
+        let _a = Zn::<22>::RING.int_hom().map(4);
+        // the following line should give a compiler error
+        // Zn::<22>::RING.div(_a, _a);
+    }
 
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = Zn::<17>::RING;
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..17);
-    let R = Zn::<63>::RING;
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..63);
+    #[test]
+    fn test_zn_ring_axioms_znbase() {
+        feanor_tracing::DelayedLogger::init_test();
+        super::super::generic_tests::test_zn_axioms(Zn::<17>::RING);
+        super::super::generic_tests::test_zn_axioms(Zn::<63>::RING);
+    }
+
+    #[test]
+    fn test_divisibility_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(Zn::<17>::RING, 0..17);
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(Zn::<9>::RING, 0..8);
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(Zn::<12>::RING, 0..12);
+    }
+
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = Zn::<17>::RING;
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..17);
+        let R = Zn::<63>::RING;
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(R, 0..63);
+    }
 }

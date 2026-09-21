@@ -296,6 +296,9 @@ where
 }
 
 #[cfg(test)]
-use super::make_primitive;
-#[cfg(test)]
-use crate::RANDOM_TEST_INSTANCE_COUNT;
+mod tests {
+    use super::*;
+
+    use super::super::make_primitive;
+    use crate::RANDOM_TEST_INSTANCE_COUNT;
+}

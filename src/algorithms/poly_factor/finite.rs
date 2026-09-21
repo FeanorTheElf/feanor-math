@@ -81,32 +81,37 @@ where
     return (result, unit);
 }
 
-#[test]
-#[ignore]
-fn test_factor_finite_field_large() {
-    use crate::algorithms::poly_factor::FactorPolyField;
-    use crate::ring_impls::extension::galois_field::GaloisField;
-    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    feanor_tracing::DelayedLogger::init_test();
-    let FqX = DensePolyRing::new(GaloisField::new(257, 128), "X");
-    let Fq = FqX.base_ring();
-    let Fp = Fq.base_ring();
-    let FpX = DensePolyRing::new(Fp, "X");
+    #[test]
+    #[ignore]
+    fn test_factor_finite_field_large() {
+        use crate::algorithms::poly_factor::FactorPolyField;
+        use crate::ring_impls::extension::galois_field::GaloisField;
+        use crate::ring_impls::poly::dense_poly::DensePolyRing;
 
-    let mut rng = oorandom::Rand64::new(0);
-    let f = loop {
-        let f = FpX.from_terms(
-            (0..128)
-                .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
-                .chain([(Fp.one(), 128)]),
-        );
-        if FactorPolyField::is_irred(&FpX, &f) {
-            break f;
-        }
-    };
-    FpX.println(&f);
+        feanor_tracing::DelayedLogger::init_test();
+        let FqX = DensePolyRing::new(GaloisField::new(257, 128), "X");
+        let Fq = FqX.base_ring();
+        let Fp = Fq.base_ring();
+        let FpX = DensePolyRing::new(Fp, "X");
 
-    let factorization = poly_factor_finite_field(&FqX, &FqX.lifted_hom(&FpX, Fq.inclusion()).map(f));
-    _ = std::hint::black_box(factorization);
+        let mut rng = oorandom::Rand64::new(0);
+        let f = loop {
+            let f = FpX.from_terms(
+                (0..128)
+                    .map(|i| (Fp.random_element(|| rng.rand_u64()), i))
+                    .chain([(Fp.one(), 128)]),
+            );
+            if FactorPolyField::is_irred(&FpX, &f) {
+                break f;
+            }
+        };
+        FpX.println(&f);
+
+        let factorization = poly_factor_finite_field(&FqX, &FqX.lifted_hom(&FpX, Fq.inclusion()).map(f));
+        _ = std::hint::black_box(factorization);
+    }
 }

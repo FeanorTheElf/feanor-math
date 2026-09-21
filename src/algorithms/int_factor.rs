@@ -177,71 +177,76 @@ where
     }
 }
 
-#[test]
-fn test_factor() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(vec![(3, 2), (5, 1), (29, 1)], factor(&ZZi64, 3 * 3 * 5 * 29));
-    assert_eq!(vec![(2, 8)], factor(&ZZi64, 256));
-    assert_eq!(vec![(1009, 2)], factor(&ZZi64, 1009 * 1009));
-    assert_eq!(vec![(0, 1)], factor(&ZZi64, 0));
-    assert_eq!(Vec::<(i64, usize)>::new(), factor(&ZZi64, 1));
-    assert_eq!(vec![(-1, 1)], factor(&ZZi64, -1));
-    assert_eq!(
-        vec![(257, 1), (1009, 2)],
-        factor(&StaticRing::<i128>::RING, 257 * 1009 * 1009)
-    );
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let expected = vec![
-        (ZZbig.int_hom().map(-1), 1),
-        (ZZbig.int_hom().map(32771), 1),
-        (ZZbig.int_hom().map(65537), 1),
-    ];
-    let actual = factor(
-        &ZZbig,
-        ZZbig.mul(ZZbig.int_hom().map(-32771), ZZbig.int_hom().map(65537)),
-    );
-    assert_eq!(expected.len(), actual.len());
-    for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in
-        expected.iter().zip(actual.iter())
-    {
-        assert_eq!(expected_multiplicity, actual_multiplicity);
-        assert!(ZZbig.eq_el(expected_factor, actual_factor));
+    #[test]
+    fn test_factor() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(vec![(3, 2), (5, 1), (29, 1)], factor(&ZZi64, 3 * 3 * 5 * 29));
+        assert_eq!(vec![(2, 8)], factor(&ZZi64, 256));
+        assert_eq!(vec![(1009, 2)], factor(&ZZi64, 1009 * 1009));
+        assert_eq!(vec![(0, 1)], factor(&ZZi64, 0));
+        assert_eq!(Vec::<(i64, usize)>::new(), factor(&ZZi64, 1));
+        assert_eq!(vec![(-1, 1)], factor(&ZZi64, -1));
+        assert_eq!(
+            vec![(257, 1), (1009, 2)],
+            factor(&StaticRing::<i128>::RING, 257 * 1009 * 1009)
+        );
+
+        let expected = vec![
+            (ZZbig.int_hom().map(-1), 1),
+            (ZZbig.int_hom().map(32771), 1),
+            (ZZbig.int_hom().map(65537), 1),
+        ];
+        let actual = factor(
+            &ZZbig,
+            ZZbig.mul(ZZbig.int_hom().map(-32771), ZZbig.int_hom().map(65537)),
+        );
+        assert_eq!(expected.len(), actual.len());
+        for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in
+            expected.iter().zip(actual.iter())
+        {
+            assert_eq!(expected_multiplicity, actual_multiplicity);
+            assert!(ZZbig.eq_el(expected_factor, actual_factor));
+        }
+
+        let expected = vec![
+            (ZZbig.int_hom().map(257), 2),
+            (ZZbig.int_hom().map(32771), 1),
+            (ZZbig.int_hom().map(65537), 2),
+        ];
+        let actual = factor(
+            &ZZbig,
+            ZZbig.prod(
+                [
+                    ZZbig.int_hom().map(257 * 257),
+                    ZZbig.int_hom().map(32771),
+                    ZZbig.int_hom().map(65537),
+                    ZZbig.int_hom().map(65537),
+                ]
+                .into_iter(),
+            ),
+        );
+        assert_eq!(expected.len(), actual.len());
+        for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in
+            expected.iter().zip(actual.iter())
+        {
+            assert_eq!(expected_multiplicity, actual_multiplicity);
+            assert!(ZZbig.eq_el(expected_factor, actual_factor));
+        }
     }
 
-    let expected = vec![
-        (ZZbig.int_hom().map(257), 2),
-        (ZZbig.int_hom().map(32771), 1),
-        (ZZbig.int_hom().map(65537), 2),
-    ];
-    let actual = factor(
-        &ZZbig,
-        ZZbig.prod(
-            [
-                ZZbig.int_hom().map(257 * 257),
-                ZZbig.int_hom().map(32771),
-                ZZbig.int_hom().map(65537),
-                ZZbig.int_hom().map(65537),
-            ]
-            .into_iter(),
-        ),
-    );
-    assert_eq!(expected.len(), actual.len());
-    for ((expected_factor, expected_multiplicity), (actual_factor, actual_multiplicity)) in
-        expected.iter().zip(actual.iter())
-    {
-        assert_eq!(expected_multiplicity, actual_multiplicity);
-        assert!(ZZbig.eq_el(expected_factor, actual_factor));
+    #[test]
+    fn test_is_prime_power() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(Some((2, 6)), is_prime_power(&ZZi64, &64));
     }
-}
 
-#[test]
-fn test_is_prime_power() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(Some((2, 6)), is_prime_power(&ZZi64, &64));
-}
-
-#[test]
-fn test_is_prime_power_large_n() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(Some((5, 25)), is_prime_power(&ZZi64, &ZZi64.pow(5, 25)));
+    #[test]
+    fn test_is_prime_power_large_n() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(Some((5, 25)), is_prime_power(&ZZi64, &ZZi64.pow(5, 25)));
+    }
 }

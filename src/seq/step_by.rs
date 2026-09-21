@@ -128,28 +128,33 @@ impl<V: VectorFn<T>, T> VectorFn<T> for StepByFn<V, T> {
     fn at(&self, i: usize) -> T { self.base.at(i * self.step_by) }
 }
 
-#[test]
-fn test_step_by() {
-    feanor_tracing::DelayedLogger::init_test();
-    let vec = [0, 1, 2, 3, 4, 5, 6, 7];
-    let zero: [i32; 0] = [];
-    assert_eq!(0, zero.step_by_view(1).len());
-    assert_eq!(4, vec.step_by_view(2).len());
-    assert_eq!(3, vec.step_by_view(3).len());
-    assert_eq!(6, *vec.step_by_view(2).at(3));
-    assert_eq!(0, *vec.step_by_view(3).at(0));
-    assert_eq!(3, *vec.step_by_view(3).at(1));
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_step_by_fn() {
-    feanor_tracing::DelayedLogger::init_test();
-    let vec = [0, 1, 2, 3, 4, 5, 6, 7].into_copy_els();
-    let zero: CloneElFn<[i32; 0], _, _> = [].into_copy_els();
-    assert_eq!(0, zero.step_by_fn(1).len());
-    assert_eq!(4, vec.step_by_fn(2).len());
-    assert_eq!(3, vec.step_by_fn(3).len());
-    assert_eq!(6, vec.step_by_fn(2).at(3));
-    assert_eq!(0, vec.step_by_fn(3).at(0));
-    assert_eq!(3, vec.step_by_fn(3).at(1));
+    #[test]
+    fn test_step_by() {
+        feanor_tracing::DelayedLogger::init_test();
+        let vec = [0, 1, 2, 3, 4, 5, 6, 7];
+        let zero: [i32; 0] = [];
+        assert_eq!(0, zero.step_by_view(1).len());
+        assert_eq!(4, vec.step_by_view(2).len());
+        assert_eq!(3, vec.step_by_view(3).len());
+        assert_eq!(6, *vec.step_by_view(2).at(3));
+        assert_eq!(0, *vec.step_by_view(3).at(0));
+        assert_eq!(3, *vec.step_by_view(3).at(1));
+    }
+
+    #[test]
+    fn test_step_by_fn() {
+        feanor_tracing::DelayedLogger::init_test();
+        let vec = [0, 1, 2, 3, 4, 5, 6, 7].into_copy_els();
+        let zero: CloneElFn<[i32; 0], _, _> = [].into_copy_els();
+        assert_eq!(0, zero.step_by_fn(1).len());
+        assert_eq!(4, vec.step_by_fn(2).len());
+        assert_eq!(3, vec.step_by_fn(3).len());
+        assert_eq!(6, vec.step_by_fn(2).at(3));
+        assert_eq!(0, vec.step_by_fn(3).at(0));
+        assert_eq!(3, vec.step_by_fn(3).at(1));
+    }
 }

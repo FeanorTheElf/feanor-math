@@ -133,25 +133,30 @@ where
     );
 }
 
-#[test]
-fn test_bisect_floor() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(0, bisect_floor(&ZZi64, 0, 10, |x| if *x == 0 { 0 } else { 1 }));
-    assert_eq!(9, bisect_floor(&ZZi64, 0, 10, |x| if *x == 10 { 1 } else { 0 }));
-    assert_eq!(-15, bisect_floor(&ZZi64, -20, -10, |x| *x + 15));
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_root_floor() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(4, root_floor(&ZZi64, 16, 2));
-    assert_eq!(3, root_floor(&ZZi64, 27, 3));
-    assert_eq!(4, root_floor(&ZZi64, 17, 2));
-    assert_eq!(3, root_floor(&ZZi64, 28, 3));
-    assert_eq!(4, root_floor(&ZZi64, 24, 2));
-    assert_eq!(3, root_floor(&ZZi64, 63, 3));
-    assert_eq!(5, root_floor(&ZZi64, ZZi64.pow(5, 25), 25));
-    assert_eq!(4, root_floor(&ZZi64, ZZi64.pow(5, 25), 26));
-    assert_eq!(4, root_floor(&ZZi64, ZZi64.pow(5, 25), 27));
-    assert_eq!(4, root_floor(&ZZi64, ZZi64.pow(5, 25), 28));
+    #[test]
+    fn test_bisect_floor() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(0, bisect_floor(&ZZi64, 0, 10, |x| if *x == 0 { 0 } else { 1 }));
+        assert_eq!(9, bisect_floor(&ZZi64, 0, 10, |x| if *x == 10 { 1 } else { 0 }));
+        assert_eq!(-15, bisect_floor(&ZZi64, -20, -10, |x| *x + 15));
+    }
+
+    #[test]
+    fn test_root_floor() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(4, root_floor(&ZZi64, 16, 2));
+        assert_eq!(3, root_floor(&ZZi64, 27, 3));
+        assert_eq!(4, root_floor(&ZZi64, 17, 2));
+        assert_eq!(3, root_floor(&ZZi64, 28, 3));
+        assert_eq!(4, root_floor(&ZZi64, 24, 2));
+        assert_eq!(3, root_floor(&ZZi64, 63, 3));
+        assert_eq!(5, root_floor(&ZZi64, ZZi64.pow(5, 25), 25));
+        assert_eq!(4, root_floor(&ZZi64, ZZi64.pow(5, 25), 26));
+        assert_eq!(4, root_floor(&ZZi64, ZZi64.pow(5, 25), 27));
+        assert_eq!(4, root_floor(&ZZi64, ZZi64.pow(5, 25), 28));
+    }
 }

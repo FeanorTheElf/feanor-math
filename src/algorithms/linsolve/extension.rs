@@ -96,87 +96,86 @@ where
 }
 
 #[cfg(test)]
-use std::alloc::Global;
+mod tests {
+    use std::alloc::Global;
 
-#[cfg(test)]
-use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
-#[cfg(test)]
-use crate::assert_matrix_eq;
-#[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static;
+    use super::*;
+    use crate::algorithms::matmul::{MatmulAlgorithm, STANDARD_MATMUL};
+    use crate::assert_matrix_eq;
+    use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
+    use crate::ring_impls::zn::zn_static;
 
-#[test]
-fn test_solve() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = zn_static::Zn::<15>::RING;
-    // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
-    let el = |x0: u64, x1: u64, x2: u64| ring.from_power_basis([x0, x1, x2]);
+    #[test]
+    fn test_solve() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = zn_static::Zn::<15>::RING;
+        // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
+        let el = |x0: u64, x1: u64, x2: u64| ring.from_power_basis([x0, x1, x2]);
 
-    let data_A = [
-        vec![el(1, 0, 0), el(0, 0, 0)],
-        vec![el(2, 1, 0), el(0, 0, 0)],
-        vec![el(0, 0, 0), el(0, 1, 0)],
-    ];
-    let data_B = [vec![el(10, 10, 5)], vec![el(0, 0, 0)], vec![el(1, 0, 0)]];
-    let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
-    let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
-    let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
+        let data_A = [
+            vec![el(1, 0, 0), el(0, 0, 0)],
+            vec![el(2, 1, 0), el(0, 0, 0)],
+            vec![el(0, 0, 0), el(0, 1, 0)],
+        ];
+        let data_B = [vec![el(10, 10, 5)], vec![el(0, 0, 0)], vec![el(1, 0, 0)]];
+        let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
+        let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
+        let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
 
-    solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).assert_solved();
+        solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).assert_solved();
 
-    let A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
-    let B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
-    let mut prod: OwnedMatrix<_> = OwnedMatrix::zero(3, 1, &ring);
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(A.data()),
-        TransposableSubmatrix::from(sol.data()),
-        TransposableSubmatrixMut::from(prod.data_mut()),
-        &ring,
-    );
+        let A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
+        let B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
+        let mut prod: OwnedMatrix<_> = OwnedMatrix::zero(3, 1, &ring);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(A.data()),
+            TransposableSubmatrix::from(sol.data()),
+            TransposableSubmatrixMut::from(prod.data_mut()),
+            &ring,
+        );
 
-    assert_matrix_eq!(&ring, &B, &prod);
+        assert_matrix_eq!(&ring, &B, &prod);
 
-    let data_B = [vec![el(8, 8, 3)], vec![el(0, 0, 0)], vec![el(1, 0, 0)]];
-    let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
-    let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
-    let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
-    assert!(!solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).is_solved());
-}
+        let data_B = [vec![el(8, 8, 3)], vec![el(0, 0, 0)], vec![el(1, 0, 0)]];
+        let mut A = OwnedMatrix::from_fn_in(3, 2, |i, j| data_A[i][j].clone(), Global);
+        let mut B = OwnedMatrix::from_fn_in(3, 1, |i, j| data_B[i][j].clone(), Global);
+        let mut sol: OwnedMatrix<_> = OwnedMatrix::zero(2, 1, &ring);
+        assert!(!solve_right_over_extension(&ring, A.data_mut(), B.data_mut(), sol.data_mut(), Global).is_solved());
+    }
 
-#[test]
-fn test_invert() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = zn_static::Zn::<15>::RING;
-    // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
+    #[test]
+    fn test_invert() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = zn_static::Zn::<15>::RING;
+        // Z_15[X]/(X^3 + X^2 + 1);  X^3 + X^2 + 1 = (X + 2)(X + 2X + 2) mod 3, but it is irreducible mod 5
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![14, 0, 14]);
 
-    let matrix = OwnedMatrix::from_fn(2, 2, |i, j| {
-        if i == 0 || j == 0 {
-            ring.one()
-        } else {
-            ring.sub(ring.canonical_gen(), ring.one())
-        }
-    });
-    let mut inverse = OwnedMatrix::zero(2, 2, &ring);
-    solve_right_over_extension(
-        &ring,
-        matrix.clone().data_mut(),
-        OwnedMatrix::identity(2, 2, &ring).data_mut(),
-        inverse.data_mut(),
-        Global,
-    )
-    .assert_solved();
+        let matrix = OwnedMatrix::from_fn(2, 2, |i, j| {
+            if i == 0 || j == 0 {
+                ring.one()
+            } else {
+                ring.sub(ring.canonical_gen(), ring.one())
+            }
+        });
+        let mut inverse = OwnedMatrix::zero(2, 2, &ring);
+        solve_right_over_extension(
+            &ring,
+            matrix.clone().data_mut(),
+            OwnedMatrix::identity(2, 2, &ring).data_mut(),
+            inverse.data_mut(),
+            Global,
+        )
+        .assert_solved();
 
-    let mut result = OwnedMatrix::zero(2, 2, &ring);
-    STANDARD_MATMUL.matmul(
-        TransposableSubmatrix::from(matrix.data()),
-        TransposableSubmatrix::from(inverse.data()),
-        TransposableSubmatrixMut::from(result.data_mut()),
-        &ring,
-    );
+        let mut result = OwnedMatrix::zero(2, 2, &ring);
+        STANDARD_MATMUL.matmul(
+            TransposableSubmatrix::from(matrix.data()),
+            TransposableSubmatrix::from(inverse.data()),
+            TransposableSubmatrixMut::from(result.data_mut()),
+            &ring,
+        );
 
-    assert_matrix_eq!(&ring, OwnedMatrix::identity(2, 2, &ring), result);
+        assert_matrix_eq!(&ring, OwnedMatrix::identity(2, 2, &ring), result);
+    }
 }

@@ -404,99 +404,98 @@ where
 }
 
 #[cfg(test)]
-use test::Bencher;
+mod tests {
+    use test::Bencher;
 
-#[cfg(test)]
-use crate::algorithms::convolution::KaratsubaAlgorithm;
-#[cfg(test)]
-use crate::ring_impls::as_field::{AsField, AsFieldBase};
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+    use super::*;
+    use crate::algorithms::convolution::KaratsubaAlgorithm;
+    use crate::ring_impls::as_field::{AsField, AsFieldBase};
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_convolution() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
-    let convolution = NTTConvolution::for_fp(ring);
-    super::generic_tests::test_convolution(&convolution, &ring, ring.one());
-}
+    #[test]
+    fn test_convolution() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
+        let convolution = NTTConvolution::for_fp(ring);
+        super::super::generic_tests::test_convolution(&convolution, &ring, ring.one());
+    }
 
-#[cfg(test)]
-fn run_benchmark<F>(ring: AsField<Zn64B>, bencher: &mut Bencher, mut f: F)
-where
-    F: FnMut(
-        &[(
-            &[El<AsField<Zn64B>>],
-            Option<&PreparedConvolutionOperand<AsFieldBase<Zn64B>>>,
-            &[El<AsField<Zn64B>>],
-            Option<&PreparedConvolutionOperand<AsFieldBase<Zn64B>>>,
-        )],
-        &mut [El<AsField<Zn64B>>],
-        AsField<Zn64B>,
-    ),
-{
-    let mut expected = (0..512).map(|_| ring.zero()).collect::<Vec<_>>();
-    let value: Vec<_> = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
-    KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution(
-        &value,
-        None,
-        &value,
-        None,
-        &mut expected,
-        ring.get_ring(),
-    );
-
-    let mut i = 1;
-    let mut actual = Vec::with_capacity(511);
-    let hom = ring.can_hom(&ZZi64).unwrap();
-    bencher.iter(|| {
-        actual.clear();
-        actual.resize_with(511, || ring.zero());
-        f(
-            &(0..256)
-                .map(|j| {
-                    (
-                        (0..256).map(|k| hom.map(i * j as i64 * k)).collect::<Vec<_>>(),
-                        None,
-                        (0..256).map(|k| hom.map(i * j as i64 * k)).collect::<Vec<_>>(),
-                        None,
-                    )
-                })
-                .collect::<Vec<_>>()
-                .iter()
-                .map(|(lhs, lhs_prep, rhs, rhs_prep)| (&lhs[..], *lhs_prep, &rhs[..], *rhs_prep))
-                .collect::<Vec<_>>(),
-            &mut actual,
-            ring,
+    fn run_benchmark<F>(ring: AsField<Zn64B>, bencher: &mut Bencher, mut f: F)
+    where
+        F: FnMut(
+            &[(
+                &[El<AsField<Zn64B>>],
+                Option<&PreparedConvolutionOperand<AsFieldBase<Zn64B>>>,
+                &[El<AsField<Zn64B>>],
+                Option<&PreparedConvolutionOperand<AsFieldBase<Zn64B>>>,
+            )],
+            &mut [El<AsField<Zn64B>>],
+            AsField<Zn64B>,
+        ),
+    {
+        let mut expected = (0..512).map(|_| ring.zero()).collect::<Vec<_>>();
+        let value: Vec<_> = (0..256).map(|i| ring.int_hom().map(i)).collect::<Vec<_>>();
+        KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution(
+            &value,
+            None,
+            &value,
+            None,
+            &mut expected,
+            ring.get_ring(),
         );
-        let factor = hom.map(i * i * 128 * 511 * 85);
-        for (l, r) in expected.iter().zip(actual.iter()) {
-            assert_el_eq!(ring, ring.mul_ref(l, &factor), r);
-        }
-        i += 1;
-    });
-}
 
-#[bench]
-fn bench_convolution_sum(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
-    let convolution = NTTConvolution::for_fp(ring);
+        let mut i = 1;
+        let mut actual = Vec::with_capacity(511);
+        let hom = ring.can_hom(&ZZi64).unwrap();
+        bencher.iter(|| {
+            actual.clear();
+            actual.resize_with(511, || ring.zero());
+            f(
+                &(0..256)
+                    .map(|j| {
+                        (
+                            (0..256).map(|k| hom.map(i * j as i64 * k)).collect::<Vec<_>>(),
+                            None,
+                            (0..256).map(|k| hom.map(i * j as i64 * k)).collect::<Vec<_>>(),
+                            None,
+                        )
+                    })
+                    .collect::<Vec<_>>()
+                    .iter()
+                    .map(|(lhs, lhs_prep, rhs, rhs_prep)| (&lhs[..], *lhs_prep, &rhs[..], *rhs_prep))
+                    .collect::<Vec<_>>(),
+                &mut actual,
+                ring,
+            );
+            let factor = hom.map(i * i * 128 * 511 * 85);
+            for (l, r) in expected.iter().zip(actual.iter()) {
+                assert_el_eq!(ring, ring.mul_ref(l, &factor), r);
+            }
+            i += 1;
+        });
+    }
 
-    run_benchmark(ring, bencher, |values, dst, _| {
-        convolution.compute_convolution_sum_impl(values, dst)
-    });
-}
+    #[bench]
+    fn bench_convolution_sum(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
+        let convolution = NTTConvolution::for_fp(ring);
 
-#[bench]
-fn bench_convolution_sum_default(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
-    let convolution = NTTConvolution::for_fp(ring);
+        run_benchmark(ring, bencher, |values, dst, _| {
+            convolution.compute_convolution_sum_impl(values, dst)
+        });
+    }
 
-    run_benchmark(ring, bencher, |values, dst, ring| {
-        for (lhs, lhs_prep, rhs, rhs_prep) in values {
-            convolution.compute_convolution(lhs, *lhs_prep, rhs, *rhs_prep, dst, ring.get_ring());
-        }
-    });
+    #[bench]
+    fn bench_convolution_sum_default(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(65537).as_field().unwrap();
+        let convolution = NTTConvolution::for_fp(ring);
+
+        run_benchmark(ring, bencher, |values, dst, ring| {
+            for (lhs, lhs_prep, rhs, rhs_prep) in values {
+                convolution.compute_convolution(lhs, *lhs_prep, rhs, *rhs_prep, dst, ring.get_ring());
+            }
+        });
+    }
 }

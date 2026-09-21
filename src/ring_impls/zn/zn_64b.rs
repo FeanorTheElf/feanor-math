@@ -1347,343 +1347,350 @@ where
 }
 
 #[cfg(test)]
-use test::Bencher;
+mod tests {
+    use test::Bencher;
 
-#[cfg(test)]
-fn elements<'a>(ring: &'a Zn64B) -> impl 'a + Iterator<Item = El<Zn64B>> {
-    (0..63).map(|i| ring.coerce(&ZZi64, 1 << i))
-}
+    use super::*;
 
-#[cfg(test)]
-const LARGE_MODULI: [u64; 6] = [
-    (1 << 41) - 1,
-    (1 << 42) - 1,
-    (1 << 58) - 1,
-    (1 << 58) + 1,
-    (3 << 57) - 1,
-    (3 << 57) + 1,
-];
+    fn elements<'a>(ring: &'a Zn64B) -> impl 'a + Iterator<Item = El<Zn64B>> {
+        (0..63).map(|i| ring.coerce(&ZZi64, 1 << i))
+    }
 
-#[test]
-fn test_complete_reduce() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(32);
-    assert_eq!(31, ring.get_ring().complete_reduce(4 * 32 - 1));
-}
-
-#[test]
-fn test_sum() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in LARGE_MODULI {
-        let Zn = Zn64B::new(n);
-        assert_el_eq!(
-            Zn,
-            Zn.int_hom().map(10001 * 5000),
-            Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x)))
-        );
-    }
-}
-
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let ring = Zn64B::new(n);
-        crate::ring::generic_tests::test_ring_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
-    }
-    for n in LARGE_MODULI {
-        let ring = Zn64B::new(n);
-        crate::ring::generic_tests::test_ring_axioms(&ring, elements(&ring));
-    }
-}
-
-#[test]
-fn test_hash_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let ring = Zn64B::new(n);
-        crate::ring::generic_tests::test_hash_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
-    }
-    for n in LARGE_MODULI {
-        let ring = Zn64B::new(n);
-        crate::ring::generic_tests::test_hash_axioms(&ring, elements(&ring));
-    }
-}
-
-#[test]
-fn test_divisibility_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let Zn = Zn64B::new(n as u64);
-        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
-            &Zn,
-            (0..n).map(|x| Zn.int_hom().map(x)),
-        );
-    }
-    for n in LARGE_MODULI {
-        let Zn = Zn64B::new(n);
-        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&Zn, elements(&Zn));
-    }
-}
-
-#[test]
-fn test_zn_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let Zn = Zn64B::new(n);
-        super::generic_tests::test_zn_axioms(&Zn);
-    }
-}
-
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let R = Zn64B::new(n as u64);
-        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-            R,
-            (0..n).map(|x| R.int_hom().map(x)),
-        );
-    }
-    let R = Zn64B::new(63);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        R,
-        (0..63).map(|x| R.int_hom().map(x)),
-    );
-}
-
-#[test]
-fn test_hom_from_fastmul() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let Zn = Zn64B::new(n as u64);
-        let Zn_fastmul = Zn64BFastmul::new(Zn).unwrap();
-        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, (0..n).map(|x| Zn_fastmul.int_hom().map(x)));
-    }
-    for n in [
+    const LARGE_MODULI: [u64; 6] = [
         (1 << 41) - 1,
         (1 << 42) - 1,
         (1 << 58) - 1,
         (1 << 58) + 1,
         (3 << 57) - 1,
         (3 << 57) + 1,
-    ] {
-        let Zn = Zn64B::new(n);
-        let Zn_fastmul = Zn64BFastmul::new(Zn).unwrap();
-        crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)));
-    }
-}
+    ];
 
-#[test]
-fn test_finite_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(n));
+    #[test]
+    fn test_complete_reduce() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(32);
+        assert_eq!(31, ring.get_ring().complete_reduce(4 * 32 - 1));
     }
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(128));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(1 << 32));
-}
 
-#[test]
-fn test_from_int_hom() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let Zn = Zn64B::new(n);
-        crate::ring::generic_tests::test_hom_axioms(StaticRing::<i8>::RING, Zn, -8..8);
-        crate::ring::generic_tests::test_hom_axioms(StaticRing::<i16>::RING, Zn, -8..8);
-        crate::ring::generic_tests::test_hom_axioms(StaticRing::<i32>::RING, Zn, -8..8);
-        crate::ring::generic_tests::test_hom_axioms(ZZi64, Zn, -8..8);
-        crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, Zn, -8..8);
-    }
-    let Zn = Zn64B::new(5);
-    assert_el_eq!(Zn, Zn.int_hom().map(3), Zn.can_hom(&ZZi64).unwrap().map(-1596802));
-}
-
-#[test]
-fn test_bounded_reduce_large() {
-    feanor_tracing::DelayedLogger::init_test();
-    const FACTOR: usize = 32;
-    let n_max = (1 << 62) / 9;
-    for n in (n_max - 10)..=n_max {
-        let Zn = Zn64B::new(n);
-        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
-        for k in (val_max - 100)..=val_max {
-            assert_eq!(
-                (k % (n as u128)) as i64,
-                Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k)))
+    #[test]
+    fn test_sum() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in LARGE_MODULI {
+            let Zn = Zn64B::new(n);
+            assert_el_eq!(
+                Zn,
+                Zn.int_hom().map(10001 * 5000),
+                Zn.sum((0..=10000).map(|x| Zn.int_hom().map(x)))
             );
         }
     }
-}
 
-#[test]
-fn test_smallest_lift() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let ring = Zn64B::new(n);
-        for k in 0..=ring.get_ring().repr_bound() {
-            let expected = if (k % n) <= n / 2 {
-                (k % n) as i64
-            } else {
-                (k % n) as i64 - n as i64
-            };
-            if n % 2 == 0 && (k % n) == n / 2 {
-                assert!(
-                    ring.smallest_lift(Zn64BEl(k)) == n as i64 / 2 || ring.smallest_lift(Zn64BEl(k)) == -(n as i64) / 2
-                )
-            } else {
-                assert_eq!(expected, ring.smallest_lift(Zn64BEl(k)));
-            }
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let ring = Zn64B::new(n);
+            crate::ring::generic_tests::test_ring_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
+        }
+        for n in LARGE_MODULI {
+            let ring = Zn64B::new(n);
+            crate::ring::generic_tests::test_ring_axioms(&ring, elements(&ring));
         }
     }
-}
 
-#[test]
-fn test_smallest_positive_lift() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let ring = Zn64B::new(n);
-        for k in 0..=ring.get_ring().repr_bound() {
-            let expected = (k % n) as i64;
-            assert_eq!(expected, ring.smallest_positive_lift(Zn64BEl(k)));
+    #[test]
+    fn test_hash_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let ring = Zn64B::new(n);
+            crate::ring::generic_tests::test_hash_axioms(&ring, (0..=ring.get_ring().repr_bound()).map(|n| Zn64BEl(n)));
+        }
+        for n in LARGE_MODULI {
+            let ring = Zn64B::new(n);
+            crate::ring::generic_tests::test_hash_axioms(&ring, elements(&ring));
         }
     }
-}
 
-#[test]
-fn test_bounded_reduce_small() {
-    feanor_tracing::DelayedLogger::init_test();
-    for n in 2..=17 {
-        let Zn = Zn64B::new(n);
-        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
-        for k in (val_max - 100)..=val_max {
-            assert_eq!(
-                (k % (n as u128)) as i64,
-                Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce(k)))
+    #[test]
+    fn test_divisibility_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let Zn = Zn64B::new(n as u64);
+            crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+                &Zn,
+                (0..n).map(|x| Zn.int_hom().map(x)),
+            );
+        }
+        for n in LARGE_MODULI {
+            let Zn = Zn64B::new(n);
+            crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(&Zn, elements(&Zn));
+        }
+    }
+
+    #[test]
+    fn test_zn_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let Zn = Zn64B::new(n);
+            super::super::generic_tests::test_zn_axioms(&Zn);
+        }
+    }
+
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let R = Zn64B::new(n as u64);
+            crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+                R,
+                (0..n).map(|x| R.int_hom().map(x)),
+            );
+        }
+        let R = Zn64B::new(63);
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            R,
+            (0..63).map(|x| R.int_hom().map(x)),
+        );
+    }
+
+    #[test]
+    fn test_hom_from_fastmul() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let Zn = Zn64B::new(n as u64);
+            let Zn_fastmul = Zn64BFastmul::new(Zn).unwrap();
+            crate::ring::generic_tests::test_hom_axioms(Zn_fastmul, Zn, (0..n).map(|x| Zn_fastmul.int_hom().map(x)));
+        }
+        for n in [
+            (1 << 41) - 1,
+            (1 << 42) - 1,
+            (1 << 58) - 1,
+            (1 << 58) + 1,
+            (3 << 57) - 1,
+            (3 << 57) + 1,
+        ] {
+            let Zn = Zn64B::new(n);
+            let Zn_fastmul = Zn64BFastmul::new(Zn).unwrap();
+            crate::ring::generic_tests::test_hom_axioms(
+                Zn_fastmul,
+                Zn,
+                elements(&Zn).map(|x| Zn_fastmul.coerce(&Zn, x)),
             );
         }
     }
-}
 
-#[test]
-fn test_bounded_reduce_large_small() {
-    feanor_tracing::DelayedLogger::init_test();
-    const FACTOR: usize = 32;
-    for n in 2..=17 {
-        let Zn = Zn64B::new(n);
-        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
-        for k in (val_max - 100)..=val_max {
-            assert_eq!(
-                (k % (n as u128)) as i64,
-                Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k)))
-            );
+    #[test]
+    fn test_finite_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(n));
         }
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(128));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&Zn64B::new(1 << 32));
     }
-}
 
-#[test]
-fn test_bounded_reduce() {
-    feanor_tracing::DelayedLogger::init_test();
-    let n_max = (1 << 62) / 9;
-    for n in (n_max - 10)..=n_max {
-        let Zn = Zn64B::new(n);
-        let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
-        for k in (val_max - 100)..=val_max {
-            assert_eq!(
-                (k % (n as u128)) as i64,
-                Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce(k)))
-            );
+    #[test]
+    fn test_from_int_hom() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let Zn = Zn64B::new(n);
+            crate::ring::generic_tests::test_hom_axioms(StaticRing::<i8>::RING, Zn, -8..8);
+            crate::ring::generic_tests::test_hom_axioms(StaticRing::<i16>::RING, Zn, -8..8);
+            crate::ring::generic_tests::test_hom_axioms(StaticRing::<i32>::RING, Zn, -8..8);
+            crate::ring::generic_tests::test_hom_axioms(ZZi64, Zn, -8..8);
+            crate::ring::generic_tests::test_hom_axioms(StaticRing::<i128>::RING, Zn, -8..8);
         }
+        let Zn = Zn64B::new(5);
+        assert_el_eq!(Zn, Zn.int_hom().map(3), Zn.can_hom(&ZZi64).unwrap().map(-1596802));
     }
-}
 
-#[bench]
-fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    // the case that the modulus is large
-    let Zn = Zn64B::new(36028797018963971 /* = 2^55 + 3 */);
-    bencher.iter(|| {
-        let hom = Zn.can_hom(&ZZi64).unwrap();
-        assert_el_eq!(
-            Zn,
-            Zn.int_hom().map(-1300),
-            Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x)))
-        )
-    });
-}
-
-#[bench]
-fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    // the case that the modulus is large
-    let Zn = Zn64B::new(17);
-    bencher.iter(|| {
-        let hom = Zn.can_hom(&ZZi64).unwrap();
-        assert_el_eq!(Zn, Zn.int_hom().map(2850 * 5699), Zn.sum((0..5700).map(|x| hom.map(x))))
-    });
-}
-
-#[bench]
-fn bench_reduction_map_use_case(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    // this benchmark is inspired by the use in https://eprint.iacr.org/2023/1510.pdf
-    let p = 17;
-    let Zp2 = Zn64B::new((p * p) as u64);
-    let Zp = Zn64B::new(p as u64);
-    let Zp2_mod_p = ZnReductionMap::new(&Zp2, &Zp).unwrap();
-    let Zp2_p = PreparedDivisor::new(Zp2.get_ring(), Zp2.int_hom().map(p));
-
-    let split_quo_rem = |x: El<Zn64B>| {
-        let rem = Zp2_mod_p.map_ref(&x);
-        let Zp2_rem = Zp2_mod_p.smallest_lift(rem);
-        let quo = Zp2_p.checked_div_by(&Zp2.sub(x, Zp2_rem), Zp2.get_ring()).unwrap();
-        (rem, Zp2_mod_p.map(quo))
-    };
-
-    bencher.iter(|| {
-        for x in (0..(p * p)).map(|x| Zp2.int_hom().map(x)) {
-            for y in (0..(p * p)).map(|x| Zp2.int_hom().map(x)) {
-                let (x_low, x_high) = split_quo_rem(x);
-                let (y_low, y_high) = split_quo_rem(y);
-                assert_el_eq!(
-                    Zp2,
-                    Zp2.mul(x, y),
-                    &Zp2.add(
-                        Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)),
-                        Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))
-                    )
+    #[test]
+    fn test_bounded_reduce_large() {
+        feanor_tracing::DelayedLogger::init_test();
+        const FACTOR: usize = 32;
+        let n_max = (1 << 62) / 9;
+        for n in (n_max - 10)..=n_max {
+            let Zn = Zn64B::new(n);
+            let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
+            for k in (val_max - 100)..=val_max {
+                assert_eq!(
+                    (k % (n as u128)) as i64,
+                    Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k)))
                 );
             }
         }
-    });
-}
+    }
 
-#[bench]
-fn bench_inner_product(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let Fp = Zn64B::new(65537);
-    let len = 1 << 12;
-    let lhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
-    let rhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
-    let expected = (0..len)
-        .map(|i| Fp.int_hom().map(i * i))
-        .fold(Fp.zero(), |l, r| Fp.add(l, r));
+    #[test]
+    fn test_smallest_lift() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let ring = Zn64B::new(n);
+            for k in 0..=ring.get_ring().repr_bound() {
+                let expected = if (k % n) <= n / 2 {
+                    (k % n) as i64
+                } else {
+                    (k % n) as i64 - n as i64
+                };
+                if n % 2 == 0 && (k % n) == n / 2 {
+                    assert!(
+                        ring.smallest_lift(Zn64BEl(k)) == n as i64 / 2
+                            || ring.smallest_lift(Zn64BEl(k)) == -(n as i64) / 2
+                    )
+                } else {
+                    assert_eq!(expected, ring.smallest_lift(Zn64BEl(k)));
+                }
+            }
+        }
+    }
 
-    bencher.iter(|| {
-        let actual = <_ as ComputeInnerProduct>::inner_product_ref(
-            Fp.get_ring(),
-            lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)),
-        );
-        assert_el_eq!(Fp, expected, actual);
-    })
-}
+    #[test]
+    fn test_smallest_positive_lift() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let ring = Zn64B::new(n);
+            for k in 0..=ring.get_ring().repr_bound() {
+                let expected = (k % n) as i64;
+                assert_eq!(expected, ring.smallest_positive_lift(Zn64BEl(k)));
+            }
+        }
+    }
 
-#[test]
-fn test_serialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(128);
-    crate::ring_properties::serialization::generic_tests::test_serialization(
-        ring,
-        (0..128).map(|x| ring.int_hom().map(x)),
-    )
+    #[test]
+    fn test_bounded_reduce_small() {
+        feanor_tracing::DelayedLogger::init_test();
+        for n in 2..=17 {
+            let Zn = Zn64B::new(n);
+            let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
+            for k in (val_max - 100)..=val_max {
+                assert_eq!(
+                    (k % (n as u128)) as i64,
+                    Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce(k)))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_bounded_reduce_large_small() {
+        feanor_tracing::DelayedLogger::init_test();
+        const FACTOR: usize = 32;
+        for n in 2..=17 {
+            let Zn = Zn64B::new(n);
+            let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128 * FACTOR as u128;
+            for k in (val_max - 100)..=val_max {
+                assert_eq!(
+                    (k % (n as u128)) as i64,
+                    Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce_larger::<FACTOR>(k)))
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_bounded_reduce() {
+        feanor_tracing::DelayedLogger::init_test();
+        let n_max = (1 << 62) / 9;
+        for n in (n_max - 10)..=n_max {
+            let Zn = Zn64B::new(n);
+            let val_max = Zn.get_ring().repr_bound() as u128 * Zn.get_ring().repr_bound() as u128;
+            for k in (val_max - 100)..=val_max {
+                assert_eq!(
+                    (k % (n as u128)) as i64,
+                    Zn.smallest_positive_lift(Zn64BEl(Zn.get_ring().bounded_reduce(k)))
+                );
+            }
+        }
+    }
+
+    #[bench]
+    fn bench_hom_from_i64_large_modulus(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        // the case that the modulus is large
+        let Zn = Zn64B::new(36028797018963971 /* = 2^55 + 3 */);
+        bencher.iter(|| {
+            let hom = Zn.can_hom(&ZZi64).unwrap();
+            assert_el_eq!(
+                Zn,
+                Zn.int_hom().map(-1300),
+                Zn.sum((0..100).flat_map(|_| (0..=56).map(|k| 1 << k)).map(|x| hom.map(x)))
+            )
+        });
+    }
+
+    #[bench]
+    fn bench_hom_from_i64_small_modulus(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        // the case that the modulus is large
+        let Zn = Zn64B::new(17);
+        bencher.iter(|| {
+            let hom = Zn.can_hom(&ZZi64).unwrap();
+            assert_el_eq!(Zn, Zn.int_hom().map(2850 * 5699), Zn.sum((0..5700).map(|x| hom.map(x))))
+        });
+    }
+
+    #[bench]
+    fn bench_reduction_map_use_case(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        // this benchmark is inspired by the use in https://eprint.iacr.org/2023/1510.pdf
+        let p = 17;
+        let Zp2 = Zn64B::new((p * p) as u64);
+        let Zp = Zn64B::new(p as u64);
+        let Zp2_mod_p = ZnReductionMap::new(&Zp2, &Zp).unwrap();
+        let Zp2_p = PreparedDivisor::new(Zp2.get_ring(), Zp2.int_hom().map(p));
+
+        let split_quo_rem = |x: El<Zn64B>| {
+            let rem = Zp2_mod_p.map_ref(&x);
+            let Zp2_rem = Zp2_mod_p.smallest_lift(rem);
+            let quo = Zp2_p.checked_div_by(&Zp2.sub(x, Zp2_rem), Zp2.get_ring()).unwrap();
+            (rem, Zp2_mod_p.map(quo))
+        };
+
+        bencher.iter(|| {
+            for x in (0..(p * p)).map(|x| Zp2.int_hom().map(x)) {
+                for y in (0..(p * p)).map(|x| Zp2.int_hom().map(x)) {
+                    let (x_low, x_high) = split_quo_rem(x);
+                    let (y_low, y_high) = split_quo_rem(y);
+                    assert_el_eq!(
+                        Zp2,
+                        Zp2.mul(x, y),
+                        &Zp2.add(
+                            Zp2.mul(Zp2_mod_p.smallest_lift(x_low), Zp2_mod_p.smallest_lift(y_low)),
+                            Zp2_mod_p.mul_quotient_fraction(Zp.add(Zp.mul(x_low, y_high), Zp.mul(x_high, y_low)))
+                        )
+                    );
+                }
+            }
+        });
+    }
+
+    #[bench]
+    fn bench_inner_product(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let Fp = Zn64B::new(65537);
+        let len = 1 << 12;
+        let lhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
+        let rhs = (0..len).map(|i| Fp.int_hom().map(i)).collect::<Vec<_>>();
+        let expected = (0..len)
+            .map(|i| Fp.int_hom().map(i * i))
+            .fold(Fp.zero(), |l, r| Fp.add(l, r));
+
+        bencher.iter(|| {
+            let actual = <_ as ComputeInnerProduct>::inner_product_ref(
+                Fp.get_ring(),
+                lhs.iter().zip(rhs.iter()).map(|x| std::hint::black_box(x)),
+            );
+            assert_el_eq!(Fp, expected, actual);
+        })
+    }
+
+    #[test]
+    fn test_serialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(128);
+        crate::ring_properties::serialization::generic_tests::test_serialization(
+            ring,
+            (0..128).map(|x| ring.int_hom().map(x)),
+        )
+    }
 }

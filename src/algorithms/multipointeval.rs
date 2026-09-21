@@ -98,36 +98,38 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+mod tests {
+    use super::*;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_multipointeval() {
-    let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X + 1]);
-    let result = multipointeval(&ZZX, &f, &[0, 1]);
-    assert_eq!(1, result[0]);
-    assert_eq!(2, result[1]);
+    #[test]
+    fn test_multipointeval() {
+        let ZZX = DensePolyRing::new(StaticRing::<i64>::RING, "X");
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X + 1]);
+        let result = multipointeval(&ZZX, &f, &[0, 1]);
+        assert_eq!(1, result[0]);
+        assert_eq!(2, result[1]);
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + 2 * X + 1]);
-    let result = multipointeval(&ZZX, &f, &[0, 1, 2, 3]);
-    assert_eq!(1, result[0]);
-    assert_eq!(4, result[1]);
-    assert_eq!(21, result[2]);
-    assert_eq!(88, result[3]);
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + 2 * X + 1]);
+        let result = multipointeval(&ZZX, &f, &[0, 1, 2, 3]);
+        assert_eq!(1, result[0]);
+        assert_eq!(4, result[1]);
+        assert_eq!(21, result[2]);
+        assert_eq!(88, result[3]);
 
-    let FpX = DensePolyRing::new(Zn64B::new(65537), "X");
-    let points = (0..99)
-        .map(|x| FpX.base_ring().int_hom().map(x * x * x - 2 * x + 7))
-        .collect::<Vec<_>>();
-    let f = FpX.from_terms((0..100).map(|i| (FpX.base_ring().int_hom().map(i * i + 3 * i + 2), i as usize)));
-    let result = multipointeval(&FpX, &f, &points);
-    for i in 0..points.len() {
-        assert_el_eq!(
-            FpX.base_ring(),
-            FpX.evaluate(&f, &points[i], FpX.base_ring().identity()),
-            &result[i]
-        );
+        let FpX = DensePolyRing::new(Zn64B::new(65537), "X");
+        let points = (0..99)
+            .map(|x| FpX.base_ring().int_hom().map(x * x * x - 2 * x + 7))
+            .collect::<Vec<_>>();
+        let f = FpX.from_terms((0..100).map(|i| (FpX.base_ring().int_hom().map(i * i + 3 * i + 2), i as usize)));
+        let result = multipointeval(&FpX, &f, &points);
+        for i in 0..points.len() {
+            assert_el_eq!(
+                FpX.base_ring(),
+                FpX.evaluate(&f, &points[i], FpX.base_ring().identity()),
+                &result[i]
+            );
+        }
     }
 }

@@ -383,78 +383,81 @@ where
 }
 
 #[cfg(test)]
-use crate::RANDOM_TEST_INSTANCE_COUNT;
+mod tests {
+    use super::*;
+    use crate::RANDOM_TEST_INSTANCE_COUNT;
 
-#[test]
-fn test_poly_factor_integer() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZbig;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X - 1,
-            2 * X + 1,
-            X.pow_ref(2) + X + 1,
-            3 * X.pow_ref(3) + X + 100,
-            6 * X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1,
-        ]
-    });
-    let assert_correct_factorization = |powers: [usize; 5]| {
-        let input = poly_ring.prod(
-            powers
-                .iter()
-                .enumerate()
-                .map(|(i, e)| poly_ring.pow(irred_polys[i].clone(), *e)),
-        );
-        let actual = poly_factor_integer(&poly_ring, &input);
-        assert_eq!(powers.iter().filter(|e| **e != 0).count(), actual.len());
-        for (f, e) in actual {
-            if let Some((idx, _)) = irred_polys
-                .iter()
-                .enumerate()
-                .filter(|(_, g)| poly_ring.eq_el(&f, *g))
-                .next()
-            {
-                assert_eq!(powers[idx], e);
-            } else {
-                panic!(
-                    "factorization yielded {}, which is not an expected irreducible factor",
-                    poly_ring.formatted_el(&f)
-                )
+    #[test]
+    fn test_poly_factor_integer() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZbig;
+        let poly_ring = DensePolyRing::new(ring, "X");
+        let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X - 1,
+                2 * X + 1,
+                X.pow_ref(2) + X + 1,
+                3 * X.pow_ref(3) + X + 100,
+                6 * X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1,
+            ]
+        });
+        let assert_correct_factorization = |powers: [usize; 5]| {
+            let input = poly_ring.prod(
+                powers
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| poly_ring.pow(irred_polys[i].clone(), *e)),
+            );
+            let actual = poly_factor_integer(&poly_ring, &input);
+            assert_eq!(powers.iter().filter(|e| **e != 0).count(), actual.len());
+            for (f, e) in actual {
+                if let Some((idx, _)) = irred_polys
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, g)| poly_ring.eq_el(&f, *g))
+                    .next()
+                {
+                    assert_eq!(powers[idx], e);
+                } else {
+                    panic!(
+                        "factorization yielded {}, which is not an expected irreducible factor",
+                        poly_ring.formatted_el(&f)
+                    )
+                }
             }
+        };
+
+        assert_correct_factorization([1, 0, 0, 0, 0]);
+        assert_correct_factorization([1, 0, 1, 0, 0]);
+        assert_correct_factorization([1, 1, 0, 1, 1]);
+        assert_correct_factorization([1, 0, 2, 0, 2]);
+        assert_correct_factorization([0, 4, 0, 0, 0]);
+    }
+
+    #[test]
+    fn random_test_poly_factor_integer() {
+        // let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+        // let filtered_chrome_layer = tracing_subscriber::Layer::with_filter(chrome_layer,
+        // tracing_subscriber::filter::filter_fn(|_metadata| true));
+        // tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt::with(tracing_subscriber::registry(), filtered_chrome_layer));
+        feanor_tracing::DelayedLogger::init_test();
+
+        let ring = ZZbig;
+        let poly_ring = DensePolyRing::new(ring, "X");
+        let mut rng = oorandom::Rand64::new(0);
+        let bound = ring.int_hom().map(500);
+        for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+            let f = poly_ring.from_terms((0..=6).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+            let g = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+            let h = poly_ring.from_terms((0..=4).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
+            let input = poly_ring.prod([f, g, h]);
+            let actual = poly_factor_integer(&poly_ring, &input);
+            assert!(actual.iter().map(|(_, e)| *e).sum::<usize>() >= 3);
+            assert_el_eq!(
+                &poly_ring,
+                input,
+                poly_ring.prod(actual.into_iter().map(|(f, e)| poly_ring.pow(f, e)))
+            );
         }
-    };
-
-    assert_correct_factorization([1, 0, 0, 0, 0]);
-    assert_correct_factorization([1, 0, 1, 0, 0]);
-    assert_correct_factorization([1, 1, 0, 1, 1]);
-    assert_correct_factorization([1, 0, 2, 0, 2]);
-    assert_correct_factorization([0, 4, 0, 0, 0]);
-}
-
-#[test]
-fn random_test_poly_factor_integer() {
-    // let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
-    // let filtered_chrome_layer = tracing_subscriber::Layer::with_filter(chrome_layer,
-    // tracing_subscriber::filter::filter_fn(|_metadata| true));
-    // tracing_subscriber::util::SubscriberInitExt::init(tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt::with(tracing_subscriber::registry(), filtered_chrome_layer));
-    feanor_tracing::DelayedLogger::init_test();
-
-    let ring = ZZbig;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let mut rng = oorandom::Rand64::new(0);
-    let bound = ring.int_hom().map(500);
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = poly_ring.from_terms((0..=6).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let g = poly_ring.from_terms((0..=5).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let h = poly_ring.from_terms((0..=4).map(|i| (ring.get_uniformly_random(&bound, || rng.rand_u64()), i)));
-        let input = poly_ring.prod([f, g, h]);
-        let actual = poly_factor_integer(&poly_ring, &input);
-        assert!(actual.iter().map(|(_, e)| *e).sum::<usize>() >= 3);
-        assert_el_eq!(
-            &poly_ring,
-            input,
-            poly_ring.prod(actual.into_iter().map(|(f, e)| poly_ring.pow(f, e)))
-        );
     }
 }

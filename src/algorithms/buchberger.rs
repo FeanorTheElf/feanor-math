@@ -659,549 +659,552 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
-#[cfg(test)]
-use crate::ring_impls::poly::{PolyRingStore, dense_poly};
-#[cfg(test)]
-use crate::ring_impls::rational::RationalField;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static;
+mod tests {
+    use super::*;
+    use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
+    use crate::ring_impls::poly::{PolyRingStore, dense_poly};
+    use crate::ring_impls::rational::RationalField;
+    use crate::ring_impls::zn::zn_static;
 
-#[test]
-fn test_buchberger_small() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::F17;
-    let ring = MultivariatePolyRingImpl::new(base, 2);
+    #[test]
+    fn test_buchberger_small() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::F17;
+        let ring = MultivariatePolyRingImpl::new(base, 2);
 
-    let f1 = ring.from_terms(
-        [
-            (1, ring.create_monomial([2, 0])),
-            (1, ring.create_monomial([0, 2])),
-            (16, ring.create_monomial([0, 0])),
-        ]
-        .into_iter(),
-    );
-    let f2 = ring.from_terms([(1, ring.create_monomial([1, 1])), (15, ring.create_monomial([0, 0]))].into_iter());
-
-    let actual = buchberger_with_strategy(
-        &ring,
-        vec![f1.clone(), f2.clone()],
-        DegRevLex,
-        default_sort_fn(&ring, DegRevLex),
-        |_| false,
-    );
-
-    let expected = ring.from_terms(
-        [
-            (16, ring.create_monomial([0, 3])),
-            (15, ring.create_monomial([1, 0])),
-            (1, ring.create_monomial([0, 1])),
-        ]
-        .into_iter(),
-    );
-
-    assert_eq!(3, actual.len());
-    assert_el_eq!(
-        ring,
-        ring.zero(),
-        multivariate_division(&ring, f1, actual.iter(), DegRevLex)
-    );
-    assert_el_eq!(
-        ring,
-        ring.zero(),
-        multivariate_division(&ring, f2, actual.iter(), DegRevLex)
-    );
-    assert_el_eq!(
-        ring,
-        ring.zero(),
-        multivariate_division(&ring, expected, actual.iter(), DegRevLex)
-    );
-}
-
-#[test]
-fn test_buchberger_larger() {
-    feanor_tracing::DelayedLogger::init_test();
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::F17;
-    let ring = MultivariatePolyRingImpl::new(base, 3);
-
-    let f1 = ring.from_terms(
-        [
-            (1, ring.create_monomial([2, 1, 1])),
-            (1, ring.create_monomial([0, 2, 0])),
-            (1, ring.create_monomial([1, 0, 1])),
-            (2, ring.create_monomial([1, 0, 0])),
-            (1, ring.create_monomial([0, 0, 0])),
-        ]
-        .into_iter(),
-    );
-    let f2 = ring.from_terms(
-        [
-            (1, ring.create_monomial([0, 3, 1])),
-            (1, ring.create_monomial([0, 0, 3])),
-            (1, ring.create_monomial([1, 1, 0])),
-        ]
-        .into_iter(),
-    );
-    let f3 = ring.from_terms(
-        [
-            (1, ring.create_monomial([1, 0, 2])),
-            (1, ring.create_monomial([1, 0, 1])),
-            (2, ring.create_monomial([0, 1, 1])),
-            (7, ring.create_monomial([0, 0, 0])),
-        ]
-        .into_iter(),
-    );
-
-    let actual = buchberger_with_strategy(
-        &ring,
-        vec![f1.clone(), f2.clone(), f3.clone()],
-        DegRevLex,
-        default_sort_fn(&ring, DegRevLex),
-        |_| false,
-    );
-
-    let g1 = ring.from_terms(
-        [
-            (1, ring.create_monomial([0, 4, 0])),
-            (8, ring.create_monomial([0, 3, 1])),
-            (12, ring.create_monomial([0, 1, 3])),
-            (6, ring.create_monomial([0, 0, 4])),
-            (1, ring.create_monomial([0, 3, 0])),
-            (13, ring.create_monomial([0, 2, 1])),
-            (11, ring.create_monomial([0, 1, 2])),
-            (10, ring.create_monomial([0, 0, 3])),
-            (11, ring.create_monomial([0, 2, 0])),
-            (12, ring.create_monomial([0, 1, 1])),
-            (6, ring.create_monomial([0, 0, 2])),
-            (6, ring.create_monomial([0, 1, 0])),
-            (13, ring.create_monomial([0, 0, 1])),
-            (9, ring.create_monomial([0, 0, 0])),
-        ]
-        .into_iter(),
-    );
-
-    assert_el_eq!(
-        ring,
-        ring.zero(),
-        multivariate_division(&ring, g1, actual.iter(), DegRevLex)
-    );
-}
-
-#[test]
-fn test_generic_computation() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::F17;
-    let ring = MultivariatePolyRingImpl::new(base, 6);
-    let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
-
-    let var_i = |i: usize| {
-        ring.create_term(
-            base.one(),
-            ring.create_monomial((0..ring.indeterminate_count()).map(|j| if i == j { 1 } else { 0 })),
-        )
-    };
-    let X1 = poly_ring.mul(
-        poly_ring.from_terms([(var_i(0), 0), (ring.one(), 1)].into_iter()),
-        poly_ring.from_terms([(var_i(1), 0), (ring.one(), 1)].into_iter()),
-    );
-    let X2 = poly_ring.mul(
-        poly_ring.add(
-            X1.clone(),
-            poly_ring.from_terms([(var_i(2), 0), (var_i(3), 1)].into_iter()),
-        ),
-        poly_ring.add(
-            X1.clone(),
-            poly_ring.from_terms([(var_i(4), 0), (var_i(5), 1)].into_iter()),
-        ),
-    );
-    let basis = vec![
-        ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 0)),
-        ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 1)),
-        ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 2)),
-    ];
-
-    let gb1 = buchberger_with_strategy(
-        &ring,
-        basis.iter().map(|f| f.clone()).collect(),
-        DegRevLex,
-        default_sort_fn(&ring, DegRevLex),
-        |_| false,
-    );
-    assert_eq!(11, gb1.len());
-}
-
-#[test]
-fn test_gb_local_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::Zn::<16>::RING;
-    let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
-
-    let f = ring.from_terms(
-        [
-            (base.int_hom().map(4), ring.create_monomial([1])),
-            (base.one(), ring.create_monomial([0])),
-        ]
-        .into_iter(),
-    );
-    let gb = buchberger_with_strategy(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
-
-    assert_eq!(1, gb.len());
-    assert_el_eq!(ring, ring.one(), gb[0]);
-}
-
-#[test]
-fn test_gb_lex() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let QQ = RationalField::new(ZZ);
-    let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
-    let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| {
-        [
-            1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2),
-            3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2),
-        ]
-    });
-    let expected = QQYX.with_wrapped_indeterminates(|[Y, X]| {
-        [
-            X.pow_ref(8) + 2 * X.pow_ref(7) + 3 * X.pow_ref(6)
-                - 5 * X.pow_ref(5)
-                - 10 * X.pow_ref(4)
-                - 7 * X.pow_ref(3)
-                + 8 * X.pow_ref(2)
-                + 8 * X
-                + 4,
-            2 * Y + X.pow_ref(6) + 3 * X.pow_ref(5) + 6 * X.pow_ref(4) + X.pow_ref(3) - 7 * X.pow_ref(2) - 12 * X - 2,
-        ]
-    });
-
-    let mut gb = buchberger(&QQYX, vec![f, g], Lex);
-
-    assert_eq!(2, gb.len());
-    gb.sort_unstable_by_key(|f| QQYX.appearing_indeterminates(f).len());
-    for (mut f, mut e) in gb.into_iter().zip(expected.into_iter()) {
-        let f_lc_inv = QQ.invert(QQYX.LT(&f, Lex).unwrap().0).unwrap();
-        QQYX.inclusion().mul_assign_map(&mut f, f_lc_inv);
-        let e_lc_inv = QQ.invert(QQYX.LT(&e, Lex).unwrap().0).unwrap();
-        QQYX.inclusion().mul_assign_map(&mut e, e_lc_inv);
-        assert_el_eq!(QQYX, e, f);
-    }
-}
-
-#[ignore]
-#[test]
-fn test_expensive_gb_1() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::Zn::<16>::RING;
-    let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 12);
-
-    let system = ring.with_wrapped_indeterminates(|[Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10, Y11]| {
-        [
-            Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4.pow_ref(2)
-                + 4 * Y0 * Y1 * Y2 * Y3 * Y4 * Y4 * Y8
-                + Y0 * Y1 * Y2 * Y5.pow_ref(2) * Y8.pow_ref(2)
-                + Y0 * Y2 * Y3 * Y4 * Y6
-                + Y0 * Y1 * Y3 * Y4 * Y7
-                + Y0 * Y2 * Y5 * Y6 * Y8
-                + Y0 * Y1 * Y5 * Y7 * Y8
-                + Y0 * Y2 * Y3 * Y5 * Y10
-                + Y0 * Y1 * Y3 * Y5 * Y11
-                + Y0 * Y6 * Y7
-                + Y3 * Y5 * Y9
-                - 4,
-            2 * Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4 * Y5
-                + 2 * Y0 * Y1 * Y2 * Y3 * Y5.pow_ref(2) * Y8
-                + Y0 * Y2 * Y3 * Y5 * Y6
-                + Y0 * Y1 * Y3 * Y5 * Y7
-                + 8,
-            Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y5.pow_ref(2) - 5,
-        ]
-    });
-
-    let part_of_result =
-        ring.with_wrapped_indeterminates(|[_Y0, Y1, Y2, _Y3, _Y4, _Y5, Y6, Y7, _Y8, _Y9, _Y10, _Y11]| {
+        let f1 = ring.from_terms(
             [
-                4 * Y2.pow_ref(2) * Y6.pow_ref(2) - 4 * Y1.pow_ref(2) * Y7.pow_ref(2),
-                8 * Y2 * Y6 + 8 * Y1 * Y7.clone(),
+                (1, ring.create_monomial([2, 0])),
+                (1, ring.create_monomial([0, 2])),
+                (16, ring.create_monomial([0, 0])),
+            ]
+            .into_iter(),
+        );
+        let f2 = ring.from_terms([(1, ring.create_monomial([1, 1])), (15, ring.create_monomial([0, 0]))].into_iter());
+
+        let actual = buchberger_with_strategy(
+            &ring,
+            vec![f1.clone(), f2.clone()],
+            DegRevLex,
+            default_sort_fn(&ring, DegRevLex),
+            |_| false,
+        );
+
+        let expected = ring.from_terms(
+            [
+                (16, ring.create_monomial([0, 3])),
+                (15, ring.create_monomial([1, 0])),
+                (1, ring.create_monomial([0, 1])),
+            ]
+            .into_iter(),
+        );
+
+        assert_eq!(3, actual.len());
+        assert_el_eq!(
+            ring,
+            ring.zero(),
+            multivariate_division(&ring, f1, actual.iter(), DegRevLex)
+        );
+        assert_el_eq!(
+            ring,
+            ring.zero(),
+            multivariate_division(&ring, f2, actual.iter(), DegRevLex)
+        );
+        assert_el_eq!(
+            ring,
+            ring.zero(),
+            multivariate_division(&ring, expected, actual.iter(), DegRevLex)
+        );
+    }
+
+    #[test]
+    fn test_buchberger_larger() {
+        feanor_tracing::DelayedLogger::init_test();
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::F17;
+        let ring = MultivariatePolyRingImpl::new(base, 3);
+
+        let f1 = ring.from_terms(
+            [
+                (1, ring.create_monomial([2, 1, 1])),
+                (1, ring.create_monomial([0, 2, 0])),
+                (1, ring.create_monomial([1, 0, 1])),
+                (2, ring.create_monomial([1, 0, 0])),
+                (1, ring.create_monomial([0, 0, 0])),
+            ]
+            .into_iter(),
+        );
+        let f2 = ring.from_terms(
+            [
+                (1, ring.create_monomial([0, 3, 1])),
+                (1, ring.create_monomial([0, 0, 3])),
+                (1, ring.create_monomial([1, 1, 0])),
+            ]
+            .into_iter(),
+        );
+        let f3 = ring.from_terms(
+            [
+                (1, ring.create_monomial([1, 0, 2])),
+                (1, ring.create_monomial([1, 0, 1])),
+                (2, ring.create_monomial([0, 1, 1])),
+                (7, ring.create_monomial([0, 0, 0])),
+            ]
+            .into_iter(),
+        );
+
+        let actual = buchberger_with_strategy(
+            &ring,
+            vec![f1.clone(), f2.clone(), f3.clone()],
+            DegRevLex,
+            default_sort_fn(&ring, DegRevLex),
+            |_| false,
+        );
+
+        let g1 = ring.from_terms(
+            [
+                (1, ring.create_monomial([0, 4, 0])),
+                (8, ring.create_monomial([0, 3, 1])),
+                (12, ring.create_monomial([0, 1, 3])),
+                (6, ring.create_monomial([0, 0, 4])),
+                (1, ring.create_monomial([0, 3, 0])),
+                (13, ring.create_monomial([0, 2, 1])),
+                (11, ring.create_monomial([0, 1, 2])),
+                (10, ring.create_monomial([0, 0, 3])),
+                (11, ring.create_monomial([0, 2, 0])),
+                (12, ring.create_monomial([0, 1, 1])),
+                (6, ring.create_monomial([0, 0, 2])),
+                (6, ring.create_monomial([0, 1, 0])),
+                (13, ring.create_monomial([0, 0, 1])),
+                (9, ring.create_monomial([0, 0, 0])),
+            ]
+            .into_iter(),
+        );
+
+        assert_el_eq!(
+            ring,
+            ring.zero(),
+            multivariate_division(&ring, g1, actual.iter(), DegRevLex)
+        );
+    }
+
+    #[test]
+    fn test_generic_computation() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::F17;
+        let ring = MultivariatePolyRingImpl::new(base, 6);
+        let poly_ring = dense_poly::DensePolyRing::new(&ring, "X");
+
+        let var_i = |i: usize| {
+            ring.create_term(
+                base.one(),
+                ring.create_monomial((0..ring.indeterminate_count()).map(|j| if i == j { 1 } else { 0 })),
+            )
+        };
+        let X1 = poly_ring.mul(
+            poly_ring.from_terms([(var_i(0), 0), (ring.one(), 1)].into_iter()),
+            poly_ring.from_terms([(var_i(1), 0), (ring.one(), 1)].into_iter()),
+        );
+        let X2 = poly_ring.mul(
+            poly_ring.add(
+                X1.clone(),
+                poly_ring.from_terms([(var_i(2), 0), (var_i(3), 1)].into_iter()),
+            ),
+            poly_ring.add(
+                X1.clone(),
+                poly_ring.from_terms([(var_i(4), 0), (var_i(5), 1)].into_iter()),
+            ),
+        );
+        let basis = vec![
+            ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 0)),
+            ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 1)),
+            ring.sub_ref_snd(ring.int_hom().map(1), poly_ring.coefficient_at(&X2, 2)),
+        ];
+
+        let gb1 = buchberger_with_strategy(
+            &ring,
+            basis.iter().map(|f| f.clone()).collect(),
+            DegRevLex,
+            default_sort_fn(&ring, DegRevLex),
+            |_| false,
+        );
+        assert_eq!(11, gb1.len());
+    }
+
+    #[test]
+    fn test_gb_local_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::Zn::<16>::RING;
+        let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
+
+        let f = ring.from_terms(
+            [
+                (base.int_hom().map(4), ring.create_monomial([1])),
+                (base.one(), ring.create_monomial([0])),
+            ]
+            .into_iter(),
+        );
+        let gb = buchberger_with_strategy(&ring, vec![f], DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+
+        assert_eq!(1, gb.len());
+        assert_el_eq!(ring, ring.one(), gb[0]);
+    }
+
+    #[test]
+    fn test_gb_lex() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let QQ = RationalField::new(ZZ);
+        let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
+        let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| {
+            [
+                1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2),
+                3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2),
+            ]
+        });
+        let expected = QQYX.with_wrapped_indeterminates(|[Y, X]| {
+            [
+                X.pow_ref(8) + 2 * X.pow_ref(7) + 3 * X.pow_ref(6)
+                    - 5 * X.pow_ref(5)
+                    - 10 * X.pow_ref(4)
+                    - 7 * X.pow_ref(3)
+                    + 8 * X.pow_ref(2)
+                    + 8 * X
+                    + 4,
+                2 * Y + X.pow_ref(6) + 3 * X.pow_ref(5) + 6 * X.pow_ref(4) + X.pow_ref(3)
+                    - 7 * X.pow_ref(2)
+                    - 12 * X
+                    - 2,
             ]
         });
 
-    let gb = buchberger_with_strategy(
-        &ring,
-        system.iter().map(|f| f.clone()).collect(),
-        DegRevLex,
-        default_sort_fn(&ring, DegRevLex),
-        |_| false,
-    );
+        let mut gb = buchberger(&QQYX, vec![f, g], Lex);
 
-    for f in &part_of_result {
-        assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), DegRevLex)));
+        assert_eq!(2, gb.len());
+        gb.sort_unstable_by_key(|f| QQYX.appearing_indeterminates(f).len());
+        for (mut f, mut e) in gb.into_iter().zip(expected.into_iter()) {
+            let f_lc_inv = QQ.invert(QQYX.LT(&f, Lex).unwrap().0).unwrap();
+            QQYX.inclusion().mul_assign_map(&mut f, f_lc_inv);
+            let e_lc_inv = QQ.invert(QQYX.LT(&e, Lex).unwrap().0).unwrap();
+            QQYX.inclusion().mul_assign_map(&mut e, e_lc_inv);
+            assert_el_eq!(QQYX, e, f);
+        }
     }
-    assert_eq!(108, gb.len());
-}
 
-#[test]
-#[ignore]
-fn test_expensive_gb_2() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::Fp::<7>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 7);
+    #[ignore]
+    #[test]
+    fn test_expensive_gb_1() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::Zn::<16>::RING;
+        let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 12);
 
-    let basis = ring.with_wrapped_indeterminates_dyn(|[X0, X1, X2, X3, X4, X5, X6]| {
-        [
-            6 + 2 * X5
-                + 2 * X4
-                + X6
-                + 4 * X0
-                + 5 * X6 * X5
-                + X6 * X4
-                + 3 * X0 * X4
-                + 6 * X0 * X6
-                + 2 * X0 * X3
-                + X0 * X2
-                + 4 * X0 * X1
-                + 2 * X3 * X4 * X5
-                + 4 * X0 * X6 * X5
-                + 6 * X0 * X2 * X5
-                + 5 * X0 * X6 * X4
-                + 2 * X0 * X3 * X4
-                + 4 * X0 * X1 * X4
-                + X0 * X6.pow_ref(2)
-                + 3 * X0 * X3 * X6
-                + 5 * X0 * X2 * X6
-                + 2 * X0 * X1 * X6
-                + X0 * X3.pow_ref(2)
-                + 2 * X0 * X2 * X3
-                + 3 * X0 * X3 * X4 * X5
-                + 4 * X0 * X3 * X6 * X5
-                + 3 * X0 * X1 * X6 * X5
-                + 3 * X0 * X2 * X3 * X5
-                + 3 * X0 * X3 * X6 * X4
-                + 2 * X0 * X1 * X6 * X4
-                + 2 * X0 * X3.pow_ref(2) * X4
-                + 2 * X0 * X2 * X3 * X4
-                + 3 * X0 * X3.pow_ref(2) * X4 * X5
-                + 4 * X0 * X1 * X3 * X4 * X5
-                + X0 * X3.pow_ref(2) * X4.pow_ref(2),
-            5 + 4 * X0
-                + 6 * X4 * X5
-                + 3 * X6 * X5
-                + 4 * X0 * X4
-                + 3 * X0 * X6
-                + 6 * X0 * X3
-                + 6 * X0 * X2
-                + 6 * X6 * X4 * X5
-                + 2 * X0 * X4 * X5
-                + 4 * X0 * X6 * X5
-                + 3 * X0 * X2 * X5
-                + 3 * X0 * X6 * X4
-                + 5 * X0 * X3 * X4
-                + 6 * X0 * X2 * X4
-                + 4 * X0 * X6.pow_ref(2)
-                + 3 * X0 * X3 * X6
-                + 3 * X0 * X2 * X6
-                + 2 * X0 * X6 * X4 * X5
-                + 6 * X0 * X3 * X4 * X5
-                + 5 * X0 * X1 * X4 * X5
-                + 6 * X0 * X6.pow_ref(2) * X5
-                + 2 * X0 * X3 * X6 * X5
-                + 2 * X0 * X2 * X6 * X5
-                + 6 * X0 * X1 * X6 * X5
-                + 6 * X0 * X2 * X3 * X5
-                + 6 * X0 * X3 * X4.pow_ref(2)
-                + 4 * X0 * X6.pow_ref(2) * X4
-                + 6 * X0 * X3 * X6 * X4
-                + 3 * X0 * X2 * X6 * X4
-                + 4 * X0 * X3 * X6 * X4 * X5
-                + 5 * X0 * X1 * X6 * X4 * X5
-                + 6 * X0 * X3.pow_ref(2) * X4 * X5
-                + 5 * X0 * X2 * X3 * X4 * X5
-                + 3 * X0 * X3 * X6 * X4.pow_ref(2)
-                + 6 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.clone(),
-            2 + 2 * X0
-                + 4 * X0 * X4
-                + 2 * X0 * X6
-                + 5 * X0 * X4 * X5
-                + 2 * X0 * X6 * X5
-                + 4 * X0 * X2 * X5
-                + 2 * X0 * X4.pow_ref(2)
-                + 4 * X0 * X6 * X4
-                + 4 * X0 * X6.pow_ref(2)
-                + 2 * X6 * X4 * X5.pow_ref(2)
-                + 4 * X0 * X6 * X4 * X5
-                + X0 * X3 * X4 * X5
-                + X0 * X2 * X4 * X5
-                + 3 * X0 * X6.pow_ref(2) * X5
-                + 2 * X0 * X3 * X6 * X5
-                + 4 * X0 * X2 * X6 * X5
-                + 2 * X0 * X6 * X4.pow_ref(2)
-                + X0 * X6.pow_ref(2) * X4
-                + 3 * X0 * X6 * X4 * X5.pow_ref(2)
-                + 2 * X0 * X6.pow_ref(2) * X5.pow_ref(2)
-                + 3 * X0 * X2 * X6 * X5.pow_ref(2)
-                + X0 * X3 * X4.pow_ref(2) * X5
-                + X0 * X6.pow_ref(2) * X4 * X5
-                + X0 * X3 * X6 * X4 * X5
-                + 6 * X0 * X2 * X6 * X4 * X5
-                + 4 * X0 * X6.pow_ref(2) * X4.pow_ref(2)
-                + 6 * X0 * X3 * X6 * X4 * X5.pow_ref(2)
-                + 4 * X0 * X1 * X6 * X4 * X5.pow_ref(2)
-                + 4 * X0 * X2 * X3 * X4 * X5.pow_ref(2)
-                + 6 * X0 * X3 * X6 * X4.pow_ref(2) * X5
-                + 2 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2),
-            4 + 5 * X0 * X4 * X5
-                + 6 * X0 * X6 * X5
-                + 5 * X0 * X4.pow_ref(2) * X5
-                + 3 * X0 * X6 * X4 * X5
-                + 3 * X0 * X6.pow_ref(2) * X5
-                + 6 * X0 * X6 * X4 * X5.pow_ref(2)
-                + 5 * X0 * X2 * X4 * X5.pow_ref(2)
-                + X0 * X6.pow_ref(2) * X5.pow_ref(2)
-                + 6 * X0 * X2 * X6 * X5.pow_ref(2)
-                + 4 * X0 * X6 * X4.pow_ref(2) * X5
-                + 2 * X0 * X6.pow_ref(2) * X4 * X5
-                + 5 * X0 * X3 * X4.pow_ref(2) * X5.pow_ref(2)
-                + 3 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(2)
-                + 5 * X0 * X3 * X6 * X4 * X5.pow_ref(2)
-                + 4 * X0 * X2 * X6 * X4 * X5.pow_ref(2)
-                + 6 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5
-                + 4 * X0 * X3 * X6 * X4.pow_ref(2) * X5.pow_ref(2),
-            4 + 4 * X0 * X4.pow_ref(2) * X5.pow_ref(2)
-                + X0 * X6 * X4 * X5.pow_ref(2)
-                + X0 * X6.pow_ref(2) * X5.pow_ref(2)
-                + 5 * X0 * X6 * X4.pow_ref(2) * X5.pow_ref(2)
-                + 6 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(2)
-                + 3 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(3)
-                + 4 * X0 * X2 * X6 * X4 * X5.pow_ref(3)
-                + 6 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2)
-                + 4 * X0 * X3 * X6 * X4.pow_ref(2) * X5.pow_ref(3),
-            5 * X0 * X6 * X4.pow_ref(2) * X5.pow_ref(3)
-                + 6 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(3)
-                + 5 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(3),
-            2 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(4),
-        ]
-    });
+        let system = ring.with_wrapped_indeterminates(|[Y0, Y1, Y2, Y3, Y4, Y5, Y6, Y7, Y8, Y9, Y10, Y11]| {
+            [
+                Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4.pow_ref(2)
+                    + 4 * Y0 * Y1 * Y2 * Y3 * Y4 * Y4 * Y8
+                    + Y0 * Y1 * Y2 * Y5.pow_ref(2) * Y8.pow_ref(2)
+                    + Y0 * Y2 * Y3 * Y4 * Y6
+                    + Y0 * Y1 * Y3 * Y4 * Y7
+                    + Y0 * Y2 * Y5 * Y6 * Y8
+                    + Y0 * Y1 * Y5 * Y7 * Y8
+                    + Y0 * Y2 * Y3 * Y5 * Y10
+                    + Y0 * Y1 * Y3 * Y5 * Y11
+                    + Y0 * Y6 * Y7
+                    + Y3 * Y5 * Y9
+                    - 4,
+                2 * Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y4 * Y5
+                    + 2 * Y0 * Y1 * Y2 * Y3 * Y5.pow_ref(2) * Y8
+                    + Y0 * Y2 * Y3 * Y5 * Y6
+                    + Y0 * Y1 * Y3 * Y5 * Y7
+                    + 8,
+                Y0 * Y1 * Y2 * Y3.pow_ref(2) * Y5.pow_ref(2) - 5,
+            ]
+        });
 
-    let gb = buchberger_with_strategy(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
-    assert_eq!(130, gb.len());
-}
+        let part_of_result =
+            ring.with_wrapped_indeterminates(|[_Y0, Y1, Y2, _Y3, _Y4, _Y5, Y6, Y7, _Y8, _Y9, _Y10, _Y11]| {
+                [
+                    4 * Y2.pow_ref(2) * Y6.pow_ref(2) - 4 * Y1.pow_ref(2) * Y7.pow_ref(2),
+                    8 * Y2 * Y6 + 8 * Y1 * Y7.clone(),
+                ]
+            });
 
-#[test]
-#[ignore]
-fn test_groebner_cyclic6() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::Fp::<65537>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 6);
+        let gb = buchberger_with_strategy(
+            &ring,
+            system.iter().map(|f| f.clone()).collect(),
+            DegRevLex,
+            default_sort_fn(&ring, DegRevLex),
+            |_| false,
+        );
 
-    let cyclic6 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, t, u, v]| {
-        [
-            x + y + z + t + u + v,
-            x * y + y * z + z * t + t * u + x * v + u * v,
-            x * y * z + y * z * t + z * t * u + x * y * v + x * u * v + t * u * v,
-            x * y * z * t + y * z * t * u + x * y * z * v + x * y * u * v + x * t * u * v + z * t * u * v,
-            x * y * z * t * u
-                + x * y * z * t * v
-                + x * y * z * u * v
-                + x * y * t * u * v
-                + x * z * t * u * v
-                + y * z * t * u * v,
-            x * y * z * t * u * v - 1,
-        ]
-    });
+        for f in &part_of_result {
+            assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), DegRevLex)));
+        }
+        assert_eq!(108, gb.len());
+    }
 
-    let gb = buchberger_with_strategy(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
-    assert_eq!(45, gb.len());
-}
+    #[test]
+    #[ignore]
+    fn test_expensive_gb_2() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::Fp::<7>::RING;
+        let ring = MultivariatePolyRingImpl::new(base, 7);
 
-#[test]
-#[ignore]
-fn test_groebner_cyclic7() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::Fp::<65537>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 7);
+        let basis = ring.with_wrapped_indeterminates_dyn(|[X0, X1, X2, X3, X4, X5, X6]| {
+            [
+                6 + 2 * X5
+                    + 2 * X4
+                    + X6
+                    + 4 * X0
+                    + 5 * X6 * X5
+                    + X6 * X4
+                    + 3 * X0 * X4
+                    + 6 * X0 * X6
+                    + 2 * X0 * X3
+                    + X0 * X2
+                    + 4 * X0 * X1
+                    + 2 * X3 * X4 * X5
+                    + 4 * X0 * X6 * X5
+                    + 6 * X0 * X2 * X5
+                    + 5 * X0 * X6 * X4
+                    + 2 * X0 * X3 * X4
+                    + 4 * X0 * X1 * X4
+                    + X0 * X6.pow_ref(2)
+                    + 3 * X0 * X3 * X6
+                    + 5 * X0 * X2 * X6
+                    + 2 * X0 * X1 * X6
+                    + X0 * X3.pow_ref(2)
+                    + 2 * X0 * X2 * X3
+                    + 3 * X0 * X3 * X4 * X5
+                    + 4 * X0 * X3 * X6 * X5
+                    + 3 * X0 * X1 * X6 * X5
+                    + 3 * X0 * X2 * X3 * X5
+                    + 3 * X0 * X3 * X6 * X4
+                    + 2 * X0 * X1 * X6 * X4
+                    + 2 * X0 * X3.pow_ref(2) * X4
+                    + 2 * X0 * X2 * X3 * X4
+                    + 3 * X0 * X3.pow_ref(2) * X4 * X5
+                    + 4 * X0 * X1 * X3 * X4 * X5
+                    + X0 * X3.pow_ref(2) * X4.pow_ref(2),
+                5 + 4 * X0
+                    + 6 * X4 * X5
+                    + 3 * X6 * X5
+                    + 4 * X0 * X4
+                    + 3 * X0 * X6
+                    + 6 * X0 * X3
+                    + 6 * X0 * X2
+                    + 6 * X6 * X4 * X5
+                    + 2 * X0 * X4 * X5
+                    + 4 * X0 * X6 * X5
+                    + 3 * X0 * X2 * X5
+                    + 3 * X0 * X6 * X4
+                    + 5 * X0 * X3 * X4
+                    + 6 * X0 * X2 * X4
+                    + 4 * X0 * X6.pow_ref(2)
+                    + 3 * X0 * X3 * X6
+                    + 3 * X0 * X2 * X6
+                    + 2 * X0 * X6 * X4 * X5
+                    + 6 * X0 * X3 * X4 * X5
+                    + 5 * X0 * X1 * X4 * X5
+                    + 6 * X0 * X6.pow_ref(2) * X5
+                    + 2 * X0 * X3 * X6 * X5
+                    + 2 * X0 * X2 * X6 * X5
+                    + 6 * X0 * X1 * X6 * X5
+                    + 6 * X0 * X2 * X3 * X5
+                    + 6 * X0 * X3 * X4.pow_ref(2)
+                    + 4 * X0 * X6.pow_ref(2) * X4
+                    + 6 * X0 * X3 * X6 * X4
+                    + 3 * X0 * X2 * X6 * X4
+                    + 4 * X0 * X3 * X6 * X4 * X5
+                    + 5 * X0 * X1 * X6 * X4 * X5
+                    + 6 * X0 * X3.pow_ref(2) * X4 * X5
+                    + 5 * X0 * X2 * X3 * X4 * X5
+                    + 3 * X0 * X3 * X6 * X4.pow_ref(2)
+                    + 6 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.clone(),
+                2 + 2 * X0
+                    + 4 * X0 * X4
+                    + 2 * X0 * X6
+                    + 5 * X0 * X4 * X5
+                    + 2 * X0 * X6 * X5
+                    + 4 * X0 * X2 * X5
+                    + 2 * X0 * X4.pow_ref(2)
+                    + 4 * X0 * X6 * X4
+                    + 4 * X0 * X6.pow_ref(2)
+                    + 2 * X6 * X4 * X5.pow_ref(2)
+                    + 4 * X0 * X6 * X4 * X5
+                    + X0 * X3 * X4 * X5
+                    + X0 * X2 * X4 * X5
+                    + 3 * X0 * X6.pow_ref(2) * X5
+                    + 2 * X0 * X3 * X6 * X5
+                    + 4 * X0 * X2 * X6 * X5
+                    + 2 * X0 * X6 * X4.pow_ref(2)
+                    + X0 * X6.pow_ref(2) * X4
+                    + 3 * X0 * X6 * X4 * X5.pow_ref(2)
+                    + 2 * X0 * X6.pow_ref(2) * X5.pow_ref(2)
+                    + 3 * X0 * X2 * X6 * X5.pow_ref(2)
+                    + X0 * X3 * X4.pow_ref(2) * X5
+                    + X0 * X6.pow_ref(2) * X4 * X5
+                    + X0 * X3 * X6 * X4 * X5
+                    + 6 * X0 * X2 * X6 * X4 * X5
+                    + 4 * X0 * X6.pow_ref(2) * X4.pow_ref(2)
+                    + 6 * X0 * X3 * X6 * X4 * X5.pow_ref(2)
+                    + 4 * X0 * X1 * X6 * X4 * X5.pow_ref(2)
+                    + 4 * X0 * X2 * X3 * X4 * X5.pow_ref(2)
+                    + 6 * X0 * X3 * X6 * X4.pow_ref(2) * X5
+                    + 2 * X0 * X3.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2),
+                4 + 5 * X0 * X4 * X5
+                    + 6 * X0 * X6 * X5
+                    + 5 * X0 * X4.pow_ref(2) * X5
+                    + 3 * X0 * X6 * X4 * X5
+                    + 3 * X0 * X6.pow_ref(2) * X5
+                    + 6 * X0 * X6 * X4 * X5.pow_ref(2)
+                    + 5 * X0 * X2 * X4 * X5.pow_ref(2)
+                    + X0 * X6.pow_ref(2) * X5.pow_ref(2)
+                    + 6 * X0 * X2 * X6 * X5.pow_ref(2)
+                    + 4 * X0 * X6 * X4.pow_ref(2) * X5
+                    + 2 * X0 * X6.pow_ref(2) * X4 * X5
+                    + 5 * X0 * X3 * X4.pow_ref(2) * X5.pow_ref(2)
+                    + 3 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(2)
+                    + 5 * X0 * X3 * X6 * X4 * X5.pow_ref(2)
+                    + 4 * X0 * X2 * X6 * X4 * X5.pow_ref(2)
+                    + 6 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5
+                    + 4 * X0 * X3 * X6 * X4.pow_ref(2) * X5.pow_ref(2),
+                4 + 4 * X0 * X4.pow_ref(2) * X5.pow_ref(2)
+                    + X0 * X6 * X4 * X5.pow_ref(2)
+                    + X0 * X6.pow_ref(2) * X5.pow_ref(2)
+                    + 5 * X0 * X6 * X4.pow_ref(2) * X5.pow_ref(2)
+                    + 6 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(2)
+                    + 3 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(3)
+                    + 4 * X0 * X2 * X6 * X4 * X5.pow_ref(3)
+                    + 6 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(2)
+                    + 4 * X0 * X3 * X6 * X4.pow_ref(2) * X5.pow_ref(3),
+                5 * X0 * X6 * X4.pow_ref(2) * X5.pow_ref(3)
+                    + 6 * X0 * X6.pow_ref(2) * X4 * X5.pow_ref(3)
+                    + 5 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(3),
+                2 * X0 * X6.pow_ref(2) * X4.pow_ref(2) * X5.pow_ref(4),
+            ]
+        });
 
-    let cyclic7 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, t, u, v, w]| {
-        [
-            x + y + z + t + u + v + w,
-            x * y + y * z + z * t + t * u + u * v + x * w + v * w,
-            x * y * z + y * z * t + z * t * u + t * u * v + x * y * w + x * v * w + u * v * w,
-            x * y * z * t
-                + y * z * t * u
-                + z * t * u * v
-                + x * y * z * w
-                + x * y * v * w
-                + x * u * v * w
-                + t * u * v * w,
-            x * y * z * t * u
-                + y * z * t * u * v
-                + x * y * z * t * w
-                + x * y * z * v * w
-                + x * y * u * v * w
-                + x * t * u * v * w
-                + z * t * u * v * w,
-            x * y * z * t * u * v
-                + x * y * z * t * u * w
-                + x * y * z * t * v * w
-                + x * y * z * u * v * w
-                + x * y * t * u * v * w
-                + x * z * t * u * v * w
-                + y * z * t * u * v * w,
-            x * y * z * t * u * v * w - 1,
-        ]
-    });
+        let gb = buchberger_with_strategy(&ring, basis, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+        assert_eq!(130, gb.len());
+    }
 
-    let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
-    assert_eq!(209, gb.len());
-}
+    #[test]
+    #[ignore]
+    fn test_groebner_cyclic6() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::Fp::<65537>::RING;
+        let ring = MultivariatePolyRingImpl::new(base, 6);
 
-#[test]
-#[ignore]
-fn test_groebner_cyclic8() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base = zn_static::Fp::<65537>::RING;
-    let ring = MultivariatePolyRingImpl::new(base, 8);
+        let cyclic6 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, t, u, v]| {
+            [
+                x + y + z + t + u + v,
+                x * y + y * z + z * t + t * u + x * v + u * v,
+                x * y * z + y * z * t + z * t * u + x * y * v + x * u * v + t * u * v,
+                x * y * z * t + y * z * t * u + x * y * z * v + x * y * u * v + x * t * u * v + z * t * u * v,
+                x * y * z * t * u
+                    + x * y * z * t * v
+                    + x * y * z * u * v
+                    + x * y * t * u * v
+                    + x * z * t * u * v
+                    + y * z * t * u * v,
+                x * y * z * t * u * v - 1,
+            ]
+        });
 
-    let cyclic7 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, s, t, u, v, w]| {
-        [
-            x + y + z + s + t + u + v + w,
-            x * y + y * z + z * s + s * t + t * u + u * v + x * w + v * w,
-            x * y * z + y * z * s + z * s * t + s * t * u + t * u * v + x * y * w + x * v * w + u * v * w,
-            x * y * z * s
-                + y * z * s * t
-                + z * s * t * u
-                + s * t * u * v
-                + x * y * z * w
-                + x * y * v * w
-                + x * u * v * w
-                + t * u * v * w,
-            x * y * z * s * t
-                + y * z * s * t * u
-                + z * s * t * u * v
-                + x * y * z * s * w
-                + x * y * z * v * w
-                + x * y * u * v * w
-                + x * t * u * v * w
-                + s * t * u * v * w,
-            x * y * z * s * t * u
-                + y * z * s * t * u * v
-                + x * y * z * s * t * w
-                + x * y * z * s * v * w
-                + x * y * z * u * v * w
-                + x * y * t * u * v * w
-                + x * s * t * u * v * w
-                + z * s * t * u * v * w,
-            x * y * z * s * t * u * v
-                + x * y * z * s * t * u * w
-                + x * y * z * s * t * v * w
-                + x * y * z * s * u * v * w
-                + x * y * z * t * u * v * w
-                + x * y * s * t * u * v * w
-                + x * z * s * t * u * v * w
-                + y * z * s * t * u * v * w,
-            x * y * z * s * t * u * v * w - 1,
-        ]
-    });
+        let gb = buchberger_with_strategy(&ring, cyclic6, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+        assert_eq!(45, gb.len());
+    }
 
-    let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
-    assert_eq!(372, gb.len());
+    #[test]
+    #[ignore]
+    fn test_groebner_cyclic7() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::Fp::<65537>::RING;
+        let ring = MultivariatePolyRingImpl::new(base, 7);
+
+        let cyclic7 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, t, u, v, w]| {
+            [
+                x + y + z + t + u + v + w,
+                x * y + y * z + z * t + t * u + u * v + x * w + v * w,
+                x * y * z + y * z * t + z * t * u + t * u * v + x * y * w + x * v * w + u * v * w,
+                x * y * z * t
+                    + y * z * t * u
+                    + z * t * u * v
+                    + x * y * z * w
+                    + x * y * v * w
+                    + x * u * v * w
+                    + t * u * v * w,
+                x * y * z * t * u
+                    + y * z * t * u * v
+                    + x * y * z * t * w
+                    + x * y * z * v * w
+                    + x * y * u * v * w
+                    + x * t * u * v * w
+                    + z * t * u * v * w,
+                x * y * z * t * u * v
+                    + x * y * z * t * u * w
+                    + x * y * z * t * v * w
+                    + x * y * z * u * v * w
+                    + x * y * t * u * v * w
+                    + x * z * t * u * v * w
+                    + y * z * t * u * v * w,
+                x * y * z * t * u * v * w - 1,
+            ]
+        });
+
+        let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+        assert_eq!(209, gb.len());
+    }
+
+    #[test]
+    #[ignore]
+    fn test_groebner_cyclic8() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base = zn_static::Fp::<65537>::RING;
+        let ring = MultivariatePolyRingImpl::new(base, 8);
+
+        let cyclic7 = ring.with_wrapped_indeterminates_dyn(|[x, y, z, s, t, u, v, w]| {
+            [
+                x + y + z + s + t + u + v + w,
+                x * y + y * z + z * s + s * t + t * u + u * v + x * w + v * w,
+                x * y * z + y * z * s + z * s * t + s * t * u + t * u * v + x * y * w + x * v * w + u * v * w,
+                x * y * z * s
+                    + y * z * s * t
+                    + z * s * t * u
+                    + s * t * u * v
+                    + x * y * z * w
+                    + x * y * v * w
+                    + x * u * v * w
+                    + t * u * v * w,
+                x * y * z * s * t
+                    + y * z * s * t * u
+                    + z * s * t * u * v
+                    + x * y * z * s * w
+                    + x * y * z * v * w
+                    + x * y * u * v * w
+                    + x * t * u * v * w
+                    + s * t * u * v * w,
+                x * y * z * s * t * u
+                    + y * z * s * t * u * v
+                    + x * y * z * s * t * w
+                    + x * y * z * s * v * w
+                    + x * y * z * u * v * w
+                    + x * y * t * u * v * w
+                    + x * s * t * u * v * w
+                    + z * s * t * u * v * w,
+                x * y * z * s * t * u * v
+                    + x * y * z * s * t * u * w
+                    + x * y * z * s * t * v * w
+                    + x * y * z * s * u * v * w
+                    + x * y * z * t * u * v * w
+                    + x * y * s * t * u * v * w
+                    + x * z * s * t * u * v * w
+                    + y * z * s * t * u * v * w,
+                x * y * z * s * t * u * v * w - 1,
+            ]
+        });
+
+        let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, default_sort_fn(&ring, DegRevLex), |_| false);
+        assert_eq!(372, gb.len());
+    }
 }

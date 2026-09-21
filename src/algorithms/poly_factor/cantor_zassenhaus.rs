@@ -508,241 +508,243 @@ where
 }
 
 #[cfg(test)]
-use crate::iters::{clone_slice, powerset};
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::Fp;
+mod tests {
+    use super::*;
+    use crate::iters::{clone_slice, powerset};
+    use crate::ring_impls::zn::zn_static::Fp;
 
-#[test]
-fn test_distinct_degree_factorization() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Fp::<2>::RING;
-    let ring = DensePolyRing::new(field, "X");
+    #[test]
+    fn test_distinct_degree_factorization() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = Fp::<2>::RING;
+        let ring = DensePolyRing::new(field, "X");
 
-    // one degree 3 factor
-    let a0 = ring.one();
-    let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
-    let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
-    let a3 = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
-    let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| x.clone()));
-    let expected = vec![a0, a1, a2, a3];
-    let actual = distinct_degree_factorization(&ring, a);
-    assert_eq!(expected.len(), actual.len());
-    for (f, e) in actual.into_iter().zip(expected.into_iter()) {
-        assert_el_eq!(ring, e, ring.normalize(f).0);
+        // one degree 3 factor
+        let a0 = ring.one();
+        let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
+        let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
+        let a3 = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
+        let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| x.clone()));
+        let expected = vec![a0, a1, a2, a3];
+        let actual = distinct_degree_factorization(&ring, a);
+        assert_eq!(expected.len(), actual.len());
+        for (f, e) in actual.into_iter().zip(expected.into_iter()) {
+            assert_el_eq!(ring, e, ring.normalize(f).0);
+        }
+
+        // two degree 3 factors
+        let a0 = ring.one();
+        let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
+        let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
+        let a3 = ring.mul(
+            ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter()),
+            ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter()),
+        );
+        let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| x.clone()));
+        let expected = vec![a0, a1, a2, a3];
+        let actual = distinct_degree_factorization(&ring, a);
+        assert_eq!(expected.len(), actual.len());
+        for (f, e) in actual.into_iter().zip(expected.into_iter()) {
+            assert_el_eq!(ring, e, ring.normalize(f).0);
+        }
     }
 
-    // two degree 3 factors
-    let a0 = ring.one();
-    let a1 = ring.mul(ring.indeterminate(), ring.from_terms([(1, 0), (1, 1)].into_iter()));
-    let a2 = ring.from_terms([(1, 0), (1, 1), (1, 2)].into_iter());
-    let a3 = ring.mul(
-        ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter()),
-        ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter()),
-    );
-    let a = ring.prod([&a0, &a1, &a2, &a3].into_iter().map(|x| x.clone()));
-    let expected = vec![a0, a1, a2, a3];
-    let actual = distinct_degree_factorization(&ring, a);
-    assert_eq!(expected.len(), actual.len());
-    for (f, e) in actual.into_iter().zip(expected.into_iter()) {
-        assert_el_eq!(ring, e, ring.normalize(f).0);
+    #[test]
+    fn test_is_irreducible() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = Fp::<3>::RING;
+        let ring = DensePolyRing::new(field, "X");
+
+        let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(2) - 1,
+                X.pow_ref(2) + 1,
+                X.pow_ref(4) + X.pow_ref(2) + 1,
+                X.pow_ref(4) + X + 2,
+            ]
+        });
+        let create_extension_ring = |f| {
+            MonogenicExtensionBarrett::new(
+                field,
+                (0..ring.degree(f).unwrap())
+                    .map(|i| field.neg(*ring.coefficient_at(f, i)))
+                    .collect::<Vec<_>>(),
+            )
+        };
+        assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f1)));
+        assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f2)));
+        assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f3)));
+        assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f4)));
     }
-}
 
-#[test]
-fn test_is_irreducible() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Fp::<3>::RING;
-    let ring = DensePolyRing::new(field, "X");
+    #[test]
+    fn test_cantor_zassenhaus() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = DensePolyRing::new(Fp::<7>::RING, "X");
+        let f = ring.from_terms([(1, 0), (1, 2)].into_iter());
+        let g = ring.from_terms([(3, 0), (1, 1), (1, 2)].into_iter());
+        let p = ring.mul_ref(&f, &g);
+        let factor = ring.normalize(cantor_zassenhaus(&ring, p, 2)).0;
+        assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
+    }
 
-    let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(2) - 1,
-            X.pow_ref(2) + 1,
-            X.pow_ref(4) + X.pow_ref(2) + 1,
-            X.pow_ref(4) + X + 2,
-        ]
-    });
-    let create_extension_ring = |f| {
-        MonogenicExtensionBarrett::new(
-            field,
-            (0..ring.degree(f).unwrap())
-                .map(|i| field.neg(*ring.coefficient_at(f, i)))
-                .collect::<Vec<_>>(),
-        )
-    };
-    assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f1)));
-    assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f2)));
-    assert_eq!(false, squarefree_is_irreducible_base(&ring, create_extension_ring(&f3)));
-    assert_eq!(true, squarefree_is_irreducible_base(&ring, create_extension_ring(&f4)));
-}
+    #[test]
+    fn test_cantor_zassenhaus_even() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = DensePolyRing::new(Fp::<2>::RING, "X");
+        // (X^3 + X + 1) (X^3 + X^2 + 1)
+        let f = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
+        let g = ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter());
+        let h = ring.mul_ref(&f, &g);
+        let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3)).0;
+        assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 
-#[test]
-fn test_cantor_zassenhaus() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    let f = ring.from_terms([(1, 0), (1, 2)].into_iter());
-    let g = ring.from_terms([(3, 0), (1, 1), (1, 2)].into_iter());
-    let p = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus(&ring, p, 2)).0;
-    assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
-}
+        // (X^4 + X + 1) (X^4 + X^3 + 1)
+        let f = ring.from_terms([(1, 0), (1, 1), (1, 4)].into_iter());
+        let g = ring.from_terms([(1, 0), (1, 3), (1, 4)].into_iter());
+        let h = ring.mul_ref(&f, &g);
+        let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4)).0;
+        assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
+    }
 
-#[test]
-fn test_cantor_zassenhaus_even() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = DensePolyRing::new(Fp::<2>::RING, "X");
-    // (X^3 + X + 1) (X^3 + X^2 + 1)
-    let f = ring.from_terms([(1, 0), (1, 1), (1, 3)].into_iter());
-    let g = ring.from_terms([(1, 0), (1, 2), (1, 3)].into_iter());
-    let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3)).0;
-    assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
+    #[test]
+    fn test_cantor_zassenhaus_even_extension_field() {
+        feanor_tracing::DelayedLogger::init_test();
 
-    // (X^4 + X + 1) (X^4 + X^3 + 1)
-    let f = ring.from_terms([(1, 0), (1, 1), (1, 4)].into_iter());
-    let g = ring.from_terms([(1, 0), (1, 3), (1, 4)].into_iter());
-    let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4)).0;
-    assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
-}
+        let Fq = MonogenicExtensionSparse::new(Fp::<2>::RING, vec![1, 1, 0, 0])
+            .as_field()
+            .ok()
+            .unwrap();
+        let ring = DensePolyRing::new(&Fq, "X");
 
-#[test]
-fn test_cantor_zassenhaus_even_extension_field() {
-    feanor_tracing::DelayedLogger::init_test();
+        // (X^3 + X + 1) (X^3 + X^2 + 1)
+        let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 3)].into_iter());
+        let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 2), (Fq.one(), 3)].into_iter());
+        let h = ring.mul_ref(&f, &g);
+        let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3)).0;
+        assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
 
-    let Fq = MonogenicExtensionSparse::new(Fp::<2>::RING, vec![1, 1, 0, 0])
-        .as_field()
-        .ok()
-        .unwrap();
-    let ring = DensePolyRing::new(&Fq, "X");
+        // (X^4 + X + 1) = (X + a) (X + a + 1) (X + a^2) (X + a^2 + 1)
+        let f1 = ring.from_terms([(Fq.canonical_gen(), 0), (Fq.one(), 1)].into_iter());
+        let f2 = ring.from_terms([(Fq.add(Fq.canonical_gen(), Fq.one()), 0), (Fq.one(), 1)].into_iter());
+        let f3 = ring.from_terms([(Fq.pow(Fq.canonical_gen(), 2), 0), (Fq.one(), 1)].into_iter());
+        let f4 = ring.from_terms([(Fq.add(Fq.pow(Fq.canonical_gen(), 2), Fq.one()), 0), (Fq.one(), 1)].into_iter());
+        let h = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
+        let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1)).0;
+        assert!(
+            powerset([&f1, &f2, &f3, &f4].into_iter(), clone_slice)
+                .filter(|factors| factors.len() > 0 && factors.len() < 4)
+                .any(|factors| ring.eq_el(&factor, &ring.prod(factors.iter().copied().cloned())))
+        );
 
-    // (X^3 + X + 1) (X^3 + X^2 + 1)
-    let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 3)].into_iter());
-    let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 2), (Fq.one(), 3)].into_iter());
-    let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 3)).0;
-    assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
+        let Fq = MonogenicExtensionSparse::new(Fp::<2>::RING, vec![1, 1, 0])
+            .as_field()
+            .ok()
+            .unwrap();
+        let ring = DensePolyRing::new(&Fq, "X");
 
-    // (X^4 + X + 1) = (X + a) (X + a + 1) (X + a^2) (X + a^2 + 1)
-    let f1 = ring.from_terms([(Fq.canonical_gen(), 0), (Fq.one(), 1)].into_iter());
-    let f2 = ring.from_terms([(Fq.add(Fq.canonical_gen(), Fq.one()), 0), (Fq.one(), 1)].into_iter());
-    let f3 = ring.from_terms([(Fq.pow(Fq.canonical_gen(), 2), 0), (Fq.one(), 1)].into_iter());
-    let f4 = ring.from_terms([(Fq.add(Fq.pow(Fq.canonical_gen(), 2), Fq.one()), 0), (Fq.one(), 1)].into_iter());
-    let h = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 1)).0;
-    assert!(
-        powerset([&f1, &f2, &f3, &f4].into_iter(), clone_slice)
-            .filter(|factors| factors.len() > 0 && factors.len() < 4)
-            .any(|factors| ring.eq_el(&factor, &ring.prod(factors.iter().copied().cloned())))
-    );
+        // (X^4 + X + 1) (X^4 + X^3 + 1)
+        let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
+        let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 3), (Fq.one(), 4)].into_iter());
+        let h = ring.mul_ref(&f, &g);
+        let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4)).0;
+        assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
+    }
 
-    let Fq = MonogenicExtensionSparse::new(Fp::<2>::RING, vec![1, 1, 0])
-        .as_field()
-        .ok()
-        .unwrap();
-    let ring = DensePolyRing::new(&Fq, "X");
+    #[test]
+    fn test_pow_geometric_series_characteristic() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = Fp::<65537>::RING;
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![1, 0, 0]);
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 65537),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
+        );
 
-    // (X^4 + X + 1) (X^4 + X^3 + 1)
-    let f = ring.from_terms([(Fq.one(), 0), (Fq.one(), 1), (Fq.one(), 4)].into_iter());
-    let g = ring.from_terms([(Fq.one(), 0), (Fq.one(), 3), (Fq.one(), 4)].into_iter());
-    let h = ring.mul_ref(&f, &g);
-    let factor = ring.normalize(cantor_zassenhaus_even(&ring, h, 4)).0;
-    assert!(ring.eq_el(&factor, &f) || ring.eq_el(&factor, &g));
-}
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![4, 3, 0]);
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 65537),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
+        );
 
-#[test]
-fn test_pow_geometric_series_characteristic() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = Fp::<65537>::RING;
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![1, 0, 0]);
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 65537),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
-    );
+        let a = ring.from_power_basis([1, 2, 3]);
+        assert_el_eq!(
+            &ring,
+            ring.pow(a.clone(), 1),
+            pow_geometric_series_characteristic(&ring, a.clone(), 0)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(a.clone(), 1 + 65537),
+            pow_geometric_series_characteristic(&ring, a.clone(), 1)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(a.clone(), 1 + 65537 + 65537 * 65537),
+            pow_geometric_series_characteristic(&ring, a.clone(), 2)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(a.clone(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537),
+            pow_geometric_series_characteristic(&ring, a.clone(), 3)
+        );
 
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![4, 3, 0]);
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 65537),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
-    );
-
-    let a = ring.from_power_basis([1, 2, 3]);
-    assert_el_eq!(
-        &ring,
-        ring.pow(a.clone(), 1),
-        pow_geometric_series_characteristic(&ring, a.clone(), 0)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(a.clone(), 1 + 65537),
-        pow_geometric_series_characteristic(&ring, a.clone(), 1)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(a.clone(), 1 + 65537 + 65537 * 65537),
-        pow_geometric_series_characteristic(&ring, a.clone(), 2)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(a.clone(), 1 + 65537 + 65537 * 65537 + 65537 * 65537 * 65537),
-        pow_geometric_series_characteristic(&ring, a.clone(), 3)
-    );
-
-    let base_ring = Fp::<100003>::RING;
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![1, 1, 0]);
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 100003),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(ring.canonical_gen(), 1 + 100003 + 100003 * 100003),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2)
-    );
-    assert_el_eq!(
-        &ring,
-        ring.pow(
-            ring.canonical_gen(),
-            1 + 100003 + 100003 * 100003 + 100003 * 100003 * 100003
-        ),
-        pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
-    );
+        let base_ring = Fp::<100003>::RING;
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![1, 1, 0]);
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 0)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 100003),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 1)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(ring.canonical_gen(), 1 + 100003 + 100003 * 100003),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 2)
+        );
+        assert_el_eq!(
+            &ring,
+            ring.pow(
+                ring.canonical_gen(),
+                1 + 100003 + 100003 * 100003 + 100003 * 100003 * 100003
+            ),
+            pow_geometric_series_characteristic(&ring, ring.canonical_gen(), 3)
+        );
+    }
 }

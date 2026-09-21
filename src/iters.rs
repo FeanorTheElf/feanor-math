@@ -531,149 +531,154 @@ where
     CondenseIter { base_iter: iter, f }
 }
 
-#[test]
-fn test_converted_combinations() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = [2, 3, 5, 7];
-    assert_eq!(1, combinations(a.iter(), 0, |_| 0).count());
-    assert_eq!(4, combinations(a.iter(), 1, |_| 0).count());
-    assert_eq!(6, combinations(a.iter(), 2, |_| 0).count());
-    assert_eq!(1, combinations(a.iter(), 4, |_| 0).count());
-    assert_eq!(0, combinations(a.iter(), 5, |_| 0).count());
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_powerset() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = [1, 2, 3, 4];
-    assert_eq!(16, basic_powerset(a.iter()).count());
+    #[test]
+    fn test_converted_combinations() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = [2, 3, 5, 7];
+        assert_eq!(1, combinations(a.iter(), 0, |_| 0).count());
+        assert_eq!(4, combinations(a.iter(), 1, |_| 0).count());
+        assert_eq!(6, combinations(a.iter(), 2, |_| 0).count());
+        assert_eq!(1, combinations(a.iter(), 4, |_| 0).count());
+        assert_eq!(0, combinations(a.iter(), 5, |_| 0).count());
+    }
 
-    let a = [2, 3];
-    assert_eq!(
-        vec![
-            vec![].into_boxed_slice(),
-            vec![2].into_boxed_slice(),
-            vec![3].into_boxed_slice(),
-            vec![2, 3].into_boxed_slice()
-        ],
-        basic_powerset(a.iter().copied()).collect::<Vec<_>>()
-    );
+    #[test]
+    fn test_powerset() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = [1, 2, 3, 4];
+        assert_eq!(16, basic_powerset(a.iter()).count());
 
-    let a = [1, 2, 3];
-    assert_eq!(
-        vec![
-            vec![].into_boxed_slice(),
-            vec![1].into_boxed_slice(),
-            vec![2].into_boxed_slice(),
-            vec![3].into_boxed_slice(),
-            vec![1, 2].into_boxed_slice(),
-            vec![1, 3].into_boxed_slice(),
-            vec![2, 3].into_boxed_slice(),
-            vec![1, 2, 3].into_boxed_slice()
-        ],
-        basic_powerset(a.iter().copied()).collect::<Vec<_>>()
-    );
-}
+        let a = [2, 3];
+        assert_eq!(
+            vec![
+                vec![].into_boxed_slice(),
+                vec![2].into_boxed_slice(),
+                vec![3].into_boxed_slice(),
+                vec![2, 3].into_boxed_slice()
+            ],
+            basic_powerset(a.iter().copied()).collect::<Vec<_>>()
+        );
 
-#[allow(deprecated)]
-#[test]
-fn test_multi_cartesian_product() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = [0, 1];
-    let b = [0, 1];
-    let c = [-1, 1];
-    let all = [a, b, c];
-    let it = multi_cartesian_product(
-        all.iter().map(|l| l.iter().map(|x| *x)),
-        |x| [x[0], x[1], x[2]],
-        |_, x| *x,
-    );
-    let expected = vec![
-        [0, 0, -1],
-        [0, 0, 1],
-        [0, 1, -1],
-        [0, 1, 1],
-        [1, 0, -1],
-        [1, 0, 1],
-        [1, 1, -1],
-        [1, 1, 1],
-    ];
-    assert_eq!(expected, it.collect::<Vec<_>>());
-}
+        let a = [1, 2, 3];
+        assert_eq!(
+            vec![
+                vec![].into_boxed_slice(),
+                vec![1].into_boxed_slice(),
+                vec![2].into_boxed_slice(),
+                vec![3].into_boxed_slice(),
+                vec![1, 2].into_boxed_slice(),
+                vec![1, 3].into_boxed_slice(),
+                vec![2, 3].into_boxed_slice(),
+                vec![1, 2, 3].into_boxed_slice()
+            ],
+            basic_powerset(a.iter().copied()).collect::<Vec<_>>()
+        );
+    }
 
-#[allow(trivial_casts)]
-#[test]
-fn test_multiset_combinations() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = [1, 2, 3, 1];
-    let mut iter = multiset_combinations(&a, 3, clone_slice);
-    assert_eq!(&[1, 2, 0, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[1, 1, 1, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[1, 1, 0, 1][..], &*iter.next().unwrap());
-    assert_eq!(&[1, 0, 2, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[1, 0, 1, 1][..], &*iter.next().unwrap());
+    #[allow(deprecated)]
+    #[test]
+    fn test_multi_cartesian_product() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = [0, 1];
+        let b = [0, 1];
+        let c = [-1, 1];
+        let all = [a, b, c];
+        let it = multi_cartesian_product(
+            all.iter().map(|l| l.iter().map(|x| *x)),
+            |x| [x[0], x[1], x[2]],
+            |_, x| *x,
+        );
+        let expected = vec![
+            [0, 0, -1],
+            [0, 0, 1],
+            [0, 1, -1],
+            [0, 1, 1],
+            [1, 0, -1],
+            [1, 0, 1],
+            [1, 1, -1],
+            [1, 1, 1],
+        ];
+        assert_eq!(expected, it.collect::<Vec<_>>());
+    }
 
-    assert_eq!(&[0, 2, 1, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 2, 0, 1][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 2, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 1, 1][..], &*iter.next().unwrap());
+    #[allow(trivial_casts)]
+    #[test]
+    fn test_multiset_combinations() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = [1, 2, 3, 1];
+        let mut iter = multiset_combinations(&a, 3, clone_slice);
+        assert_eq!(&[1, 2, 0, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[1, 1, 1, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[1, 1, 0, 1][..], &*iter.next().unwrap());
+        assert_eq!(&[1, 0, 2, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[1, 0, 1, 1][..], &*iter.next().unwrap());
 
-    assert_eq!(&[0, 0, 3, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 0, 2, 1][..], &*iter.next().unwrap());
-    assert_eq!(None, iter.next());
+        assert_eq!(&[0, 2, 1, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 2, 0, 1][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 2, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 1, 1][..], &*iter.next().unwrap());
 
-    assert_eq!(
-        &([] as [[usize; 1]; 0]),
-        &multiset_combinations(&[0], 1, clone_array::<usize, 1>).collect::<Vec<_>>()[..]
-    );
-    assert_eq!(
-        &([[0]] as [[usize; 1]; 1]),
-        &multiset_combinations(&[0], 0, clone_array::<usize, 1>).collect::<Vec<_>>()[..]
-    );
+        assert_eq!(&[0, 0, 3, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 0, 2, 1][..], &*iter.next().unwrap());
+        assert_eq!(None, iter.next());
 
-    let a = [0, 2, 0, 1];
-    let mut iter = multiset_combinations(&a, 2, clone_slice);
-    assert_eq!(&[0, 2, 0, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 0, 1][..], &*iter.next().unwrap());
-    assert_eq!(None, iter.next());
+        assert_eq!(
+            &([] as [[usize; 1]; 0]),
+            &multiset_combinations(&[0], 1, clone_array::<usize, 1>).collect::<Vec<_>>()[..]
+        );
+        assert_eq!(
+            &([[0]] as [[usize; 1]; 1]),
+            &multiset_combinations(&[0], 0, clone_array::<usize, 1>).collect::<Vec<_>>()[..]
+        );
 
-    let a = [0, 3, 0, 0, 2, 0];
-    let mut iter = multiset_combinations(&a, 3, clone_slice);
-    assert_eq!(&[0, 3, 0, 0, 0, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 2, 0, 0, 1, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 0, 0, 2, 0][..], &*iter.next().unwrap());
-    assert_eq!(None, iter.next());
+        let a = [0, 2, 0, 1];
+        let mut iter = multiset_combinations(&a, 2, clone_slice);
+        assert_eq!(&[0, 2, 0, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 0, 1][..], &*iter.next().unwrap());
+        assert_eq!(None, iter.next());
 
-    let a = [0, 3, 0, 0, 2, 2, 0];
-    let mut iter = multiset_combinations(&a, 3, clone_slice);
-    assert_eq!(&[0, 3, 0, 0, 0, 0, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 2, 0, 0, 1, 0, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 2, 0, 0, 0, 1, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 0, 0, 2, 0, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 0, 0, 1, 1, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 1, 0, 0, 0, 2, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 0, 0, 0, 2, 1, 0][..], &*iter.next().unwrap());
-    assert_eq!(&[0, 0, 0, 0, 1, 2, 0][..], &*iter.next().unwrap());
-    assert_eq!(None, iter.next());
+        let a = [0, 3, 0, 0, 2, 0];
+        let mut iter = multiset_combinations(&a, 3, clone_slice);
+        assert_eq!(&[0, 3, 0, 0, 0, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 2, 0, 0, 1, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 0, 0, 2, 0][..], &*iter.next().unwrap());
+        assert_eq!(None, iter.next());
 
-    let a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0];
-    let mut iter = multiset_combinations(&a, 10, clone_slice);
-    assert_eq!(
-        &[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0][..],
-        &*iter.next().unwrap()
-    );
-    assert_eq!(1000, iter.count());
-}
+        let a = [0, 3, 0, 0, 2, 2, 0];
+        let mut iter = multiset_combinations(&a, 3, clone_slice);
+        assert_eq!(&[0, 3, 0, 0, 0, 0, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 2, 0, 0, 1, 0, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 2, 0, 0, 0, 1, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 0, 0, 2, 0, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 0, 0, 1, 1, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 1, 0, 0, 0, 2, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 0, 0, 0, 2, 1, 0][..], &*iter.next().unwrap());
+        assert_eq!(&[0, 0, 0, 0, 1, 2, 0][..], &*iter.next().unwrap());
+        assert_eq!(None, iter.next());
 
-#[test]
-fn test_multiset_combinations_k_unlimited() {
-    feanor_tracing::DelayedLogger::init_test();
-    fn fac(n: usize) -> usize { if n == 0 { 1 } else { n * fac(n - 1) } }
-    let a = [10, 10, 10, 10, 10, 10];
-    assert_eq!(1, multiset_combinations(&a[..], 0, |_| ()).count());
-    assert_eq!(6, multiset_combinations(&a[..], 1, |_| ()).count());
-    assert_eq!(
-        fac(6 + 8 - 1) / fac(6 - 1) / fac(8),
-        multiset_combinations(&a[..], 8, |_| ()).count()
-    );
+        let a = [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 1, 0];
+        let mut iter = multiset_combinations(&a, 10, clone_slice);
+        assert_eq!(
+            &[1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 0, 0, 0, 0, 0, 0][..],
+            &*iter.next().unwrap()
+        );
+        assert_eq!(1000, iter.count());
+    }
+
+    #[test]
+    fn test_multiset_combinations_k_unlimited() {
+        feanor_tracing::DelayedLogger::init_test();
+        fn fac(n: usize) -> usize { if n == 0 { 1 } else { n * fac(n - 1) } }
+        let a = [10, 10, 10, 10, 10, 10];
+        assert_eq!(1, multiset_combinations(&a[..], 0, |_| ()).count());
+        assert_eq!(6, multiset_combinations(&a[..], 1, |_| ()).count());
+        assert_eq!(
+            fac(6 + 8 - 1) / fac(6 - 1) / fac(8),
+            multiset_combinations(&a[..], 8, |_| ()).count()
+        );
+    }
 }

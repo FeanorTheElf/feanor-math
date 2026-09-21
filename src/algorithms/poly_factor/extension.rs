@@ -7,8 +7,6 @@ use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::resultant::ComputeResultantRing;
 use crate::homomorphism::*;
 use crate::prelude::*;
-#[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
 use crate::ring_impls::extension::{MonogenicExtension, MonogenicExtensionStore};
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
 use crate::ring_impls::poly::{PolyRing, PolyRingStore};
@@ -172,73 +170,69 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::as_field::AsField;
-#[cfg(test)]
-use crate::ring_impls::as_field::AsFieldBase;
-#[cfg(test)]
-use crate::ring_impls::extension::number_field::NumberField;
-#[cfg(test)]
-use crate::ring_impls::extension::number_field::NumberFieldBase;
-#[cfg(test)]
-use crate::ring_impls::rational::RationalField;
-#[cfg(test)]
-use crate::wrapper::RingElementWrapper;
+mod tests {
+    use super::*;
+    use crate::ring_impls::as_field::{AsField, AsFieldBase};
+    use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
+    use crate::ring_impls::extension::number_field::{NumberField, NumberFieldBase};
+    use crate::ring_impls::rational::RationalField;
+    use crate::wrapper::RingElementWrapper;
 
-#[cfg(test)]
-fn test_field() -> NumberField<AsField<MonogenicExtensionSparse<RationalField<BigIntRing>>>> {
-    let QQ = RationalField::new(ZZbig);
-    let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
-    NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(MonogenicExtensionSparse::new(QQ, modulus_vec)).unwrap(),
-    )))
-}
+    fn test_field() -> NumberField<AsField<MonogenicExtensionSparse<RationalField<BigIntRing>>>> {
+        let QQ = RationalField::new(ZZbig);
+        let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
+        NumberField::from(NumberFieldBase::create(AsField::from(
+            AsFieldBase::promise_is_field(MonogenicExtensionSparse::new(QQ, modulus_vec)).unwrap(),
+        )))
+    }
 
-#[test]
-fn test_poly_factor_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = test_field();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let zeta = RingElementWrapper::new(
-        &poly_ring,
-        poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
-    );
-    let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X - &zeta,
-            X + &zeta,
-            X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
-            X.pow_ref(3) - zeta.pow_ref(3) * X + zeta.pow_ref(2),
-        ]
-    });
-    let assert_correct_factorization = |powers: [usize; 4]| {
-        let input = poly_ring.prod(
-            powers
-                .iter()
-                .enumerate()
-                .map(|(i, e)| poly_ring.pow(irred_polys[i].clone(), *e)),
+    #[test]
+    fn test_poly_factor_number_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = test_field();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let zeta = RingElementWrapper::new(
+            &poly_ring,
+            poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
         );
-        let (actual, _) = poly_factor_extfield(&poly_ring, &input);
-        assert_eq!(powers.iter().filter(|e| **e != 0).count(), actual.len());
-        for (f, e) in actual {
-            if let Some((idx, _)) = irred_polys
-                .iter()
-                .enumerate()
-                .filter(|(_, g)| poly_ring.eq_el(&f, *g))
-                .next()
-            {
-                assert_eq!(powers[idx], e);
-            } else {
-                panic!(
-                    "factorization yielded {}, which is not an expected irreducible factor",
-                    poly_ring.formatted_el(&f)
-                )
+        let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X - &zeta,
+                X + &zeta,
+                X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
+                X.pow_ref(3) - zeta.pow_ref(3) * X + zeta.pow_ref(2),
+            ]
+        });
+        let assert_correct_factorization = |powers: [usize; 4]| {
+            let input = poly_ring.prod(
+                powers
+                    .iter()
+                    .enumerate()
+                    .map(|(i, e)| poly_ring.pow(irred_polys[i].clone(), *e)),
+            );
+            let (actual, _) = poly_factor_extfield(&poly_ring, &input);
+            assert_eq!(powers.iter().filter(|e| **e != 0).count(), actual.len());
+            for (f, e) in actual {
+                if let Some((idx, _)) = irred_polys
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, g)| poly_ring.eq_el(&f, *g))
+                    .next()
+                {
+                    assert_eq!(powers[idx], e);
+                } else {
+                    panic!(
+                        "factorization yielded {}, which is not an expected irreducible factor",
+                        poly_ring.formatted_el(&f)
+                    )
+                }
             }
-        }
-    };
+        };
 
-    assert_correct_factorization([1, 0, 0, 0]);
-    assert_correct_factorization([1, 0, 1, 0]);
-    assert_correct_factorization([1, 1, 0, 1]);
-    assert_correct_factorization([1, 0, 2, 0]);
-    assert_correct_factorization([0, 4, 0, 0]);
+        assert_correct_factorization([1, 0, 0, 0]);
+        assert_correct_factorization([1, 0, 1, 0]);
+        assert_correct_factorization([1, 1, 0, 1]);
+        assert_correct_factorization([1, 0, 2, 0]);
+        assert_correct_factorization([0, 4, 0, 0]);
+    }
 }

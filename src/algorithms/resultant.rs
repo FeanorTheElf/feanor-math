@@ -242,43 +242,42 @@ where
 }
 
 #[cfg(test)]
-use crate::algorithms::buchberger::buchberger;
-#[cfg(test)]
-use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
-#[cfg(test)]
-use crate::ring_impls::multivariate::*;
+mod tests {
+    use super::*;
+    use crate::algorithms::buchberger::buchberger;
+    use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
+    use crate::ring_impls::multivariate::*;
 
-#[test]
-#[allow(deprecated)]
-fn test_resultant_local_polynomial() {
-    let ZZ = ZZbig;
-    let QQ = RationalField::new(ZZ);
-    // we eliminate `Y`, so add it as the outer indeterminate
-    let QQX = DensePolyRing::new(&QQ, "X");
-    let QQXY = DensePolyRing::new(&QQX, "Y");
-    let ZZ_to_QQ = QQ.int_hom();
+    #[test]
+    #[allow(deprecated)]
+    fn test_resultant_local_polynomial() {
+        let ZZ = ZZbig;
+        let QQ = RationalField::new(ZZ);
+        // we eliminate `Y`, so add it as the outer indeterminate
+        let QQX = DensePolyRing::new(&QQ, "X");
+        let QQXY = DensePolyRing::new(&QQX, "Y");
+        let ZZ_to_QQ = QQ.int_hom();
 
-    // 1 + X^2 + 2 Y + (1 + X) Y^2
-    let f = QQXY.from_terms(
-        [(vec![(1, 0), (1, 2)], 0), (vec![(2, 0)], 1), (vec![(1, 0), (1, 1)], 2)]
+        // 1 + X^2 + 2 Y + (1 + X) Y^2
+        let f = QQXY.from_terms(
+            [(vec![(1, 0), (1, 2)], 0), (vec![(2, 0)], 1), (vec![(1, 0), (1, 1)], 2)]
+                .into_iter()
+                .map(|(v, i)| (QQX.from_terms(v.into_iter().map(|(c, j)| (ZZ_to_QQ.map(c), j))), i)),
+        );
+
+        // 3 + X + (2 + X) Y + (1 + X + X^2) Y^2
+        let g = QQXY.from_terms(
+            [
+                (vec![(3, 0), (1, 1)], 0),
+                (vec![(2, 0), (1, 1)], 1),
+                (vec![(1, 0), (1, 1), (1, 2)], 2),
+            ]
             .into_iter()
             .map(|(v, i)| (QQX.from_terms(v.into_iter().map(|(c, j)| (ZZ_to_QQ.map(c), j))), i)),
-    );
+        );
 
-    // 3 + X + (2 + X) Y + (1 + X + X^2) Y^2
-    let g = QQXY.from_terms(
-        [
-            (vec![(3, 0), (1, 1)], 0),
-            (vec![(2, 0), (1, 1)], 1),
-            (vec![(1, 0), (1, 1), (1, 2)], 2),
-        ]
-        .into_iter()
-        .map(|(v, i)| (QQX.from_terms(v.into_iter().map(|(c, j)| (ZZ_to_QQ.map(c), j))), i)),
-    );
-
-    let actual = <_ as ComputeResultantRing>::resultant(&QQXY, f.clone(), g.clone());
-    let [expected] =
-        QQX.with_wrapped_indeterminate(|X| {
+        let actual = <_ as ComputeResultantRing>::resultant(&QQXY, f.clone(), g.clone());
+        let [expected] = QQX.with_wrapped_indeterminate(|X| {
             [X.pow_ref(8) + 2 * X.pow_ref(7) + 3 * X.pow_ref(6)
                 - 5 * X.pow_ref(5)
                 - 10 * X.pow_ref(4)
@@ -287,72 +286,73 @@ fn test_resultant_local_polynomial() {
                 + 8 * X
                 + 4]
         });
-    assert_el_eq!(&QQX, &expected, &actual);
+        assert_el_eq!(&QQX, &expected, &actual);
 
-    let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
-    // reverse the order of indeterminates, so that we indeed eliminate `Y`
-    let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| {
-        [
-            1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2),
-            3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2),
-        ]
-    });
+        let QQYX = MultivariatePolyRingImpl::new(&QQ, 2);
+        // reverse the order of indeterminates, so that we indeed eliminate `Y`
+        let [f, g] = QQYX.with_wrapped_indeterminates(|[Y, X]| {
+            [
+                1 + X.pow_ref(2) + 2 * Y + (1 + X) * Y.pow_ref(2),
+                3 + X + (2 + X) * Y + (1 + X + X.pow_ref(2)) * Y.pow_ref(2),
+            ]
+        });
 
-    let gb = buchberger::<_, _>(&QQYX, vec![f, g], Lex);
-    let expected = gb
-        .into_iter()
-        .filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1)
-        .collect::<Vec<_>>();
-    assert!(expected.len() == 1);
-    let expected = QQX
-        .normalize(
-            QQX.from_terms(
-                QQYX.terms(&expected[0])
-                    .map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))),
-            ),
-        )
-        .0;
+        let gb = buchberger::<_, _>(&QQYX, vec![f, g], Lex);
+        let expected = gb
+            .into_iter()
+            .filter(|poly| QQYX.appearing_indeterminates(&poly).len() == 1)
+            .collect::<Vec<_>>();
+        assert!(expected.len() == 1);
+        let expected = QQX
+            .normalize(
+                QQX.from_terms(
+                    QQYX.terms(&expected[0])
+                        .map(|(c, m)| (c.clone(), QQYX.exponent_at(m, 1))),
+                ),
+            )
+            .0;
 
-    assert_el_eq!(QQX, expected, actual);
-}
+        assert_el_eq!(QQX, expected, actual);
+    }
 
-#[test]
-fn test_resultant_local_integer() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(ZZ, "X");
+    #[test]
+    fn test_resultant_local_integer() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(ZZ, "X");
 
-    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(32) + 1, X.pow_ref(2) - X - 1]);
-    assert_el_eq!(
-        ZZ,
-        ZZ.int_hom().map(4870849),
-        <_ as ComputeResultantRing>::resultant(&ZZX, f, g)
-    );
+        let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(32) + 1, X.pow_ref(2) - X - 1]);
+        assert_el_eq!(
+            ZZ,
+            ZZ.int_hom().map(4870849),
+            <_ as ComputeResultantRing>::resultant(&ZZX, f, g)
+        );
 
-    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2, X.pow_ref(64) + 1]);
-    assert_el_eq!(
-        ZZ,
-        ZZ.parse("381380816531458621441", 10).unwrap(),
-        <_ as ComputeResultantRing>::resultant(&ZZX, f, g)
-    );
+        let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2, X.pow_ref(64) + 1]);
+        assert_el_eq!(
+            ZZ,
+            ZZ.parse("381380816531458621441", 10).unwrap(),
+            <_ as ComputeResultantRing>::resultant(&ZZX, f, g)
+        );
 
-    let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(32) - 2 * X.pow_ref(8) + 2, X.pow_ref(512) + 1]);
-    assert_el_eq!(
-        ZZ,
-        ZZ.pow(ZZ.parse("381380816531458621441", 10).unwrap(), 8),
-        <_ as ComputeResultantRing>::resultant(&ZZX, f, g)
-    );
-}
+        let [f, g] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(32) - 2 * X.pow_ref(8) + 2, X.pow_ref(512) + 1]);
+        assert_el_eq!(
+            ZZ,
+            ZZ.pow(ZZ.parse("381380816531458621441", 10).unwrap(), 8),
+            <_ as ComputeResultantRing>::resultant(&ZZX, f, g)
+        );
+    }
 
-#[test]
-#[ignore]
-fn test_resultant_large() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(ZZ, "X");
+    #[test]
+    #[ignore]
+    fn test_resultant_large() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(ZZ, "X");
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2]);
-    let g = ZZX.from_terms([(ZZ.one(), 1 << 14), (ZZ.one(), 0)]);
-    let result = BigIntRingBase::resultant(&ZZX, f, g);
-    println!("{}", ZZ.formatted_el(&result))
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2 * X + 2]);
+        let g = ZZX.from_terms([(ZZ.one(), 1 << 14), (ZZ.one(), 0)]);
+        let result = BigIntRingBase::resultant(&ZZX, f, g);
+        println!("{}", ZZ.formatted_el(&result))
+    }
 }

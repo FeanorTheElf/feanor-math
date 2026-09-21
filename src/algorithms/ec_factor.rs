@@ -401,77 +401,78 @@ where
 }
 
 #[cfg(test)]
-use test::Bencher;
+mod tests {
+    use test::Bencher;
 
-#[cfg(test)]
-use crate::ring_impls::rust_bigint::*;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+    use super::*;
+    use crate::ring_impls::rust_bigint::*;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_ec_factor() {
-    feanor_tracing::DelayedLogger::init_test();
-    let n = 65537 * 65539;
-    let actual = lenstra_ec_factor(&Zn64B::new(n as u64));
-    assert!(actual != 1 && actual != n && n % actual == 0);
-}
+    #[test]
+    fn test_ec_factor() {
+        feanor_tracing::DelayedLogger::init_test();
+        let n = 65537 * 65539;
+        let actual = lenstra_ec_factor(&Zn64B::new(n as u64));
+        assert!(actual != 1 && actual != n && n % actual == 0);
+    }
 
-#[bench]
-fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let bits = 58;
-    let n = ((1i64 << bits) + 1) / 5;
-    let ring = Zn64B::new(n as u64);
+    #[bench]
+    fn bench_ec_factor_mersenne_number_58(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let bits = 58;
+        let n = ((1i64 << bits) + 1) / 5;
+        let ring = Zn64B::new(n as u64);
 
-    bencher.iter(|| {
-        let p = lenstra_ec_factor(&ring);
-        assert!(n > 0 && n != 1 && n != p);
-        assert!(n % p == 0);
-    });
-}
+        bencher.iter(|| {
+            let p = lenstra_ec_factor(&ring);
+            assert!(n > 0 && n != 1 && n != p);
+            assert!(n % p == 0);
+        });
+    }
 
-#[test]
-#[ignore]
-fn test_ec_factor_large() {
-    feanor_tracing::DelayedLogger::init_test();
+    #[test]
+    #[ignore]
+    fn test_ec_factor_large() {
+        feanor_tracing::DelayedLogger::init_test();
 
-    let n: i128 = 1073741827 * 71316922984999;
+        let n: i128 = 1073741827 * 71316922984999;
 
-    let p = StaticRing::<i128>::RING.coerce(
-        &ZZbig,
-        lenstra_ec_factor(&zn_big::ZnGB::new(
+        let p = StaticRing::<i128>::RING.coerce(
             &ZZbig,
-            ZZbig.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, n),
-        )),
-    );
-    assert!(p == 1073741827 || p == 71316922984999);
+            lenstra_ec_factor(&zn_big::ZnGB::new(
+                &ZZbig,
+                ZZbig.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, n),
+            )),
+        );
+        assert!(p == 1073741827 || p == 71316922984999);
 
-    let n: i128 = 1152921504606847009 * 2305843009213693967;
+        let n: i128 = 1152921504606847009 * 2305843009213693967;
 
-    let p = StaticRing::<i128>::RING.coerce(
-        &ZZbig,
-        lenstra_ec_factor(&zn_big::ZnGB::new(
+        let p = StaticRing::<i128>::RING.coerce(
             &ZZbig,
-            ZZbig.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, n),
-        )),
-    );
-    assert!(p == 1152921504606847009 || p == 2305843009213693967);
-}
+            lenstra_ec_factor(&zn_big::ZnGB::new(
+                &ZZbig,
+                ZZbig.coerce::<StaticRing<i128>>(&StaticRing::<i128>::RING, n),
+            )),
+        );
+        assert!(p == 1152921504606847009 || p == 2305843009213693967);
+    }
 
-#[test]
-#[ignore]
-fn test_compute_partial_factorization() {
-    feanor_tracing::DelayedLogger::init_test();
-    let n = int_cast(
-        RustBigIntRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
-        ZZbig,
-        RustBigIntRing::RING
-    );
+    #[test]
+    #[ignore]
+    fn test_compute_partial_factorization() {
+        feanor_tracing::DelayedLogger::init_test();
+        let n = int_cast(
+            RustBigIntRing::RING.get_ring().parse("5164499756173817179311838344006023748659411585658447025661318713081295244033682389259290706560275662871806343945494986751", 10).unwrap(),
+            ZZbig,
+            RustBigIntRing::RING
+        );
 
-    let Zn = zn_big::ZnGB::new(ZZbig, n.clone());
-    let factor = lenstra_ec_factor_small(&Zn, 50, 1).unwrap();
-    ZZbig.println(&factor);
-    assert!(!ZZbig.is_one(&factor));
-    assert!(!ZZbig.eq_el(&factor, &n));
-    assert!(ZZbig.divides(&n, &factor));
+        let Zn = zn_big::ZnGB::new(ZZbig, n.clone());
+        let factor = lenstra_ec_factor_small(&Zn, 50, 1).unwrap();
+        ZZbig.println(&factor);
+        assert!(!ZZbig.is_one(&factor));
+        assert!(!ZZbig.eq_el(&factor, &n));
+        assert!(ZZbig.divides(&n, &factor));
+    }
 }

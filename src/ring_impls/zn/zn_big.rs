@@ -774,188 +774,191 @@ impl_field_wrap_unwrap_homs! { <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingSt
 impl_field_wrap_unwrap_isos! { <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingStore, I::Ring: IntegerRing, J: RingStore, J::Ring: IntegerRing }
 
 #[cfg(test)]
-use crate::ring_impls::rust_bigint::*;
-#[cfg(test)]
-use crate::ring_properties::integer::BigIntRing;
+mod tests {
+    use super::*;
+    use crate::ring_impls::rust_bigint::*;
+    use crate::ring_properties::integer::BigIntRing;
 
-#[test]
-fn test_mul() {
-    feanor_tracing::DelayedLogger::init_test();
-    const ZZ: BigIntRing = ZZbig;
-    let Z257 = ZnGB::new(ZZ, ZZ.int_hom().map(257));
-    let x = Z257.coerce(&ZZ, ZZ.int_hom().map(256));
-    assert_el_eq!(Z257, Z257.one(), Z257.mul_ref(&x, &x));
-}
-
-#[test]
-fn test_project() {
-    feanor_tracing::DelayedLogger::init_test();
-    const ZZ: StaticRing<i64> = StaticRing::RING;
-    let Z17 = ZnGB::new(ZZ, 17);
-    for k in 0..289 {
-        assert_el_eq!(Z17, Z17.int_hom().map((289 - k) % 17), Z17.coerce(&ZZ, -k as i64));
+    #[test]
+    fn test_mul() {
+        feanor_tracing::DelayedLogger::init_test();
+        const ZZ: BigIntRing = ZZbig;
+        let Z257 = ZnGB::new(ZZ, ZZ.int_hom().map(257));
+        let x = Z257.coerce(&ZZ, ZZ.int_hom().map(256));
+        assert_el_eq!(Z257, Z257.one(), Z257.mul_ref(&x, &x));
     }
-}
 
-#[test]
-fn test_ring_axioms_znbase() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnGB::new(ZZi64, 63);
-    crate::ring::generic_tests::test_ring_axioms(&ring, (0..63).map(|x| ring.int_hom().map(x)))
-}
+    #[test]
+    fn test_project() {
+        feanor_tracing::DelayedLogger::init_test();
+        const ZZ: StaticRing<i64> = StaticRing::RING;
+        let Z17 = ZnGB::new(ZZ, 17);
+        for k in 0..289 {
+            assert_el_eq!(Z17, Z17.int_hom().map((289 - k) % 17), Z17.coerce(&ZZ, -k as i64));
+        }
+    }
 
-#[test]
-fn test_hash_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnGB::new(ZZi64, 63);
-    crate::ring::generic_tests::test_hash_axioms(&ring, (0..63).map(|x| ring.int_hom().map(x)))
-}
+    #[test]
+    fn test_ring_axioms_znbase() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnGB::new(ZZi64, 63);
+        crate::ring::generic_tests::test_ring_axioms(&ring, (0..63).map(|x| ring.int_hom().map(x)))
+    }
 
-#[test]
-fn test_canonical_iso_axioms_zn_big() {
-    feanor_tracing::DelayedLogger::init_test();
-    let from = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = ZnGB::new(ZZbig, ZZbig.int_hom().map(7 * 11));
-    crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
-    crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
-    assert!(from.can_hom(&ZnGB::new(ZZi64, 19)).is_none());
-}
+    #[test]
+    fn test_hash_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnGB::new(ZZi64, 63);
+        crate::ring::generic_tests::test_hash_axioms(&ring, (0..63).map(|x| ring.int_hom().map(x)))
+    }
 
-#[test]
-fn test_canonical_hom_axioms_static_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let from = StaticRing::<i32>::RING;
-    let to = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
-    crate::ring::generic_tests::test_hom_axioms(&from, to, 0..=(2 * 7 * 11));
-}
+    #[test]
+    fn test_canonical_iso_axioms_zn_big() {
+        feanor_tracing::DelayedLogger::init_test();
+        let from = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
+        let to = ZnGB::new(ZZbig, ZZbig.int_hom().map(7 * 11));
+        crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+        crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+        assert!(from.can_hom(&ZnGB::new(ZZi64, 19)).is_none());
+    }
 
-#[test]
-fn test_zn_ring_axioms_znbase() {
-    feanor_tracing::DelayedLogger::init_test();
-    super::generic_tests::test_zn_axioms(ZnGB::new(ZZi64, 17));
-    super::generic_tests::test_zn_axioms(ZnGB::new(ZZi64, 63));
-}
+    #[test]
+    fn test_canonical_hom_axioms_static_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let from = StaticRing::<i32>::RING;
+        let to = ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
+        crate::ring::generic_tests::test_hom_axioms(&from, to, 0..=(2 * 7 * 11));
+    }
 
-#[test]
-fn test_zn_map_in_large_int_znbase() {
-    feanor_tracing::DelayedLogger::init_test();
-    super::generic_tests::test_map_in_large_int(ZnGB::new(ZZi64, 63));
-}
+    #[test]
+    fn test_zn_ring_axioms_znbase() {
+        feanor_tracing::DelayedLogger::init_test();
+        super::super::generic_tests::test_zn_axioms(ZnGB::new(ZZi64, 17));
+        super::super::generic_tests::test_zn_axioms(ZnGB::new(ZZi64, 63));
+    }
 
-#[test]
-fn test_zn_map_in_small_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnGB::new(ZZi64, 257);
-    assert_el_eq!(ring, ring.one(), ring.coerce(&StaticRing::<i8>::RING, 1));
-}
+    #[test]
+    fn test_zn_map_in_large_int_znbase() {
+        feanor_tracing::DelayedLogger::init_test();
+        super::super::generic_tests::test_map_in_large_int(ZnGB::new(ZZi64, 63));
+    }
 
-#[test]
-fn test_divisibility_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17);
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
-        &R,
-        (0..17).map(|x| R.int_hom().map(x)),
-    );
-}
+    #[test]
+    fn test_zn_map_in_small_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnGB::new(ZZi64, 257);
+        assert_el_eq!(ring, ring.one(), ring.coerce(&StaticRing::<i8>::RING, 1));
+    }
 
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        (0..17).map(|x| R.int_hom().map(x)),
-    );
-    let R = ZnGB::new(ZZi64, 63);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        (0..63).map(|x| R.int_hom().map(x)),
-    );
-}
+    #[test]
+    fn test_divisibility_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17);
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+            &R,
+            (0..17).map(|x| R.int_hom().map(x)),
+        );
+    }
 
-#[test]
-fn test_canonical_iso_axioms_as_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(StaticRing::<i128>::RING, 17);
-    let R2 = R.clone().as_field().ok().unwrap();
-    crate::ring::generic_tests::test_hom_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
-    crate::ring::generic_tests::test_iso_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
-    crate::ring::generic_tests::test_hom_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
-    crate::ring::generic_tests::test_iso_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
-}
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17);
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            (0..17).map(|x| R.int_hom().map(x)),
+        );
+        let R = ZnGB::new(ZZi64, 63);
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            (0..63).map(|x| R.int_hom().map(x)),
+        );
+    }
 
-#[test]
-fn test_canonical_iso_axioms_zn_64() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(StaticRing::<i128>::RING, 17);
-    let R2 = zn_64b::Zn64B::new(17);
-    crate::ring::generic_tests::test_hom_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
-    crate::ring::generic_tests::test_iso_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
-    crate::ring::generic_tests::test_hom_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
-    crate::ring::generic_tests::test_iso_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
-}
+    #[test]
+    fn test_canonical_iso_axioms_as_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(StaticRing::<i128>::RING, 17);
+        let R2 = R.clone().as_field().ok().unwrap();
+        crate::ring::generic_tests::test_hom_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+        crate::ring::generic_tests::test_iso_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+        crate::ring::generic_tests::test_hom_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
+        crate::ring::generic_tests::test_iso_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
+    }
 
-#[test]
-fn test_finite_field_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 128));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 15));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(
-        &StaticRing::<i128>::RING,
-        1 << 32,
-    ));
-}
+    #[test]
+    fn test_canonical_iso_axioms_zn_64() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(StaticRing::<i128>::RING, 17);
+        let R2 = zn_64b::Zn64B::new(17);
+        crate::ring::generic_tests::test_hom_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+        crate::ring::generic_tests::test_iso_axioms(&R, &R2, (0..17).map(|x| R.int_hom().map(x)));
+        crate::ring::generic_tests::test_hom_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
+        crate::ring::generic_tests::test_iso_axioms(&R2, &R, (0..17).map(|x| R2.int_hom().map(x)));
+    }
 
-#[test]
-fn test_serialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnGB::new(&ZZi64, 128);
-    crate::ring_properties::serialization::generic_tests::test_serialization(
-        ring,
-        (0..128).map(|x| ring.int_hom().map(x)),
-    )
-}
-#[test]
-fn test_unreduced() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnGB::new(
-        ZZbig,
-        ZZbig.prod(
-            [
-                72057594035352641,
-                72057594035418113,
-                72057594036334721,
-                72057594036945793,
-            ]
-            .iter()
-            .map(|p| int_cast(*p, ZZbig, ZZi64)),
-        ),
-    );
-    let value = ZZbig
-        .get_ring()
-        .parse(
-            "26959946664284515451292772736873168147996033528710027874998326058050",
-            10,
+    #[test]
+    fn test_finite_field_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 128));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(&ZZi64, 15));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnGB::new(
+            &StaticRing::<i128>::RING,
+            1 << 32,
+        ));
+    }
+
+    #[test]
+    fn test_serialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnGB::new(&ZZi64, 128);
+        crate::ring_properties::serialization::generic_tests::test_serialization(
+            ring,
+            (0..128).map(|x| ring.int_hom().map(x)),
         )
-        .unwrap();
+    }
 
-    let x: ZnGBEl<RustBigIntRing> = ZnGBEl(value);
-    // this means this is a valid representative, although it is > ring.modulus()
-    assert!(ZZbig.is_lt(&x.0, &ring.get_ring().twice_modulus));
+    #[test]
+    fn test_unreduced() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnGB::new(
+            ZZbig,
+            ZZbig.prod(
+                [
+                    72057594035352641,
+                    72057594035418113,
+                    72057594036334721,
+                    72057594036945793,
+                ]
+                .iter()
+                .map(|p| int_cast(*p, ZZbig, ZZi64)),
+            ),
+        );
+        let value = ZZbig
+            .get_ring()
+            .parse(
+                "26959946664284515451292772736873168147996033528710027874998326058050",
+                10,
+            )
+            .unwrap();
 
-    assert!(ring.is_one(&x));
-    assert!(ring.is_one(&ring.mul_ref(&x, &x)));
-    assert!(ring.eq_el(&x, &ring.mul_ref(&x, &x)));
-    assert_eq!("1", format!("{}", ring.formatted_el(&x)));
-}
+        let x: ZnGBEl<RustBigIntRing> = ZnGBEl(value);
+        // this means this is a valid representative, although it is > ring.modulus()
+        assert!(ZZbig.is_lt(&x.0, &ring.get_ring().twice_modulus));
 
-#[test]
-fn test_serialize_deserialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(ZZi64, 128).into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(ZZi64, 129).into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
-        ZnGB::new(ZZbig, ZZbig.power_of_two(10)).into(),
-    );
+        assert!(ring.is_one(&x));
+        assert!(ring.is_one(&ring.mul_ref(&x, &x)));
+        assert!(ring.eq_el(&x, &ring.mul_ref(&x, &x)));
+        assert_eq!("1", format!("{}", ring.formatted_el(&x)));
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(ZZi64, 128).into());
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZnGB::new(ZZi64, 129).into());
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            ZnGB::new(ZZbig, ZZbig.power_of_two(10)).into(),
+        );
+    }
 }

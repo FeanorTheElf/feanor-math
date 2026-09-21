@@ -1142,220 +1142,221 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::approx_real::float::Real64;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::F17;
-#[cfg(test)]
-use crate::ring_impls::zn::*;
+mod tests {
+    use super::*;
+    use crate::ring_impls::approx_real::float::Real64;
+    use crate::ring_impls::zn::zn_static::F17;
+    use crate::ring_impls::zn::{zn_static, *};
 
-#[cfg(test)]
-fn ring_and_elements() -> (
-    MultivariatePolyRingImpl<zn_static::Fp<17>>,
-    Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>,
-) {
-    let ring = MultivariatePolyRingImpl::new(F17, 3);
-    let els = vec![
-        ring.from_terms([]),
-        ring.from_terms([(ring.base_ring().one(), ring.create_monomial([0, 0, 0]))]),
-        ring.from_terms([(ring.base_ring().neg_one(), ring.create_monomial([0, 0, 0]))]),
-        ring.from_terms([(ring.base_ring().one(), ring.create_monomial([1, 0, 0]))]),
-        ring.from_terms([(ring.base_ring().neg_one(), ring.create_monomial([1, 0, 0]))]),
-        ring.from_terms([
-            (ring.base_ring().one(), ring.create_monomial([1, 0, 0])),
-            (ring.base_ring().one(), ring.create_monomial([0, 1, 0])),
-        ]),
-        ring.from_terms([
-            (ring.base_ring().one(), ring.create_monomial([2, 0, 0])),
-            (ring.base_ring().neg_one(), ring.create_monomial([1, 0, 0])),
-        ]),
-        ring.from_terms([
-            (ring.base_ring().one(), ring.create_monomial([1, 0, 0])),
-            (ring.base_ring().neg_one(), ring.create_monomial([0, 1, 1])),
-            (ring.base_ring().one(), ring.create_monomial([0, 0, 2])),
-        ]),
-    ];
-    return (ring, els);
-}
-
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, els) = ring_and_elements();
-    crate::ring::generic_tests::test_ring_axioms(&ring, els.into_iter());
-}
-
-#[test]
-fn test_multivariate_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, _els) = ring_and_elements();
-    crate::ring_impls::multivariate::generic_tests::test_poly_ring_axioms(
-        &ring,
-        [F17.one(), F17.zero(), F17.int_hom().map(2), F17.neg_one()].into_iter(),
-    );
-}
-
-#[test]
-fn test_enumeration_index_degrevlex() {
-    feanor_tracing::DelayedLogger::init_test();
-
-    let cum_binomial_lookup_table = (0..4)
-        .map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>())
-        .collect::<Vec<_>>();
-
-    assert_eq!(
-        0,
-        enumeration_index_degrevlex(0, [0, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table)
-    );
-    let mut check = [0, 0, 0, 0];
-    nth_monomial_degrevlex(4, 0, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
-    assert_eq!(&[0, 0, 0, 0], &check);
-
-    assert_eq!(
-        0,
-        enumeration_index_degrevlex(1, [0, 0, 0, 1].clone_els_by(|x| *x), &cum_binomial_lookup_table)
-    );
-    let mut check = [0, 0, 0, 0];
-    nth_monomial_degrevlex(4, 1, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
-    assert_eq!(&[0, 0, 0, 1], &check);
-
-    assert_eq!(
-        3,
-        enumeration_index_degrevlex(1, [1, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table)
-    );
-    let mut check = [0, 0, 0, 0];
-    nth_monomial_degrevlex(4, 1, 3, &cum_binomial_lookup_table, |i, x| check[i] = x);
-    assert_eq!(&[1, 0, 0, 0], &check);
-
-    fn degrevlex_cmp(lhs: &[u16; 4], rhs: &[u16; 4]) -> Ordering {
-        let lhs_deg = lhs[0] + lhs[1] + lhs[2] + lhs[3];
-        let rhs_deg = rhs[0] + rhs[1] + rhs[2] + rhs[3];
-        if lhs_deg < rhs_deg {
-            return Ordering::Less;
-        } else if lhs_deg > rhs_deg {
-            return Ordering::Greater;
-        } else {
-            for i in (0..4).rev() {
-                if lhs[i] > rhs[i] {
-                    return Ordering::Less;
-                } else if lhs[i] < rhs[i] {
-                    return Ordering::Greater;
-                }
-            }
-            return Ordering::Equal;
-        }
+    fn ring_and_elements() -> (
+        MultivariatePolyRingImpl<zn_static::Fp<17>>,
+        Vec<MultivariatePolyRingEl<zn_static::Fp<17>>>,
+    ) {
+        let ring = MultivariatePolyRingImpl::new(F17, 3);
+        let els = vec![
+            ring.from_terms([]),
+            ring.from_terms([(ring.base_ring().one(), ring.create_monomial([0, 0, 0]))]),
+            ring.from_terms([(ring.base_ring().neg_one(), ring.create_monomial([0, 0, 0]))]),
+            ring.from_terms([(ring.base_ring().one(), ring.create_monomial([1, 0, 0]))]),
+            ring.from_terms([(ring.base_ring().neg_one(), ring.create_monomial([1, 0, 0]))]),
+            ring.from_terms([
+                (ring.base_ring().one(), ring.create_monomial([1, 0, 0])),
+                (ring.base_ring().one(), ring.create_monomial([0, 1, 0])),
+            ]),
+            ring.from_terms([
+                (ring.base_ring().one(), ring.create_monomial([2, 0, 0])),
+                (ring.base_ring().neg_one(), ring.create_monomial([1, 0, 0])),
+            ]),
+            ring.from_terms([
+                (ring.base_ring().one(), ring.create_monomial([1, 0, 0])),
+                (ring.base_ring().neg_one(), ring.create_monomial([0, 1, 1])),
+                (ring.base_ring().one(), ring.create_monomial([0, 0, 2])),
+            ]),
+        ];
+        return (ring, els);
     }
 
-    let all_monomials = multiset_combinations(&[6, 6, 6, 6], 6, |slice| {
-        std::array::from_fn::<_, 4, _>(|i| slice[3 - i] as u16)
-    })
-    .collect::<Vec<_>>();
-    assert!(all_monomials.is_sorted_by(|l, r| degrevlex_cmp(l, r) == Ordering::Less));
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, els) = ring_and_elements();
+        crate::ring::generic_tests::test_ring_axioms(&ring, els.into_iter());
+    }
 
-    for i in 0..all_monomials.len() {
+    #[test]
+    fn test_multivariate_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, _els) = ring_and_elements();
+        crate::ring_impls::multivariate::generic_tests::test_poly_ring_axioms(
+            &ring,
+            [F17.one(), F17.zero(), F17.int_hom().map(2), F17.neg_one()].into_iter(),
+        );
+    }
+
+    #[test]
+    fn test_enumeration_index_degrevlex() {
+        feanor_tracing::DelayedLogger::init_test();
+
+        let cum_binomial_lookup_table = (0..4)
+            .map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+
         assert_eq!(
-            i as u64,
-            enumeration_index_degrevlex(6, (&all_monomials[i]).clone_els_by(|x| *x), &cum_binomial_lookup_table)
+            0,
+            enumeration_index_degrevlex(0, [0, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table)
         );
         let mut check = [0, 0, 0, 0];
-        nth_monomial_degrevlex(4, 6, i as u64, &cum_binomial_lookup_table, |i, x| check[i] = x);
-        assert_eq!(&all_monomials[i], &check);
-    }
-}
+        nth_monomial_degrevlex(4, 0, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
+        assert_eq!(&[0, 0, 0, 0], &check);
 
-#[test]
-fn test_create_multiplication_table() {
-    feanor_tracing::DelayedLogger::init_test();
-    let cum_binomial_lookup_table = (0..3)
-        .map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>())
+        assert_eq!(
+            0,
+            enumeration_index_degrevlex(1, [0, 0, 0, 1].clone_els_by(|x| *x), &cum_binomial_lookup_table)
+        );
+        let mut check = [0, 0, 0, 0];
+        nth_monomial_degrevlex(4, 1, 0, &cum_binomial_lookup_table, |i, x| check[i] = x);
+        assert_eq!(&[0, 0, 0, 1], &check);
+
+        assert_eq!(
+            3,
+            enumeration_index_degrevlex(1, [1, 0, 0, 0].clone_els_by(|x| *x), &cum_binomial_lookup_table)
+        );
+        let mut check = [0, 0, 0, 0];
+        nth_monomial_degrevlex(4, 1, 3, &cum_binomial_lookup_table, |i, x| check[i] = x);
+        assert_eq!(&[1, 0, 0, 0], &check);
+
+        fn degrevlex_cmp(lhs: &[u16; 4], rhs: &[u16; 4]) -> Ordering {
+            let lhs_deg = lhs[0] + lhs[1] + lhs[2] + lhs[3];
+            let rhs_deg = rhs[0] + rhs[1] + rhs[2] + rhs[3];
+            if lhs_deg < rhs_deg {
+                return Ordering::Less;
+            } else if lhs_deg > rhs_deg {
+                return Ordering::Greater;
+            } else {
+                for i in (0..4).rev() {
+                    if lhs[i] > rhs[i] {
+                        return Ordering::Less;
+                    } else if lhs[i] < rhs[i] {
+                        return Ordering::Greater;
+                    }
+                }
+                return Ordering::Equal;
+            }
+        }
+
+        let all_monomials = multiset_combinations(&[6, 6, 6, 6], 6, |slice| {
+            std::array::from_fn::<_, 4, _>(|i| slice[3 - i] as u16)
+        })
         .collect::<Vec<_>>();
-    let mul_table = MultivariatePolyRingImplBase::<StaticRing<i64>>::create_multiplication_table(
-        3,
-        3,
-        4,
-        &cum_binomial_lookup_table,
-    );
+        assert!(all_monomials.is_sorted_by(|l, r| degrevlex_cmp(l, r) == Ordering::Less));
 
-    let deg3_monomials = multiset_combinations(&[3, 3, 3], 3, |slice| {
-        std::array::from_fn::<_, 3, _>(|i| slice[2 - i] as u16)
-    })
-    .collect::<Vec<_>>();
-    let deg4_monomials = multiset_combinations(&[4, 4, 4], 4, |slice| {
-        std::array::from_fn::<_, 3, _>(|i| slice[2 - i] as u16)
-    })
-    .collect::<Vec<_>>();
-
-    for lhs in &deg3_monomials {
-        for rhs in &deg4_monomials {
+        for i in 0..all_monomials.len() {
             assert_eq!(
-                enumeration_index_degrevlex(7, (0..3).map_fn(|i| lhs[i] + rhs[i]), &cum_binomial_lookup_table),
-                mul_table
-                    [enumeration_index_degrevlex(3, (0..3).map_fn(|i| lhs[i]), &cum_binomial_lookup_table) as usize]
-                    [enumeration_index_degrevlex(4, (0..3).map_fn(|i| rhs[i]), &cum_binomial_lookup_table) as usize]
+                i as u64,
+                enumeration_index_degrevlex(6, (&all_monomials[i]).clone_els_by(|x| *x), &cum_binomial_lookup_table)
             );
+            let mut check = [0, 0, 0, 0];
+            nth_monomial_degrevlex(4, 6, i as u64, &cum_binomial_lookup_table, |i, x| check[i] = x);
+            assert_eq!(&all_monomials[i], &check);
         }
     }
-}
 
-#[test]
-fn test_monomial_small() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(16, size_of::<MonomialIdentifier>());
-}
+    #[test]
+    fn test_create_multiplication_table() {
+        feanor_tracing::DelayedLogger::init_test();
+        let cum_binomial_lookup_table = (0..3)
+            .map(|n| (0..7).map(|k| compute_cum_binomial(n, k)).collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let mul_table = MultivariatePolyRingImplBase::<StaticRing<i64>>::create_multiplication_table(
+            3,
+            3,
+            4,
+            &cum_binomial_lookup_table,
+        );
 
-#[test]
-fn test_new_many_variables() {
-    feanor_tracing::DelayedLogger::init_test();
-    for m in 1..32 {
+        let deg3_monomials = multiset_combinations(&[3, 3, 3], 3, |slice| {
+            std::array::from_fn::<_, 3, _>(|i| slice[2 - i] as u16)
+        })
+        .collect::<Vec<_>>();
+        let deg4_monomials = multiset_combinations(&[4, 4, 4], 4, |slice| {
+            std::array::from_fn::<_, 3, _>(|i| slice[2 - i] as u16)
+        })
+        .collect::<Vec<_>>();
+
+        for lhs in &deg3_monomials {
+            for rhs in &deg4_monomials {
+                assert_eq!(
+                    enumeration_index_degrevlex(7, (0..3).map_fn(|i| lhs[i] + rhs[i]), &cum_binomial_lookup_table),
+                    mul_table[enumeration_index_degrevlex(3, (0..3).map_fn(|i| lhs[i]), &cum_binomial_lookup_table)
+                        as usize][enumeration_index_degrevlex(
+                        4,
+                        (0..3).map_fn(|i| rhs[i]),
+                        &cum_binomial_lookup_table
+                    ) as usize]
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn test_monomial_small() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(16, size_of::<MonomialIdentifier>());
+    }
+
+    #[test]
+    fn test_new_many_variables() {
+        feanor_tracing::DelayedLogger::init_test();
+        for m in 1..32 {
+            let ring = RingArc::from(Arc::new(MultivariatePolyRingImplBase::new_with_mult_table(
+                ZZi64,
+                m,
+                32,
+                (2, 3),
+                Global,
+            )));
+            assert_eq!(m, ring.indeterminate_count());
+        }
+    }
+
+    #[test]
+    fn test_evaluate_approximate_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = MultivariatePolyRingImpl::new(Real64::RING, 2);
+        let [f] = ring.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - Y * Y]);
+        let x = 0.47312;
+        let y = -1.43877;
+        assert!(
+            Real64::RING
+                .abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].clone_els_by(|x| *x), &Real64::RING.identity()))
+                <= 0.000000001
+        );
+    }
+
+    #[test]
+    fn test_evaluate_many_variables() {
+        feanor_tracing::DelayedLogger::init_test();
         let ring = RingArc::from(Arc::new(MultivariatePolyRingImplBase::new_with_mult_table(
             ZZi64,
-            m,
-            32,
-            (2, 3),
+            20,
+            16,
+            (4, 6),
             Global,
         )));
-        assert_eq!(m, ring.indeterminate_count());
+        let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
+        assert_eq!(
+            1 + 6 + 20,
+            ring.evaluate(&f, (1..21).map_fn(|x| x as i64), ZZi64.identity())
+        );
     }
-}
 
-#[test]
-fn test_evaluate_approximate_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = MultivariatePolyRingImpl::new(Real64::RING, 2);
-    let [f] = ring.with_wrapped_indeterminates(|[X, Y]| [X * X * Y - Y * Y]);
-    let x = 0.47312;
-    let y = -1.43877;
-    assert!(
-        Real64::RING
-            .abs((x * x * y - y * y) - ring.evaluate(&f, [x, y].clone_els_by(|x| *x), &Real64::RING.identity()))
-            <= 0.000000001
-    );
-}
-
-#[test]
-fn test_evaluate_many_variables() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RingArc::from(Arc::new(MultivariatePolyRingImplBase::new_with_mult_table(
-        ZZi64,
-        20,
-        16,
-        (4, 6),
-        Global,
-    )));
-    let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);
-    assert_eq!(
-        1 + 6 + 20,
-        ring.evaluate(&f, (1..21).map_fn(|x| x as i64), ZZi64.identity())
-    );
-}
-
-#[test]
-fn test_appearing_indeterminates() {
-    feanor_tracing::DelayedLogger::init_test();
-    let F7 = zn_64b::Zn64B::new(7).as_field().ok().unwrap();
-    let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
-    let [f, g] = F7XY.with_wrapped_indeterminates(|[X, Y]| [5 + 4 * X, 6 + 2 * Y]);
-    assert_eq!(vec![(0, 1)], F7XY.appearing_indeterminates(&f));
-    assert_eq!(vec![(1, 1)], F7XY.appearing_indeterminates(&g));
+    #[test]
+    fn test_appearing_indeterminates() {
+        feanor_tracing::DelayedLogger::init_test();
+        let F7 = zn_64b::Zn64B::new(7).as_field().ok().unwrap();
+        let F7XY = MultivariatePolyRingImpl::new(&F7, 2);
+        let [f, g] = F7XY.with_wrapped_indeterminates(|[X, Y]| [5 + 4 * X, 6 + 2 * Y]);
+        assert_eq!(vec![(0, 1)], F7XY.appearing_indeterminates(&f));
+        assert_eq!(vec![(1, 1)], F7XY.appearing_indeterminates(&g));
+    }
 }

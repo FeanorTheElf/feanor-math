@@ -272,103 +272,104 @@ where
 }
 
 #[cfg(test)]
-use std::f64::consts::PI;
+mod tests {
+    use std::f64::consts::PI;
 
-#[cfg(test)]
-use crate::algorithms::cyclotomic::cyclotomic_polynomial;
-#[cfg(test)]
-use crate::ring_properties::pid::PrincipalIdealRingStore;
+    use super::*;
+    use crate::algorithms::cyclotomic::cyclotomic_polynomial;
+    use crate::ring_properties::pid::PrincipalIdealRingStore;
 
-#[test]
-fn test_find_approximate_complex_root() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(&ZZ, "X");
-    let CC = Complex64::RING;
+    #[test]
+    fn test_find_approximate_complex_root() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(&ZZ, "X");
+        let CC = Complex64::RING;
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
-    let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
-    assert!(radius <= 0.000000001);
-    assert!(CC.abs(CC.sub(Complex64::I, root)) <= radius || CC.abs(CC.add(Complex64::I, root)) <= radius);
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+        let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
+        assert!(radius <= 0.000000001);
+        assert!(CC.abs(CC.sub(Complex64::I, root)) <= radius || CC.abs(CC.add(Complex64::I, root)) <= radius);
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [100000000 * X.pow_ref(2) + 1]);
-    let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
-    assert!(radius <= 0.000000001);
-    assert!(
-        CC.abs(CC.sub(CC.mul(Complex64::I, CC.from_f64(0.0001)), root)) <= radius
-            || CC.abs(CC.add(CC.mul(Complex64::I, CC.from_f64(0.0001)), root)) <= radius
-    );
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [100000000 * X.pow_ref(2) + 1]);
+        let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
+        assert!(radius <= 0.000000001);
+        assert!(
+            CC.abs(CC.sub(CC.mul(Complex64::I, CC.from_f64(0.0001)), root)) <= radius
+                || CC.abs(CC.add(CC.mul(Complex64::I, CC.from_f64(0.0001)), root)) <= radius
+        );
 
-    let f = cyclotomic_polynomial(&ZZX, 105);
-    let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
-    assert!(radius <= 0.000000001);
-    let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
-    assert!(
-        (0..105)
-            .filter(|k| ZZi64.ideal_gen(k, &105) == 1)
-            .any(|k| CC.abs(CC.sub(root_of_unity(k, 105), root)) <= radius)
-    );
+        let f = cyclotomic_polynomial(&ZZX, 105);
+        let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
+        assert!(radius <= 0.000000001);
+        let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
+        assert!(
+            (0..105)
+                .filter(|k| ZZi64.ideal_gen(k, &105) == 1)
+                .any(|k| CC.abs(CC.sub(root_of_unity(k, 105), root)) <= radius)
+        );
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 6 * X.pow_ref(2) - 11]);
-    let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
-    assert!(radius <= 0.000000001);
-    let expected = [
-        CC.from_f64(-2.7335207983477241859817441249894389670263693372196541057936155022),
-        CC.from_f64(2.7335207983477241859817441249894389670263693372196541057936155022),
-        CC.mul(
-            CC.from_f64(-1.2133160985495821701841076107103126272177604441592580488679327999),
-            Complex64::I,
-        ),
-        CC.mul(
-            CC.from_f64(1.2133160985495821701841076107103126272177604441592580488679327999),
-            Complex64::I,
-        ),
-    ];
-    assert!(expected.iter().any(|x| CC.abs(CC.sub(*x, root)) <= radius));
-}
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 6 * X.pow_ref(2) - 11]);
+        let (root, radius) = find_approximate_complex_root(&ZZX, &f).unwrap();
+        assert!(radius <= 0.000000001);
+        let expected = [
+            CC.from_f64(-2.7335207983477241859817441249894389670263693372196541057936155022),
+            CC.from_f64(2.7335207983477241859817441249894389670263693372196541057936155022),
+            CC.mul(
+                CC.from_f64(-1.2133160985495821701841076107103126272177604441592580488679327999),
+                Complex64::I,
+            ),
+            CC.mul(
+                CC.from_f64(1.2133160985495821701841076107103126272177604441592580488679327999),
+                Complex64::I,
+            ),
+        ];
+        assert!(expected.iter().any(|x| CC.abs(CC.sub(*x, root)) <= radius));
+    }
 
-#[test]
-fn test_find_all_approximate_complex_roots() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(&ZZ, "X");
-    let CC = Complex64::RING;
+    #[test]
+    fn test_find_all_approximate_complex_roots() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(&ZZ, "X");
+        let CC = Complex64::RING;
 
-    // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 7 * X + 100]);
-    // let expected = [
-    //     CC.from_f64(-5.1425347350362689414102462079341122827700721701123021518405977272),
-    //     CC.add(
-    //         CC.from_f64(2.5712673675181344707051231039670561413850360850561510759202988636),
-    //         CC.mul(
-    //             CC.from_f64(-3.5824918179656616775077885147170618458138064112538190024361795659),
-    //             Complex64::I,
-    //         ),
-    //     ),
-    //     CC.add(
-    //         CC.from_f64(2.5712673675181344707051231039670561413850360850561510759202988636),
-    //         CC.mul(
-    //             CC.from_f64(3.5824918179656616775077885147170618458138064112538190024361795659),
-    //             Complex64::I,
-    //         ),
-    //     ),
-    // ];
-    // let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();
-    // for (expected, (actual, dist)) in expected.iter().copied().zip(actual.iter().copied()) {
-    //     assert!(dist < 0.000000001);
-    //     assert!(CC.abs(CC.sub(actual, expected)) <= dist);
-    // }
+        // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 7 * X + 100]);
+        // let expected = [
+        //     CC.from_f64(-5.1425347350362689414102462079341122827700721701123021518405977272),
+        //     CC.add(
+        //         CC.from_f64(2.5712673675181344707051231039670561413850360850561510759202988636),
+        //         CC.mul(
+        //             CC.from_f64(-3.5824918179656616775077885147170618458138064112538190024361795659),
+        //             Complex64::I,
+        //         ),
+        //     ),
+        //     CC.add(
+        //         CC.from_f64(2.5712673675181344707051231039670561413850360850561510759202988636),
+        //         CC.mul(
+        //             CC.from_f64(3.5824918179656616775077885147170618458138064112538190024361795659),
+        //             Complex64::I,
+        //         ),
+        //     ),
+        // ];
+        // let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();
+        // for (expected, (actual, dist)) in expected.iter().copied().zip(actual.iter().copied()) {
+        //     assert!(dist < 0.000000001);
+        //     assert!(CC.abs(CC.sub(actual, expected)) <= dist);
+        // }
 
-    let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
-    let f = cyclotomic_polynomial(&ZZX, 105);
-    let expected = (1..=52)
-        .rev()
-        .filter(|i| ZZi64.ideal_gen(i, &105) == 1)
-        .flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)])
-        .chain([CC.one()]);
-    let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();
-    assert_eq!(48, actual.len());
-    for (expected, (actual, dist)) in expected.zip(actual.iter().copied()) {
-        assert!(dist < 0.000000001);
-        assert!(CC.abs(CC.sub(actual, expected)) <= dist);
+        let root_of_unity = |k, n| CC.exp(CC.mul(CC.from_f64(2.0 * PI * k as f64 / n as f64), Complex64::I));
+        let f = cyclotomic_polynomial(&ZZX, 105);
+        let expected = (1..=52)
+            .rev()
+            .filter(|i| ZZi64.ideal_gen(i, &105) == 1)
+            .flat_map(|i| [root_of_unity(105 - i, 105), root_of_unity(i, 105)])
+            .chain([CC.one()]);
+        let actual = find_all_approximate_complex_roots(&ZZX, &f).unwrap();
+        assert_eq!(48, actual.len());
+        for (expected, (actual, dist)) in expected.zip(actual.iter().copied()) {
+            assert!(dist < 0.000000001);
+            assert!(CC.abs(CC.sub(actual, expected)) <= dist);
+        }
     }
 }

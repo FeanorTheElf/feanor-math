@@ -347,53 +347,55 @@ impl<R: RingStore, C: ConvolutionAlgorithm<R::Ring>, A: Allocator> PolyModulus<R
 }
 
 #[cfg(test)]
-use crate::function::no_error;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+mod tests {
+    use super::*;
+    use crate::function::no_error;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_fast_poly_div() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(ZZ, "X");
-    let [f, g] = ZZX.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(80) - 1,
-            X.pow_ref(40) - 2 * X.pow_ref(33) + X.pow_ref(21) - X + 10,
-        ]
-    });
-    assert_el_eq!(
-        &ZZX,
-        ZZX.div_rem_monic(f.clone(), &g).0,
-        fast_poly_div_rem(&ZZX, f.clone(), &g, |c| Ok(c.clone()))
-            .unwrap_or_else(no_error)
-            .0
-    );
-}
-
-#[test]
-fn test_barrett_poly_reduction() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(65537);
-    // f = X^3 - 2 X^2 - 1
-    let x_pow_rank = [1, 0, 2].into_iter().map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
-    let reducer = BarrettPolyModulus::new(ring, 9, x_pow_rank, KaratsubaAlgorithm::new(4), Global);
-
-    let mut operand = [4, 3, 2, 1]
-        .into_iter()
-        .map(|x| ring.int_hom().map(x))
-        .collect::<Vec<_>>();
-    reducer.perform_reduction(&mut operand);
-    for i in 0..3 {
-        assert_el_eq!(&ring, ring.int_hom().map([5, 3, 4][i]), operand[i]);
+    #[test]
+    fn test_fast_poly_div() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(ZZ, "X");
+        let [f, g] = ZZX.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(80) - 1,
+                X.pow_ref(40) - 2 * X.pow_ref(33) + X.pow_ref(21) - X + 10,
+            ]
+        });
+        assert_el_eq!(
+            &ZZX,
+            ZZX.div_rem_monic(f.clone(), &g).0,
+            fast_poly_div_rem(&ZZX, f.clone(), &g, |c| Ok(c.clone()))
+                .unwrap_or_else(no_error)
+                .0
+        );
     }
 
-    let mut operand = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
-        .into_iter()
-        .map(|x| ring.int_hom().map(x))
-        .collect::<Vec<_>>();
-    reducer.perform_reduction(&mut operand);
-    for i in 0..3 {
-        assert_el_eq!(&ring, ring.int_hom().map([330, 152, 711][i]), operand[i]);
+    #[test]
+    fn test_barrett_poly_reduction() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(65537);
+        // f = X^3 - 2 X^2 - 1
+        let x_pow_rank = [1, 0, 2].into_iter().map(|x| ring.int_hom().map(x)).collect::<Vec<_>>();
+        let reducer = BarrettPolyModulus::new(ring, 9, x_pow_rank, KaratsubaAlgorithm::new(4), Global);
+
+        let mut operand = [4, 3, 2, 1]
+            .into_iter()
+            .map(|x| ring.int_hom().map(x))
+            .collect::<Vec<_>>();
+        reducer.perform_reduction(&mut operand);
+        for i in 0..3 {
+            assert_el_eq!(&ring, ring.int_hom().map([5, 3, 4][i]), operand[i]);
+        }
+
+        let mut operand = [10, 9, 8, 7, 6, 5, 4, 3, 2, 1]
+            .into_iter()
+            .map(|x| ring.int_hom().map(x))
+            .collect::<Vec<_>>();
+        reducer.perform_reduction(&mut operand);
+        for i in 0..3 {
+            assert_el_eq!(&ring, ring.int_hom().map([330, 152, 711][i]), operand[i]);
+        }
     }
 }

@@ -1032,201 +1032,206 @@ where
 }
 
 #[cfg(test)]
-use std::time::Instant;
+mod tests {
+    use std::time::Instant;
 
-#[cfg(test)]
-use test::Bencher;
+    use test::Bencher;
 
-#[test]
-fn test_can_hom_from() {
-    feanor_tracing::DelayedLogger::init_test();
-    #[allow(unused)]
-    fn assert_impl_CanHomFrom<From, To>()
-    where
-        To: ?Sized + CanHomFrom<From>,
-        From: ?Sized + RingBase,
-    {
-    }
+    use super::*;
 
-    #[allow(unused)]
-    fn MonogenicExtensionImpl_wrap_unwrap_homs<R, M, A, C>()
-    where
-        R: RingStore,
-        R::Ring: SelfIso + LinSolveRing,
-        M: PolyModulus<R> + Send + Sync + Clone,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Ring> + Clone,
-    {
-        assert_impl_CanHomFrom::<MonogenicExtensionImplBase<R, M, C, A>, AsFieldBase<MonogenicExtensionImpl<R, M, C, A>>>(
-        );
-    }
+    #[test]
+    fn test_can_hom_from() {
+        feanor_tracing::DelayedLogger::init_test();
+        #[allow(unused)]
+        fn assert_impl_CanHomFrom<From, To>()
+        where
+            To: ?Sized + CanHomFrom<From>,
+            From: ?Sized + RingBase,
+        {
+        }
 
-    #[allow(unused)]
-    fn MonogenicExtensionImpl_from_GaloisField<R, M, A, C>()
-    where
-        R: RingStore,
-        R::Ring: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
-        M: PolyModulus<R> + Send + Sync + Clone,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Ring> + Clone,
-    {
-        assert_impl_CanHomFrom::<
-            GaloisFieldBase<AsField<MonogenicExtensionImpl<R, M, C, A>>>,
-            AsFieldBase<MonogenicExtensionImpl<R, M, C, A>>,
-        >();
-    }
+        #[allow(unused)]
+        fn MonogenicExtensionImpl_wrap_unwrap_homs<R, M, A, C>()
+        where
+            R: RingStore,
+            R::Ring: SelfIso + LinSolveRing,
+            M: PolyModulus<R> + Send + Sync + Clone,
+            A: Allocator + Clone + Send + Sync,
+            C: ConvolutionAlgorithm<R::Ring> + Clone,
+        {
+            assert_impl_CanHomFrom::<
+                MonogenicExtensionImplBase<R, M, C, A>,
+                AsFieldBase<MonogenicExtensionImpl<R, M, C, A>>,
+            >();
+        }
 
-    #[allow(unused)]
-    fn GaloisField_from_GaloisField<R, M, A, C>()
-    where
-        R: RingStore,
-        R::Ring: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
-        M: PolyModulus<R> + Send + Sync + Clone,
-        A: Allocator + Clone + Send + Sync,
-        C: ConvolutionAlgorithm<R::Ring> + Clone,
-    {
-        assert_impl_CanHomFrom::<
-            GaloisFieldBase<AsField<MonogenicExtensionImpl<R, M, C, A>>>,
-            GaloisFieldBase<AsField<MonogenicExtensionImpl<R, M, C, A>>>,
-        >();
-    }
-}
+        #[allow(unused)]
+        fn MonogenicExtensionImpl_from_GaloisField<R, M, A, C>()
+        where
+            R: RingStore,
+            R::Ring: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
+            M: PolyModulus<R> + Send + Sync + Clone,
+            A: Allocator + Clone + Send + Sync,
+            C: ConvolutionAlgorithm<R::Ring> + Clone,
+        {
+            assert_impl_CanHomFrom::<
+                GaloisFieldBase<AsField<MonogenicExtensionImpl<R, M, C, A>>>,
+                AsFieldBase<MonogenicExtensionImpl<R, M, C, A>>,
+            >();
+        }
 
-#[test]
-fn test_galois_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = GaloisField::new(3, 1);
-    let elements = (0..3).map(|x| field.int_hom().map(x));
-    crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
-    crate::ring::generic_tests::test_self_iso(&field, elements.clone());
-    crate::ring_properties::field::generic_tests::test_field_axioms(&field, elements.clone());
-
-    let field = GaloisField::new(3, 2);
-    let field_ref = &field;
-    let elements = (0..3).flat_map(|x| {
-        (0..3).map(move |y| {
-            field_ref.from_power_basis([
-                field_ref.base_ring().int_hom().map(x),
-                field_ref.base_ring().int_hom().map(y),
-            ])
-        })
-    });
-    crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
-    crate::ring::generic_tests::test_self_iso(&field, elements.clone());
-    crate::ring_properties::field::generic_tests::test_field_axioms(&field, elements.clone());
-}
-
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = GaloisField::new(3, 2);
-    let field_ref = &field;
-    let elements = (0..3).flat_map(|x| {
-        (0..3).map(move |y| {
-            field_ref.from_power_basis([
-                field_ref.base_ring().int_hom().map(x),
-                field_ref.base_ring().int_hom().map(y),
-            ])
-        })
-    });
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&field, elements.clone());
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&field, elements.clone());
-}
-
-#[test]
-fn test_galois_field_even() {
-    feanor_tracing::DelayedLogger::init_test();
-    for degree in 1..=9 {
-        let field = GaloisField::new(2, degree);
-        assert_eq!(degree, field.rank());
-        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
-    }
-}
-
-#[test]
-fn test_construct_galois_field() {
-    for p in [2, 3, 5] {
-        for d in [1, 2, 3, 5, 8, 12, 13] {
-            let GF = GaloisField::new(p, d);
-            let ZpX = DensePolyRing::new(GF.base_ring(), "X");
-            assert!(FactorPolyField::is_irred(
-                &ZpX,
-                &GF.generating_poly(&ZpX, ZpX.base_ring().identity())
-            ));
+        #[allow(unused)]
+        fn GaloisField_from_GaloisField<R, M, A, C>()
+        where
+            R: RingStore,
+            R::Ring: SelfIso + LinSolveRing + FiniteRing + Field + ZnRing,
+            M: PolyModulus<R> + Send + Sync + Clone,
+            A: Allocator + Clone + Send + Sync,
+            C: ConvolutionAlgorithm<R::Ring> + Clone,
+        {
+            assert_impl_CanHomFrom::<
+                GaloisFieldBase<AsField<MonogenicExtensionImpl<R, M, C, A>>>,
+                GaloisFieldBase<AsField<MonogenicExtensionImpl<R, M, C, A>>>,
+            >();
         }
     }
-}
 
-#[test]
-fn test_galois_field_odd() {
-    feanor_tracing::DelayedLogger::init_test();
-    for degree in 1..=9 {
-        let field = GaloisField::new(3, degree);
-        assert_eq!(degree, field.rank());
+    #[test]
+    fn test_galois_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = GaloisField::new(3, 1);
+        let elements = (0..3).map(|x| field.int_hom().map(x));
+        crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
+        crate::ring::generic_tests::test_self_iso(&field, elements.clone());
+        crate::ring_properties::field::generic_tests::test_field_axioms(&field, elements.clone());
+
+        let field = GaloisField::new(3, 2);
+        let field_ref = &field;
+        let elements = (0..3).flat_map(|x| {
+            (0..3).map(move |y| {
+                field_ref.from_power_basis([
+                    field_ref.base_ring().int_hom().map(x),
+                    field_ref.base_ring().int_hom().map(y),
+                ])
+            })
+        });
+        crate::ring::generic_tests::test_ring_axioms(&field, elements.clone());
+        crate::ring::generic_tests::test_self_iso(&field, elements.clone());
+        crate::ring_properties::field::generic_tests::test_field_axioms(&field, elements.clone());
+    }
+
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = GaloisField::new(3, 2);
+        let field_ref = &field;
+        let elements = (0..3).flat_map(|x| {
+            (0..3).map(move |y| {
+                field_ref.from_power_basis([
+                    field_ref.base_ring().int_hom().map(x),
+                    field_ref.base_ring().int_hom().map(y),
+                ])
+            })
+        });
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(&field, elements.clone());
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&field, elements.clone());
+    }
+
+    #[test]
+    fn test_galois_field_even() {
+        feanor_tracing::DelayedLogger::init_test();
+        for degree in 1..=9 {
+            let field = GaloisField::new(2, degree);
+            assert_eq!(degree, field.rank());
+            assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+        }
+    }
+
+    #[test]
+    fn test_construct_galois_field() {
+        for p in [2, 3, 5] {
+            for d in [1, 2, 3, 5, 8, 12, 13] {
+                let GF = GaloisField::new(p, d);
+                let ZpX = DensePolyRing::new(GF.base_ring(), "X");
+                assert!(FactorPolyField::is_irred(
+                    &ZpX,
+                    &GF.generating_poly(&ZpX, ZpX.base_ring().identity())
+                ));
+            }
+        }
+    }
+
+    #[test]
+    fn test_galois_field_odd() {
+        feanor_tracing::DelayedLogger::init_test();
+        for degree in 1..=9 {
+            let field = GaloisField::new(3, degree);
+            assert_eq!(degree, field.rank());
+            assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+        }
+
+        for degree in 1..=9 {
+            let field = GaloisField::new(5, degree);
+            assert_eq!(degree, field.rank());
+            assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+        }
+    }
+
+    #[test]
+    fn test_galois_field_no_trinomial() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = GaloisField::new(2, 24);
+        assert_eq!(24, field.rank());
+        assert!(
+            field
+                .clone()
+                .into()
+                .unwrap_self()
+                .into()
+                .unwrap_self()
+                .as_field()
+                .is_ok()
+        );
+
+        let field = GaloisField::new(3, 30);
+        assert_eq!(30, field.rank());
+        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+
+        let field = GaloisField::new(17, 32);
+        assert_eq!(32, field.rank());
         assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
     }
 
-    for degree in 1..=9 {
-        let field = GaloisField::new(5, degree);
-        assert_eq!(degree, field.rank());
-        assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
+    #[bench]
+    fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+
+        bencher.iter(|| {
+            let field = GaloisField::new(2, 96);
+            let ring = field.get_ring().galois_ring(14);
+            assert_eq!(96, ring.rank());
+        });
     }
-}
 
-#[test]
-fn test_galois_field_no_trinomial() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = GaloisField::new(2, 24);
-    assert_eq!(24, field.rank());
-    assert!(
-        field
-            .clone()
-            .into()
-            .unwrap_self()
-            .into()
-            .unwrap_self()
-            .as_field()
-            .is_ok()
-    );
+    #[test]
+    #[ignore]
+    fn test_galois_field_2_976() {
+        feanor_tracing::DelayedLogger::init_test();
+        let start = Instant::now();
+        let field = GaloisField::new(2, 976);
+        _ = std::hint::black_box(field);
+        let end = Instant::now();
+        println!("Created GF(2^976) in {} ms", (end - start).as_millis());
+    }
 
-    let field = GaloisField::new(3, 30);
-    assert_eq!(30, field.rank());
-    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
-
-    let field = GaloisField::new(17, 32);
-    assert_eq!(32, field.rank());
-    assert!(field.into().unwrap_self().into().unwrap_self().as_field().is_ok());
-}
-
-#[bench]
-fn bench_create_galois_ring_2_14_96(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-
-    bencher.iter(|| {
-        let field = GaloisField::new(2, 96);
-        let ring = field.get_ring().galois_ring(14);
-        assert_eq!(96, ring.rank());
-    });
-}
-
-#[test]
-#[ignore]
-fn test_galois_field_2_976() {
-    feanor_tracing::DelayedLogger::init_test();
-    let start = Instant::now();
-    let field = GaloisField::new(2, 976);
-    _ = std::hint::black_box(field);
-    let end = Instant::now();
-    println!("Created GF(2^976) in {} ms", (end - start).as_millis());
-}
-
-#[test]
-#[ignore]
-fn test_galois_field_17_2048() {
-    feanor_tracing::DelayedLogger::init_test();
-    let start = Instant::now();
-    let field = GaloisField::new(17, 2048);
-    _ = std::hint::black_box(field);
-    let end = Instant::now();
-    println!("Created GF(17^2048) in {} ms", (end - start).as_millis());
+    #[test]
+    #[ignore]
+    fn test_galois_field_17_2048() {
+        feanor_tracing::DelayedLogger::init_test();
+        let start = Instant::now();
+        let field = GaloisField::new(17, 2048);
+        _ = std::hint::black_box(field);
+        let end = Instant::now();
+        println!("Created GF(17^2048) in {} ms", (end - start).as_millis());
+    }
 }

@@ -172,118 +172,120 @@ impl<R: RingStore> VectorViewMut<El<R>> for SparseMapVector<R> {
 }
 
 #[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
+mod tests {
+    use super::*;
+    use crate::ring_impls::primitive_int::StaticRing;
 
-#[cfg(test)]
-fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, values: [i64; N]) {
-    assert_eq!(vec.len(), N);
-    vec.check_consistency();
-    for i in 0..N {
-        // at_mut() might change the vector, so don't test that
-        assert_eq!(*vec.at(i), values[i]);
+    fn assert_vector_eq<const N: usize>(vec: &SparseMapVector<StaticRing<i64>>, values: [i64; N]) {
+        assert_eq!(vec.len(), N);
+        vec.check_consistency();
+        for i in 0..N {
+            // at_mut() might change the vector, so don't test that
+            assert_eq!(*vec.at(i), values[i]);
+        }
     }
-}
 
-#[test]
-fn test_at_mut() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZi64;
-    let mut vector = SparseMapVector::new(5, ring);
+    #[test]
+    fn test_at_mut() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZi64;
+        let mut vector = SparseMapVector::new(5, ring);
 
-    assert_vector_eq(&mut vector, [0, 0, 0, 0, 0]);
-    let mut entry = vector.at_mut(1);
-    assert_eq!(0, *entry);
-    *entry = 3;
-    assert_vector_eq(&mut vector, [0, 3, 0, 0, 0]);
+        assert_vector_eq(&mut vector, [0, 0, 0, 0, 0]);
+        let mut entry = vector.at_mut(1);
+        assert_eq!(0, *entry);
+        *entry = 3;
+        assert_vector_eq(&mut vector, [0, 3, 0, 0, 0]);
 
-    entry = vector.at_mut(4);
-    assert_eq!(0, *entry);
-    *entry = -1;
-    assert_vector_eq(&mut vector, [0, 3, 0, 0, -1]);
+        entry = vector.at_mut(4);
+        assert_eq!(0, *entry);
+        *entry = -1;
+        assert_vector_eq(&mut vector, [0, 3, 0, 0, -1]);
 
-    entry = vector.at_mut(1);
-    assert_eq!(3, *entry);
-    *entry = 4;
-    assert_vector_eq(&mut vector, [0, 4, 0, 0, -1]);
+        entry = vector.at_mut(1);
+        assert_eq!(3, *entry);
+        *entry = 4;
+        assert_vector_eq(&mut vector, [0, 4, 0, 0, -1]);
 
-    entry = vector.at_mut(1);
-    assert_eq!(4, *entry);
-    *entry = 5;
-    assert_vector_eq(&mut vector, [0, 5, 0, 0, -1]);
+        entry = vector.at_mut(1);
+        assert_eq!(4, *entry);
+        *entry = 5;
+        assert_vector_eq(&mut vector, [0, 5, 0, 0, -1]);
 
-    entry = vector.at_mut(3);
-    assert_eq!(0, *entry);
-    *entry = 0;
-    assert_vector_eq(&mut vector, [0, 5, 0, 0, -1]);
-}
+        entry = vector.at_mut(3);
+        assert_eq!(0, *entry);
+        *entry = 0;
+        assert_vector_eq(&mut vector, [0, 5, 0, 0, -1]);
+    }
 
-#[test]
-fn test_nontrivial_entries() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZi64;
-    let mut vector = SparseMapVector::new(5, ring);
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [].into_iter().collect()
-    );
-    *vector.at_mut(1) = 3;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &3)].into_iter().collect()
-    );
-    *vector.at_mut(4) = -1;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &3), (4, &-1)].into_iter().collect()
-    );
+    #[test]
+    fn test_nontrivial_entries() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZi64;
+        let mut vector = SparseMapVector::new(5, ring);
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [].into_iter().collect()
+        );
+        *vector.at_mut(1) = 3;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &3)].into_iter().collect()
+        );
+        *vector.at_mut(4) = -1;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &3), (4, &-1)].into_iter().collect()
+        );
 
-    *vector.at_mut(1) = 4;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &4), (4, &-1)].into_iter().collect()
-    );
-    *vector.at_mut(1) = 0;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(4, &-1)].into_iter().collect()
-    );
-    *vector.at_mut(1) = 5;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &5), (4, &-1)].into_iter().collect()
-    );
+        *vector.at_mut(1) = 4;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &4), (4, &-1)].into_iter().collect()
+        );
+        *vector.at_mut(1) = 0;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(4, &-1)].into_iter().collect()
+        );
+        *vector.at_mut(1) = 5;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &5), (4, &-1)].into_iter().collect()
+        );
 
-    *vector.at_mut(3) = 0;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &5), (4, &-1)].into_iter().collect()
-    );
-    *vector.at_mut(4) = -2;
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &5), (4, &-2)].into_iter().collect()
-    );
+        *vector.at_mut(3) = 0;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &5), (4, &-1)].into_iter().collect()
+        );
+        *vector.at_mut(4) = -2;
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &5), (4, &-2)].into_iter().collect()
+        );
 
-    *vector.at_mut(1) = 0;
-    assert_eq!(vector.nontrivial_entries().count(), 1);
-    *vector.at_mut(4) = 0;
-    assert_eq!(vector.nontrivial_entries().count(), 0);
-}
+        *vector.at_mut(1) = 0;
+        assert_eq!(vector.nontrivial_entries().count(), 1);
+        *vector.at_mut(4) = 0;
+        assert_eq!(vector.nontrivial_entries().count(), 0);
+    }
 
-#[test]
-fn test_scan() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZi64;
-    let mut vector = SparseMapVector::new(5, ring);
-    *vector.at_mut(1) = 2;
-    *vector.at_mut(3) = 1;
-    *vector.at_mut(4) = 0;
-    vector.scan(|_, c| {
-        *c -= 1;
-    });
-    assert_vector_eq(&vector, [0, 1, 0, 0, 0]);
-    assert_eq!(
-        vector.nontrivial_entries().collect::<HashMap<_, _>>(),
-        [(1, &1)].into_iter().collect()
-    );
+    #[test]
+    fn test_scan() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZi64;
+        let mut vector = SparseMapVector::new(5, ring);
+        *vector.at_mut(1) = 2;
+        *vector.at_mut(3) = 1;
+        *vector.at_mut(4) = 0;
+        vector.scan(|_, c| {
+            *c -= 1;
+        });
+        assert_vector_eq(&vector, [0, 1, 0, 0, 0]);
+        assert_eq!(
+            vector.nontrivial_entries().collect::<HashMap<_, _>>(),
+            [(1, &1)].into_iter().collect()
+        );
+    }
 }

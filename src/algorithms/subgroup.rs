@@ -1207,481 +1207,479 @@ fn generator_mod_pe(p: El<BigIntRing>, e: usize, order_factorization: &[(El<BigI
 }
 
 #[cfg(test)]
-struct ProdGroupBase<G: AbelianGroupStore, const N: usize>(G);
+mod tests {
+    use std::array::from_fn;
 
-#[cfg(test)]
-impl<G: AbelianGroupStore, const N: usize> PartialEq for ProdGroupBase<G, N> {
-    fn eq(&self, other: &Self) -> bool { self.0.get_group() == other.0.get_group() }
-}
+    use super::*;
+    use crate::RANDOM_TEST_INSTANCE_COUNT;
+    use crate::algorithms::linsolve::LinSolveRingStore;
+    use crate::algorithms::matmul::ComputeInnerProduct;
+    use crate::group::AddGroup;
+    use crate::ring_impls::zn::zn_static::Zn;
 
-#[cfg(test)]
-impl<G: AbelianGroupStore, const N: usize> Debug for ProdGroupBase<G, N> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { write!(f, "({:?})^{}", self.0.get_group(), N) }
-}
+    struct ProdGroupBase<G: AbelianGroupStore, const N: usize>(G);
 
-#[cfg(test)]
-impl<G: AbelianGroupStore, const N: usize> AbelianGroupBase for ProdGroupBase<G, N> {
-    type Element = [GEl<G>; N];
-
-    fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { (0..N).all(|i| self.0.eq_el(&lhs[i], &rhs[i])) }
-
-    fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
-        from_fn(|i| self.0.op_ref(&lhs[i], &rhs[i]))
+    impl<G: AbelianGroupStore, const N: usize> PartialEq for ProdGroupBase<G, N> {
+        fn eq(&self, other: &Self) -> bool { self.0.get_group() == other.0.get_group() }
     }
 
-    fn hash<H: std::hash::Hasher>(&self, x: &Self::Element, hasher: &mut H) {
-        for i in 0..N {
-            self.0.hash(&x[i], hasher)
+    impl<G: AbelianGroupStore, const N: usize> Debug for ProdGroupBase<G, N> {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "({:?})^{}", self.0.get_group(), N)
         }
     }
 
-    fn inv(&self, x: &Self::Element) -> Self::Element { from_fn(|i| self.0.inv(&x[i])) }
+    impl<G: AbelianGroupStore, const N: usize> AbelianGroupBase for ProdGroupBase<G, N> {
+        type Element = [GEl<G>; N];
 
-    fn identity(&self) -> Self::Element { from_fn(|_| self.0.identity()) }
-
-    fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
-        let mut seq = out.debug_list();
-        for x in value {
-            _ = seq.entry(&self.0.formatted_el(x));
+        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool {
+            (0..N).all(|i| self.0.eq_el(&lhs[i], &rhs[i]))
         }
-        return seq.finish();
+
+        fn op(&self, lhs: Self::Element, rhs: Self::Element) -> Self::Element {
+            from_fn(|i| self.0.op_ref(&lhs[i], &rhs[i]))
+        }
+
+        fn hash<H: std::hash::Hasher>(&self, x: &Self::Element, hasher: &mut H) {
+            for i in 0..N {
+                self.0.hash(&x[i], hasher)
+            }
+        }
+
+        fn inv(&self, x: &Self::Element) -> Self::Element { from_fn(|i| self.0.inv(&x[i])) }
+
+        fn identity(&self) -> Self::Element { from_fn(|_| self.0.identity()) }
+
+        fn fmt_el<'a>(&self, value: &Self::Element, out: &mut std::fmt::Formatter<'a>) -> std::fmt::Result {
+            let mut seq = out.debug_list();
+            for x in value {
+                _ = seq.entry(&self.0.formatted_el(x));
+            }
+            return seq.finish();
+        }
     }
-}
 
-#[cfg(test)]
-use std::array::from_fn;
+    #[test]
+    fn test_baby_giant_step() {
+        feanor_tracing::DelayedLogger::init_test();
+        for base_bound in [21, 26, 31, 37] {
+            let G = AddGroup::new(ZZi64);
+            assert_eq!(Some(vec![6]), baby_giant_step(&G, 6, &[1], &[base_bound]));
+            assert_eq!(None, baby_giant_step(&G, 0, &[1], &[base_bound]));
 
-#[cfg(test)]
-use crate::RANDOM_TEST_INSTANCE_COUNT;
-#[cfg(test)]
-use crate::algorithms::linsolve::LinSolveRingStore;
-#[cfg(test)]
-use crate::algorithms::matmul::ComputeInnerProduct;
-#[cfg(test)]
-use crate::group::AddGroup;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::Zn;
+            let G = AddGroup::new(Zn::<20>::RING);
+            assert_eq!(Some(vec![20]), baby_giant_step(&G, 0, &[1], &[base_bound]));
+            assert_eq!(Some(vec![10]), baby_giant_step(&G, 10, &[1], &[base_bound]));
+            assert_eq!(Some(vec![5]), baby_giant_step(&G, 0, &[16], &[base_bound]));
+        }
 
-#[test]
-fn test_baby_giant_step() {
-    feanor_tracing::DelayedLogger::init_test();
-    for base_bound in [21, 26, 31, 37] {
         let G = AddGroup::new(ZZi64);
-        assert_eq!(Some(vec![6]), baby_giant_step(&G, 6, &[1], &[base_bound]));
-        assert_eq!(None, baby_giant_step(&G, 0, &[1], &[base_bound]));
 
-        let G = AddGroup::new(Zn::<20>::RING);
-        assert_eq!(Some(vec![20]), baby_giant_step(&G, 0, &[1], &[base_bound]));
-        assert_eq!(Some(vec![10]), baby_giant_step(&G, 10, &[1], &[base_bound]));
-        assert_eq!(Some(vec![5]), baby_giant_step(&G, 0, &[16], &[base_bound]));
+        // the collision point is at 96
+        assert_eq!(Some(vec![9 - 1, 6 - 1]), baby_giant_step(&G, 85, &[10, 1], &[8, 8]));
+        // the collision point is at 105
+        assert_eq!(Some(vec![10 - 2, 5 - 0]), baby_giant_step(&G, 85, &[10, 1], &[21, 21]));
+        // the collision point is at 90
+        assert_eq!(Some(vec![6 - 0, 30 - 5]), baby_giant_step(&G, 85, &[10, 1], &[31, 31]));
     }
 
-    let G = AddGroup::new(ZZi64);
+    #[test]
+    fn test_padic_relation_lattice() {
+        feanor_tracing::DelayedLogger::init_test();
+        let G = AddGroup::new(Zn::<81>::RING);
+        let inner_prod = |l: Column<_, El<BigIntRing>>, r: &[i64]| {
+            ZZi64.get_ring().inner_product(
+                l.as_iter()
+                    .map(|x| int_cast(x.clone(), ZZi64, ZZbig))
+                    .zip(r.iter().copied()),
+            )
+        };
 
-    // the collision point is at 96
-    assert_eq!(Some(vec![9 - 1, 6 - 1]), baby_giant_step(&G, 85, &[10, 1], &[8, 8]));
-    // the collision point is at 105
-    assert_eq!(Some(vec![10 - 2, 5 - 0]), baby_giant_step(&G, 85, &[10, 1], &[21, 21]));
-    // the collision point is at 90
-    assert_eq!(Some(vec![6 - 0, 30 - 5]), baby_giant_step(&G, 85, &[10, 1], &[31, 31]));
-}
-
-#[test]
-fn test_padic_relation_lattice() {
-    feanor_tracing::DelayedLogger::init_test();
-    let G = AddGroup::new(Zn::<81>::RING);
-    let inner_prod = |l: Column<_, El<BigIntRing>>, r: &[i64]| {
-        ZZi64.get_ring().inner_product(
-            l.as_iter()
-                .map(|x| int_cast(x.clone(), ZZi64, ZZbig))
-                .zip(r.iter().copied()),
-        )
-    };
-
-    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![1]);
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(-81),
-        subgroup.get_group().padic_relation_lattices[0][4].at(0, 0)
-    );
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(-27),
-        subgroup.get_group().padic_relation_lattices[0][3].at(0, 0)
-    );
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(-9),
-        subgroup.get_group().padic_relation_lattices[0][2].at(0, 0)
-    );
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(-3),
-        subgroup.get_group().padic_relation_lattices[0][1].at(0, 0)
-    );
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(-1),
-        subgroup.get_group().padic_relation_lattices[0][0].at(0, 0)
-    );
-
-    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 6]);
-    let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
-    let expected = OwnedMatrix::new(vec![1, 0, 13, 27], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
-    assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[3, 6]) % 81);
-
-    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 9]);
-    let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
-    let expected = OwnedMatrix::new(vec![3, 0, -1, 9], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
-    assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[3, 9]) % 81);
-
-    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![6, 18, 9]);
-    let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
-    let expected = OwnedMatrix::new(vec![0, 3, 0, 1, -1, 0, -2, 0, 9], 3, 3).map(|x| int_cast(x, ZZbig, ZZi64));
-    assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[6, 18, 9]) % 81);
-    assert_eq!(0, inner_prod(matrix.data().col_at(2), &[6, 18, 9]) % 81);
-
-    let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<81>::RING)));
-
-    let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![[1, 4], [1, 1]]);
-    let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
-    let expected = OwnedMatrix::new(vec![81, 27, 0, -27], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
-    assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[1, 1]) % 81);
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[4, 1]) % 81);
-
-    let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<8>::RING)));
-
-    let subgroup = Subgroup::new(&G, int_cast(8, ZZbig, ZZi64), vec![[6, 3, 5], [6, 2, 6], [4, 5, 7]]);
-    let matrix = &subgroup.get_group().padic_relation_lattices[0][3];
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[6, 6, 4]) % 8);
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[3, 2, 5]) % 8);
-    assert_eq!(0, inner_prod(matrix.data().col_at(1), &[5, 6, 7]) % 8);
-    assert_eq!(0, inner_prod(matrix.data().col_at(2), &[6, 6, 4]) % 8);
-    assert_eq!(0, inner_prod(matrix.data().col_at(2), &[3, 2, 5]) % 8);
-    assert_eq!(0, inner_prod(matrix.data().col_at(2), &[5, 6, 7]) % 8);
-}
-
-#[test]
-fn test_dlog() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<153>::RING;
-    let group = AddGroup::new(ring);
-    let subgroup = Subgroup::new(&group, int_cast(3 * 17, ZZbig, ZZi64), vec![3]);
-    assert!(subgroup.dlog(&1).is_none());
-    assert!(subgroup.dlog(&17).is_none());
-    assert_gel_eq!(group, 3, group.pow_bigint(3, &subgroup.dlog(&3).unwrap()[0]));
-    let subgroup = subgroup.add_generator(17, &int_cast(9, ZZbig, ZZi64));
-    assert_gel_eq!(
-        group,
-        17,
-        group.op(
-            group.pow_bigint(3, &subgroup.dlog(&17).unwrap()[0]),
-            group.pow_bigint(17, &subgroup.dlog(&17).unwrap()[1])
-        )
-    );
-}
-
-#[test]
-fn random_test_dlog() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<1400>::RING;
-    let int_hom = ring.can_hom(&ZZbig).unwrap();
-    let mut rng = Rand64::new(0);
-    let G = GroupValue::from(ProdGroupBase(AddGroup::new(ring)));
-    let rand_gs = |rng: &mut Rand64| from_fn::<_, 3, _>(|_| ring.random_element(|| rng.rand_u64()));
-
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let gs = from_fn::<_, 3, _>(|_| rand_gs(&mut rng));
-        let subgroup = Subgroup::new(&G, int_cast(1400, ZZbig, ZZi64), gs.into());
-
-        let coeffs = rand_gs(&mut rng);
-        let val = (0..3).fold(G.identity(), |current, i| {
-            G.op(current, G.pow(gs[i].clone(), coeffs[i] as i64))
-        });
-        let dlog = subgroup.dlog(&val);
-        println!(
-            "{:?} * x + {:?} * y + {:?} * z = {:?} mod 1400",
-            gs[0], gs[1], gs[2], val
+        let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![1]);
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(-81),
+            subgroup.get_group().padic_relation_lattices[0][4].at(0, 0)
         );
-        if let Some(dlog) = dlog {
-            for k in 0..3 {
-                assert_el_eq!(
-                    ring,
-                    val[k],
-                    ring.sum([
-                        int_hom.mul_ref_map(&gs[0][k], &dlog[0]),
-                        int_hom.mul_ref_map(&gs[1][k], &dlog[1]),
-                        int_hom.mul_ref_map(&gs[2][k], &dlog[2])
-                    ])
-                );
-            }
-            println!("checked solution");
-        }
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(-27),
+            subgroup.get_group().padic_relation_lattices[0][3].at(0, 0)
+        );
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(-9),
+            subgroup.get_group().padic_relation_lattices[0][2].at(0, 0)
+        );
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(-3),
+            subgroup.get_group().padic_relation_lattices[0][1].at(0, 0)
+        );
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(-1),
+            subgroup.get_group().padic_relation_lattices[0][0].at(0, 0)
+        );
+
+        let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 6]);
+        let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
+        let expected = OwnedMatrix::new(vec![1, 0, 13, 27], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
+        assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[3, 6]) % 81);
+
+        let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![3, 9]);
+        let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
+        let expected = OwnedMatrix::new(vec![3, 0, -1, 9], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
+        assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[3, 9]) % 81);
+
+        let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![6, 18, 9]);
+        let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
+        let expected = OwnedMatrix::new(vec![0, 3, 0, 1, -1, 0, -2, 0, 9], 3, 3).map(|x| int_cast(x, ZZbig, ZZi64));
+        assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[6, 18, 9]) % 81);
+        assert_eq!(0, inner_prod(matrix.data().col_at(2), &[6, 18, 9]) % 81);
+
+        let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<81>::RING)));
+
+        let subgroup = Subgroup::new(&G, int_cast(81, ZZbig, ZZi64), vec![[1, 4], [1, 1]]);
+        let matrix = &subgroup.get_group().padic_relation_lattices[0][4];
+        let expected = OwnedMatrix::new(vec![81, 27, 0, -27], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
+        assert!(lattice_eq(ZZbig, expected.data(), matrix.data(), None, None));
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[1, 1]) % 81);
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[4, 1]) % 81);
+
+        let G = GroupValue::from(ProdGroupBase(AddGroup::new(Zn::<8>::RING)));
+
+        let subgroup = Subgroup::new(&G, int_cast(8, ZZbig, ZZi64), vec![[6, 3, 5], [6, 2, 6], [4, 5, 7]]);
+        let matrix = &subgroup.get_group().padic_relation_lattices[0][3];
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[6, 6, 4]) % 8);
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[3, 2, 5]) % 8);
+        assert_eq!(0, inner_prod(matrix.data().col_at(1), &[5, 6, 7]) % 8);
+        assert_eq!(0, inner_prod(matrix.data().col_at(2), &[6, 6, 4]) % 8);
+        assert_eq!(0, inner_prod(matrix.data().col_at(2), &[3, 2, 5]) % 8);
+        assert_eq!(0, inner_prod(matrix.data().col_at(2), &[5, 6, 7]) % 8);
     }
 
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let gs = from_fn::<_, 3, _>(|_| rand_gs(&mut rng));
-        let subgroup = Subgroup::new(&G, int_cast(1400, ZZbig, ZZi64), gs.into());
-
-        let val = rand_gs(&mut rng);
-        let dlog = subgroup.dlog(&val);
-        println!(
-            "{:?} * x + {:?} * y + {:?} * z = {:?} mod 1400",
-            gs[0], gs[1], gs[2], val
+    #[test]
+    fn test_dlog() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<153>::RING;
+        let group = AddGroup::new(ring);
+        let subgroup = Subgroup::new(&group, int_cast(3 * 17, ZZbig, ZZi64), vec![3]);
+        assert!(subgroup.dlog(&1).is_none());
+        assert!(subgroup.dlog(&17).is_none());
+        assert_gel_eq!(group, 3, group.pow_bigint(3, &subgroup.dlog(&3).unwrap()[0]));
+        let subgroup = subgroup.add_generator(17, &int_cast(9, ZZbig, ZZi64));
+        assert_gel_eq!(
+            group,
+            17,
+            group.op(
+                group.pow_bigint(3, &subgroup.dlog(&17).unwrap()[0]),
+                group.pow_bigint(17, &subgroup.dlog(&17).unwrap()[1])
+            )
         );
-        if let Some(dlog) = dlog {
-            for k in 0..3 {
-                assert_el_eq!(
-                    ring,
-                    val[k],
-                    ring.sum([
-                        int_hom.mul_ref_map(&gs[0][k], &dlog[0]),
-                        int_hom.mul_ref_map(&gs[1][k], &dlog[1]),
-                        int_hom.mul_ref_map(&gs[2][k], &dlog[2])
-                    ])
-                );
-            }
-            println!("checked solution");
-        } else {
-            let mut gen_matrix = OwnedMatrix::from_fn(3, 3, |i, j| gs[j][i]);
-            let mut value = OwnedMatrix::from_fn(3, 1, |i, _| val[i]);
-            let mut res = OwnedMatrix::zero(3, 1, ring);
-            let solved = ring.solve_right(gen_matrix.data_mut(), value.data_mut(), res.data_mut());
-            println!("[{}, {}, {}]", res.at(0, 0), res.at(1, 0), res.at(2, 0));
-            if solved.is_solved() {
+    }
+
+    #[test]
+    fn random_test_dlog() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<1400>::RING;
+        let int_hom = ring.can_hom(&ZZbig).unwrap();
+        let mut rng = Rand64::new(0);
+        let G = GroupValue::from(ProdGroupBase(AddGroup::new(ring)));
+        let rand_gs = |rng: &mut Rand64| from_fn::<_, 3, _>(|_| ring.random_element(|| rng.rand_u64()));
+
+        for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+            let gs = from_fn::<_, 3, _>(|_| rand_gs(&mut rng));
+            let subgroup = Subgroup::new(&G, int_cast(1400, ZZbig, ZZi64), gs.into());
+
+            let coeffs = rand_gs(&mut rng);
+            let val = (0..3).fold(G.identity(), |current, i| {
+                G.op(current, G.pow(gs[i].clone(), coeffs[i] as i64))
+            });
+            let dlog = subgroup.dlog(&val);
+            println!(
+                "{:?} * x + {:?} * y + {:?} * z = {:?} mod 1400",
+                gs[0], gs[1], gs[2], val
+            );
+            if let Some(dlog) = dlog {
                 for k in 0..3 {
                     assert_el_eq!(
                         ring,
                         val[k],
                         ring.sum([
-                            ring.mul(gs[0][k], *res.at(0, 0)),
-                            ring.mul(gs[1][k], *res.at(1, 0)),
-                            ring.mul(gs[2][k], *res.at(2, 0))
+                            int_hom.mul_ref_map(&gs[0][k], &dlog[0]),
+                            int_hom.mul_ref_map(&gs[1][k], &dlog[1]),
+                            int_hom.mul_ref_map(&gs[2][k], &dlog[2])
                         ])
                     );
                 }
-                assert!(solved == crate::algorithms::linsolve::SolveResult::NoSolution);
+                println!("checked solution");
             }
-            println!("has no solution");
         }
-    }
-}
 
-#[test]
-fn test_full_subgroup() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<153>::RING;
-    let group = MultGroup::new(ring);
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(96),
-        Subgroup::zn_unit_group(group).subgroup_order()
-    );
+        for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+            let gs = from_fn::<_, 3, _>(|_| rand_gs(&mut rng));
+            let subgroup = Subgroup::new(&G, int_cast(1400, ZZbig, ZZi64), gs.into());
 
-    let ring = Zn::<1400>::RING;
-    let group = MultGroup::new(ring);
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(16 * 5 * 6),
-        Subgroup::zn_unit_group(group).subgroup_order()
-    );
-
-    let ring = Zn::<257>::RING;
-    let group = MultGroup::new(ring);
-    assert_el_eq!(
-        ZZbig,
-        ZZbig.int_hom().map(256),
-        Subgroup::zn_unit_group(group).subgroup_order()
-    );
-}
-
-#[test]
-fn test_subgroup_order() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<153>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
-
-    let mut subgroup = Subgroup::for_zn(group.clone(), Vec::new());
-    let order_multiple = subgroup.order_multiple().clone();
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(1), subgroup.subgroup_order());
-
-    let next_gen = g1.clone();
-    subgroup = subgroup.add_generator(next_gen, &order_multiple);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), subgroup.subgroup_order());
-
-    let next_gen = subgroup.parent().pow(g1.clone(), 2);
-    subgroup = subgroup.add_generator(next_gen, &order_multiple);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), subgroup.subgroup_order());
-
-    let next_gen = g2.clone();
-    subgroup = subgroup.add_generator(next_gen, &order_multiple);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(96), subgroup.subgroup_order());
-
-    let generating_set = Subgroup::for_zn(group, vec![g2]);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(16), generating_set.subgroup_order());
-}
-
-#[test]
-fn test_global_relation_lattice() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<153>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
-
-    let subgroup = Subgroup::for_zn(group, vec![g1.clone(), g2.clone()]);
-    let actual = subgroup.get_group().relation_lattice();
-    let expected = OwnedMatrix::new(vec![6, 0, -4, 16], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
-    assert!(lattice_eq(ZZbig, expected.data(), actual.data(), None, None));
-
-    let g3 = group.from_ring_el(ring.int_hom().map(10)).unwrap();
-    let subgroup = subgroup.add_generator(g3, &int_cast(16, ZZbig, ZZi64));
-    let actual = subgroup.get_group().relation_lattice();
-    let expected = OwnedMatrix::new(vec![6, 0, 30, -4, 16, -55, 0, 0, 1], 3, 3).map(|x| int_cast(x, ZZbig, ZZi64));
-    assert!(lattice_eq(ZZbig, expected.data(), actual.data(), None, None));
-}
-
-#[test]
-fn test_intersection() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<7>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(5)).unwrap();
-    let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let actual = Subgroup::for_zn(group, vec![g1]).intersection(&Subgroup::for_zn(group, vec![g2]));
-    let expected = Subgroup::for_zn(group, vec![g3]);
-    assert_eq!(expected.get_group(), actual.get_group());
-    let mut elements = actual
-        .enumerate_elements()
-        .map(|x| ring.smallest_positive_lift(*group.as_ring_el(&x)))
-        .collect::<Vec<_>>();
-    elements.sort_unstable();
-    assert_eq!(vec![1, 2, 4], elements);
-
-    let ring = Zn::<153>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(5)).unwrap();
-    let g3 = group.from_ring_el(ring.int_hom().map(13)).unwrap();
-    let actual = Subgroup::for_zn(group, vec![g1]).intersection(&Subgroup::for_zn(group, vec![g2]));
-    let expected = Subgroup::for_zn(group, vec![g3]);
-    assert_eq!(expected.get_group(), actual.get_group());
-}
-
-#[test]
-fn test_enumerate_elements() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<45>::RING;
-    let group = AddGroup::new(ring);
-
-    let subgroup = Subgroup::new(group.clone(), int_cast(45, ZZbig, ZZi64), Vec::new());
-    let elements = subgroup.enumerate_elements().collect::<Vec<_>>();
-    assert_eq!(vec![ring.zero()], elements);
-
-    let subgroup = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![9, 15]);
-    let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
-    elements.sort_unstable();
-    assert_eq!((0..45).step_by(3).collect::<Vec<_>>(), elements);
-
-    let ring = Zn::<6>::RING;
-    let group = AddGroup::new(ring);
-    let subgroup = Subgroup::new(group, int_cast(6, ZZbig, ZZi64), vec![2, 2]);
-    let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
-    elements.sort_unstable();
-    assert_eq!(vec![0, 2, 4], elements);
-}
-
-#[test]
-fn test_quotient_cyclic_decomposition() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<45>::RING;
-    let group = AddGroup::new(ring);
-
-    let G = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![6]);
-    let H = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![15]);
-    let [(g, n)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(5), n);
-    assert!(g % 3 == 0);
-    assert!(g % 5 != 0);
-
-    let G = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![6]);
-    let H = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![0, 6]);
-    let [] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
-
-    let ring = Zn::<153>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
-    let G = Subgroup::for_zn(group, vec![g1, g2]);
-    let H = Subgroup::for_zn(group, vec![group.pow(g1, 2), group.pow(group.op(g2, g1), 2)]);
-    let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n2);
-    assert!(!group.is_identity(&h1));
-    assert!(!group.is_identity(&h2));
-    let elements = [group.identity(), h1, h2, group.op(h1, h2)];
-    for a in &elements {
-        for b in &elements {
-            assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+            let val = rand_gs(&mut rng);
+            let dlog = subgroup.dlog(&val);
+            println!(
+                "{:?} * x + {:?} * y + {:?} * z = {:?} mod 1400",
+                gs[0], gs[1], gs[2], val
+            );
+            if let Some(dlog) = dlog {
+                for k in 0..3 {
+                    assert_el_eq!(
+                        ring,
+                        val[k],
+                        ring.sum([
+                            int_hom.mul_ref_map(&gs[0][k], &dlog[0]),
+                            int_hom.mul_ref_map(&gs[1][k], &dlog[1]),
+                            int_hom.mul_ref_map(&gs[2][k], &dlog[2])
+                        ])
+                    );
+                }
+                println!("checked solution");
+            } else {
+                let mut gen_matrix = OwnedMatrix::from_fn(3, 3, |i, j| gs[j][i]);
+                let mut value = OwnedMatrix::from_fn(3, 1, |i, _| val[i]);
+                let mut res = OwnedMatrix::zero(3, 1, ring);
+                let solved = ring.solve_right(gen_matrix.data_mut(), value.data_mut(), res.data_mut());
+                println!("[{}, {}, {}]", res.at(0, 0), res.at(1, 0), res.at(2, 0));
+                if solved.is_solved() {
+                    for k in 0..3 {
+                        assert_el_eq!(
+                            ring,
+                            val[k],
+                            ring.sum([
+                                ring.mul(gs[0][k], *res.at(0, 0)),
+                                ring.mul(gs[1][k], *res.at(1, 0)),
+                                ring.mul(gs[2][k], *res.at(2, 0))
+                            ])
+                        );
+                    }
+                    assert!(solved == crate::algorithms::linsolve::SolveResult::NoSolution);
+                }
+                println!("has no solution");
+            }
         }
     }
 
-    let ring = Zn::<91>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(66)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(50)).unwrap();
-    let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
-    let G = Subgroup::for_zn(group, vec![g1, g2]);
-    let H = Subgroup::for_zn(group, vec![g3]);
-    let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), n2);
-    assert!(!group.is_identity(&h1));
-    assert!(!group.is_identity(&h2));
-    let elements = [
-        group.identity(),
-        h1,
-        h2,
-        group.op(h1, h2),
-        group.op(h2, h2),
-        group.op(h1, group.op(h2, h2)),
-    ];
-    for a in &elements {
-        for b in &elements {
-            assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
-        }
+    #[test]
+    fn test_full_subgroup() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<153>::RING;
+        let group = MultGroup::new(ring);
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(96),
+            Subgroup::zn_unit_group(group).subgroup_order()
+        );
+
+        let ring = Zn::<1400>::RING;
+        let group = MultGroup::new(ring);
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(16 * 5 * 6),
+            Subgroup::zn_unit_group(group).subgroup_order()
+        );
+
+        let ring = Zn::<257>::RING;
+        let group = MultGroup::new(ring);
+        assert_el_eq!(
+            ZZbig,
+            ZZbig.int_hom().map(256),
+            Subgroup::zn_unit_group(group).subgroup_order()
+        );
     }
 
-    let ring = Zn::<1729>::RING;
-    let group = MultGroup::new(ring);
-    let g1 = group.from_ring_el(ring.int_hom().map(248)).unwrap();
-    let g2 = group.from_ring_el(ring.int_hom().map(1597)).unwrap();
-    let g3 = group.from_ring_el(ring.int_hom().map(457)).unwrap();
-    let G = Subgroup::for_zn(group, vec![g1, g2]);
-    let H = Subgroup::for_zn(group, vec![g3]);
-    let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
-    assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), n2);
-    assert!(!group.is_identity(&h1));
-    assert!(!group.is_identity(&h2));
-    let elements = [
-        group.identity(),
-        h1,
-        h2,
-        group.op(h1, h2),
-        group.op(h2, h2),
-        group.op(h1, group.op(h2, h2)),
-    ];
-    for a in &elements {
-        for b in &elements {
-            assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+    #[test]
+    fn test_subgroup_order() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<153>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
+
+        let mut subgroup = Subgroup::for_zn(group.clone(), Vec::new());
+        let order_multiple = subgroup.order_multiple().clone();
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(1), subgroup.subgroup_order());
+
+        let next_gen = g1.clone();
+        subgroup = subgroup.add_generator(next_gen, &order_multiple);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), subgroup.subgroup_order());
+
+        let next_gen = subgroup.parent().pow(g1.clone(), 2);
+        subgroup = subgroup.add_generator(next_gen, &order_multiple);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(24), subgroup.subgroup_order());
+
+        let next_gen = g2.clone();
+        subgroup = subgroup.add_generator(next_gen, &order_multiple);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(96), subgroup.subgroup_order());
+
+        let generating_set = Subgroup::for_zn(group, vec![g2]);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(16), generating_set.subgroup_order());
+    }
+
+    #[test]
+    fn test_global_relation_lattice() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<153>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
+
+        let subgroup = Subgroup::for_zn(group, vec![g1.clone(), g2.clone()]);
+        let actual = subgroup.get_group().relation_lattice();
+        let expected = OwnedMatrix::new(vec![6, 0, -4, 16], 2, 2).map(|x| int_cast(x, ZZbig, ZZi64));
+        assert!(lattice_eq(ZZbig, expected.data(), actual.data(), None, None));
+
+        let g3 = group.from_ring_el(ring.int_hom().map(10)).unwrap();
+        let subgroup = subgroup.add_generator(g3, &int_cast(16, ZZbig, ZZi64));
+        let actual = subgroup.get_group().relation_lattice();
+        let expected = OwnedMatrix::new(vec![6, 0, 30, -4, 16, -55, 0, 0, 1], 3, 3).map(|x| int_cast(x, ZZbig, ZZi64));
+        assert!(lattice_eq(ZZbig, expected.data(), actual.data(), None, None));
+    }
+
+    #[test]
+    fn test_intersection() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<7>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(5)).unwrap();
+        let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let actual = Subgroup::for_zn(group, vec![g1]).intersection(&Subgroup::for_zn(group, vec![g2]));
+        let expected = Subgroup::for_zn(group, vec![g3]);
+        assert_eq!(expected.get_group(), actual.get_group());
+        let mut elements = actual
+            .enumerate_elements()
+            .map(|x| ring.smallest_positive_lift(*group.as_ring_el(&x)))
+            .collect::<Vec<_>>();
+        elements.sort_unstable();
+        assert_eq!(vec![1, 2, 4], elements);
+
+        let ring = Zn::<153>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(5)).unwrap();
+        let g3 = group.from_ring_el(ring.int_hom().map(13)).unwrap();
+        let actual = Subgroup::for_zn(group, vec![g1]).intersection(&Subgroup::for_zn(group, vec![g2]));
+        let expected = Subgroup::for_zn(group, vec![g3]);
+        assert_eq!(expected.get_group(), actual.get_group());
+    }
+
+    #[test]
+    fn test_enumerate_elements() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<45>::RING;
+        let group = AddGroup::new(ring);
+
+        let subgroup = Subgroup::new(group.clone(), int_cast(45, ZZbig, ZZi64), Vec::new());
+        let elements = subgroup.enumerate_elements().collect::<Vec<_>>();
+        assert_eq!(vec![ring.zero()], elements);
+
+        let subgroup = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![9, 15]);
+        let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
+        elements.sort_unstable();
+        assert_eq!((0..45).step_by(3).collect::<Vec<_>>(), elements);
+
+        let ring = Zn::<6>::RING;
+        let group = AddGroup::new(ring);
+        let subgroup = Subgroup::new(group, int_cast(6, ZZbig, ZZi64), vec![2, 2]);
+        let mut elements = subgroup.enumerate_elements().collect::<Vec<_>>();
+        elements.sort_unstable();
+        assert_eq!(vec![0, 2, 4], elements);
+    }
+
+    #[test]
+    fn test_quotient_cyclic_decomposition() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<45>::RING;
+        let group = AddGroup::new(ring);
+
+        let G = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![6]);
+        let H = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![15]);
+        let [(g, n)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(5), n);
+        assert!(g % 3 == 0);
+        assert!(g % 5 != 0);
+
+        let G = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![6]);
+        let H = Subgroup::new(group, int_cast(45, ZZbig, ZZi64), vec![0, 6]);
+        let [] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+
+        let ring = Zn::<153>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(37)).unwrap();
+        let G = Subgroup::for_zn(group, vec![g1, g2]);
+        let H = Subgroup::for_zn(group, vec![group.pow(g1, 2), group.pow(group.op(g2, g1), 2)]);
+        let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n2);
+        assert!(!group.is_identity(&h1));
+        assert!(!group.is_identity(&h2));
+        let elements = [group.identity(), h1, h2, group.op(h1, h2)];
+        for a in &elements {
+            for b in &elements {
+                assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+            }
+        }
+
+        let ring = Zn::<91>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(66)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(50)).unwrap();
+        let g3 = group.from_ring_el(ring.int_hom().map(2)).unwrap();
+        let G = Subgroup::for_zn(group, vec![g1, g2]);
+        let H = Subgroup::for_zn(group, vec![g3]);
+        let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), n2);
+        assert!(!group.is_identity(&h1));
+        assert!(!group.is_identity(&h2));
+        let elements = [
+            group.identity(),
+            h1,
+            h2,
+            group.op(h1, h2),
+            group.op(h2, h2),
+            group.op(h1, group.op(h2, h2)),
+        ];
+        for a in &elements {
+            for b in &elements {
+                assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+            }
+        }
+
+        let ring = Zn::<1729>::RING;
+        let group = MultGroup::new(ring);
+        let g1 = group.from_ring_el(ring.int_hom().map(248)).unwrap();
+        let g2 = group.from_ring_el(ring.int_hom().map(1597)).unwrap();
+        let g3 = group.from_ring_el(ring.int_hom().map(457)).unwrap();
+        let G = Subgroup::for_zn(group, vec![g1, g2]);
+        let H = Subgroup::for_zn(group, vec![g3]);
+        let [(h1, n1), (h2, n2)] = G.quotient_cyclic_decomposition(&H).try_into().unwrap();
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(2), n1);
+        assert_el_eq!(ZZbig, ZZbig.int_hom().map(3), n2);
+        assert!(!group.is_identity(&h1));
+        assert!(!group.is_identity(&h2));
+        let elements = [
+            group.identity(),
+            h1,
+            h2,
+            group.op(h1, h2),
+            group.op(h2, h2),
+            group.op(h1, group.op(h2, h2)),
+        ];
+        for a in &elements {
+            for b in &elements {
+                assert!(group.eq_el(a, b) || !H.contains(&group.op_ref(a, &group.inv(b))));
+            }
         }
     }
 }

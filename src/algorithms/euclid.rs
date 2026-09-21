@@ -208,64 +208,69 @@ where
     return ([sa, ta, sb, tb], [a, b]);
 }
 
-#[test]
-fn test_gcd() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(3, general_euclid(15, 6, &ZZi64).abs());
-    assert_eq!(3, general_euclid(6, 15, &ZZi64).abs());
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    assert_eq!(7, general_euclid(0, 7, &ZZi64).abs());
-    assert_eq!(7, general_euclid(7, 0, &ZZi64).abs());
-    assert_eq!(0, general_euclid(0, 0, &ZZi64).abs());
+    #[test]
+    fn test_gcd() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(3, general_euclid(15, 6, &ZZi64).abs());
+        assert_eq!(3, general_euclid(6, 15, &ZZi64).abs());
 
-    assert_eq!(1, general_euclid(9, 1, &ZZi64).abs());
-    assert_eq!(1, general_euclid(1, 9, &ZZi64).abs());
+        assert_eq!(7, general_euclid(0, 7, &ZZi64).abs());
+        assert_eq!(7, general_euclid(7, 0, &ZZi64).abs());
+        assert_eq!(0, general_euclid(0, 0, &ZZi64).abs());
 
-    assert_eq!(1, general_euclid(13, 300, &ZZi64).abs());
-    assert_eq!(1, general_euclid(300, 13, &ZZi64).abs());
+        assert_eq!(1, general_euclid(9, 1, &ZZi64).abs());
+        assert_eq!(1, general_euclid(1, 9, &ZZi64).abs());
 
-    assert_eq!(3, general_euclid(-15, 6, &ZZi64).abs());
-    assert_eq!(3, general_euclid(6, -15, &ZZi64).abs());
-    assert_eq!(3, general_euclid(-6, -15, &ZZi64).abs());
-}
+        assert_eq!(1, general_euclid(13, 300, &ZZi64).abs());
+        assert_eq!(1, general_euclid(300, 13, &ZZi64).abs());
 
-#[test]
-fn test_partial_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let test_on_input = |a: i64, b: i64, size: i64| {
-        assert!(a != 0);
-        assert!(b != 0);
-        let ([s, t, s_, t_], [x, x_]) = partial_extended_euclid_int(ZZi64, a, b, &size);
-        assert_eq!(x, s * a + t * b);
-        assert_eq!(x_, s_ * a + t_ * b);
-        if a.abs() <= size && b.abs() <= size {
-            assert!(x.abs() <= size);
-            assert!(x_.abs() <= size);
-        } else if a.abs() <= size || b.abs() <= size {
-            assert!(x.abs() > size);
-            assert!(x_.abs() <= size);
-            if a.abs() >= b.abs() {
+        assert_eq!(3, general_euclid(-15, 6, &ZZi64).abs());
+        assert_eq!(3, general_euclid(6, -15, &ZZi64).abs());
+        assert_eq!(3, general_euclid(-6, -15, &ZZi64).abs());
+    }
+
+    #[test]
+    fn test_partial_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let test_on_input = |a: i64, b: i64, size: i64| {
+            assert!(a != 0);
+            assert!(b != 0);
+            let ([s, t, s_, t_], [x, x_]) = partial_extended_euclid_int(ZZi64, a, b, &size);
+            assert_eq!(x, s * a + t * b);
+            assert_eq!(x_, s_ * a + t_ * b);
+            if a.abs() <= size && b.abs() <= size {
+                assert!(x.abs() <= size);
+                assert!(x_.abs() <= size);
+            } else if a.abs() <= size || b.abs() <= size {
+                assert!(x.abs() > size);
+                assert!(x_.abs() <= size);
+                if a.abs() >= b.abs() {
+                    assert!(t.abs() * x.abs() <= a.abs());
+                    assert!(t_.abs() * (x.abs() - x_.abs()) <= a.abs());
+                } else {
+                    assert!(s.abs() * x.abs() <= b.abs());
+                    assert!(s_.abs() * (x.abs() - x_.abs()) <= b.abs());
+                }
+            } else {
+                assert!(x.abs() > size);
+                assert!(x_.abs() <= size);
                 assert!(t.abs() * x.abs() <= a.abs());
                 assert!(t_.abs() * (x.abs() - x_.abs()) <= a.abs());
-            } else {
                 assert!(s.abs() * x.abs() <= b.abs());
                 assert!(s_.abs() * (x.abs() - x_.abs()) <= b.abs());
             }
-        } else {
-            assert!(x.abs() > size);
-            assert!(x_.abs() <= size);
-            assert!(t.abs() * x.abs() <= a.abs());
-            assert!(t_.abs() * (x.abs() - x_.abs()) <= a.abs());
-            assert!(s.abs() * x.abs() <= b.abs());
-            assert!(s_.abs() * (x.abs() - x_.abs()) <= b.abs());
+        };
+        for i in 0..9 {
+            test_on_input(6, 9, i);
+            test_on_input(9, 6, i);
+            test_on_input(7, 9, i);
+            test_on_input(9, 7, i);
+            test_on_input(7, 1, i);
+            test_on_input(1, 7, i);
         }
-    };
-    for i in 0..9 {
-        test_on_input(6, 9, i);
-        test_on_input(9, 6, i);
-        test_on_input(7, 9, i);
-        test_on_input(9, 7, i);
-        test_on_input(7, 1, i);
-        test_on_input(1, 7, i);
     }
 }

@@ -302,106 +302,109 @@ const SHORTEST_ADDITION_CHAINS: [(usize, usize); 65] = [
     (32, 32),
 ];
 
-#[cfg(test)]
-use test::Bencher;
 use tracing::instrument;
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_64b;
+mod tests {
+    use test::Bencher;
 
-#[test]
-fn test_generic_abs_square_and_multiply() {
-    feanor_tracing::DelayedLogger::init_test();
-    for i in 0..(1 << 16) {
-        assert_eq!(
-            Ok(i),
-            try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
-                1,
-                &i,
-                StaticRing::<i32>::RING,
-                |a| Ok(a * 2),
-                |a, b| Ok(a + b),
-                0
-            )
-        );
+    use super::*;
+    use crate::ring_impls::zn::zn_64b;
+
+    #[test]
+    fn test_generic_abs_square_and_multiply() {
+        feanor_tracing::DelayedLogger::init_test();
+        for i in 0..(1 << 16) {
+            assert_eq!(
+                Ok(i),
+                try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
+                    1,
+                    &i,
+                    StaticRing::<i32>::RING,
+                    |a| Ok(a * 2),
+                    |a, b| Ok(a + b),
+                    0
+                )
+            );
+        }
     }
-}
 
-#[test]
-fn test_generic_pow_shortest_chain_table() {
-    feanor_tracing::DelayedLogger::init_test();
-    for i in 0..(1 << 16) {
-        assert_eq!(
-            Ok(i),
-            generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
-                1,
-                &i,
-                StaticRing::<i32>::RING,
-                |a| Ok(a * 2),
-                |a, b| Ok(a + b),
-                |a| *a,
-                0
-            )
-        );
+    #[test]
+    fn test_generic_pow_shortest_chain_table() {
+        feanor_tracing::DelayedLogger::init_test();
+        for i in 0..(1 << 16) {
+            assert_eq!(
+                Ok(i),
+                generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
+                    1,
+                    &i,
+                    StaticRing::<i32>::RING,
+                    |a| Ok(a * 2),
+                    |a, b| Ok(a + b),
+                    |a| *a,
+                    0
+                )
+            );
+        }
     }
-}
 
-#[test]
-fn test_shortest_addition_chain_table() {
-    feanor_tracing::DelayedLogger::init_test();
-    for i in 0..SHORTEST_ADDITION_CHAINS.len() {
-        assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
+    #[test]
+    fn test_shortest_addition_chain_table() {
+        feanor_tracing::DelayedLogger::init_test();
+        for i in 0..SHORTEST_ADDITION_CHAINS.len() {
+            assert_eq!(i, SHORTEST_ADDITION_CHAINS[i].0 + SHORTEST_ADDITION_CHAINS[i].1);
+        }
     }
-}
 
-#[bench]
-fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(536903681);
-    let x = ring.int_hom().map(2);
-    bencher.iter(|| {
-        assert_el_eq!(
-            &ring,
-            &ring.one(),
-            try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
-                &x,
-                &536903680,
-                ZZi64,
-                |mut res| {
-                    ring.square(&mut res);
-                    return Ok(res);
-                },
-                |a, b| Ok(ring.mul_ref_fst(a, b)),
-                ring.one()
-            )
-            .unwrap()
-        );
-    });
-}
+    #[bench]
+    fn bench_standard_square_and_multiply(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(536903681);
+        let x = ring.int_hom().map(2);
+        bencher.iter(|| {
+            assert_el_eq!(
+                &ring,
+                &ring.one(),
+                try_generic_abs_square_and_multiply::<_, _, _, _, _, !>(
+                    &x,
+                    &536903680,
+                    ZZi64,
+                    |mut res| {
+                        ring.square(&mut res);
+                        return Ok(res);
+                    },
+                    |a, b| Ok(ring.mul_ref_fst(a, b)),
+                    ring.one()
+                )
+                .unwrap()
+            );
+        });
+    }
 
-#[bench]
-fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(536903681);
-    let x = ring.int_hom().map(2);
-    bencher.iter(|| {
-        assert_el_eq!(
-            &ring,
-            &ring.one(),
-            generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
-                x,
-                &536903680,
-                ZZi64,
-                |a| {
-                    let mut res = a.clone();
-                    ring.square(&mut res);
-                    return Ok(res);
-                },
-                |a, b| Ok(ring.mul_ref(a, b)),
-                |a| a.clone(),
-                ring.one()
-            )
-            .unwrap()
-        );
-    });
+    #[bench]
+    fn bench_addchain_square_and_multiply(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(536903681);
+        let x = ring.int_hom().map(2);
+        bencher.iter(|| {
+            assert_el_eq!(
+                &ring,
+                &ring.one(),
+                generic_pow_shortest_chain_table::<_, _, _, _, _, !>(
+                    x,
+                    &536903680,
+                    ZZi64,
+                    |a| {
+                        let mut res = a.clone();
+                        ring.square(&mut res);
+                        return Ok(res);
+                    },
+                    |a, b| Ok(ring.mul_ref(a, b)),
+                    |a| a.clone(),
+                    ring.one()
+                )
+                .unwrap()
+            );
+        });
+    }
 }

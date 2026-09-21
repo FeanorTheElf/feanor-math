@@ -785,48 +785,49 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use std::fmt::{Display, Formatter};
+mod tests {
+    use std::fmt::{Display, Formatter};
 
-#[cfg(test)]
-use dense_poly::DensePolyRing;
+    use dense_poly::DensePolyRing;
 
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
+    use super::*;
+    use crate::ring_impls::primitive_int::StaticRing;
 
-#[test]
-fn test_dbg_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = DensePolyRing::new(ZZi64, "X");
-    let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1, 2 * X + 1, 2 * X]);
+    #[test]
+    fn test_dbg_poly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = DensePolyRing::new(ZZi64, "X");
+        let [f1, f2, f3, f4] = ring.with_wrapped_indeterminate(|X| [X.clone(), X + 1, 2 * X + 1, 2 * X]);
 
-    fn to_str(
-        ring: &DensePolyRing<StaticRing<i64>>,
-        f: &El<DensePolyRing<StaticRing<i64>>>,
-        env: EnvBindingStrength,
-    ) -> String {
-        struct DisplayEl<'a> {
-            ring: &'a DensePolyRing<StaticRing<i64>>,
-            f: &'a El<DensePolyRing<StaticRing<i64>>>,
+        fn to_str(
+            ring: &DensePolyRing<StaticRing<i64>>,
+            f: &El<DensePolyRing<StaticRing<i64>>>,
             env: EnvBindingStrength,
-        }
-        impl<'a> Display for DisplayEl<'a> {
-            fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-                generic_impls::fmt_poly(self.ring.get_ring(), self.f, f, "X", self.env)
+        ) -> String {
+            struct DisplayEl<'a> {
+                ring: &'a DensePolyRing<StaticRing<i64>>,
+                f: &'a El<DensePolyRing<StaticRing<i64>>>,
+                env: EnvBindingStrength,
             }
+            impl<'a> Display for DisplayEl<'a> {
+                fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                    generic_impls::fmt_poly(self.ring.get_ring(), self.f, f, "X", self.env)
+                }
+            }
+            return format!("{}", DisplayEl { ring, f, env });
         }
-        return format!("{}", DisplayEl { ring, f, env });
-    }
 
-    assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Sum));
-    assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Product));
-    assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Power));
-    assert_eq!("X + 1", to_str(&ring, &f2, EnvBindingStrength::Sum));
-    assert_eq!("(X + 1)", to_str(&ring, &f2, EnvBindingStrength::Product));
-    assert_eq!("(X + 1)", to_str(&ring, &f2, EnvBindingStrength::Power));
-    assert_eq!("2X + 1", to_str(&ring, &f3, EnvBindingStrength::Sum));
-    assert_eq!("(2X + 1)", to_str(&ring, &f3, EnvBindingStrength::Product));
-    assert_eq!("(2X + 1)", to_str(&ring, &f3, EnvBindingStrength::Power));
-    assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Sum));
-    assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Product));
-    assert_eq!("(2X)", to_str(&ring, &f4, EnvBindingStrength::Power));
+        assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Sum));
+        assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Product));
+        assert_eq!("X", to_str(&ring, &f1, EnvBindingStrength::Power));
+        assert_eq!("X + 1", to_str(&ring, &f2, EnvBindingStrength::Sum));
+        assert_eq!("(X + 1)", to_str(&ring, &f2, EnvBindingStrength::Product));
+        assert_eq!("(X + 1)", to_str(&ring, &f2, EnvBindingStrength::Power));
+        assert_eq!("2X + 1", to_str(&ring, &f3, EnvBindingStrength::Sum));
+        assert_eq!("(2X + 1)", to_str(&ring, &f3, EnvBindingStrength::Product));
+        assert_eq!("(2X + 1)", to_str(&ring, &f3, EnvBindingStrength::Power));
+        assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Sum));
+        assert_eq!("2X", to_str(&ring, &f4, EnvBindingStrength::Product));
+        assert_eq!("(2X)", to_str(&ring, &f4, EnvBindingStrength::Power));
+    }
 }

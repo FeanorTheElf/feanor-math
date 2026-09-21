@@ -70,20 +70,25 @@ where
     }
 }
 
-#[test]
-fn test_permute() {
-    feanor_tracing::DelayedLogger::init_test();
-    let mut values = [0, 1, 2, 3, 4, 5, 6, 7];
-    let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
-    permute(&mut values, |i| permutation[i]);
-    assert_eq!(values, permutation);
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_permute_inv() {
-    feanor_tracing::DelayedLogger::init_test();
-    let mut values = [2, 1, 7, 5, 6, 3, 4, 0];
-    let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
-    permute_inv(&mut values, |i| permutation[i]);
-    assert_eq!(values, [0, 1, 2, 3, 4, 5, 6, 7]);
+    #[test]
+    fn test_permute() {
+        feanor_tracing::DelayedLogger::init_test();
+        let mut values = [0, 1, 2, 3, 4, 5, 6, 7];
+        let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
+        permute(&mut values, |i| permutation[i]);
+        assert_eq!(values, permutation);
+    }
+
+    #[test]
+    fn test_permute_inv() {
+        feanor_tracing::DelayedLogger::init_test();
+        let mut values = [2, 1, 7, 5, 6, 3, 4, 0];
+        let permutation = [2, 1, 7, 5, 6, 3, 4, 0];
+        permute_inv(&mut values, |i| permutation[i]);
+        assert_eq!(values, [0, 1, 2, 3, 4, 5, 6, 7]);
+    }
 }

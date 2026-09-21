@@ -518,136 +518,154 @@ impl<T: PrimitiveInt> Default for StaticRingBase<T> {
 }
 
 #[cfg(test)]
-use crate::ring_properties::divisibility::PreparedDivisor;
+mod tests {
+    use super::*;
+    use crate::ring_properties::divisibility::PreparedDivisor;
 
-#[test]
-fn test_ixx_bit_op() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring_i16 = StaticRing::<i16>::RING;
-    let ring_i128 = StaticRing::<i128>::RING;
-    assert_eq!(Some(2), ring_i16.abs_highest_set_bit(&0x5));
-    assert_eq!(Some(15), ring_i16.abs_highest_set_bit(&i16::MIN));
-    assert_eq!(Some(1), ring_i16.abs_highest_set_bit(&-2));
-    assert_eq!(Some(2), ring_i128.abs_highest_set_bit(&0x5));
-    assert_eq!(Some(127), ring_i128.abs_highest_set_bit(&i128::MIN));
-    assert_eq!(Some(126), ring_i128.abs_highest_set_bit(&(i128::MIN + 1)));
-    assert_eq!(Some(126), ring_i128.abs_highest_set_bit(&(-1 - i128::MIN)));
-    assert_eq!(Some(1), ring_i128.abs_highest_set_bit(&-2));
-    assert_eq!(true, ring_i128.abs_is_bit_set(&-12, 2));
-    assert_eq!(false, ring_i128.abs_is_bit_set(&-12, 1));
-    assert_eq!(true, ring_i128.abs_is_bit_set(&i128::MIN, 127));
-    assert_eq!(false, ring_i128.abs_is_bit_set(&i128::MIN, 126));
-}
+    #[test]
+    fn test_ixx_bit_op() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring_i16 = StaticRing::<i16>::RING;
+        let ring_i128 = StaticRing::<i128>::RING;
+        assert_eq!(Some(2), ring_i16.abs_highest_set_bit(&0x5));
+        assert_eq!(Some(15), ring_i16.abs_highest_set_bit(&i16::MIN));
+        assert_eq!(Some(1), ring_i16.abs_highest_set_bit(&-2));
+        assert_eq!(Some(2), ring_i128.abs_highest_set_bit(&0x5));
+        assert_eq!(Some(127), ring_i128.abs_highest_set_bit(&i128::MIN));
+        assert_eq!(Some(126), ring_i128.abs_highest_set_bit(&(i128::MIN + 1)));
+        assert_eq!(Some(126), ring_i128.abs_highest_set_bit(&(-1 - i128::MIN)));
+        assert_eq!(Some(1), ring_i128.abs_highest_set_bit(&-2));
+        assert_eq!(true, ring_i128.abs_is_bit_set(&-12, 2));
+        assert_eq!(false, ring_i128.abs_is_bit_set(&-12, 1));
+        assert_eq!(true, ring_i128.abs_is_bit_set(&i128::MIN, 127));
+        assert_eq!(false, ring_i128.abs_is_bit_set(&i128::MIN, 126));
+    }
 
-#[test]
-fn test_get_uniformly_random() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i8>::RING);
-    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i16>::RING);
-    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i32>::RING);
-    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(ZZi64);
-    crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i128>::RING);
-}
+    #[test]
+    fn test_get_uniformly_random() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i8>::RING);
+        crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i16>::RING);
+        crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i32>::RING);
+        crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(ZZi64);
+        crate::ring_properties::integer::generic_tests::test_integer_get_uniformly_random(StaticRing::<i128>::RING);
+    }
 
-#[test]
-fn test_integer_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::integer::generic_tests::test_integer_axioms(
-        StaticRing::<i8>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::integer::generic_tests::test_integer_axioms(
-        StaticRing::<i16>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::integer::generic_tests::test_integer_axioms(
-        StaticRing::<i32>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::integer::generic_tests::test_integer_axioms(
-        ZZi64,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::integer::generic_tests::test_integer_axioms(
-        StaticRing::<i128>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-}
+    #[test]
+    fn test_integer_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::integer::generic_tests::test_integer_axioms(
+            StaticRing::<i8>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::integer::generic_tests::test_integer_axioms(
+            StaticRing::<i16>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::integer::generic_tests::test_integer_axioms(
+            StaticRing::<i32>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::integer::generic_tests::test_integer_axioms(
+            ZZi64,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::integer::generic_tests::test_integer_axioms(
+            StaticRing::<i128>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+    }
 
-#[test]
-fn test_euclidean_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
-        StaticRing::<i8>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
-        StaticRing::<i16>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
-        StaticRing::<i32>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
-        ZZi64,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
-        StaticRing::<i128>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-}
+    #[test]
+    fn test_euclidean_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            StaticRing::<i8>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            StaticRing::<i16>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            StaticRing::<i32>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            ZZi64,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            StaticRing::<i128>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+    }
 
-#[test]
-fn test_principal_ideal_ring_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        StaticRing::<i8>::RING,
-        [-2, -1, 0, 1, 2].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        StaticRing::<i16>::RING,
-        [-2, -1, 0, 1, 2, 3, 4].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        StaticRing::<i32>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        ZZi64,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        StaticRing::<i128>::RING,
-        [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
-    );
-}
+    #[test]
+    fn test_principal_ideal_ring_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            StaticRing::<i8>::RING,
+            [-2, -1, 0, 1, 2].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            StaticRing::<i16>::RING,
+            [-2, -1, 0, 1, 2, 3, 4].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            StaticRing::<i32>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            ZZi64,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            StaticRing::<i128>::RING,
+            [-2, -1, 0, 1, 2, 3, 4, 5, 6, 7, 8].into_iter(),
+        );
+    }
 
-#[test]
-fn test_lowest_set_bit() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
-    assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&3));
-    assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
-    assert_eq!(None, StaticRing::<i128>::RING.abs_lowest_set_bit(&0));
-    assert_eq!(Some(127), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MIN));
-    assert_eq!(Some(0), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MAX));
-}
+    #[test]
+    fn test_lowest_set_bit() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(None, StaticRing::<i32>::RING.abs_lowest_set_bit(&0));
+        assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&3));
+        assert_eq!(Some(0), StaticRing::<i32>::RING.abs_lowest_set_bit(&-3));
+        assert_eq!(None, StaticRing::<i128>::RING.abs_lowest_set_bit(&0));
+        assert_eq!(Some(127), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MIN));
+        assert_eq!(Some(0), StaticRing::<i128>::RING.abs_lowest_set_bit(&i128::MAX));
+    }
 
-#[test]
-fn test_prepared_div() {
-    feanor_tracing::DelayedLogger::init_test();
-    type PrimInt = i8;
-    for x in PrimInt::MIN..PrimInt::MAX {
-        let div_x = PreparedDivisor::new(StaticRing::<PrimInt>::RING.get_ring(), x);
-        for y in PrimInt::MIN..PrimInt::MAX {
-            if x == 0 {
-                if y == 0 {
-                    assert!(
+    #[test]
+    fn test_prepared_div() {
+        feanor_tracing::DelayedLogger::init_test();
+        type PrimInt = i8;
+        for x in PrimInt::MIN..PrimInt::MAX {
+            let div_x = PreparedDivisor::new(StaticRing::<PrimInt>::RING.get_ring(), x);
+            for y in PrimInt::MIN..PrimInt::MAX {
+                if x == 0 {
+                    if y == 0 {
+                        assert!(
+                            div_x
+                                .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
+                                .is_some()
+                        );
+                    } else {
+                        assert!(
+                            div_x
+                                .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
+                                .is_none()
+                        );
+                    }
+                } else if y == PrimInt::MIN && x == -1 {
+                    // this cannot be evaluated without overflow
+                } else if y % x == 0 {
+                    assert_eq!(
+                        y / x,
                         div_x
                             .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
-                            .is_some()
+                            .unwrap()
                     );
                 } else {
                     assert!(
@@ -656,32 +674,23 @@ fn test_prepared_div() {
                             .is_none()
                     );
                 }
-            } else if y == PrimInt::MIN && x == -1 {
-                // this cannot be evaluated without overflow
-            } else if y % x == 0 {
-                assert_eq!(
-                    y / x,
-                    div_x
-                        .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
-                        .unwrap()
-                );
-            } else {
-                assert!(
-                    div_x
-                        .checked_div_by(&y, StaticRing::<PrimInt>::RING.get_ring())
-                        .is_none()
-                );
             }
         }
     }
-}
 
-#[test]
-fn test_serialization() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i8>::RING.into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i16>::RING.into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i32>::RING.into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZZi64.into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i128>::RING.into());
+    #[test]
+    fn test_serialization() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(StaticRing::<i8>::RING.into());
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            StaticRing::<i16>::RING.into(),
+        );
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            StaticRing::<i32>::RING.into(),
+        );
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(ZZi64.into());
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            StaticRing::<i128>::RING.into(),
+        );
+    }
 }

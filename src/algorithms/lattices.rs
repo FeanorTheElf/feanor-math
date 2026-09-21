@@ -209,35 +209,40 @@ where
     })
 }
 
-#[test]
-fn test_lattice_intersect() {
-    feanor_tracing::DelayedLogger::init_test();
-    let A = OwnedMatrix::new(vec![1, 2, 3, 4, 5, 6], 3, 2);
-    let B = OwnedMatrix::new(vec![3, 7, 11], 3, 1);
-    let expected = B.clone();
-    let intersection = lattice_intersect(ZZi64, A.clone(), B.clone(), None, None);
-    assert_eq!(1, intersection.col_count());
-    assert!(lattice_eq(ZZi64, expected.data(), intersection.data(), None, None));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let B = OwnedMatrix::new(vec![3, 7, 12], 3, 1);
-    let intersection = lattice_intersect(ZZi64, A.clone(), B.clone(), None, None);
-    let expected = OwnedMatrix::new(Vec::new(), 3, 0);
-    assert!(lattice_eq(ZZi64, expected.data(), intersection.data(), None, None));
-}
+    #[test]
+    fn test_lattice_intersect() {
+        feanor_tracing::DelayedLogger::init_test();
+        let A = OwnedMatrix::new(vec![1, 2, 3, 4, 5, 6], 3, 2);
+        let B = OwnedMatrix::new(vec![3, 7, 11], 3, 1);
+        let expected = B.clone();
+        let intersection = lattice_intersect(ZZi64, A.clone(), B.clone(), None, None);
+        assert_eq!(1, intersection.col_count());
+        assert!(lattice_eq(ZZi64, expected.data(), intersection.data(), None, None));
 
-#[test]
-fn test_lattice_p_saturation_tower() {
-    feanor_tracing::DelayedLogger::init_test();
-    let A = OwnedMatrix::new(vec![54, 27, -27, 0, 3, -2, 27, 21, -18], 3, 3);
-    let expected = [
-        A.clone(),
-        OwnedMatrix::new(vec![18, 9, -27, 0, 1, -2, 9, 7, -18], 3, 3),
-        OwnedMatrix::new(vec![6, 9, -27, 0, 1, -2, 3, 7, -18], 3, 3),
-        OwnedMatrix::new(vec![2, 9, -27, 0, 1, -2, 1, 7, -18], 3, 3),
-    ];
-    let actual = lattice_p_saturation_tower(ZZi64, 3, A, None).collect::<Vec<_>>();
-    assert_eq!(expected.len(), actual.len());
-    for (expected, actual) in expected.iter().zip(actual.iter()) {
-        assert!(lattice_eq(ZZi64, expected.data(), actual.data(), None, None));
+        let B = OwnedMatrix::new(vec![3, 7, 12], 3, 1);
+        let intersection = lattice_intersect(ZZi64, A.clone(), B.clone(), None, None);
+        let expected = OwnedMatrix::new(Vec::new(), 3, 0);
+        assert!(lattice_eq(ZZi64, expected.data(), intersection.data(), None, None));
+    }
+
+    #[test]
+    fn test_lattice_p_saturation_tower() {
+        feanor_tracing::DelayedLogger::init_test();
+        let A = OwnedMatrix::new(vec![54, 27, -27, 0, 3, -2, 27, 21, -18], 3, 3);
+        let expected = [
+            A.clone(),
+            OwnedMatrix::new(vec![18, 9, -27, 0, 1, -2, 9, 7, -18], 3, 3),
+            OwnedMatrix::new(vec![6, 9, -27, 0, 1, -2, 3, 7, -18], 3, 3),
+            OwnedMatrix::new(vec![2, 9, -27, 0, 1, -2, 1, 7, -18], 3, 3),
+        ];
+        let actual = lattice_p_saturation_tower(ZZi64, 3, A, None).collect::<Vec<_>>();
+        assert_eq!(expected.len(), actual.len());
+        for (expected, actual) in expected.iter().zip(actual.iter()) {
+            assert!(lattice_eq(ZZi64, expected.data(), actual.data(), None, None));
+        }
     }
 }

@@ -549,37 +549,40 @@ where
 }
 
 #[cfg(test)]
-use crate::iters::multi_cartesian_product;
+mod tests {
+    use super::*;
+    use crate::iters::multi_cartesian_product;
 
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(ZZ, "X");
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(ZZ, "X");
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
-    let K = NumberField::new(&ZZX, &f);
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+        let K = NumberField::new(&ZZX, &f);
 
-    let elements = multi_cartesian_product(
-        [(-4..4), (-2..2)].into_iter(),
-        |slice| K.from_power_basis(slice.iter().map(|x| K.base_ring().int_hom().map(*x))),
-        |_, x| *x,
-    )
-    .collect::<Vec<_>>();
+        let elements = multi_cartesian_product(
+            [(-4..4), (-2..2)].into_iter(),
+            |slice| K.from_power_basis(slice.iter().map(|x| K.base_ring().int_hom().map(*x))),
+            |_, x| *x,
+        )
+        .collect::<Vec<_>>();
 
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &K,
-        elements.iter().map(|x| x.clone()),
-    );
-}
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &K,
+            elements.iter().map(|x| x.clone()),
+        );
+    }
 
-#[test]
-fn test_adjoin_root() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let QQ = RationalField::new(ZZ);
-    let QQX = DensePolyRing::new(QQ, "X");
-    let [f] = QQX.with_wrapped_indeterminate(|X| [2 * X.pow_ref(3) - 1]);
-    let (K, a) = NumberField::adjoin_root(&QQX, &f);
-    assert_el_eq!(&K, K.zero(), K.sub(K.mul(K.int_hom().map(2), K.pow(a, 3)), K.one()));
+    #[test]
+    fn test_adjoin_root() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let QQ = RationalField::new(ZZ);
+        let QQX = DensePolyRing::new(QQ, "X");
+        let [f] = QQX.with_wrapped_indeterminate(|X| [2 * X.pow_ref(3) - 1]);
+        let (K, a) = NumberField::adjoin_root(&QQX, &f);
+        assert_el_eq!(&K, K.zero(), K.sub(K.mul(K.int_hom().map(2), K.pow(a, 3)), K.one()));
+    }
 }

@@ -761,238 +761,239 @@ where
 }
 
 #[cfg(test)]
-use crate::RANDOM_TEST_INSTANCE_COUNT;
-#[cfg(test)]
-use crate::ring_impls::extension::number_field::*;
-#[cfg(test)]
-use crate::wrapper::RingElementWrapper;
+mod tests {
+    use super::*;
+    use crate::RANDOM_TEST_INSTANCE_COUNT;
+    use crate::ring_impls::extension::number_field::*;
+    use crate::wrapper::RingElementWrapper;
 
-#[cfg(test)]
-fn test_field() -> NumberField<AsField<MonogenicExtensionSparse<RationalField<BigIntRing>>>> {
-    let QQ = RationalField::new(ZZbig);
-    let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
-    NumberField::from(NumberFieldBase::create(AsField::from(
-        AsFieldBase::promise_is_field(MonogenicExtensionSparse::new(QQ, modulus_vec)).unwrap(),
-    )))
-}
+    fn test_field() -> NumberField<AsField<MonogenicExtensionSparse<RationalField<BigIntRing>>>> {
+        let QQ = RationalField::new(ZZbig);
+        let modulus_vec = vec![QQ.neg_one(), QQ.zero(), QQ.zero(), QQ.zero()];
+        NumberField::from(NumberFieldBase::create(AsField::from(
+            AsFieldBase::promise_is_field(MonogenicExtensionSparse::new(QQ, modulus_vec)).unwrap(),
+        )))
+    }
 
-#[test]
-fn test_poly_power_decomposition_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = test_field();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let zeta = RingElementWrapper::new(
-        &poly_ring,
-        poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
-    );
-    let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X - &zeta,
-            X + &zeta,
-            X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
-            &zeta * X.pow_ref(3) - X + 1,
-        ]
-    });
-    let multiply_out =
-        |list: &[(El<DensePolyRing<_>>, usize)]| poly_ring.prod(list.iter().map(|(g, k)| poly_ring.pow(g.clone(), *k)));
-    let assert_eq = |expected: &[(El<DensePolyRing<_>>, usize)], actual: &[(El<DensePolyRing<_>>, usize)]| {
-        assert!(expected.is_sorted_by_key(|(_, k)| *k));
-        assert!(actual.is_sorted_by_key(|(_, k)| *k));
-        assert_eq!(expected.len(), actual.len());
-        for ((f_expected, k_expected), (f_actual, k_actual)) in expected.iter().zip(actual.iter()) {
-            assert_el_eq!(&poly_ring, f_expected, f_actual);
-            assert_eq!(k_expected, k_actual);
+    #[test]
+    fn test_poly_power_decomposition_number_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = test_field();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let zeta = RingElementWrapper::new(
+            &poly_ring,
+            poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
+        );
+        let [f1, f2, f3, f4] = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X - &zeta,
+                X + &zeta,
+                X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
+                &zeta * X.pow_ref(3) - X + 1,
+            ]
+        });
+        let multiply_out = |list: &[(El<DensePolyRing<_>>, usize)]| {
+            poly_ring.prod(list.iter().map(|(g, k)| poly_ring.pow(g.clone(), *k)))
+        };
+        let assert_eq = |expected: &[(El<DensePolyRing<_>>, usize)], actual: &[(El<DensePolyRing<_>>, usize)]| {
+            assert!(expected.is_sorted_by_key(|(_, k)| *k));
+            assert!(actual.is_sorted_by_key(|(_, k)| *k));
+            assert_eq!(expected.len(), actual.len());
+            for ((f_expected, k_expected), (f_actual, k_actual)) in expected.iter().zip(actual.iter()) {
+                assert_el_eq!(&poly_ring, f_expected, f_actual);
+                assert_eq!(k_expected, k_actual);
+            }
+        };
+
+        let expected = [(f1.clone(), 1)];
+        let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
+        assert_eq(&expected, &actual);
+
+        let expected = [(poly_ring.normalize(poly_ring.mul_ref(&f3, &f4)).0, 3)];
+        let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
+        assert_eq(&expected, &actual);
+
+        let expected = [(f2.clone(), 2), (poly_ring.normalize(poly_ring.mul_ref(&f3, &f4)).0, 3)];
+        let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
+        assert_eq(&expected, &actual);
+
+        let expected = [
+            (poly_ring.mul_ref(&f1, &f2), 1),
+            (poly_ring.normalize(f4.clone()).0, 2),
+            (f3.clone(), 3),
+        ];
+        let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
+        assert_eq(&expected, &actual);
+
+        let expected = [
+            (poly_ring.mul_ref(&f1, &f2), 2),
+            (poly_ring.normalize(f4.clone()).0, 4),
+            (f3.clone(), 6),
+        ];
+        let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
+        assert_eq(&expected, &actual);
+    }
+
+    #[test]
+    fn random_test_poly_power_decomposition_number_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = test_field();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let field = poly_ring.base_ring();
+        let QQ = field.base_ring();
+        let mut rng = oorandom::Rand64::new(0);
+        let bound = ZZbig.int_hom().map(500);
+        let mut random_poly_of_deg = |deg: usize| {
+            poly_ring.from_terms((0..=deg).map(|i| {
+                (
+                    field.from_power_basis((0..field.rank()).map(|_| {
+                        QQ.inclusion()
+                            .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
+                    })),
+                    i,
+                )
+            }))
+        };
+
+        for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+            let f = random_poly_of_deg(5);
+            let g = random_poly_of_deg(3);
+            let h = random_poly_of_deg(2);
+            let poly = poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone()));
+            let power_decomp = poly_power_decomposition_number_field(&poly_ring, &poly);
+
+            assert_el_eq!(
+                &poly_ring,
+                &poly_ring.normalize(poly).0,
+                poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly.clone(), *k)))
+            );
+            assert!(
+                poly_ring.divides(
+                    &poly_ring.prod(
+                        power_decomp
+                            .iter()
+                            .filter(|(_, k)| k % 3 == 0)
+                            .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
+                    ),
+                    &make_primitive(&poly_ring, &h).0
+                )
+            );
+            assert!(
+                poly_ring.divides(
+                    &poly_ring.prod(
+                        power_decomp
+                            .iter()
+                            .filter(|(_, k)| k % 2 == 0)
+                            .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
+                    ),
+                    &make_primitive(&poly_ring, &g).0
+                )
+            );
         }
-    };
+    }
 
-    let expected = [(f1.clone(), 1)];
-    let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
-    assert_eq(&expected, &actual);
-
-    let expected = [(poly_ring.normalize(poly_ring.mul_ref(&f3, &f4)).0, 3)];
-    let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
-    assert_eq(&expected, &actual);
-
-    let expected = [(f2.clone(), 2), (poly_ring.normalize(poly_ring.mul_ref(&f3, &f4)).0, 3)];
-    let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
-    assert_eq(&expected, &actual);
-
-    let expected = [
-        (poly_ring.mul_ref(&f1, &f2), 1),
-        (poly_ring.normalize(f4.clone()).0, 2),
-        (f3.clone(), 3),
-    ];
-    let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
-    assert_eq(&expected, &actual);
-
-    let expected = [
-        (poly_ring.mul_ref(&f1, &f2), 2),
-        (poly_ring.normalize(f4.clone()).0, 4),
-        (f3.clone(), 6),
-    ];
-    let actual = poly_power_decomposition_number_field(&poly_ring, &multiply_out(&expected));
-    assert_eq(&expected, &actual);
-}
-
-#[test]
-fn random_test_poly_power_decomposition_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = test_field();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let field = poly_ring.base_ring();
-    let QQ = field.base_ring();
-    let mut rng = oorandom::Rand64::new(0);
-    let bound = ZZbig.int_hom().map(500);
-    let mut random_poly_of_deg = |deg: usize| {
-        poly_ring.from_terms((0..=deg).map(|i| {
-            (
-                field.from_power_basis((0..field.rank()).map(|_| {
-                    QQ.inclusion()
-                        .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
-                })),
-                i,
+    #[test]
+    fn test_poly_gcd_number_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = test_field();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let zeta = RingElementWrapper::new(
+            &poly_ring,
+            poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
+        );
+        let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X - &zeta,
+                X + &zeta,
+                X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
+                &zeta * X.pow_ref(3) - X + 1,
+            ]
+        });
+        let poly = |powers: [usize; 4]| {
+            poly_ring.prod(
+                powers
+                    .iter()
+                    .zip(irred_polys.iter())
+                    .map(|(e, f)| poly_ring.pow(f.clone(), *e)),
             )
-        }))
-    };
-
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = random_poly_of_deg(5);
-        let g = random_poly_of_deg(3);
-        let h = random_poly_of_deg(2);
-        let poly = poly_ring.prod([&f, &g, &g, &h, &h, &h].into_iter().map(|poly| poly.clone()));
-        let power_decomp = poly_power_decomposition_number_field(&poly_ring, &poly);
+        };
 
         assert_el_eq!(
             &poly_ring,
-            &poly_ring.normalize(poly).0,
-            poly_ring.prod(power_decomp.iter().map(|(poly, k)| poly_ring.pow(poly.clone(), *k)))
+            poly_ring.normalize(poly([1, 0, 0, 0])).0,
+            poly_gcd_number_field(&poly_ring, &poly([1, 0, 1, 0]), &poly([1, 0, 0, 1]))
         );
-        assert!(
-            poly_ring.divides(
-                &poly_ring.prod(
-                    power_decomp
-                        .iter()
-                        .filter(|(_, k)| k % 3 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 3))
-                ),
-                &make_primitive(&poly_ring, &h).0
-            )
+        assert_el_eq!(
+            &poly_ring,
+            poly_ring.normalize(poly([1, 0, 1, 0])).0,
+            poly_gcd_number_field(&poly_ring, &poly([1, 1, 1, 0]), &poly([1, 0, 1, 1]))
         );
-        assert!(
-            poly_ring.divides(
-                &poly_ring.prod(
-                    power_decomp
-                        .iter()
-                        .filter(|(_, k)| k % 2 == 0)
-                        .map(|(poly, k)| poly_ring.pow(poly.clone(), k / 2))
-                ),
-                &make_primitive(&poly_ring, &g).0
-            )
+        assert_el_eq!(
+            &poly_ring,
+            poly_ring.normalize(poly([1, 0, 2, 0])).0,
+            poly_gcd_number_field(&poly_ring, &poly([1, 1, 3, 0]), &poly([3, 0, 2, 0]))
+        );
+        assert_el_eq!(
+            &poly_ring,
+            poly_ring.normalize(poly([1, 0, 0, 5])).0,
+            poly_gcd_number_field(&poly_ring, &poly([2, 1, 3, 5]), &poly([1, 0, 0, 7]))
         );
     }
-}
 
-#[test]
-fn test_poly_gcd_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = test_field();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let zeta = RingElementWrapper::new(
-        &poly_ring,
-        poly_ring.inclusion().map(poly_ring.base_ring().canonical_gen()),
-    );
-    let irred_polys = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X - &zeta,
-            X + &zeta,
-            X.pow_ref(2) + zeta.pow_ref(1) * X + 100,
-            &zeta * X.pow_ref(3) - X + 1,
-        ]
-    });
-    let poly = |powers: [usize; 4]| {
-        poly_ring.prod(
-            powers
-                .iter()
-                .zip(irred_polys.iter())
-                .map(|(e, f)| poly_ring.pow(f.clone(), *e)),
-        )
-    };
-
-    assert_el_eq!(
-        &poly_ring,
-        poly_ring.normalize(poly([1, 0, 0, 0])).0,
-        poly_gcd_number_field(&poly_ring, &poly([1, 0, 1, 0]), &poly([1, 0, 0, 1]))
-    );
-    assert_el_eq!(
-        &poly_ring,
-        poly_ring.normalize(poly([1, 0, 1, 0])).0,
-        poly_gcd_number_field(&poly_ring, &poly([1, 1, 1, 0]), &poly([1, 0, 1, 1]))
-    );
-    assert_el_eq!(
-        &poly_ring,
-        poly_ring.normalize(poly([1, 0, 2, 0])).0,
-        poly_gcd_number_field(&poly_ring, &poly([1, 1, 3, 0]), &poly([3, 0, 2, 0]))
-    );
-    assert_el_eq!(
-        &poly_ring,
-        poly_ring.normalize(poly([1, 0, 0, 5])).0,
-        poly_gcd_number_field(&poly_ring, &poly([2, 1, 3, 5]), &poly([1, 0, 0, 7]))
-    );
-}
-
-#[test]
-fn test_poly_power_decomposition_number_field_degenerate_reduction() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = test_field();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let field = poly_ring.base_ring();
-    let QQ = field.base_ring();
-    let f = poly_ring.from_terms([
-        (
-            field
-                .inclusion()
-                .compose(QQ.inclusion())
-                .map(ZZbig.prod(LARGE_PRIMES[..6].iter().map(|x| int_cast(*x, ZZbig, ZZi64)))),
-            2,
-        ),
-        (field.one(), 0),
-    ]);
-    let power_decomposition = poly_power_decomposition_number_field(&poly_ring, &f);
-    assert_eq!(1, power_decomposition.len());
-    assert_el_eq!(&poly_ring, poly_ring.normalize(f).0, power_decomposition[0].0);
-}
-
-#[test]
-fn random_test_poly_gcd_number_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = test_field();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let field = poly_ring.base_ring();
-    let QQ = field.base_ring();
-    let mut rng = oorandom::Rand64::new(0);
-    let bound = ZZbig.int_hom().map(500);
-    let mut random_poly_of_deg = |deg: usize| {
-        poly_ring.from_terms((0..=deg).map(|i| {
+    #[test]
+    fn test_poly_power_decomposition_number_field_degenerate_reduction() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = test_field();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let field = poly_ring.base_ring();
+        let QQ = field.base_ring();
+        let f = poly_ring.from_terms([
             (
-                field.from_power_basis((0..field.rank()).map(|_| {
-                    QQ.inclusion()
-                        .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
-                })),
-                i,
-            )
-        }))
-    };
+                field
+                    .inclusion()
+                    .compose(QQ.inclusion())
+                    .map(ZZbig.prod(LARGE_PRIMES[..6].iter().map(|x| int_cast(*x, ZZbig, ZZi64)))),
+                2,
+            ),
+            (field.one(), 0),
+        ]);
+        let power_decomposition = poly_power_decomposition_number_field(&poly_ring, &f);
+        assert_eq!(1, power_decomposition.len());
+        assert_el_eq!(&poly_ring, poly_ring.normalize(f).0, power_decomposition[0].0);
+    }
 
-    for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
-        let f = random_poly_of_deg(14);
-        let g = random_poly_of_deg(12);
-        let h = random_poly_of_deg(10);
-        let lhs = poly_ring.mul_ref(&f, &h);
-        let rhs = poly_ring.mul_ref(&g, &h);
-        let gcd = make_primitive(&poly_ring, &poly_gcd_number_field(&poly_ring, &lhs, &rhs)).0;
+    #[test]
+    fn random_test_poly_gcd_number_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = test_field();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let field = poly_ring.base_ring();
+        let QQ = field.base_ring();
+        let mut rng = oorandom::Rand64::new(0);
+        let bound = ZZbig.int_hom().map(500);
+        let mut random_poly_of_deg = |deg: usize| {
+            poly_ring.from_terms((0..=deg).map(|i| {
+                (
+                    field.from_power_basis((0..field.rank()).map(|_| {
+                        QQ.inclusion()
+                            .map(QQ.base_ring().get_uniformly_random(&bound, || rng.rand_u64()))
+                    })),
+                    i,
+                )
+            }))
+        };
 
-        assert!(poly_ring.divides(&lhs, &gcd));
-        assert!(poly_ring.divides(&rhs, &gcd));
-        assert!(poly_ring.divides(&gcd, &make_primitive(&poly_ring, &h).0));
+        for _ in 0..RANDOM_TEST_INSTANCE_COUNT {
+            let f = random_poly_of_deg(14);
+            let g = random_poly_of_deg(12);
+            let h = random_poly_of_deg(10);
+            let lhs = poly_ring.mul_ref(&f, &h);
+            let rhs = poly_ring.mul_ref(&g, &h);
+            let gcd = make_primitive(&poly_ring, &poly_gcd_number_field(&poly_ring, &lhs, &rhs)).0;
+
+            assert!(poly_ring.divides(&lhs, &gcd));
+            assert!(poly_ring.divides(&rhs, &gcd));
+            assert!(poly_ring.divides(&gcd, &make_primitive(&poly_ring, &h).0));
+        }
     }
 }

@@ -575,107 +575,6 @@ where
     }
 }
 
-#[cfg(test)]
-use std::array::from_fn;
-
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::*;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::Fp;
-
-#[test]
-fn test_radix3_butterflies() {
-    feanor_tracing::DelayedLogger::init_test();
-    let log3_n = 3;
-    let ring = Zn64B::new(109);
-    let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
-    let int_hom = ring.int_hom();
-    let i = |x| int_hom.map(x);
-    let zeta = i(97);
-    let zeta_inv = ring.invert(&zeta).unwrap();
-    let fft = CooleyTukeyRadix3FFT::new_with_hom(
-        ring.into_can_hom(ring_fastmul).ok().unwrap(),
-        ring_fastmul.coerce(&ring, zeta),
-        log3_n,
-    );
-
-    const LEN: usize = 27;
-    let data: [_; LEN] = from_fn(|j| i(j as i32));
-    let expected_std_order = |step: usize, group_idx: usize, value_idx: usize| {
-        ring.sum((0..ZZ.pow(3, step)).map(|k| {
-            ring.mul(
-                ring.pow(zeta_inv, value_idx * (k * ZZ.pow(3, log3_n - step)) as usize),
-                data[group_idx + (k * ZZ.pow(3, log3_n - step)) as usize],
-            )
-        }))
-    };
-    let expected_threeadic_reverse = |step: usize| {
-        from_fn(|i| {
-            expected_std_order(
-                step,
-                i % ZZ.pow(3, log3_n - step) as usize,
-                threeadic_reverse(i / ZZ.pow(3, log3_n - step) as usize, step),
-            )
-        })
-    };
-    let begin = expected_threeadic_reverse(0);
-    for (a, e) in data.iter().zip(begin.iter()) {
-        assert_el_eq!(ring, a, e);
-    }
-
-    let mut actual = data;
-    for i in 0..log3_n {
-        fft.butterfly_step_main::<false>(&mut actual, i);
-        let expected: [Zn64BEl; LEN] = expected_threeadic_reverse(i + 1);
-        for (a, e) in actual.iter().zip(expected.iter()) {
-            assert_el_eq!(ring, a, e);
-        }
-    }
-}
-
-#[test]
-fn test_radix3_inv_fft() {
-    feanor_tracing::DelayedLogger::init_test();
-    let log3_n = 3;
-    let ring = Zn64B::new(109);
-    let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
-    let zeta = ring.int_hom().map(97);
-    let fft = CooleyTukeyRadix3FFT::new_with_hom(
-        ring.into_can_hom(ring_fastmul).ok().unwrap(),
-        ring_fastmul.coerce(&ring, zeta),
-        log3_n,
-    );
-
-    let data = (0..ZZ.pow(3, log3_n))
-        .map(|x| ring.int_hom().map(x as i32))
-        .collect::<Vec<_>>();
-    let mut actual = data.clone();
-    fft.unordered_fft(&mut actual, &ring);
-    fft.unordered_inv_fft(&mut actual, &ring);
-
-    for i in 0..data.len() {
-        assert_el_eq!(&ring, &data[i], &actual[i]);
-    }
-}
-
-#[test]
-fn test_size_1_fft() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Fp::<17>::RING;
-    let fft = CooleyTukeyRadix3FFT::for_zn(&ring, 0)
-        .unwrap()
-        .change_ring(ring.identity())
-        .0;
-    let values: [u64; 1] = [3];
-    let mut work = values;
-    fft.unordered_fft(&mut work, ring);
-    assert_eq!(&work, &values);
-    fft.unordered_inv_fft(&mut work, ring);
-    assert_eq!(&work, &values);
-    assert_eq!(0, fft.unordered_fft_permutation(0));
-    assert_eq!(0, fft.unordered_fft_permutation_inv(0));
-}
-
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
     use super::*;
@@ -751,15 +650,117 @@ pub mod generic_tests {
     }
 }
 
-#[test]
-fn test_butterfly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Fp::<109>::RING;
-    generic_tests::test_cooley_tuckey_radix3_butterfly(
-        ring,
-        ring,
-        (0..109).step_by(10).map(|x| ring.int_hom().map(x)),
-        &63,
-        &97,
-    );
+#[cfg(test)]
+mod tests {
+    use std::array::from_fn;
+
+    use super::*;
+    use crate::ring_impls::zn::zn_64b::*;
+    use crate::ring_impls::zn::zn_static::Fp;
+
+    #[test]
+    fn test_radix3_butterflies() {
+        feanor_tracing::DelayedLogger::init_test();
+        let log3_n = 3;
+        let ring = Zn64B::new(109);
+        let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
+        let int_hom = ring.int_hom();
+        let i = |x| int_hom.map(x);
+        let zeta = i(97);
+        let zeta_inv = ring.invert(&zeta).unwrap();
+        let fft = CooleyTukeyRadix3FFT::new_with_hom(
+            ring.into_can_hom(ring_fastmul).ok().unwrap(),
+            ring_fastmul.coerce(&ring, zeta),
+            log3_n,
+        );
+
+        const LEN: usize = 27;
+        let data: [_; LEN] = from_fn(|j| i(j as i32));
+        let expected_std_order = |step: usize, group_idx: usize, value_idx: usize| {
+            ring.sum((0..ZZ.pow(3, step)).map(|k| {
+                ring.mul(
+                    ring.pow(zeta_inv, value_idx * (k * ZZ.pow(3, log3_n - step)) as usize),
+                    data[group_idx + (k * ZZ.pow(3, log3_n - step)) as usize],
+                )
+            }))
+        };
+        let expected_threeadic_reverse = |step: usize| {
+            from_fn(|i| {
+                expected_std_order(
+                    step,
+                    i % ZZ.pow(3, log3_n - step) as usize,
+                    threeadic_reverse(i / ZZ.pow(3, log3_n - step) as usize, step),
+                )
+            })
+        };
+        let begin = expected_threeadic_reverse(0);
+        for (a, e) in data.iter().zip(begin.iter()) {
+            assert_el_eq!(ring, a, e);
+        }
+
+        let mut actual = data;
+        for i in 0..log3_n {
+            fft.butterfly_step_main::<false>(&mut actual, i);
+            let expected: [Zn64BEl; LEN] = expected_threeadic_reverse(i + 1);
+            for (a, e) in actual.iter().zip(expected.iter()) {
+                assert_el_eq!(ring, a, e);
+            }
+        }
+    }
+
+    #[test]
+    fn test_radix3_inv_fft() {
+        feanor_tracing::DelayedLogger::init_test();
+        let log3_n = 3;
+        let ring = Zn64B::new(109);
+        let ring_fastmul = Zn64BFastmul::new(ring).unwrap();
+        let zeta = ring.int_hom().map(97);
+        let fft = CooleyTukeyRadix3FFT::new_with_hom(
+            ring.into_can_hom(ring_fastmul).ok().unwrap(),
+            ring_fastmul.coerce(&ring, zeta),
+            log3_n,
+        );
+
+        let data = (0..ZZ.pow(3, log3_n))
+            .map(|x| ring.int_hom().map(x as i32))
+            .collect::<Vec<_>>();
+        let mut actual = data.clone();
+        fft.unordered_fft(&mut actual, &ring);
+        fft.unordered_inv_fft(&mut actual, &ring);
+
+        for i in 0..data.len() {
+            assert_el_eq!(&ring, &data[i], &actual[i]);
+        }
+    }
+
+    #[test]
+    fn test_size_1_fft() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Fp::<17>::RING;
+        let fft = CooleyTukeyRadix3FFT::for_zn(&ring, 0)
+            .unwrap()
+            .change_ring(ring.identity())
+            .0;
+        let values: [u64; 1] = [3];
+        let mut work = values;
+        fft.unordered_fft(&mut work, ring);
+        assert_eq!(&work, &values);
+        fft.unordered_inv_fft(&mut work, ring);
+        assert_eq!(&work, &values);
+        assert_eq!(0, fft.unordered_fft_permutation(0));
+        assert_eq!(0, fft.unordered_fft_permutation_inv(0));
+    }
+
+    #[test]
+    fn test_butterfly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Fp::<109>::RING;
+        generic_tests::test_cooley_tuckey_radix3_butterfly(
+            ring,
+            ring,
+            (0..109).step_by(10).map(|x| ring.int_hom().map(x)),
+            &63,
+            &97,
+        );
+    }
 }

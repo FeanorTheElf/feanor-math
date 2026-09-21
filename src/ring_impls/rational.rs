@@ -846,175 +846,182 @@ where
 }
 
 #[cfg(test)]
-use crate::homomorphism::Homomorphism;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
+mod tests {
+    use super::*;
+    use crate::homomorphism::Homomorphism;
+    use crate::ring_impls::primitive_int::StaticRing;
 
-#[cfg(test)]
-fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
-    let ring = RationalField::new(ZZi64);
-    let incl = ring.into_int_hom();
-    [-3, -2, -1, 0, 1, 2].iter().copied().flat_map(move |x| {
-        [1, 4, 5]
-            .iter()
-            .copied()
-            .map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap())
-    })
-}
+    fn edge_case_elements() -> impl Iterator<Item = El<RationalField<StaticRing<i64>>>> {
+        let ring = RationalField::new(ZZi64);
+        let incl = ring.into_int_hom();
+        [-3, -2, -1, 0, 1, 2].iter().copied().flat_map(move |x| {
+            [1, 4, 5]
+                .iter()
+                .copied()
+                .map(move |y| ring.checked_div(&incl.map(x), &incl.map(y)).unwrap())
+        })
+    }
 
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RationalField::new(ZZi64);
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = RationalField::new(ZZi64);
 
-    let half = ring
-        .checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2))
-        .unwrap();
-    assert!(!ring.is_one(&half));
-    assert!(!ring.is_zero(&half));
-    assert_el_eq!(ring, ring.one(), ring.add_ref(&half, &half));
-    crate::ring::generic_tests::test_ring_axioms(ring, edge_case_elements());
-}
+        let half = ring
+            .checked_div(&ring.int_hom().map(1), &ring.int_hom().map(2))
+            .unwrap();
+        assert!(!ring.is_one(&half));
+        assert!(!ring.is_zero(&half));
+        assert_el_eq!(ring, ring.one(), ring.add_ref(&half, &half));
+        crate::ring::generic_tests::test_ring_axioms(ring, edge_case_elements());
+    }
 
-#[test]
-fn test_inner_product() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RationalField::new(ZZi64);
+    #[test]
+    fn test_inner_product() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = RationalField::new(ZZi64);
 
-    assert_el_eq!(
-        ring,
-        ring.from_fraction(5, 3),
-        <_ as ComputeInnerProduct>::inner_product(
-            ring.get_ring(),
-            [
-                (ring.from_fraction(1, 1), ring.from_fraction(1, 1)),
-                (ring.from_fraction(2, 1), ring.from_fraction(1, 3))
-            ]
-        )
-    );
+        assert_el_eq!(
+            ring,
+            ring.from_fraction(5, 3),
+            <_ as ComputeInnerProduct>::inner_product(
+                ring.get_ring(),
+                [
+                    (ring.from_fraction(1, 1), ring.from_fraction(1, 1)),
+                    (ring.from_fraction(2, 1), ring.from_fraction(1, 3))
+                ]
+            )
+        );
 
-    assert_el_eq!(
-        ring,
-        ring.from_fraction(11, 6),
-        <_ as ComputeInnerProduct>::inner_product(
-            ring.get_ring(),
-            [
-                (ring.from_fraction(1, 3), ring.from_fraction(2, 1)),
-                (ring.from_fraction(2, 3), ring.from_fraction(1, 1)),
-                (ring.from_fraction(2, 3), ring.from_fraction(1, 2)),
-                (ring.from_fraction(1, 3), ring.from_fraction(1, 2))
-            ]
-        )
-    );
-}
+        assert_el_eq!(
+            ring,
+            ring.from_fraction(11, 6),
+            <_ as ComputeInnerProduct>::inner_product(
+                ring.get_ring(),
+                [
+                    (ring.from_fraction(1, 3), ring.from_fraction(2, 1)),
+                    (ring.from_fraction(2, 3), ring.from_fraction(1, 1)),
+                    (ring.from_fraction(2, 3), ring.from_fraction(1, 2)),
+                    (ring.from_fraction(1, 3), ring.from_fraction(1, 2))
+                ]
+            )
+        );
+    }
 
-#[test]
-fn test_divisibility_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RationalField::new(ZZi64);
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, edge_case_elements());
-}
+    #[test]
+    fn test_divisibility_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = RationalField::new(ZZi64);
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, edge_case_elements());
+    }
 
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RationalField::new(ZZi64);
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(ring, edge_case_elements());
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(ring, edge_case_elements());
-}
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = RationalField::new(ZZi64);
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(ring, edge_case_elements());
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(ring, edge_case_elements());
+    }
 
-#[test]
-fn test_int_hom_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RationalField::new(ZZi64);
-    crate::ring::generic_tests::test_hom_axioms(&ZZi64, ring, -16..15);
-}
+    #[test]
+    fn test_int_hom_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = RationalField::new(ZZi64);
+        crate::ring::generic_tests::test_hom_axioms(&ZZi64, ring, -16..15);
+    }
 
-#[test]
-fn test_serialization() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = RationalField::new(ZZi64);
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, edge_case_elements());
-}
+    #[test]
+    fn test_serialization() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = RationalField::new(ZZi64);
+        crate::ring_properties::serialization::generic_tests::test_serialization(ring, edge_case_elements());
+    }
 
-#[test]
-fn test_serialize_deserialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(RationalField::new(ZZi64).into());
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(RationalField::new(ZZbig).into());
-}
+    #[test]
+    fn test_serialize_deserialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            RationalField::new(ZZi64).into(),
+        );
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            RationalField::new(ZZbig).into(),
+        );
+    }
 
-#[test]
-fn test_serialize_postcard() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring: RingValue<RationalFieldBase<RingValue<crate::ring_impls::primitive_int::StaticRingBase<i64>>>> =
-        RationalField::new(ZZi64);
-    let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
-    let result = DeserializeWithRing::new(&ring)
-        .deserialize(&mut postcard::Deserializer::from_flavor(
-            postcard::de_flavors::Slice::new(&serialized),
-        ))
-        .unwrap();
+    #[test]
+    fn test_serialize_postcard() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring: RingValue<RationalFieldBase<RingValue<crate::ring_impls::primitive_int::StaticRingBase<i64>>>> =
+            RationalField::new(ZZi64);
+        let serialized = postcard::to_allocvec(&SerializeWithRing::new(&ring.int_hom().map(42), &ring)).unwrap();
+        let result = DeserializeWithRing::new(&ring)
+            .deserialize(&mut postcard::Deserializer::from_flavor(
+                postcard::de_flavors::Slice::new(&serialized),
+            ))
+            .unwrap();
 
-    assert_el_eq!(&ring, ring.int_hom().map(42), result);
-}
+        assert_el_eq!(&ring, ring.int_hom().map(42), result);
+    }
 
-#[test]
-fn test_factor_rational_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZbig);
-    let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(&QQ, "X");
-    let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
-    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let (mut actual, unit) = <_ as FactorPolyField>::factor_poly(
-        &poly_ring,
-        &poly_ring.prod([f.clone(), f.clone(), g.clone()].into_iter()),
-    );
-    assert_eq!(2, actual.len());
-    actual.sort_unstable_by_key(|(_, e)| *e);
-    assert_el_eq!(poly_ring, g, actual[0].0);
-    assert_eq!(1, actual[0].1);
-    assert_el_eq!(poly_ring, f, actual[1].0);
-    assert_eq!(2, actual[1].1);
-    assert_el_eq!(QQ, QQ.one(), unit);
+    #[test]
+    fn test_factor_rational_poly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let QQ = RationalField::new(ZZbig);
+        let incl = QQ.int_hom();
+        let poly_ring = DensePolyRing::new(&QQ, "X");
+        let f = poly_ring.from_terms([(incl.map(2), 0), (incl.map(1), 3)].into_iter());
+        let g =
+            poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+        let (mut actual, unit) = <_ as FactorPolyField>::factor_poly(
+            &poly_ring,
+            &poly_ring.prod([f.clone(), f.clone(), g.clone()].into_iter()),
+        );
+        assert_eq!(2, actual.len());
+        actual.sort_unstable_by_key(|(_, e)| *e);
+        assert_el_eq!(poly_ring, g, actual[0].0);
+        assert_eq!(1, actual[0].1);
+        assert_el_eq!(poly_ring, f, actual[1].0);
+        assert_eq!(2, actual[1].1);
+        assert_el_eq!(QQ, QQ.one(), unit);
 
-    let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-    assert_eq!(1, actual.len());
-    assert_eq!(1, actual[0].1);
-    assert_el_eq!(&poly_ring, f, &actual[0].0);
-    assert_el_eq!(QQ, QQ.one(), unit);
+        let f = poly_ring.from_terms([(incl.map(3), 0), (incl.map(1), 1)]);
+        let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+        assert_eq!(1, actual.len());
+        assert_eq!(1, actual[0].1);
+        assert_el_eq!(&poly_ring, f, &actual[0].0);
+        assert_el_eq!(QQ, QQ.one(), unit);
 
-    let [mut f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]
-    });
-    poly_ring
-        .inclusion()
-        .mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
-    assert_eq!(1, actual.len());
-    assert_eq!(2, actual[0].1);
-    assert_el_eq!(QQ, QQ.one(), unit);
-}
+        let [mut f] = poly_ring.with_wrapped_indeterminate(|X| {
+            [16 - 32 * X + 104 * X.pow_ref(2) - 8 * 11 * X.pow_ref(3) + 121 * X.pow_ref(4)]
+        });
+        poly_ring
+            .inclusion()
+            .mul_assign_map(&mut f, QQ.div(&QQ.one(), &QQ.int_hom().map(121)));
+        let (actual, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &f);
+        assert_eq!(1, actual.len());
+        assert_eq!(2, actual[0].1);
+        assert_el_eq!(QQ, QQ.one(), unit);
+    }
 
-#[test]
-fn test_factor_nonmonic_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let QQ = RationalField::new(ZZbig);
-    let incl = QQ.int_hom();
-    let poly_ring = DensePolyRing::new(&QQ, "X");
-    let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
-    let g = poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
-    let (actual, unit) = <_ as FactorPolyField>::factor_poly(
-        &poly_ring,
-        &poly_ring.prod([f.clone(), f.clone(), g.clone(), poly_ring.int_hom().map(100)].into_iter()),
-    );
-    assert_eq!(2, actual.len());
+    #[test]
+    fn test_factor_nonmonic_poly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let QQ = RationalField::new(ZZbig);
+        let incl = QQ.int_hom();
+        let poly_ring = DensePolyRing::new(&QQ, "X");
+        let f = poly_ring.from_terms([(QQ.div(&incl.map(3), &incl.map(5)), 0), (incl.map(1), 4)].into_iter());
+        let g =
+            poly_ring.from_terms([(incl.map(1), 0), (incl.map(2), 1), (incl.map(1), 2), (incl.map(1), 4)].into_iter());
+        let (actual, unit) = <_ as FactorPolyField>::factor_poly(
+            &poly_ring,
+            &poly_ring.prod([f.clone(), f.clone(), g.clone(), poly_ring.int_hom().map(100)].into_iter()),
+        );
+        assert_eq!(2, actual.len());
 
-    assert_el_eq!(poly_ring, g, actual[0].0);
-    assert_eq!(1, actual[0].1);
-    assert_el_eq!(poly_ring, f, actual[1].0);
-    assert_eq!(2, actual[1].1);
-    assert_el_eq!(QQ, incl.map(100), unit);
+        assert_el_eq!(poly_ring, g, actual[0].0);
+        assert_eq!(1, actual[0].1);
+        assert_el_eq!(poly_ring, f, actual[1].0);
+        assert_eq!(2, actual[1].1);
+        assert_el_eq!(QQ, incl.map(100), unit);
+    }
 }

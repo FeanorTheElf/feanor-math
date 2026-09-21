@@ -1043,16 +1043,17 @@ pub fn prime_fields_for_local_computation() -> impl Iterator<Item = AsField<Zn64
 }
 
 #[cfg(test)]
-use crate::algorithms::cyclotomic::is_prim_root_of_unity_pow2;
-#[cfg(test)]
-use crate::prelude::*;
-#[cfg(test)]
-use crate::ring_properties::integer::ZZi64;
+mod tests {
+    use super::*;
+    use crate::algorithms::cyclotomic::is_prim_root_of_unity_pow2;
+    use crate::prelude::*;
+    use crate::ring_properties::integer::ZZi64;
 
-#[test]
-fn test_are_primitive_roots_of_unity() {
-    for (p, rou) in LARGE_NTT_FRIENDLY_PRIMES {
-        let Zp = Zn64B::new(p as u64);
-        assert!(is_prim_root_of_unity_pow2(Zp, &Zp.coerce(&ZZi64, rou), 32));
+    #[test]
+    fn test_are_primitive_roots_of_unity() {
+        for (p, rou) in LARGE_NTT_FRIENDLY_PRIMES {
+            let Zp = Zn64B::new(p as u64);
+            assert!(is_prim_root_of_unity_pow2(Zp, &Zp.coerce(&ZZi64, rou), 32));
+        }
     }
 }

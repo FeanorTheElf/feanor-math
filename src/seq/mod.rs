@@ -839,9 +839,14 @@ impl<'a, T: Clone> Fn<(usize, &'a T)> for CloneValue {
     extern "rust-call" fn call(&self, args: (usize, &'a T)) -> Self::Output { args.1.clone() }
 }
 
-#[test]
-fn test_vector_fn_iter() {
-    feanor_tracing::DelayedLogger::init_test();
-    let vec = vec![1, 2, 4, 8, 16];
-    assert_eq!(vec, vec.as_fn().into_iter().copied().collect::<Vec<_>>());
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_vector_fn_iter() {
+        feanor_tracing::DelayedLogger::init_test();
+        let vec = vec![1, 2, 4, 8, 16];
+        assert_eq!(vec, vec.as_fn().into_iter().copied().collect::<Vec<_>>());
+    }
 }

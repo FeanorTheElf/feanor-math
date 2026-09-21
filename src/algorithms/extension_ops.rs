@@ -165,162 +165,163 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
-#[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::rational::RationalField;
+mod tests {
+    use super::*;
+    use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+    use crate::ring_impls::rational::RationalField;
 
-#[test]
-fn test_charpoly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
-    let poly_ring = DensePolyRing::new(ZZi64, "X");
+    #[test]
+    fn test_charpoly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+        let poly_ring = DensePolyRing::new(ZZi64, "X");
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        charpoly(
-            ring.get_ring(),
-            &ring.canonical_gen(),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
+            &expected,
+            charpoly(
+                ring.get_ring(),
+                &ring.canonical_gen(),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 4]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        charpoly(
-            ring.get_ring(),
-            &ring.pow(ring.canonical_gen(), 2),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 4]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
+            &expected,
+            charpoly(
+                ring.get_ring(),
+                &ring.pow(ring.canonical_gen(), 2),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 6 * X - 6]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        charpoly(
-            ring.get_ring(),
-            &ring.add(ring.canonical_gen(), ring.pow(ring.canonical_gen(), 2)),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 6 * X - 6]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
+            &expected,
+            charpoly(
+                ring.get_ring(),
+                &ring.add(ring.canonical_gen(), ring.pow(ring.canonical_gen(), 2)),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
 
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0, 0]);
-    let poly_ring = DensePolyRing::new(ZZi64, "X");
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0, 0]);
+        let poly_ring = DensePolyRing::new(ZZi64, "X");
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        charpoly(
-            ring.get_ring(),
-            &ring.canonical_gen(),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
+            &expected,
+            charpoly(
+                ring.get_ring(),
+                &ring.canonical_gen(),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 4 * X.pow_ref(2) + 4]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        charpoly(
-            ring.get_ring(),
-            &ring.pow(ring.canonical_gen(), 2),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 4 * X.pow_ref(2) + 4]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
-}
+            &expected,
+            charpoly(
+                ring.get_ring(),
+                &ring.pow(ring.canonical_gen(), 2),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
+    }
 
-#[test]
-fn test_minpoly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0, 0, 0, 0]);
-    let poly_ring = DensePolyRing::new(ZZi64, "X");
+    #[test]
+    fn test_minpoly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0, 0, 0, 0]);
+        let poly_ring = DensePolyRing::new(ZZi64, "X");
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) - 2]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        minpoly(
-            ring.get_ring(),
-            &ring.canonical_gen(),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(6) - 2]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
+            &expected,
+            minpoly(
+                ring.get_ring(),
+                &ring.canonical_gen(),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        minpoly(
-            ring.get_ring(),
-            &ring.pow(ring.canonical_gen(), 2),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) - 2]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
+            &expected,
+            minpoly(
+                ring.get_ring(),
+                &ring.pow(ring.canonical_gen(), 2),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
 
-    let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X - 1]);
-    assert_el_eq!(
-        &poly_ring,
-        &expected,
-        minpoly(
-            ring.get_ring(),
-            &ring.add(ring.one(), ring.pow(ring.canonical_gen(), 3)),
+        let [expected] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2 * X - 1]);
+        assert_el_eq!(
             &poly_ring,
-            &ring.base_ring().identity()
-        )
-    );
-}
+            &expected,
+            minpoly(
+                ring.get_ring(),
+                &ring.add(ring.one(), ring.pow(ring.canonical_gen(), 3)),
+                &poly_ring,
+                &ring.base_ring().identity()
+            )
+        );
+    }
 
-#[test]
-fn test_trace() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+    #[test]
+    fn test_trace() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
 
-    assert_eq!(3, ring.trace(ring.from_power_basis([1, 0, 0])));
-    assert_eq!(0, ring.trace(ring.from_power_basis([0, 1, 0])));
-    assert_eq!(0, ring.trace(ring.from_power_basis([0, 0, 1])));
-    assert_eq!(6, ring.trace(ring.from_power_basis([2, 0, 0])));
-    assert_eq!(6, ring.trace(ring.from_power_basis([2, 1, 0])));
-    assert_eq!(6, ring.trace(ring.from_power_basis([2, 0, 1])));
-}
+        assert_eq!(3, ring.trace(ring.from_power_basis([1, 0, 0])));
+        assert_eq!(0, ring.trace(ring.from_power_basis([0, 1, 0])));
+        assert_eq!(0, ring.trace(ring.from_power_basis([0, 0, 1])));
+        assert_eq!(6, ring.trace(ring.from_power_basis([2, 0, 0])));
+        assert_eq!(6, ring.trace(ring.from_power_basis([2, 1, 0])));
+        assert_eq!(6, ring.trace(ring.from_power_basis([2, 0, 1])));
+    }
 
-#[test]
-fn test_discriminant() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
-    assert_eq!(-108, discriminant(ring.get_ring()));
+    #[test]
+    fn test_discriminant() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+        assert_eq!(-108, discriminant(ring.get_ring()));
 
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 1, 0]);
-    assert_eq!(-104, discriminant(ring.get_ring()));
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 1, 0]);
+        assert_eq!(-104, discriminant(ring.get_ring()));
 
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![3, 0, 0]);
-    assert_eq!(-243, discriminant(ring.get_ring()));
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![3, 0, 0]);
+        assert_eq!(-243, discriminant(ring.get_ring()));
 
-    let base_ring = DensePolyRing::new(RationalField::new(ZZi64), "X");
-    let [f] = base_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + 1]);
-    let ring = MonogenicExtensionSparse::new(&base_ring, vec![f, base_ring.zero()]);
-    let [expected] = base_ring.with_wrapped_indeterminate(|X| [4 * X.pow_ref(3) + 4]);
-    assert_el_eq!(&base_ring, expected, discriminant(ring.get_ring()));
-}
+        let base_ring = DensePolyRing::new(RationalField::new(ZZi64), "X");
+        let [f] = base_ring.with_wrapped_indeterminate(|X| [X.pow_ref(3) + 1]);
+        let ring = MonogenicExtensionSparse::new(&base_ring, vec![f, base_ring.zero()]);
+        let [expected] = base_ring.with_wrapped_indeterminate(|X| [4 * X.pow_ref(3) + 4]);
+        assert_el_eq!(&base_ring, expected, discriminant(ring.get_ring()));
+    }
 
-#[test]
-fn test_from_power_basis_extended() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
-    let actual = from_power_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
-    let expected = ring.from_power_basis([37, 12, 15]);
-    assert_el_eq!(&ring, expected, actual);
+    #[test]
+    fn test_from_power_basis_extended() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = MonogenicExtensionSparse::new(ZZi64, vec![2, 0, 0]);
+        let actual = from_power_basis_extended(ring.get_ring(), [1, 2, 3, 4, 5, 6, 7]);
+        let expected = ring.from_power_basis([37, 12, 15]);
+        assert_el_eq!(&ring, expected, actual);
+    }
 }

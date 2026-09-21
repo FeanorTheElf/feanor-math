@@ -1064,293 +1064,287 @@ where
 }
 
 #[cfg(test)]
-use crate::algorithms::convolution::fft::FFTConvolution;
-#[cfg(test)]
-use crate::ring_impls::zn::ZnRingStore;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static;
+mod tests {
+    use super::*;
+    use crate::algorithms::convolution::fft::FFTConvolution;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
+    use crate::ring_impls::zn::{ZnRingStore, zn_static};
 
-#[cfg(test)]
-fn test_ring0_and_elements() -> (MonogenicExtensionSparse<Zn64B>, Vec<MonogenicExtensionImplEl<Zn64B>>) {
-    let R = MonogenicExtensionSparse::new(Zn64B::new(7), vec![Zn64B::new(7).neg_one()]);
-    let elements = (0..7).map(|x| R.int_hom().map(x)).collect();
-    return (R, elements);
-}
-
-#[cfg(test)]
-fn test_ring1_and_elements() -> (
-    MonogenicExtensionSparse<StaticRing<i64>>,
-    Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
-) {
-    let ZZ = ZZi64;
-    let R = MonogenicExtensionSparse::new(ZZ, vec![1, 1]);
-    let mut elements = Vec::new();
-    for a in -2..=3 {
-        for b in -2..=3 {
-            elements.push(R.from_power_basis([a, b]));
-        }
+    fn test_ring0_and_elements() -> (MonogenicExtensionSparse<Zn64B>, Vec<MonogenicExtensionImplEl<Zn64B>>) {
+        let R = MonogenicExtensionSparse::new(Zn64B::new(7), vec![Zn64B::new(7).neg_one()]);
+        let elements = (0..7).map(|x| R.int_hom().map(x)).collect();
+        return (R, elements);
     }
-    return (R, elements);
-}
 
-#[cfg(test)]
-fn test_ring2_and_elements() -> (
-    MonogenicExtensionSparse<StaticRing<i64>>,
-    Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
-) {
-    let ZZ = ZZi64;
-    let R = MonogenicExtensionSparse::new(ZZ, vec![1, -1, 1]);
-    let mut elements = Vec::new();
-    for a in [-2, 0, 1, 2] {
-        for b in [0, 2] {
-            for c in [0, 2] {
-                elements.push(R.from_power_basis([a, b, c]));
+    fn test_ring1_and_elements() -> (
+        MonogenicExtensionSparse<StaticRing<i64>>,
+        Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
+    ) {
+        let ZZ = ZZi64;
+        let R = MonogenicExtensionSparse::new(ZZ, vec![1, 1]);
+        let mut elements = Vec::new();
+        for a in -2..=3 {
+            for b in -2..=3 {
+                elements.push(R.from_power_basis([a, b]));
             }
         }
+        return (R, elements);
     }
-    return (R, elements);
-}
 
-#[cfg(test)]
-fn test_ring3_and_elements() -> (
-    MonogenicExtensionSparse<StaticRing<i64>>,
-    Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
-) {
-    let ZZ = ZZi64;
-    let R = MonogenicExtensionSparse::new(ZZ, vec![1, 0, 0]);
-    let mut elements = Vec::new();
-    for a in [-2, 0, 1, 2] {
-        for b in [0, 2] {
-            for c in [0, 2] {
-                elements.push(R.from_power_basis([a, b, c]));
+    fn test_ring2_and_elements() -> (
+        MonogenicExtensionSparse<StaticRing<i64>>,
+        Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
+    ) {
+        let ZZ = ZZi64;
+        let R = MonogenicExtensionSparse::new(ZZ, vec![1, -1, 1]);
+        let mut elements = Vec::new();
+        for a in [-2, 0, 1, 2] {
+            for b in [0, 2] {
+                for c in [0, 2] {
+                    elements.push(R.from_power_basis([a, b, c]));
+                }
             }
         }
+        return (R, elements);
     }
-    return (R, elements);
-}
 
-#[cfg(test)]
-fn test_ring4_and_elements() -> (
-    MonogenicExtensionBarrett<StaticRing<i64>>,
-    Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
-) {
-    let ZZ = ZZi64;
-    let R = MonogenicExtensionBarrett::new(ZZ, vec![0, 1, 0]);
-    let mut elements = Vec::new();
-    for a in [-2, 0, 1, 2] {
-        for b in [0, 2] {
-            for c in [0, 2] {
-                elements.push(R.from_power_basis([a, b, c]));
+    fn test_ring3_and_elements() -> (
+        MonogenicExtensionSparse<StaticRing<i64>>,
+        Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
+    ) {
+        let ZZ = ZZi64;
+        let R = MonogenicExtensionSparse::new(ZZ, vec![1, 0, 0]);
+        let mut elements = Vec::new();
+        for a in [-2, 0, 1, 2] {
+            for b in [0, 2] {
+                for c in [0, 2] {
+                    elements.push(R.from_power_basis([a, b, c]));
+                }
             }
         }
+        return (R, elements);
     }
-    return (R, elements);
-}
 
-#[test]
-fn test_sparse() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, _) = test_ring3_and_elements();
-    assert_el_eq!(ring, ring.one(), ring.pow(ring.canonical_gen(), 3));
-}
+    fn test_ring4_and_elements() -> (
+        MonogenicExtensionBarrett<StaticRing<i64>>,
+        Vec<MonogenicExtensionImplEl<StaticRing<i64>>>,
+    ) {
+        let ZZ = ZZi64;
+        let R = MonogenicExtensionBarrett::new(ZZ, vec![0, 1, 0]);
+        let mut elements = Vec::new();
+        for a in [-2, 0, 1, 2] {
+            for b in [0, 2] {
+                for c in [0, 2] {
+                    elements.push(R.from_power_basis([a, b, c]));
+                }
+            }
+        }
+        return (R, elements);
+    }
 
-#[test]
-fn test_dense() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, _) = test_ring4_and_elements();
-    assert_el_eq!(ring, ring.canonical_gen(), ring.pow(ring.canonical_gen(), 3));
-}
+    #[test]
+    fn test_sparse() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, _) = test_ring3_and_elements();
+        assert_el_eq!(ring, ring.one(), ring.pow(ring.canonical_gen(), 3));
+    }
 
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, els) = test_ring0_and_elements();
-    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring1_and_elements();
-    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring2_and_elements();
-    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring3_and_elements();
-    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring4_and_elements();
-    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+    #[test]
+    fn test_dense() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, _) = test_ring4_and_elements();
+        assert_el_eq!(ring, ring.canonical_gen(), ring.pow(ring.canonical_gen(), 3));
+    }
 
-    let (ring, els) = test_ring2_and_elements();
-    let ring = RingValue::from(ring.into().with_convolution(FFTConvolution::new_with_alloc(Global)));
-    crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, els) = test_ring0_and_elements();
+        crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring1_and_elements();
+        crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring2_and_elements();
+        crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring3_and_elements();
+        crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring4_and_elements();
+        crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 
-    let base_ring = zn_static::Fp::<257>::RING;
-    let x_pow_rank = vec![base_ring.neg_one(); 64];
-    let ring = MonogenicExtensionSparse::new(base_ring, x_pow_rank);
-    let mut rng = oorandom::Rand64::new(0);
-    let els =
-        (0..10).map(|_| ring.from_power_basis((0..64).map(|_| ring.base_ring().random_element(|| rng.rand_u64()))));
-    crate::ring::generic_tests::test_ring_axioms(&ring, els);
-}
+        let (ring, els) = test_ring2_and_elements();
+        let ring = RingValue::from(ring.into().with_convolution(FFTConvolution::new_with_alloc(Global)));
+        crate::ring::generic_tests::test_ring_axioms(ring, els.into_iter());
 
-#[test]
-fn test_rank_1_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = Zn64B::new(5).as_field().ok().unwrap();
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(1)])
-        .as_field()
-        .ok()
-        .unwrap();
-    crate::ring_properties::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
+        let base_ring = zn_static::Fp::<257>::RING;
+        let x_pow_rank = vec![base_ring.neg_one(); 64];
+        let ring = MonogenicExtensionSparse::new(base_ring, x_pow_rank);
+        let mut rng = oorandom::Rand64::new(0);
+        let els =
+            (0..10).map(|_| ring.from_power_basis((0..64).map(|_| ring.base_ring().random_element(|| rng.rand_u64()))));
+        crate::ring::generic_tests::test_ring_axioms(&ring, els);
+    }
 
-    assert_el_eq!(ring, ring.one(), ring.canonical_gen());
-}
-
-#[test]
-fn test_free_algebra_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, _) = test_ring0_and_elements();
-    super::generic_tests::test_free_algebra_axioms(ring);
-    let (ring, _) = test_ring1_and_elements();
-    super::generic_tests::test_free_algebra_axioms(ring);
-    let (ring, _) = test_ring2_and_elements();
-    super::generic_tests::test_free_algebra_axioms(ring);
-    let (ring, _) = test_ring3_and_elements();
-    super::generic_tests::test_free_algebra_axioms(ring);
-    let (ring, _) = test_ring4_and_elements();
-    super::generic_tests::test_free_algebra_axioms(ring);
-}
-
-#[test]
-fn test_division() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = Zn64B::new(4);
-    let i = base_ring.int_hom();
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![i.map(-1), i.map(-1)]);
-
-    assert_el_eq!(
-        ring,
-        &ring.from_power_basis([i.map(1), i.map(3)]),
-        &ring
-            .checked_div(&ring.one(), &ring.from_power_basis([i.map(2), i.map(3)]))
-            .unwrap()
-    );
-
-    let a = ring.from_power_basis([i.map(2), i.map(2)]);
-    let b = ring.from_power_basis([i.map(0), i.map(2)]);
-    assert_el_eq!(ring, a, ring.mul(ring.checked_div(&a, &b).unwrap(), b));
-
-    assert!(ring.checked_div(&ring.one(), &a).is_none());
-}
-
-#[test]
-fn test_division_ring_of_integers() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = ZZi64;
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![11, 0]);
-
-    // the solution to Pell's equation is 10^2 - 3^2 * 11 = 1
-    let u = ring.from_power_basis([10, 3]);
-    let u_inv = ring.from_power_basis([10, -3]);
-
-    assert_el_eq!(ring, u_inv, ring.checked_div(&ring.one(), &u).unwrap());
-    assert_el_eq!(
-        ring,
-        ring.pow(u_inv, 3),
-        &ring.checked_div(&ring.one(), &ring.pow(u, 3)).unwrap()
-    );
-
-    assert!(
-        ring.checked_div(&ring.from_power_basis([2, 0]), &ring.from_power_basis([3, 0]))
-            .is_none()
-    );
-}
-
-#[test]
-fn test_divisibility_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, els) = test_ring0_and_elements();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring1_and_elements();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring2_and_elements();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring3_and_elements();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
-    let (ring, els) = test_ring4_and_elements();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
-}
-
-#[test]
-fn test_cubic_mul() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = zn_static::Zn::<256>::RING;
-    let modulo: IntHom<&RingValue<zn_static::ZnSBase<256, false>>> = base_ring.int_hom();
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![modulo.map(-1), modulo.map(-1), modulo.map(-1)]);
-    let a = ring.from_power_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)]);
-    let b = ring.from_power_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)]);
-    assert_el_eq!(ring, b, ring.pow(a, 2));
-}
-
-#[test]
-fn test_as_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_ring = Zn64B::new(5).as_field().ok().unwrap();
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(1)])
-        .as_field()
-        .ok()
-        .unwrap();
-    crate::ring_properties::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
-
-    let base_ring = Zn64B::new(3).as_field().ok().unwrap();
-    let ring = MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(2), base_ring.zero()])
-        .as_field()
-        .ok()
-        .unwrap();
-    let ring_ref = &ring;
-    crate::ring_properties::field::generic_tests::test_field_axioms(
-        &ring,
-        (0..3).flat_map(|x| {
-            (0..3).map(move |y| ring_ref.from_power_basis([base_ring.int_hom().map(x), base_ring.int_hom().map(y)]))
-        }),
-    );
-
-    assert!(
-        MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(1), base_ring.zero()])
+    #[test]
+    fn test_rank_1_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = Zn64B::new(5).as_field().ok().unwrap();
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(1)])
             .as_field()
-            .is_err()
-    );
-}
+            .ok()
+            .unwrap();
+        crate::ring_properties::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
 
-#[test]
-fn test_serialization() {
-    feanor_tracing::DelayedLogger::init_test();
-    let (ring, els) = test_ring0_and_elements();
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
-    let (ring, els) = test_ring1_and_elements();
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
-    let (ring, els) = test_ring2_and_elements();
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
-    let (ring, els) = test_ring3_and_elements();
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
-    let (ring, els) = test_ring4_and_elements();
-    crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
-}
+        assert_el_eq!(ring, ring.one(), ring.canonical_gen());
+    }
 
-#[test]
-#[should_panic]
-fn test_from_power_basis_enforce_len() {
-    let (ring, _) = test_ring1_and_elements();
-    _ = ring.from_power_basis([0, 1, 2]);
-}
+    #[test]
+    fn test_free_algebra_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, _) = test_ring0_and_elements();
+        super::super::generic_tests::test_free_algebra_axioms(ring);
+        let (ring, _) = test_ring1_and_elements();
+        super::super::generic_tests::test_free_algebra_axioms(ring);
+        let (ring, _) = test_ring2_and_elements();
+        super::super::generic_tests::test_free_algebra_axioms(ring);
+        let (ring, _) = test_ring3_and_elements();
+        super::super::generic_tests::test_free_algebra_axioms(ring);
+        let (ring, _) = test_ring4_and_elements();
+        super::super::generic_tests::test_free_algebra_axioms(ring);
+    }
 
-#[test]
-fn test_serialize_deserialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
-        test_ring0_and_elements().0.into(),
-    );
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
-        test_ring2_and_elements().0.into(),
-    );
-    crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
-        test_ring3_and_elements().0.into(),
-    );
+    #[test]
+    fn test_division() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = Zn64B::new(4);
+        let i = base_ring.int_hom();
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![i.map(-1), i.map(-1)]);
+
+        assert_el_eq!(
+            ring,
+            &ring.from_power_basis([i.map(1), i.map(3)]),
+            &ring
+                .checked_div(&ring.one(), &ring.from_power_basis([i.map(2), i.map(3)]))
+                .unwrap()
+        );
+
+        let a = ring.from_power_basis([i.map(2), i.map(2)]);
+        let b = ring.from_power_basis([i.map(0), i.map(2)]);
+        assert_el_eq!(ring, a, ring.mul(ring.checked_div(&a, &b).unwrap(), b));
+
+        assert!(ring.checked_div(&ring.one(), &a).is_none());
+    }
+
+    #[test]
+    fn test_division_ring_of_integers() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = ZZi64;
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![11, 0]);
+
+        // the solution to Pell's equation is 10^2 - 3^2 * 11 = 1
+        let u = ring.from_power_basis([10, 3]);
+        let u_inv = ring.from_power_basis([10, -3]);
+
+        assert_el_eq!(ring, u_inv, ring.checked_div(&ring.one(), &u).unwrap());
+        assert_el_eq!(
+            ring,
+            ring.pow(u_inv, 3),
+            &ring.checked_div(&ring.one(), &ring.pow(u, 3)).unwrap()
+        );
+
+        assert!(
+            ring.checked_div(&ring.from_power_basis([2, 0]), &ring.from_power_basis([3, 0]))
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn test_divisibility_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, els) = test_ring0_and_elements();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring1_and_elements();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring2_and_elements();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring3_and_elements();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+        let (ring, els) = test_ring4_and_elements();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(ring, els.into_iter());
+    }
+
+    #[test]
+    fn test_cubic_mul() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = zn_static::Zn::<256>::RING;
+        let modulo: IntHom<&RingValue<zn_static::ZnSBase<256, false>>> = base_ring.int_hom();
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![modulo.map(-1), modulo.map(-1), modulo.map(-1)]);
+        let a = ring.from_power_basis([modulo.map(0), modulo.map(-1), modulo.map(-1)]);
+        let b = ring.from_power_basis([modulo.map(-1), modulo.map(-2), modulo.map(-1)]);
+        assert_el_eq!(ring, b, ring.pow(a, 2));
+    }
+
+    #[test]
+    fn test_as_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_ring = Zn64B::new(5).as_field().ok().unwrap();
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(1)])
+            .as_field()
+            .ok()
+            .unwrap();
+        crate::ring_properties::field::generic_tests::test_field_axioms(&ring, (0..5).map(|x| ring.int_hom().map(x)));
+
+        let base_ring = Zn64B::new(3).as_field().ok().unwrap();
+        let ring = MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(2), base_ring.zero()])
+            .as_field()
+            .ok()
+            .unwrap();
+        let ring_ref = &ring;
+        crate::ring_properties::field::generic_tests::test_field_axioms(
+            &ring,
+            (0..3).flat_map(|x| {
+                (0..3).map(move |y| ring_ref.from_power_basis([base_ring.int_hom().map(x), base_ring.int_hom().map(y)]))
+            }),
+        );
+
+        assert!(
+            MonogenicExtensionSparse::new(base_ring, vec![base_ring.int_hom().map(1), base_ring.zero()])
+                .as_field()
+                .is_err()
+        );
+    }
+
+    #[test]
+    fn test_serialization() {
+        feanor_tracing::DelayedLogger::init_test();
+        let (ring, els) = test_ring0_and_elements();
+        crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
+        let (ring, els) = test_ring1_and_elements();
+        crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
+        let (ring, els) = test_ring2_and_elements();
+        crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
+        let (ring, els) = test_ring3_and_elements();
+        crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
+        let (ring, els) = test_ring4_and_elements();
+        crate::ring_properties::serialization::generic_tests::test_serialization(ring, els.into_iter());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_from_power_basis_enforce_len() {
+        let (ring, _) = test_ring1_and_elements();
+        _ = ring.from_power_basis([0, 1, 2]);
+    }
+
+    #[test]
+    fn test_serialize_deserialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            test_ring0_and_elements().0.into(),
+        );
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            test_ring2_and_elements().0.into(),
+        );
+        crate::ring_properties::serialization::generic_tests::test_serialize_deserialize(
+            test_ring3_and_elements().0.into(),
+        );
+    }
 }

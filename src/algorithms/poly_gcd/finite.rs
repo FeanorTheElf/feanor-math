@@ -310,141 +310,142 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
-#[cfg(test)]
-use crate::ring_impls::zn::*;
+mod tests {
+    use super::*;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
+    use crate::ring_impls::zn::*;
 
-#[test]
-fn test_poly_squarefree_part() {
-    let F2 = Zn64B::new(2).as_field().unwrap();
-    let F2X = DensePolyRing::new(F2, "X");
-    let [f] = F2X.with_wrapped_indeterminate(|X| [X.pow_ref(3) + X.pow_ref(2) + 1]);
-    assert_el_eq!(&F2X, &f, poly_squarefree_part_finite_field(&F2X, &f));
-}
+    #[test]
+    fn test_poly_squarefree_part() {
+        let F2 = Zn64B::new(2).as_field().unwrap();
+        let F2X = DensePolyRing::new(F2, "X");
+        let [f] = F2X.with_wrapped_indeterminate(|X| [X.pow_ref(3) + X.pow_ref(2) + 1]);
+        assert_el_eq!(&F2X, &f, poly_squarefree_part_finite_field(&F2X, &f));
+    }
 
-#[test]
-fn test_partial_eea_poly() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Zn64B::new(65537).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let test_on_input = |a: &El<DensePolyRing<_>>, b: &El<DensePolyRing<_>>, deg| {
-        let ([s, t, s_, t_], [x, x_]) = partial_eea_poly(&poly_ring, a.clone(), b.clone(), deg);
-        assert_el_eq!(
-            &poly_ring,
-            poly_ring.add(poly_ring.mul_ref(&s, a), poly_ring.mul_ref(&t, b)),
-            &x
-        );
-        assert_el_eq!(
-            &poly_ring,
-            poly_ring.add(poly_ring.mul_ref(&s_, a), poly_ring.mul_ref(&t_, b)),
-            &x_
-        );
-        let a_deg = poly_ring.degree(a).unwrap_or(0);
-        let b_deg = poly_ring.degree(b).unwrap_or(0);
-        if a_deg <= deg && b_deg <= deg {
-            assert!(poly_ring.degree(&x).unwrap_or(0) <= deg);
-            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-        } else if a_deg <= deg || b_deg <= deg {
-            assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
-            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-            if a_deg >= b_deg {
+    #[test]
+    fn test_partial_eea_poly() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = Zn64B::new(65537).as_field().ok().unwrap();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let test_on_input = |a: &El<DensePolyRing<_>>, b: &El<DensePolyRing<_>>, deg| {
+            let ([s, t, s_, t_], [x, x_]) = partial_eea_poly(&poly_ring, a.clone(), b.clone(), deg);
+            assert_el_eq!(
+                &poly_ring,
+                poly_ring.add(poly_ring.mul_ref(&s, a), poly_ring.mul_ref(&t, b)),
+                &x
+            );
+            assert_el_eq!(
+                &poly_ring,
+                poly_ring.add(poly_ring.mul_ref(&s_, a), poly_ring.mul_ref(&t_, b)),
+                &x_
+            );
+            let a_deg = poly_ring.degree(a).unwrap_or(0);
+            let b_deg = poly_ring.degree(b).unwrap_or(0);
+            if a_deg <= deg && b_deg <= deg {
+                assert!(poly_ring.degree(&x).unwrap_or(0) <= deg);
+                assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
+            } else if a_deg <= deg || b_deg <= deg {
+                assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
+                assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
+                if a_deg >= b_deg {
+                    assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
+                    assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
+                } else {
+                    assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
+                    assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
+                }
+            } else {
+                assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
+                assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
                 assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
                 assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
-            } else {
                 assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
                 assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
             }
-        } else {
-            assert!(poly_ring.degree(&x).unwrap_or(0) > deg);
-            assert!(poly_ring.degree(&x_).unwrap_or(0) <= deg);
-            assert!(poly_ring.degree(&t).unwrap_or(0) <= a_deg - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&t_).unwrap_or(0) <= a_deg - poly_ring.degree(&x_).unwrap_or(0));
-            assert!(poly_ring.degree(&s).unwrap_or(0) <= b_deg - poly_ring.degree(&x).unwrap_or(0));
-            assert!(poly_ring.degree(&s_).unwrap_or(0) <= b_deg - poly_ring.degree(&x_).unwrap_or(0));
+        };
+
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
+                X.pow_ref(10) + X.pow_ref(6) + 1,
+            ]
+        });
+        for deg in (0..10).rev() {
+            test_on_input(&f, &g, deg);
+            test_on_input(&g, &f, deg);
         }
-    };
 
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
-            X.pow_ref(10) + X.pow_ref(6) + 1,
-        ]
-    });
-    for deg in (0..10).rev() {
-        test_on_input(&f, &g, deg);
-        test_on_input(&g, &f, deg);
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(5) - 1, X.pow_ref(10) - 1]);
+        for deg in (0..5).rev() {
+            test_on_input(&f, &g, deg);
+            test_on_input(&g, &f, deg);
+        }
     }
 
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(5) - 1, X.pow_ref(10) - 1]);
-    for deg in (0..5).rev() {
-        test_on_input(&f, &g, deg);
-        test_on_input(&g, &f, deg);
+    #[test]
+    fn test_fast_poly_eea() {
+        feanor_tracing::DelayedLogger::init_test();
+
+        let field = Zn64B::new(2).as_field().ok().unwrap();
+        let poly_ring = DensePolyRing::new(field, "X");
+
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(96) + X.pow_ref(55), X.pow_ref(54)]);
+        let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
+        assert_el_eq!(
+            &poly_ring,
+            &d,
+            poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
+        );
+        assert_el_eq!(
+            &poly_ring,
+            poly_ring.pow(poly_ring.indeterminate(), 54),
+            poly_ring.normalize(d).0
+        );
+
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(976) + X.pow_ref(943) + X.pow_ref(765) + X.pow_ref(602) + 1,
+                X.pow_ref(942) + X.pow_ref(764),
+            ]
+        });
+        let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
+        assert_el_eq!(
+            &poly_ring,
+            &d,
+            poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
+        );
+
+        let field = zn_64b::Zn64B::new(65537).as_field().ok().unwrap();
+        let poly_ring = DensePolyRing::new(field, "X");
+
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(90) - X.pow_ref(70) + 3 * X.pow_ref(20) - 1,
+                X.pow_ref(100) + X.pow_ref(60) + 1,
+            ]
+        });
+        let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
+        assert!(poly_ring.is_unit(&d));
+        assert_el_eq!(
+            &poly_ring,
+            &d,
+            poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
+        );
+
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
+                X.pow_ref(100) + X.pow_ref(60) + 1,
+            ]
+        });
+        let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
+        assert!(poly_ring.is_unit(&d));
+        assert_el_eq!(
+            &poly_ring,
+            &d,
+            poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
+        );
     }
-}
-
-#[test]
-fn test_fast_poly_eea() {
-    feanor_tracing::DelayedLogger::init_test();
-
-    let field = Zn64B::new(2).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [X.pow_ref(96) + X.pow_ref(55), X.pow_ref(54)]);
-    let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
-    assert_el_eq!(
-        &poly_ring,
-        &d,
-        poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
-    );
-    assert_el_eq!(
-        &poly_ring,
-        poly_ring.pow(poly_ring.indeterminate(), 54),
-        poly_ring.normalize(d).0
-    );
-
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(976) + X.pow_ref(943) + X.pow_ref(765) + X.pow_ref(602) + 1,
-            X.pow_ref(942) + X.pow_ref(764),
-        ]
-    });
-    let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
-    assert_el_eq!(
-        &poly_ring,
-        &d,
-        poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
-    );
-
-    let field = zn_64b::Zn64B::new(65537).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(90) - X.pow_ref(70) + 3 * X.pow_ref(20) - 1,
-            X.pow_ref(100) + X.pow_ref(60) + 1,
-        ]
-    });
-    let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
-    assert!(poly_ring.is_unit(&d));
-    assert_el_eq!(
-        &poly_ring,
-        &d,
-        poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
-    );
-
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(9) - X.pow_ref(7) + 3 * X.pow_ref(2) - 1,
-            X.pow_ref(100) + X.pow_ref(60) + 1,
-        ]
-    });
-    let (s, t, d) = fast_poly_eea(&poly_ring, f.clone(), g.clone());
-    assert!(poly_ring.is_unit(&d));
-    assert_el_eq!(
-        &poly_ring,
-        &d,
-        poly_ring.add(poly_ring.mul_ref(&s, &f), poly_ring.mul_ref(&t, &g))
-    );
 }

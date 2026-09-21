@@ -550,41 +550,44 @@ where
 }
 
 #[cfg(test)]
-use crate::iters::multi_cartesian_product;
+mod tests {
+    use super::*;
+    use crate::iters::multi_cartesian_product;
 
-#[test]
-fn test_balance_factor() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = FractionFieldImpl::new(ZZi64);
-    let elements = [
-        ring.from_fraction(2 * 11, 3),
-        ring.from_fraction(6 * 11, 3),
-        ring.from_fraction(3 * 11, 18),
-        ring.from_fraction(6 * 11, 2),
-        ring.from_fraction(2 * 11, 6),
-        ring.from_fraction(5 * 11, 7),
-        ring.from_fraction(0, 1),
-        ring.from_fraction(0, 3),
-        ring.from_fraction(0, 12),
-        ring.from_fraction(0, 13),
-    ];
-    assert_el_eq!(
-        &ring,
-        ring.from_fraction(11, 7 * 6),
-        ring.get_ring().balance_factor(elements.iter()).unwrap()
-    );
-}
+    #[test]
+    fn test_balance_factor() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = FractionFieldImpl::new(ZZi64);
+        let elements = [
+            ring.from_fraction(2 * 11, 3),
+            ring.from_fraction(6 * 11, 3),
+            ring.from_fraction(3 * 11, 18),
+            ring.from_fraction(6 * 11, 2),
+            ring.from_fraction(2 * 11, 6),
+            ring.from_fraction(5 * 11, 7),
+            ring.from_fraction(0, 1),
+            ring.from_fraction(0, 3),
+            ring.from_fraction(0, 12),
+            ring.from_fraction(0, 13),
+        ];
+        assert_el_eq!(
+            &ring,
+            ring.from_fraction(11, 7 * 6),
+            ring.get_ring().balance_factor(elements.iter()).unwrap()
+        );
+    }
 
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = FractionFieldImpl::new(ZZi64);
-    let edge_case_elements = multi_cartesian_product(
-        [&[-3, -2, -1, 0, 1, 2, 3][..], &[1, 2, 3][..]]
-            .into_iter()
-            .map(|list| list.iter().copied()),
-        |data| ring.from_fraction(data[0], data[1]),
-        |_, x| *x,
-    );
-    crate::ring::generic_tests::test_ring_axioms(&ring, edge_case_elements);
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = FractionFieldImpl::new(ZZi64);
+        let edge_case_elements = multi_cartesian_product(
+            [&[-3, -2, -1, 0, 1, 2, 3][..], &[1, 2, 3][..]]
+                .into_iter()
+                .map(|list| list.iter().copied()),
+            |data| ring.from_fraction(data[0], data[1]),
+            |_, x| *x,
+        );
+        crate::ring::generic_tests::test_ring_axioms(&ring, edge_case_elements);
+    }
 }

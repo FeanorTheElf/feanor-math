@@ -232,14 +232,19 @@ impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
     }
 }
 
-#[test]
-fn test_zero_col_matrix() {
-    feanor_tracing::DelayedLogger::init_test();
-    let A: OwnedMatrix<i64> = OwnedMatrix::new(Vec::new(), 10, 0);
-    assert_eq!(0, A.col_count());
-    assert_eq!(10, A.row_count());
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let B: OwnedMatrix<i64> = OwnedMatrix::zero(11, 0, ZZi64);
-    assert_eq!(0, B.col_count());
-    assert_eq!(11, B.row_count());
+    #[test]
+    fn test_zero_col_matrix() {
+        feanor_tracing::DelayedLogger::init_test();
+        let A: OwnedMatrix<i64> = OwnedMatrix::new(Vec::new(), 10, 0);
+        assert_eq!(0, A.col_count());
+        assert_eq!(10, A.row_count());
+
+        let B: OwnedMatrix<i64> = OwnedMatrix::zero(11, 0, ZZi64);
+        assert_eq!(0, B.col_count());
+        assert_eq!(11, B.row_count());
+    }
 }

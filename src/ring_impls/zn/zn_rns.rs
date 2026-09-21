@@ -879,181 +879,189 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
+mod tests {
+    use super::*;
+    use crate::ring_impls::primitive_int::StaticRing;
 
-#[cfg(test)]
-const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
+    const EDGE_CASE_ELEMENTS: [i32; 9] = [0, 1, 7, 9, 62, 8, 10, 11, 12];
 
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
-    crate::ring::generic_tests::test_ring_axioms(
-        &ring,
-        EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)),
-    )
-}
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+        crate::ring::generic_tests::test_ring_axioms(
+            &ring,
+            EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)),
+        )
+    }
 
-#[test]
-fn test_hash_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
-    crate::ring::generic_tests::test_hash_axioms(
-        &ring,
-        EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)),
-    )
-}
+    #[test]
+    fn test_hash_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+        crate::ring::generic_tests::test_hash_axioms(
+            &ring,
+            EDGE_CASE_ELEMENTS.iter().cloned().map(|x| ring.int_hom().map(x)),
+        )
+    }
 
-#[test]
-fn test_map_in_map_out() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring1 = ZnRNS::create_from_primes(vec![7, 11, 17], ZZi64);
-    let ring2 = zn_big::ZnGB::new(ZZi64, 7 * 11 * 17);
-    for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
-        let value = ring2.int_hom().map(x);
-        assert!(ring2.eq_el(
-            &value,
-            &ring1.can_iso(&ring2).unwrap().map(ring1.coerce(&ring2, value.clone()))
+    #[test]
+    fn test_map_in_map_out() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring1 = ZnRNS::create_from_primes(vec![7, 11, 17], ZZi64);
+        let ring2 = zn_big::ZnGB::new(ZZi64, 7 * 11 * 17);
+        for x in [0, 1, 7, 8, 9, 10, 11, 17, 7 * 17, 11 * 8, 11 * 17, 7 * 11 * 17 - 1] {
+            let value = ring2.int_hom().map(x);
+            assert!(ring2.eq_el(
+                &value,
+                &ring1.can_iso(&ring2).unwrap().map(ring1.coerce(&ring2, value.clone()))
+            ));
+        }
+    }
+
+    #[test]
+    fn test_canonical_iso_axioms_zn_big() {
+        feanor_tracing::DelayedLogger::init_test();
+        let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
+        let to = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+        crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+        crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+
+        let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11 * 65537);
+        let to = ZnRNS::create_from_primes(vec![7, 11, 65537], StaticRing::<i128>::RING);
+        crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x * 65536)));
+        crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x * 65536)));
+    }
+
+    #[test]
+    fn test_canonical_hom_axioms_static_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let from = StaticRing::<i32>::RING;
+        let to = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+        crate::ring::generic_tests::test_hom_axioms(
+            &from,
+            to,
+            EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)),
+        );
+    }
+
+    #[test]
+    fn test_zn_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
+        super::super::generic_tests::test_zn_axioms(ring);
+    }
+
+    #[test]
+    fn test_zn_map_in_large_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::create_from_primes(vec![7, 11], ZZbig);
+        super::super::generic_tests::test_map_in_large_int(ring);
+
+        let R = ZnRNS::create_from_primes(vec![3, 5, 7], ZZbig);
+        let S = ZZbig;
+        assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
+    }
+
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnRNS::create_from_primes(vec![5], ZZbig);
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            (0..5).map(|x| R.int_hom().map(x)),
+        );
+
+        let R = ZnRNS::create_from_primes(vec![3, 5], ZZbig);
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            (0..15).map(|x| R.int_hom().map(x)),
+        );
+
+        let R = ZnRNS::create_from_primes(vec![2, 3, 5], ZZbig);
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            (0..30).map(|x| R.int_hom().map(x)),
+        );
+
+        let R = ZnRNS::create_from_primes(vec![3, 5, 2], ZZbig);
+        let modulo = R.int_hom();
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            [-1, 0, 1, 3, 2, 4, 5, 9, 18, 15, 30].into_iter().map(|x| modulo.map(x)),
+        );
+    }
+
+    #[test]
+    fn test_finite_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+            vec![3, 5, 7, 11],
+            ZZi64,
+        ));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+            vec![3, 5],
+            ZZi64,
+        ));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+            vec![3],
+            ZZi64,
+        ));
+        crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
+            vec![2],
+            ZZi64,
         ));
     }
-}
 
-#[test]
-fn test_canonical_iso_axioms_zn_big() {
-    feanor_tracing::DelayedLogger::init_test();
-    let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11);
-    let to = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
-    crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
-    crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x)));
+    #[test]
+    fn test_not_prime() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)], ZZi64);
+        let equivalent_ring = zn_big::ZnGB::new(ZZi64, 15 * 7);
+        crate::ring::generic_tests::test_ring_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+            &ring,
+            (0..105).map(|x| ring.int_hom().map(x)),
+        );
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(
+            ring.can_hom(&equivalent_ring).unwrap(),
+            (0..105).map(|x| equivalent_ring.int_hom().map(x)),
+        );
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(
+            ring.can_iso(&equivalent_ring).unwrap(),
+            (0..105).map(|x| ring.int_hom().map(x)),
+        );
+    }
 
-    let from = zn_big::ZnGB::new(StaticRing::<i128>::RING, 7 * 11 * 65537);
-    let to = ZnRNS::create_from_primes(vec![7, 11, 65537], StaticRing::<i128>::RING);
-    crate::ring::generic_tests::test_hom_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x * 65536)));
-    crate::ring::generic_tests::test_iso_axioms(&from, &to, (0..63).map(|x| from.int_hom().map(x * 65536)));
-}
+    #[test]
+    fn test_serialization() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::create_from_primes(vec![3, 5, 7], ZZi64);
+        crate::ring_properties::serialization::generic_tests::test_serialization(
+            &ring,
+            (0..105).map(|x| ring.int_hom().map(x)),
+        );
+    }
 
-#[test]
-fn test_canonical_hom_axioms_static_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let from = StaticRing::<i32>::RING;
-    let to = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
-    crate::ring::generic_tests::test_hom_axioms(
-        &from,
-        to,
-        EDGE_CASE_ELEMENTS.iter().cloned().map(|x| from.int_hom().map(x)),
-    );
-}
+    #[test]
+    #[should_panic]
+    fn test_not_coprime() { _ = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(35)], ZZi64); }
 
-#[test]
-fn test_zn_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZi64);
-    super::generic_tests::test_zn_axioms(ring);
-}
-
-#[test]
-fn test_zn_map_in_large_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::create_from_primes(vec![7, 11], ZZbig);
-    super::generic_tests::test_map_in_large_int(ring);
-
-    let R = ZnRNS::create_from_primes(vec![3, 5, 7], ZZbig);
-    let S = ZZbig;
-    assert!(R.eq_el(&R.int_hom().map(120493), &R.coerce(&S, S.int_hom().map(120493))));
-}
-
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnRNS::create_from_primes(vec![5], ZZbig);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        (0..5).map(|x| R.int_hom().map(x)),
-    );
-
-    let R = ZnRNS::create_from_primes(vec![3, 5], ZZbig);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        (0..15).map(|x| R.int_hom().map(x)),
-    );
-
-    let R = ZnRNS::create_from_primes(vec![2, 3, 5], ZZbig);
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        (0..30).map(|x| R.int_hom().map(x)),
-    );
-
-    let R = ZnRNS::create_from_primes(vec![3, 5, 2], ZZbig);
-    let modulo = R.int_hom();
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        [-1, 0, 1, 3, 2, 4, 5, 9, 18, 15, 30].into_iter().map(|x| modulo.map(x)),
-    );
-}
-
-#[test]
-fn test_finite_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
-        vec![3, 5, 7, 11],
-        ZZi64,
-    ));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(
-        vec![3, 5],
-        ZZi64,
-    ));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![3], ZZi64));
-    crate::ring_properties::finite::generic_tests::test_finite_ring_axioms(&ZnRNS::create_from_primes(vec![2], ZZi64));
-}
-
-#[test]
-fn test_not_prime() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(7)], ZZi64);
-    let equivalent_ring = zn_big::ZnGB::new(ZZi64, 15 * 7);
-    crate::ring::generic_tests::test_ring_axioms(&ring, (0..105).map(|x| ring.int_hom().map(x)));
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
-        &ring,
-        (0..105).map(|x| ring.int_hom().map(x)),
-    );
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(
-        ring.can_hom(&equivalent_ring).unwrap(),
-        (0..105).map(|x| equivalent_ring.int_hom().map(x)),
-    );
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(
-        ring.can_iso(&equivalent_ring).unwrap(),
-        (0..105).map(|x| ring.int_hom().map(x)),
-    );
-}
-
-#[test]
-fn test_serialization() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::create_from_primes(vec![3, 5, 7], ZZi64);
-    crate::ring_properties::serialization::generic_tests::test_serialization(
-        &ring,
-        (0..105).map(|x| ring.int_hom().map(x)),
-    );
-}
-
-#[test]
-#[should_panic]
-fn test_not_coprime() { _ = ZnRNS::new(vec![zn_64b::Zn64B::new(15), zn_64b::Zn64B::new(35)], ZZi64); }
-
-#[test]
-fn test_format() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZnRNS::new(
-        [
-            72057594035352641,
-            72057594035418113,
-            72057594036334721,
-            72057594036945793,
-        ]
-        .iter()
-        .map(|p| zn_64b::Zn64B::new(*p))
-        .collect(),
-        ZZbig,
-    );
-    assert_eq!("1", format!("{}", ring.formatted_el(&ring.int_hom().map(1))));
+    #[test]
+    fn test_format() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZnRNS::new(
+            [
+                72057594035352641,
+                72057594035418113,
+                72057594036334721,
+                72057594036945793,
+            ]
+            .iter()
+            .map(|p| zn_64b::Zn64B::new(*p))
+            .collect(),
+            ZZbig,
+        );
+        assert_eq!("1", format!("{}", ring.formatted_el(&ring.int_hom().map(1))));
+    }
 }

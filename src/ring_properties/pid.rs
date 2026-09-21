@@ -328,31 +328,33 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use crate::prelude::*;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::Zn;
+mod tests {
+    use super::*;
+    use crate::prelude::*;
+    use crate::ring_impls::zn::zn_static::Zn;
 
-#[test]
-fn test_inv_crt() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZi64;
-    assert_eq!(4, (ring.inv_crt([&4, &3], [&7, &9]) % 7 + 7) % 7);
-    assert_eq!(3, (ring.inv_crt([&4, &3], [&7, &9]) % 9 + 9) % 9);
-    assert_eq!(2, (ring.inv_crt([&-2, &3], [&4, &5]) % 4 + 4) % 4);
-    assert_eq!(3, (ring.inv_crt([&-2, &3], [&4, &5]) % 5 + 5) % 5);
-    assert_eq!(1, (ring.inv_crt([&-3, &10], [&4, &25]) % 4 + 4) % 4);
-    assert_eq!(10, (ring.inv_crt([&-3, &10], [&4, &25]) % 25 + 25) % 25);
-}
+    #[test]
+    fn test_inv_crt() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZi64;
+        assert_eq!(4, (ring.inv_crt([&4, &3], [&7, &9]) % 7 + 7) % 7);
+        assert_eq!(3, (ring.inv_crt([&4, &3], [&7, &9]) % 9 + 9) % 9);
+        assert_eq!(2, (ring.inv_crt([&-2, &3], [&4, &5]) % 4 + 4) % 4);
+        assert_eq!(3, (ring.inv_crt([&-2, &3], [&4, &5]) % 5 + 5) % 5);
+        assert_eq!(1, (ring.inv_crt([&-3, &10], [&4, &25]) % 4 + 4) % 4);
+        assert_eq!(10, (ring.inv_crt([&-3, &10], [&4, &25]) % 25 + 25) % 25);
+    }
 
-#[test]
-fn test_ideal_intersect() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<6>::RING;
-    assert!(ring.ideal_intersect(&2, &4) == 2 || ring.ideal_intersect(&2, &4) == 4);
-    assert_eq!(0, ring.ideal_intersect(&2, &3));
+    #[test]
+    fn test_ideal_intersect() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<6>::RING;
+        assert!(ring.ideal_intersect(&2, &4) == 2 || ring.ideal_intersect(&2, &4) == 4);
+        assert_eq!(0, ring.ideal_intersect(&2, &3));
 
-    let ring = Zn::<8>::RING;
-    assert_eq!(4, ring.ideal_intersect(&4, &4));
-    assert_eq!(4, ring.ideal_intersect(&2, &4));
-    assert_eq!(2, ring.ideal_intersect(&2, &2));
+        let ring = Zn::<8>::RING;
+        assert_eq!(4, ring.ideal_intersect(&4, &4));
+        assert_eq!(4, ring.ideal_intersect(&2, &4));
+        assert_eq!(2, ring.ideal_intersect(&2, &2));
+    }
 }

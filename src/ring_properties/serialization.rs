@@ -173,12 +173,15 @@ pub mod generic_tests {
 }
 
 #[cfg(test)]
-use crate::prelude::*;
+mod tests {
+    use super::*;
+    use crate::prelude::*;
 
-#[test]
-fn test_serialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    let value = ZZbig.add(ZZbig.power_of_two(128), ZZbig.one());
-    let json = serde_json::to_string(&SerializeWithRing::new(&value, ZZbig)).unwrap();
-    assert_eq!("\"340282366920938463463374607431768211457\"", json);
+    #[test]
+    fn test_serialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        let value = ZZbig.add(ZZbig.power_of_two(128), ZZbig.one());
+        let json = serde_json::to_string(&SerializeWithRing::new(&value, ZZbig)).unwrap();
+        assert_eq!("\"340282366920938463463374607431768211457\"", json);
+    }
 }

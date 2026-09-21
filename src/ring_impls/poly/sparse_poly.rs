@@ -537,98 +537,100 @@ where
 }
 
 #[cfg(test)]
-use super::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::{Fp, Zn};
-#[cfg(test)]
-use crate::ring_impls::zn::*;
+mod tests {
+    use super::super::dense_poly::DensePolyRing;
+    use super::*;
+    use crate::ring_impls::primitive_int::StaticRing;
+    use crate::ring_impls::zn::zn_static::{Fp, Zn};
+    use crate::ring_impls::zn::*;
 
-#[cfg(test)]
-fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
-where
-    P::Ring: PolyRing,
-{
-    let base_ring = poly_ring.base_ring();
-    vec![
-        poly_ring.from_terms([].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 2)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 2)].into_iter()),
-        poly_ring.from_terms(
-            [
-                (base_ring.int_hom().map(1), 0),
-                (base_ring.int_hom().map(-1), 2),
-                (base_ring.int_hom().map(0), 2),
-            ]
-            .into_iter(),
-        ),
-    ]
-    .into_iter()
-}
+    fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
+    where
+        P::Ring: PolyRing,
+    {
+        let base_ring = poly_ring.base_ring();
+        vec![
+            poly_ring.from_terms([].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 2)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 2)].into_iter()),
+            poly_ring.from_terms(
+                [
+                    (base_ring.int_hom().map(1), 0),
+                    (base_ring.int_hom().map(-1), 2),
+                    (base_ring.int_hom().map(0), 2),
+                ]
+                .into_iter(),
+            ),
+        ]
+        .into_iter()
+    }
 
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
-    crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
-}
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
+        crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    }
 
-#[test]
-fn test_poly_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
-    super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
-}
+    #[test]
+    fn test_poly_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = SparsePolyRing::new(Zn::<7>::RING, "X");
+        super::super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
+    }
 
-#[test]
-fn test_canonical_iso_axioms_different_base_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring1 = SparsePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
-    let poly_ring2 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-}
+    #[test]
+    fn test_canonical_iso_axioms_different_base_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring1 = SparsePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
+        let poly_ring2 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+        crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    }
 
-#[test]
-fn test_canonical_iso_dense_poly_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring1 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
-    crate::ring::generic_tests::test_iso_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
-}
+    #[test]
+    fn test_canonical_iso_dense_poly_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring1 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        crate::ring::generic_tests::test_hom_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
+        crate::ring::generic_tests::test_iso_axioms(&poly_ring2, &poly_ring1, edge_case_elements(&poly_ring2));
+    }
 
-#[test]
-fn test_divisibility_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
-}
+    #[test]
+    fn test_divisibility_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
 
-#[test]
-fn test_euclidean_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
-}
+    #[test]
+    fn test_euclidean_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
 
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = SparsePolyRing::new(Fp::<7>::RING, "X");
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
 }

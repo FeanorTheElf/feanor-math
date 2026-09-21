@@ -477,39 +477,6 @@ impl<R: ?Sized + RingBase> DefaultConvolutionRing for R {
     }
 }
 
-#[cfg(test)]
-use test;
-
-#[bench]
-fn bench_schoolbook_convolution(bencher: &mut test::Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let a: Vec<i32> = (0..32).collect();
-    let b: Vec<i32> = (0..32).collect();
-    let mut c: Vec<i32> = (0..64).collect();
-    bencher.iter(|| {
-        c.clear();
-        c.resize(64, 0);
-        karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &Global);
-        assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
-        assert_eq!(c[62], 31 * 31);
-    });
-}
-
-#[bench]
-fn bench_karatsuba_convolution(bencher: &mut test::Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let a: Vec<i32> = (0..32).collect();
-    let b: Vec<i32> = (0..32).collect();
-    let mut c: Vec<i32> = (0..64).collect();
-    bencher.iter(|| {
-        c.clear();
-        c.resize(64, 0);
-        karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &Global);
-        assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
-        assert_eq!(c[62], 31 * 31);
-    });
-}
-
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
@@ -714,5 +681,42 @@ pub mod generic_tests {
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use test;
+
+    use super::*;
+
+    #[bench]
+    fn bench_schoolbook_convolution(bencher: &mut test::Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let a: Vec<i32> = (0..32).collect();
+        let b: Vec<i32> = (0..32).collect();
+        let mut c: Vec<i32> = (0..64).collect();
+        bencher.iter(|| {
+            c.clear();
+            c.resize(64, 0);
+            karatsuba(10, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &Global);
+            assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
+            assert_eq!(c[62], 31 * 31);
+        });
+    }
+
+    #[bench]
+    fn bench_karatsuba_convolution(bencher: &mut test::Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let a: Vec<i32> = (0..32).collect();
+        let b: Vec<i32> = (0..32).collect();
+        let mut c: Vec<i32> = (0..64).collect();
+        bencher.iter(|| {
+            c.clear();
+            c.resize(64, 0);
+            karatsuba(4, &mut c[..], &a[..], &b[..], StaticRing::<i32>::RING, &Global);
+            assert_eq!(c[31], 31 * 31 * 32 / 2 - 31 * (31 + 1) * (31 * 2 + 1) / 6);
+            assert_eq!(c[62], 31 * 31);
+        });
     }
 }

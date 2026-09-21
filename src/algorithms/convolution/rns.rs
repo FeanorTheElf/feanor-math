@@ -683,97 +683,100 @@ where
 }
 
 #[cfg(test)]
-use crate::algorithms::convolution::KaratsubaAlgorithm;
+mod tests {
+    use super::*;
+    use crate::algorithms::convolution::KaratsubaAlgorithm;
 
-#[test]
-fn test_convolution_integer() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new();
+    #[test]
+    fn test_convolution_integer() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = StaticRing::<i128>::RING;
+        let convolution = RNSConvolution::new();
 
-    super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
-}
+        super::super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
+    }
 
-#[test]
-fn test_convolution_zn() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new((1 << 57) + 1);
-    let convolution = RNSConvolutionZn::from(RNSConvolution::new());
+    #[test]
+    fn test_convolution_zn() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new((1 << 57) + 1);
+        let convolution = RNSConvolutionZn::from(RNSConvolution::new());
 
-    super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
-}
+        super::super::generic_tests::test_convolution(&convolution, &ring, ring.int_hom().map(1 << 30));
+    }
 
-#[test]
-fn test_convolution_sum() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = StaticRing::<i128>::RING;
-    let convolution = RNSConvolution::new();
+    #[test]
+    fn test_convolution_sum() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = StaticRing::<i128>::RING;
+        let convolution = RNSConvolution::new();
 
-    let data = (0..40usize)
-        .map(|i| {
-            (
-                (0..(5 + i % 5)).map(|x| (1 << i) * (x as i128 - 2)).collect::<Vec<_>>(),
-                (0..(13 - i % 7))
-                    .map(|x| (1 << i) * (x as i128 + 1))
-                    .collect::<Vec<_>>(),
-            )
-        })
-        .collect::<Vec<_>>();
-    let mut expected = (0..22).map(|_| 0).collect::<Vec<_>>();
-    KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution_sum(
-        &data
-            .iter()
-            .map(|(l, r)| (&l[..], None, &r[..], None))
-            .collect::<Vec<_>>(),
-        &mut expected,
-        ring.get_ring(),
-    );
-
-    let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
-    convolution.compute_convolution_sum(
-        &data
-            .iter()
-            .map(|(l, r)| (&l[..], None, &r[..], None))
-            .collect::<Vec<_>>(),
-        &mut actual,
-        ring.get_ring(),
-    );
-    assert_eq!(&expected[..21], actual);
-
-    let data_prep = data
-        .iter()
-        .map(|(l, r)| {
-            let l_prep = convolution.prepare_convolution_operand(&l, Some(21), ring.get_ring());
-            let r_prep = convolution.prepare_convolution_operand(&r, Some(21), ring.get_ring());
-            (&l[..], l_prep, &r[..], r_prep)
-        })
-        .collect::<Vec<_>>();
-    let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
-    convolution.compute_convolution_sum(
-        &data_prep
-            .iter()
-            .map(|(l, l_prep, r, r_prep)| (*l, Some(l_prep), *r, Some(r_prep)))
-            .collect::<Vec<_>>(),
-        &mut actual,
-        ring.get_ring(),
-    );
-    assert_eq!(&expected[..21], actual);
-
-    let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
-    convolution.compute_convolution_sum(
-        &data_prep
-            .iter()
-            .enumerate()
-            .map(|(i, (l, l_prep, r, r_prep))| match i % 4 {
-                0 => (*l, Some(l_prep), *r, Some(r_prep)),
-                1 => (*l, None, *r, Some(r_prep)),
-                2 => (*l, Some(l_prep), *r, None),
-                3 => (*l, None, *r, None),
-                _ => unreachable!(),
+        let data = (0..40usize)
+            .map(|i| {
+                (
+                    (0..(5 + i % 5)).map(|x| (1 << i) * (x as i128 - 2)).collect::<Vec<_>>(),
+                    (0..(13 - i % 7))
+                        .map(|x| (1 << i) * (x as i128 + 1))
+                        .collect::<Vec<_>>(),
+                )
             })
-            .collect::<Vec<_>>(),
-        &mut actual,
-        ring.get_ring(),
-    );
-    assert_eq!(&expected[..21], actual);
+            .collect::<Vec<_>>();
+        let mut expected = (0..22).map(|_| 0).collect::<Vec<_>>();
+        KaratsubaAlgorithm::new_with_alloc(4, Global).compute_convolution_sum(
+            &data
+                .iter()
+                .map(|(l, r)| (&l[..], None, &r[..], None))
+                .collect::<Vec<_>>(),
+            &mut expected,
+            ring.get_ring(),
+        );
+
+        let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
+        convolution.compute_convolution_sum(
+            &data
+                .iter()
+                .map(|(l, r)| (&l[..], None, &r[..], None))
+                .collect::<Vec<_>>(),
+            &mut actual,
+            ring.get_ring(),
+        );
+        assert_eq!(&expected[..21], actual);
+
+        let data_prep = data
+            .iter()
+            .map(|(l, r)| {
+                let l_prep = convolution.prepare_convolution_operand(&l, Some(21), ring.get_ring());
+                let r_prep = convolution.prepare_convolution_operand(&r, Some(21), ring.get_ring());
+                (&l[..], l_prep, &r[..], r_prep)
+            })
+            .collect::<Vec<_>>();
+        let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
+        convolution.compute_convolution_sum(
+            &data_prep
+                .iter()
+                .map(|(l, l_prep, r, r_prep)| (*l, Some(l_prep), *r, Some(r_prep)))
+                .collect::<Vec<_>>(),
+            &mut actual,
+            ring.get_ring(),
+        );
+        assert_eq!(&expected[..21], actual);
+
+        let mut actual = (0..21).map(|_| 0).collect::<Vec<_>>();
+        convolution.compute_convolution_sum(
+            &data_prep
+                .iter()
+                .enumerate()
+                .map(|(i, (l, l_prep, r, r_prep))| match i % 4 {
+                    0 => (*l, Some(l_prep), *r, Some(r_prep)),
+                    1 => (*l, None, *r, Some(r_prep)),
+                    2 => (*l, Some(l_prep), *r, None),
+                    3 => (*l, None, *r, None),
+                    _ => unreachable!(),
+                })
+                .collect::<Vec<_>>(),
+            &mut actual,
+            ring.get_ring(),
+        );
+        assert_eq!(&expected[..21], actual);
+    }
 }

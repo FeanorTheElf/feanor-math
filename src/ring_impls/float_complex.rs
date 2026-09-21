@@ -279,30 +279,35 @@ where
     }
 }
 
-#[test]
-fn test_pow() {
-    feanor_tracing::DelayedLogger::init_test();
-    let CC = Complex64::RING;
-    let i = Complex64::I;
-    assert!(CC.is_approx_eq(CC.neg(i), CC.pow(i, 3), 1));
-    assert!(!CC.is_approx_eq(CC.neg(i), CC.pow(i, 1024 + 3), 1));
-    assert!(CC.is_approx_eq(CC.neg(i), CC.pow(i, 1024 + 3), 100));
-    assert!(CC.is_approx_eq(
-        CC.exp(CC.mul(CC.from_f64(PI / 4.0), i)),
-        CC.mul(CC.add(CC.one(), i), CC.from_f64(2.0f64.powf(-0.5))),
-        1
-    ));
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2.0 * PI / 7.0)));
-    assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
-}
+    #[test]
+    fn test_pow() {
+        feanor_tracing::DelayedLogger::init_test();
+        let CC = Complex64::RING;
+        let i = Complex64::I;
+        assert!(CC.is_approx_eq(CC.neg(i), CC.pow(i, 3), 1));
+        assert!(!CC.is_approx_eq(CC.neg(i), CC.pow(i, 1024 + 3), 1));
+        assert!(CC.is_approx_eq(CC.neg(i), CC.pow(i, 1024 + 3), 100));
+        assert!(CC.is_approx_eq(
+            CC.exp(CC.mul(CC.from_f64(PI / 4.0), i)),
+            CC.mul(CC.add(CC.one(), i), CC.from_f64(2.0f64.powf(-0.5))),
+            1
+        ));
 
-#[test]
-fn test_mul() {
-    feanor_tracing::DelayedLogger::init_test();
-    let CC = Complex64::RING;
-    let i = Complex64::I;
-    assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.0), 1));
-    assert!(CC.is_approx_eq(CC.mul(i, CC.neg(i)), CC.from_f64(1.0), 1));
-    assert!(CC.is_approx_eq(CC.mul(CC.add(i, CC.one()), i), CC.sub(i, CC.one()), 1));
+        let seventh_root_of_unity = CC.exp(CC.mul(i, CC.from_f64(2.0 * PI / 7.0)));
+        assert!(CC.is_approx_eq(CC.pow(seventh_root_of_unity, 7 * 100 + 1), seventh_root_of_unity, 1000));
+    }
+
+    #[test]
+    fn test_mul() {
+        feanor_tracing::DelayedLogger::init_test();
+        let CC = Complex64::RING;
+        let i = Complex64::I;
+        assert!(CC.is_approx_eq(CC.mul(i, i), CC.from_f64(-1.0), 1));
+        assert!(CC.is_approx_eq(CC.mul(i, CC.neg(i)), CC.from_f64(1.0), 1));
+        assert!(CC.is_approx_eq(CC.mul(CC.add(i, CC.one()), i), CC.sub(i, CC.one()), 1));
+    }
 }

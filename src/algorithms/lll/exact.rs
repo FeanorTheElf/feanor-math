@@ -446,416 +446,254 @@ pub fn lll<S, I, H, V, T>(
     );
 }
 
-#[cfg(test)]
-use test::Bencher;
 use tracing::instrument;
 
 #[cfg(test)]
-use crate::algorithms::lll::{assert_rational_lattice_isomorphic, norm_squared};
-#[cfg(test)]
-use crate::assert_matrix_eq;
-#[cfg(test)]
-use crate::ring_impls::primitive_int::StaticRing;
+mod tests {
+    use test::Bencher;
 
-#[cfg(test)]
-macro_rules! matrix {
-    (# $hom:expr; $num:literal) => {
-        ($hom).map($num)
-    };
-    (# $hom:expr; $num:literal, $den:literal) => {
-        ($hom).codomain().div(&($hom).map($num), &($hom).map($den))
-    };
-    ($hom:expr, $([$($num:literal $(/ $den:literal)?),*]),*) => {
-        {
-            let ZZ_to_ring = $hom;
-            [
-                $([$(
-                    matrix!(# ZZ_to_ring; $num $(, $den)?)
-                ),*]),*
-            ]
-        }
-    };
-    ($hom:expr, $(vec[$($num:literal $(/ $den:literal)?),*]),*) => {
-        {
-            let ZZ_to_ring = $hom;
-            [
-                $(vec![$(
-                    matrix!(# ZZ_to_ring; $num $(, $den)?)
-                ),*]),*
-            ]
-        }
-    };
-}
+    use super::*;
+    use crate::algorithms::lll::tests::{assert_rational_lattice_isomorphic, norm_squared};
+    use crate::assert_matrix_eq;
+    use crate::ring_impls::primitive_int::StaticRing;
 
-#[test]
-fn test_ldl() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZi64;
-    let QQ = RationalField::new(ZZ);
-    let mut data = matrix!(
-        QQ.inclusion(),
-        vec[1, 2, 1],
-        vec[2, 5, 0],
-        vec[1, 0, 7]
-    );
-    let mut matrix = SubmatrixMut::from_2d(&mut data);
-    let mut expected = matrix!(QQ.inclusion(), [1, 2, 1], [0, 1, -2], [0, 0, 2]);
-    ldl(QQ, matrix.reborrow()).unwrap();
+    macro_rules! matrix {
+        (# $hom:expr; $num:literal) => {
+            ($hom).map($num)
+        };
+        (# $hom:expr; $num:literal, $den:literal) => {
+            ($hom).codomain().div(&($hom).map($num), &($hom).map($den))
+        };
+        ($hom:expr, $([$($num:literal $(/ $den:literal)?),*]),*) => {
+            {
+                let ZZ_to_ring = $hom;
+                [
+                    $([$(
+                        matrix!(# ZZ_to_ring; $num $(, $den)?)
+                    ),*]),*
+                ]
+            }
+        };
+        ($hom:expr, $(vec[$($num:literal $(/ $den:literal)?),*]),*) => {
+            {
+                let ZZ_to_ring = $hom;
+                [
+                    $(vec![$(
+                        matrix!(# ZZ_to_ring; $num $(, $den)?)
+                    ),*]),*
+                ]
+            }
+        };
+    }
 
-    // only the upper triangle is filled
-    expected[1][0] = *matrix.at(1, 0);
-    expected[2][0] = *matrix.at(2, 0);
-    expected[2][1] = *matrix.at(2, 1);
+    #[test]
+    fn test_ldl() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZi64;
+        let QQ = RationalField::new(ZZ);
+        let mut data = matrix!(
+            QQ.inclusion(),
+            vec[1, 2, 1],
+            vec[2, 5, 0],
+            vec[1, 0, 7]
+        );
+        let mut matrix = SubmatrixMut::from_2d(&mut data);
+        let mut expected = matrix!(QQ.inclusion(), [1, 2, 1], [0, 1, -2], [0, 0, 2]);
+        ldl(QQ, matrix.reborrow()).unwrap();
 
-    assert_matrix_eq!(&QQ, &expected, &matrix);
-}
+        // only the upper triangle is filled
+        expected[1][0] = *matrix.at(1, 0);
+        expected[2][0] = *matrix.at(2, 0);
+        expected[2][1] = *matrix.at(2, 1);
 
-#[test]
-fn test_swap_gso_cols() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZi64;
-    let QQ = RationalField::new(ZZ);
-    let mut matrix = matrix!(
-        QQ.inclusion(),
-        vec[2, 1 / 2, 2 / 5],
-        vec[0, 3 / 2, 1 / 4],
-        vec[0, 0, 1]
-    );
-    let expected = matrix!(QQ.inclusion(), [2, 1 / 2, 31 / 80], [0, 3 / 2, 11 / 40], [0, 0, 1]);
-    let matrix_view = SubmatrixMut::from_2d(&mut matrix);
+        assert_matrix_eq!(&QQ, &expected, &matrix);
+    }
 
-    swap_gso_cols(&QQ, matrix_view, 0, 1);
+    #[test]
+    fn test_swap_gso_cols() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZi64;
+        let QQ = RationalField::new(ZZ);
+        let mut matrix = matrix!(
+            QQ.inclusion(),
+            vec[2, 1 / 2, 2 / 5],
+            vec[0, 3 / 2, 1 / 4],
+            vec[0, 0, 1]
+        );
+        let expected = matrix!(QQ.inclusion(), [2, 1 / 2, 31 / 80], [0, 3 / 2, 11 / 40], [0, 0, 1]);
+        let matrix_view = SubmatrixMut::from_2d(&mut matrix);
 
-    assert_matrix_eq!(&QQ, &expected, &matrix);
-}
+        swap_gso_cols(&QQ, matrix_view, 0, 1);
 
-#[test]
-fn test_lll_2d() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZi64;
-    let QQ = RationalField::new(ZZ);
-    let original = matrix!(QQ.inclusion(), vec[5, 9], vec[11, 20]);
-    let mut reduced = original.clone();
-    let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
-    lll(
-        reduced_matrix.reborrow(),
-        QQ.identity(),
-        &QQ.from_fraction(9, 10),
-        true,
-        &mut (),
-    );
+        assert_matrix_eq!(&QQ, &expected, &matrix);
+    }
 
-    assert_rational_lattice_isomorphic(
-        QQ,
-        RationalField::new(ZZbig),
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
-    );
+    #[test]
+    fn test_lll_2d() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZi64;
+        let QQ = RationalField::new(ZZ);
+        let original = matrix!(QQ.inclusion(), vec[5, 9], vec[11, 20]);
+        let mut reduced = original.clone();
+        let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
+        lll(
+            reduced_matrix.reborrow(),
+            QQ.identity(),
+            &QQ.from_fraction(9, 10),
+            true,
+            &mut (),
+        );
 
-    let original = matrix!(QQ.inclusion(), vec[10, 8], vec[27, 22]);
-    let mut reduced = original.clone();
-    let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
-    lll(
-        reduced_matrix.reborrow(),
-        QQ.identity(),
-        &QQ.from_fraction(9, 10),
-        true,
-        &mut (),
-    );
+        assert_rational_lattice_isomorphic(
+            QQ,
+            RationalField::new(ZZbig),
+            Submatrix::from_2d(&original),
+            reduced_matrix.as_const(),
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
+        );
 
-    assert_rational_lattice_isomorphic(
-        QQ,
-        RationalField::new(ZZbig),
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(4),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(5),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
-    );
-}
+        let original = matrix!(QQ.inclusion(), vec[10, 8], vec[27, 22]);
+        let mut reduced = original.clone();
+        let mut reduced_matrix = SubmatrixMut::<Vec<_>, _>::from_2d(&mut reduced);
+        lll(
+            reduced_matrix.reborrow(),
+            QQ.identity(),
+            &QQ.from_fraction(9, 10),
+            true,
+            &mut (),
+        );
 
-#[test]
-fn test_lll_3d() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i128>::RING;
-    let QQ = RationalField::new(ZZ);
-    // in this case, the shortest vector is shorter than half the second successive minimum,
-    // so LLL will find it (for delta = 0.9 > 0.75)
-    let original = matrix!(
-        QQ.inclusion(),
-        vec[72, 0, 0],
-        vec[0, 9, 0],
-        vec[8432, 7344, 16864]
-    );
+        assert_rational_lattice_isomorphic(
+            QQ,
+            RationalField::new(ZZbig),
+            Submatrix::from_2d(&original),
+            reduced_matrix.as_const(),
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(4),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(5),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
+        );
+    }
 
-    let mut reduced = original.clone();
-    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll(
-        reduced_matrix.reborrow(),
-        QQ.identity(),
-        &QQ.from_fraction(999, 1000),
-        true,
-        &mut (),
-    );
+    #[test]
+    fn test_lll_3d() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = StaticRing::<i128>::RING;
+        let QQ = RationalField::new(ZZ);
+        // in this case, the shortest vector is shorter than half the second successive minimum,
+        // so LLL will find it (for delta = 0.9 > 0.75)
+        let original = matrix!(
+            QQ.inclusion(),
+            vec[72, 0, 0],
+            vec[0, 9, 0],
+            vec[8432, 7344, 16864]
+        );
 
-    assert_rational_lattice_isomorphic(
-        QQ,
-        RationalField::new(ZZbig),
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(144 * 144),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(72 * 72 + 279 * 279),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(72 * 72 * 2 + 272 * 272),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(2))
-    );
-}
+        let mut reduced = original.clone();
+        let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+        lll(
+            reduced_matrix.reborrow(),
+            QQ.identity(),
+            &QQ.from_fraction(999, 1000),
+            true,
+            &mut (),
+        );
 
-#[test]
-fn test_lll_generating_set() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZi64;
-    let QQ = RationalField::new(ZZ);
+        assert_rational_lattice_isomorphic(
+            QQ,
+            RationalField::new(ZZbig),
+            Submatrix::from_2d(&original),
+            reduced_matrix.as_const(),
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(144 * 144),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(0))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(72 * 72 + 279 * 279),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(1))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(72 * 72 * 2 + 272 * 272),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(2))
+        );
+    }
 
-    let original = matrix!(
-        QQ.inclusion(),
-        vec[-6, -1, 6, 116, -2],
-        vec[-14, -12, 8, 232, -2],
-        vec[-10, 2, 12, 0, 2]
-    );
+    #[test]
+    fn test_lll_generating_set() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZi64;
+        let QQ = RationalField::new(ZZ);
 
-    let mut reduced = original.clone();
-    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll(
-        reduced_matrix.reborrow(),
-        QQ.identity(),
-        &QQ.from_fraction(999, 1000),
-        true,
-        &mut (),
-    );
+        let original = matrix!(
+            QQ.inclusion(),
+            vec[-6, -1, 6, 116, -2],
+            vec[-14, -12, 8, 232, -2],
+            vec[-10, 2, 12, 0, 2]
+        );
 
-    assert_rational_lattice_isomorphic(
-        QQ,
-        RationalField::new(ZZbig),
-        Submatrix::from_2d(&original),
-        reduced_matrix.as_const(),
-    );
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(1)));
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(5),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(2))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(5),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(3))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(12),
-        norm_squared(QQ, &reduced_matrix.as_const().col_at(4))
-    );
+        let mut reduced = original.clone();
+        let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+        lll(
+            reduced_matrix.reborrow(),
+            QQ.identity(),
+            &QQ.from_fraction(999, 1000),
+            true,
+            &mut (),
+        );
 
-    let ZZ = ZZbig;
-    let QQ = RationalField::new(ZZ);
-    let original = matrix!(
-        QQ.inclusion()
-            .compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
-            vec[-4, 8, -54, -1, 42, 15, -23, -259],
-            vec[-3, 10, -36, 18, -48, -473, -1200, -6493],
-            vec[5, -13, 62, -15, 17, 398, 1043, 5721],
-            vec[-8, 10, -68, 18, -18, -434, -1118, -6126],
-            vec[11, -5, 90, 26, -215, -910, -2227, -11637]
-    );
-    let mut reduced = original.clone();
-    let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
-    lll(
-        reduced_matrix.reborrow(),
-        QQ.identity(),
-        &QQ.from_fraction(
-            int_cast(999, ZZ, StaticRing::<i64>::RING),
-            int_cast(1000, ZZ, StaticRing::<i64>::RING),
-        ),
-        true,
-        &mut (),
-    );
+        assert_rational_lattice_isomorphic(
+            QQ,
+            RationalField::new(ZZbig),
+            Submatrix::from_2d(&original),
+            reduced_matrix.as_const(),
+        );
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(0)));
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(QQ, &reduced_matrix.as_const().col_at(1)));
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(5),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(2))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(5),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(3))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(12),
+            norm_squared(QQ, &reduced_matrix.as_const().col_at(4))
+        );
 
-    assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(3))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(4))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(5))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(5),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(6))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(40),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(7))
-    );
-
-    let original: [[i64; 8]; 5] = [
-        [
-            -60725263117,
-            -448122081513,
-            -218368759847,
-            2100701846793,
-            216156377534,
-            -3137996709827,
-            14835704835919,
-            67504381450573,
-        ],
-        [
-            -1310716961940,
-            -9682451257943,
-            -4729935920987,
-            45413204073392,
-            4667627712725,
-            -67791459966817,
-            320528485599331,
-            1458334256347773,
-        ],
-        [
-            1159398893231,
-            8564380015666,
-            4183444050825,
-            -40168532351902,
-            -4128711773154,
-            59963582382418,
-            -283516375460965,
-            -1289940218804617,
-        ],
-        [
-            -1236320093452,
-            -9132639612642,
-            -4461079566742,
-            42833893239948,
-            4402644221490,
-            -63942205977848,
-            302328006373120,
-            1375528654002990,
-        ],
-        [
-            -2344979577397,
-            -17323890604545,
-            -8464219959177,
-            81256383857324,
-            8351008895542,
-            -121291584595649,
-            573488494361461,
-            2609233431319737,
-        ],
-    ];
-    let original = OwnedMatrix::from_fn(5, 8, |i, j| QQ.coerce(&StaticRing::<i64>::RING, original[i][j]));
-    let mut reduced = original.clone();
-    let mut reduced_matrix = reduced.data_mut();
-    lll(
-        reduced_matrix.reborrow(),
-        QQ.identity(),
-        &QQ.from_fraction(
-            int_cast(999, ZZ, StaticRing::<i64>::RING),
-            int_cast(1000, ZZ, StaticRing::<i64>::RING),
-        ),
-        true,
-        &mut (),
-    );
-
-    assert_rational_lattice_isomorphic(&QQ, &QQ, original.data(), reduced_matrix.as_const());
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
-    assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(3))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(4))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(1),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(5))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(5),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(6))
-    );
-    assert_el_eq!(
-        QQ,
-        QQ.int_hom().map(40),
-        norm_squared(&QQ, &reduced_matrix.as_const().col_at(7))
-    );
-}
-
-#[bench]
-fn bench_lll_10d(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let QQ = RationalField::new(ZZ);
-
-    bencher.iter(|| {
+        let ZZ = ZZbig;
+        let QQ = RationalField::new(ZZ);
         let original = matrix!(
             QQ.inclusion()
                 .compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
-            vec[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec[0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
-            vec[0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
-            vec[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
-            vec[0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
-            vec[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
-            vec[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
-            vec[2, 2, 2, 2, 0, 0, 1, 4, 0, 0],
-            vec[4, 3, 3, 3, 1, 2, 1, 0, 5, 0],
-            vec[3433883, 14315221, 24549008, 6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+                vec[-4, 8, -54, -1, 42, 15, -23, -259],
+                vec[-3, 10, -36, 18, -48, -473, -1200, -6493],
+                vec[5, -13, 62, -15, 17, 398, 1043, 5721],
+                vec[-8, 10, -68, 18, -18, -434, -1118, -6126],
+                vec[11, -5, 90, 26, -215, -910, -2227, -11637]
         );
         let mut reduced = original.clone();
         let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
@@ -871,9 +709,171 @@ fn bench_lll_10d(bencher: &mut Bencher) {
         );
 
         assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
-        assert!(QQ.is_geq(
-            &QQ.int_hom().map(16 * 16),
-            &norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))
-        ));
-    });
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(3))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(4))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(5))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(5),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(6))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(40),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(7))
+        );
+
+        let original: [[i64; 8]; 5] = [
+            [
+                -60725263117,
+                -448122081513,
+                -218368759847,
+                2100701846793,
+                216156377534,
+                -3137996709827,
+                14835704835919,
+                67504381450573,
+            ],
+            [
+                -1310716961940,
+                -9682451257943,
+                -4729935920987,
+                45413204073392,
+                4667627712725,
+                -67791459966817,
+                320528485599331,
+                1458334256347773,
+            ],
+            [
+                1159398893231,
+                8564380015666,
+                4183444050825,
+                -40168532351902,
+                -4128711773154,
+                59963582382418,
+                -283516375460965,
+                -1289940218804617,
+            ],
+            [
+                -1236320093452,
+                -9132639612642,
+                -4461079566742,
+                42833893239948,
+                4402644221490,
+                -63942205977848,
+                302328006373120,
+                1375528654002990,
+            ],
+            [
+                -2344979577397,
+                -17323890604545,
+                -8464219959177,
+                81256383857324,
+                8351008895542,
+                -121291584595649,
+                573488494361461,
+                2609233431319737,
+            ],
+        ];
+        let original = OwnedMatrix::from_fn(5, 8, |i, j| QQ.coerce(&StaticRing::<i64>::RING, original[i][j]));
+        let mut reduced = original.clone();
+        let mut reduced_matrix = reduced.data_mut();
+        lll(
+            reduced_matrix.reborrow(),
+            QQ.identity(),
+            &QQ.from_fraction(
+                int_cast(999, ZZ, StaticRing::<i64>::RING),
+                int_cast(1000, ZZ, StaticRing::<i64>::RING),
+            ),
+            true,
+            &mut (),
+        );
+
+        assert_rational_lattice_isomorphic(&QQ, &QQ, original.data(), reduced_matrix.as_const());
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(0)));
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(1)));
+        assert_el_eq!(QQ, QQ.zero(), norm_squared(&QQ, &reduced_matrix.as_const().col_at(2)));
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(3))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(4))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(1),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(5))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(5),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(6))
+        );
+        assert_el_eq!(
+            QQ,
+            QQ.int_hom().map(40),
+            norm_squared(&QQ, &reduced_matrix.as_const().col_at(7))
+        );
+    }
+
+    #[bench]
+    fn bench_lll_10d(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let QQ = RationalField::new(ZZ);
+
+        bencher.iter(|| {
+            let original = matrix!(
+                QQ.inclusion()
+                    .compose(ZZ.can_hom::<StaticRing<i128>>(&StaticRing::<i128>::RING).unwrap()),
+                vec[1, 0, 0, 0, 0, 0, 0, 0, 0, 0],
+                vec[0, 1, 0, 0, 0, 0, 0, 0, 0, 0],
+                vec[0, 0, 1, 0, 0, 0, 0, 0, 0, 0],
+                vec[0, 0, 0, 1, 0, 0, 0, 0, 0, 0],
+                vec[0, 0, 0, 0, 1, 0, 0, 0, 0, 0],
+                vec[0, 0, 0, 0, 0, 1, 0, 0, 0, 0],
+                vec[0, 0, 0, 0, 0, 0, 1, 0, 0, 0],
+                vec[2, 2, 2, 2, 0, 0, 1, 4, 0, 0],
+                vec[4, 3, 3, 3, 1, 2, 1, 0, 5, 0],
+                vec[3433883, 14315221, 24549008, 6570781, 32725387, 33674813, 27390657, 15726308, 43003827, 43364304]
+            );
+            let mut reduced = original.clone();
+            let mut reduced_matrix = SubmatrixMut::from_2d(&mut reduced);
+            lll(
+                reduced_matrix.reborrow(),
+                QQ.identity(),
+                &QQ.from_fraction(
+                    int_cast(999, ZZ, StaticRing::<i64>::RING),
+                    int_cast(1000, ZZ, StaticRing::<i64>::RING),
+                ),
+                true,
+                &mut (),
+            );
+
+            assert_rational_lattice_isomorphic(&QQ, &QQ, Submatrix::from_2d(&original), reduced_matrix.as_const());
+            assert!(QQ.is_geq(
+                &QQ.int_hom().map(16 * 16),
+                &norm_squared(&QQ, &reduced_matrix.as_const().col_at(0))
+            ));
+        });
+    }
 }

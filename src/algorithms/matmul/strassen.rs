@@ -829,221 +829,223 @@ pub fn strassen<R, V1, V2, V3, A, const T1: bool, const T2: bool, const T3: bool
 }
 
 #[cfg(test)]
-use std::alloc::Global;
+mod tests {
+    use std::alloc::Global;
 
-#[cfg(test)]
-use crate::assert_matrix_eq;
+    use super::*;
+    use crate::assert_matrix_eq;
 
-#[test]
-fn test_dispatch_strassen_one_level() {
-    feanor_tracing::DelayedLogger::init_test();
-    {
-        let a = [vec![1, 2], vec![3, 4]];
-        let b = [vec![2, 1], vec![-1, -2]];
-        let mut result = [vec![i32::MIN, i32::MIN], vec![i32::MIN, i32::MIN]];
-        let expected = [vec![0, -3], vec![2, -5]];
-        let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
+    #[test]
+    fn test_dispatch_strassen_one_level() {
+        feanor_tracing::DelayedLogger::init_test();
+        {
+            let a = [vec![1, 2], vec![3, 4]];
+            let b = [vec![2, 1], vec![-1, -2]];
+            let mut result = [vec![i32::MIN, i32::MIN], vec![i32::MIN, i32::MIN]];
+            let expected = [vec![0, -3], vec![2, -5]];
+            let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
+
+            dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
+                1,
+                0,
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+                TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
+                StaticRing::<i32>::RING,
+                &mut memory,
+            );
+
+            assert_eq!(expected, result);
+            // ensure that all of memory was used, i.e. `strassen_mem_size()` is correct
+            assert!(memory.iter().all(|x| *x != i32::MIN));
+        }
+        {
+            let a = [vec![1, 0], vec![7, 2]];
+            let b = [vec![-3, -3], vec![3, 1]];
+            let mut result = [vec![i32::MIN, i32::MIN], vec![i32::MIN, i32::MIN]];
+            let expected = [vec![-3, -3], vec![-15, -19]];
+            let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
+
+            dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
+                1,
+                0,
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+                TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
+                StaticRing::<i32>::RING,
+                &mut memory,
+            );
+
+            assert_eq!(expected, result);
+            assert!(memory.iter().all(|x| *x != i32::MIN));
+        }
+    }
+
+    #[test]
+    fn test_dispatch_strassen_add_assign_one_level() {
+        feanor_tracing::DelayedLogger::init_test();
+        {
+            let a = [vec![1, 2], vec![3, 4]];
+            let b = [vec![2, 1], vec![-1, -2]];
+            let mut result = [vec![10, 20], vec![30, 40]];
+            let expected = [vec![10, 17], vec![32, 35]];
+            let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
+
+            dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
+                1,
+                0,
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+                TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
+                StaticRing::<i32>::RING,
+                &mut memory,
+            );
+
+            assert_eq!(expected, result);
+            // ensure that all of memory was used, i.e. `strassen_mem_size()` is correct
+            assert!(memory.iter().all(|x| *x != i32::MIN));
+        }
+        {
+            let a = [vec![1, 0], vec![7, 2]];
+            let b = [vec![-3, -3], vec![3, 1]];
+            let mut result = [vec![100, 100], vec![0, 0]];
+            let expected = [vec![97, 97], vec![-15, -19]];
+            let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
+
+            dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
+                1,
+                0,
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
+                TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
+                TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
+                StaticRing::<i32>::RING,
+                &mut memory,
+            );
+
+            assert_eq!(expected, result);
+            assert!(memory.iter().all(|x| *x != i32::MIN));
+        }
+    }
+
+    #[test]
+    fn test_dispatch_strassen_more_levels() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
+        let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
+        let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |_, _| i64::MIN, Global);
+        let mut memory = (0..strassen_mem_size(false, 4, 1))
+            .map(|_| i64::MIN)
+            .collect::<Vec<_>>();
 
         dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
+            4,
             1,
-            0,
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
-            StaticRing::<i32>::RING,
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(result.data_mut()),
+            ZZi64,
             &mut memory,
         );
 
-        assert_eq!(expected, result);
-        // ensure that all of memory was used, i.e. `strassen_mem_size()` is correct
-        assert!(memory.iter().all(|x| *x != i32::MIN));
-    }
-    {
-        let a = [vec![1, 0], vec![7, 2]];
-        let b = [vec![-3, -3], vec![3, 1]];
-        let mut result = [vec![i32::MIN, i32::MIN], vec![i32::MIN, i32::MIN]];
-        let expected = [vec![-3, -3], vec![-15, -19]];
-        let mut memory = [i32::MIN; strassen_mem_size(false, 1, 0)];
-
-        dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
-            1,
-            0,
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
-            StaticRing::<i32>::RING,
-            &mut memory,
+        let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, ZZi64);
+        schoolbook_matmul::<_, _, _, _, false, false, false, false>(
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(expected.data_mut()),
+            ZZi64,
         );
 
-        assert_eq!(expected, result);
-        assert!(memory.iter().all(|x| *x != i32::MIN));
+        assert_matrix_eq!(&ZZi64, &expected, &result);
+        assert!(memory.iter().all(|x| *x != i64::MIN));
     }
-}
 
-#[test]
-fn test_dispatch_strassen_add_assign_one_level() {
-    feanor_tracing::DelayedLogger::init_test();
-    {
-        let a = [vec![1, 2], vec![3, 4]];
-        let b = [vec![2, 1], vec![-1, -2]];
-        let mut result = [vec![10, 20], vec![30, 40]];
-        let expected = [vec![10, 17], vec![32, 35]];
-        let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
+    #[test]
+    fn test_dispatch_strassen_add_assign_more_levels() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
+        let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
+        let mut result: OwnedMatrix<i64> =
+            OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
+        let mut memory = (0..strassen_mem_size(true, 4, 1)).map(|_| i64::MIN).collect::<Vec<_>>();
 
         dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
+            4,
             1,
-            0,
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
-            StaticRing::<i32>::RING,
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(result.data_mut()),
+            ZZi64,
             &mut memory,
         );
 
-        assert_eq!(expected, result);
-        // ensure that all of memory was used, i.e. `strassen_mem_size()` is correct
-        assert!(memory.iter().all(|x| *x != i32::MIN));
-    }
-    {
-        let a = [vec![1, 0], vec![7, 2]];
-        let b = [vec![-3, -3], vec![3, 1]];
-        let mut result = [vec![100, 100], vec![0, 0]];
-        let expected = [vec![97, 97], vec![-15, -19]];
-        let mut memory = [i32::MIN; strassen_mem_size(true, 1, 0)];
-
-        dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
-            1,
-            0,
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&a)),
-            TransposableSubmatrix::from(Submatrix::<Vec<_>, _>::from_2d(&b)),
-            TransposableSubmatrixMut::from(SubmatrixMut::<Vec<_>, _>::from_2d(&mut result)),
-            StaticRing::<i32>::RING,
-            &mut memory,
+        let mut expected: OwnedMatrix<i64> =
+            OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
+        schoolbook_matmul::<_, _, _, _, true, false, false, false>(
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(expected.data_mut()),
+            ZZi64,
         );
 
-        assert_eq!(expected, result);
-        assert!(memory.iter().all(|x| *x != i32::MIN));
+        assert_matrix_eq!(&ZZi64, &expected, &result);
+        assert!(memory.iter().all(|x| *x != i64::MIN));
     }
-}
 
-#[test]
-fn test_dispatch_strassen_more_levels() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
-    let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
-    let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(16, 16, |_, _| i64::MIN, Global);
-    let mut memory = (0..strassen_mem_size(false, 4, 1))
-        .map(|_| i64::MIN)
-        .collect::<Vec<_>>();
+    #[test]
+    fn test_strassen_non_power_of_two() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
+        let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
+        let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |_, _| i64::MIN, Global);
 
-    dispatch_strassen_impl::<_, _, _, _, false, false, false, false>(
-        4,
-        1,
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(result.data_mut()),
-        ZZi64,
-        &mut memory,
-    );
+        strassen::<_, _, _, _, _, false, false, false>(
+            false,
+            2,
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(result.data_mut()),
+            ZZi64,
+            &Global,
+        );
 
-    let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(16, 16, ZZi64);
-    schoolbook_matmul::<_, _, _, _, false, false, false, false>(
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(expected.data_mut()),
-        ZZi64,
-    );
+        let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(15, 17, ZZi64);
+        schoolbook_matmul::<_, _, _, _, false, false, false, false>(
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(expected.data_mut()),
+            ZZi64,
+        );
 
-    assert_matrix_eq!(&ZZi64, &expected, &result);
-    assert!(memory.iter().all(|x| *x != i64::MIN));
-}
+        assert_matrix_eq!(&ZZi64, &expected, &result);
+    }
 
-#[test]
-fn test_dispatch_strassen_add_assign_more_levels() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = OwnedMatrix::from_fn_in(16, 16, |i, j| (i * j) as i64, Global);
-    let b = OwnedMatrix::from_fn_in(16, 16, |i, j| i as i64 - (j as i64) * (j as i64), Global);
-    let mut result: OwnedMatrix<i64> =
-        OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-    let mut memory = (0..strassen_mem_size(true, 4, 1)).map(|_| i64::MIN).collect::<Vec<_>>();
+    #[test]
+    fn test_strassen_non_power_of_two_add_assign() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
+        let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
+        let mut result: OwnedMatrix<i64> =
+            OwnedMatrix::from_fn_in(15, 17, |i, j| (i as i64) * (i as i64) + j as i64, Global);
 
-    dispatch_strassen_impl::<_, _, _, _, true, false, false, false>(
-        4,
-        1,
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(result.data_mut()),
-        ZZi64,
-        &mut memory,
-    );
+        strassen::<_, _, _, _, _, false, false, false>(
+            true,
+            2,
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(result.data_mut()),
+            ZZi64,
+            &Global,
+        );
 
-    let mut expected: OwnedMatrix<i64> =
-        OwnedMatrix::from_fn_in(16, 16, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-    schoolbook_matmul::<_, _, _, _, true, false, false, false>(
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(expected.data_mut()),
-        ZZi64,
-    );
+        let mut expected: OwnedMatrix<i64> =
+            OwnedMatrix::from_fn_in(15, 17, |i, j| (i as i64) * (i as i64) + j as i64, Global);
+        schoolbook_matmul::<_, _, _, _, true, false, false, false>(
+            TransposableSubmatrix::from(a.data()),
+            TransposableSubmatrix::from(b.data()),
+            TransposableSubmatrixMut::from(expected.data_mut()),
+            ZZi64,
+        );
 
-    assert_matrix_eq!(&ZZi64, &expected, &result);
-    assert!(memory.iter().all(|x| *x != i64::MIN));
-}
-
-#[test]
-fn test_strassen_non_power_of_two() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
-    let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
-    let mut result: OwnedMatrix<i64> = OwnedMatrix::from_fn_in(15, 17, |_, _| i64::MIN, Global);
-
-    strassen::<_, _, _, _, _, false, false, false>(
-        false,
-        2,
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(result.data_mut()),
-        ZZi64,
-        &Global,
-    );
-
-    let mut expected: OwnedMatrix<i64> = OwnedMatrix::zero(15, 17, ZZi64);
-    schoolbook_matmul::<_, _, _, _, false, false, false, false>(
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(expected.data_mut()),
-        ZZi64,
-    );
-
-    assert_matrix_eq!(&ZZi64, &expected, &result);
-}
-
-#[test]
-fn test_strassen_non_power_of_two_add_assign() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = OwnedMatrix::from_fn_in(15, 60, |i, j| (i * j) as i64, Global);
-    let b = OwnedMatrix::from_fn_in(60, 17, |i, j| i as i64 - (j as i64) * (j as i64), Global);
-    let mut result: OwnedMatrix<i64> =
-        OwnedMatrix::from_fn_in(15, 17, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-
-    strassen::<_, _, _, _, _, false, false, false>(
-        true,
-        2,
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(result.data_mut()),
-        ZZi64,
-        &Global,
-    );
-
-    let mut expected: OwnedMatrix<i64> =
-        OwnedMatrix::from_fn_in(15, 17, |i, j| (i as i64) * (i as i64) + j as i64, Global);
-    schoolbook_matmul::<_, _, _, _, true, false, false, false>(
-        TransposableSubmatrix::from(a.data()),
-        TransposableSubmatrix::from(b.data()),
-        TransposableSubmatrixMut::from(expected.data_mut()),
-        ZZi64,
-    );
-
-    assert_matrix_eq!(&ZZi64, &expected, &result);
+        assert_matrix_eq!(&ZZi64, &expected, &result);
+    }
 }

@@ -304,115 +304,119 @@ pub fn find_complex_conjugation<'a, K1, K2, K3>(
 }
 
 #[cfg(test)]
-use crate::algorithms::poly_factor::FactorPolyField;
+mod tests {
+    use super::*;
 
-#[test]
-fn test_compute_galois_closure() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(&ZZ, "X");
+    use crate::algorithms::poly_factor::FactorPolyField;
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2]);
-    let number_field = NumberField::new(&ZZX, &f);
-    let (number_field, conjugates) = compute_galois_closure(number_field).err().unwrap();
-    assert_el_eq!(&number_field, number_field.canonical_gen(), &conjugates[0]);
-    assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), &conjugates[1]);
+    #[test]
+    fn test_compute_galois_closure() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(&ZZ, "X");
 
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
-    let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(number_field).ok().unwrap();
-    let number_field = into_closure.domain();
-    assert_eq!(8, into_closure.codomain().rank());
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..8).map(|i| number_field.pow(number_field.canonical_gen(), i)));
-    let KX = DensePolyRing::new(into_closure.codomain(), "X");
-    let (factors, _) = <_ as FactorPolyField>::factor_poly(&KX, &number_field.generating_poly(&KX, KX.base_ring().inclusion()));
-    assert_eq!(4, factors.len());
-    
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) + 1]);
-    let number_field = NumberField::new(&ZZX, &f);
-    let into_closure = compute_galois_closure(number_field).ok().unwrap();
-    let number_field = into_closure.domain();
-    assert_eq!(6, into_closure.codomain().rank());
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..6).map(|i| number_field.pow(number_field.canonical_gen(), i)));
-    let KX = DensePolyRing::new(into_closure.codomain(), "X");
-    let (factors, _) = <_ as FactorPolyField>::factor_poly(&KX, &number_field.generating_poly(&KX, KX.base_ring().inclusion()));
-    assert_eq!(3, factors.len());
-}
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) - 2]);
+        let number_field = NumberField::new(&ZZX, &f);
+        let (number_field, conjugates) = compute_galois_closure(number_field).err().unwrap();
+        assert_el_eq!(&number_field, number_field.canonical_gen(), &conjugates[0]);
+        assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), &conjugates[1]);
 
-#[test]
-fn test_compute_galois_group() {
-    feanor_tracing::DelayedLogger::init_test();
-    // use tracing_subscriber::Layer;
-    // use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
-    // use tracing_subscriber::util::SubscriberInitExt;
-    // let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
-    // let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
-    //     !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::convolution::karatsuba", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
-    // ));
-    // tracing_subscriber::registry().with(filtered_chrome_layer).init();
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) - 2]);
+        let number_field = NumberField::new(&ZZX, &f);
+        let into_closure = compute_galois_closure(number_field).ok().unwrap();
+        let number_field = into_closure.domain();
+        assert_eq!(8, into_closure.codomain().rank());
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..8).map(|i| number_field.pow(number_field.canonical_gen(), i)));
+        let KX = DensePolyRing::new(into_closure.codomain(), "X");
+        let (factors, _) = <_ as FactorPolyField>::factor_poly(&KX, &number_field.generating_poly(&KX, KX.base_ring().inclusion()));
+        assert_eq!(4, factors.len());
 
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(&ZZ, "X");
-    
-    // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) - 6 * X + 7]);
-    // let number_field = NumberField::new(&ZZX, &f);
-    // let galois_group = compute_galois_group(&number_field).ok().unwrap();
-    // assert_eq!(3, galois_group.len());
-    // assert!(galois_group[0].is_identity());
-    // let g = &galois_group[1];
-    // assert_eq!(&g.clone().pow(2), &galois_group[2]);
-    // assert_eq!(&g.clone().pow(3), &galois_group[0]);
-
-    // the galois group in this case is C12
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(12) - X.pow_ref(11) + 3 * X.pow_ref(10) - 4 * X.pow_ref(9) + 9 * X.pow_ref(8) + 2 * X.pow_ref(7) + 12 * X.pow_ref(6) + X.pow_ref(5) + 25 * X.pow_ref(4) - 11 * X.pow_ref(3) + 5 * X.pow_ref(2) - 2 * X + 1]);
-    let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
-    assert_eq!(12, galois_group.len());
-    let g = galois_group.iter().filter(|g| !(*g).clone().pow(4).is_identity() && !(*g).clone().pow(6).is_identity()).next().unwrap();
-    assert!(g.clone().pow(12).is_identity());
-    for i in 0..12 {
-        assert!(galois_group.contains(&g.clone().pow(i)));
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) + 1]);
+        let number_field = NumberField::new(&ZZX, &f);
+        let into_closure = compute_galois_closure(number_field).ok().unwrap();
+        let number_field = into_closure.domain();
+        assert_eq!(6, into_closure.codomain().rank());
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(&into_closure, (0..6).map(|i| number_field.pow(number_field.canonical_gen(), i)));
+        let KX = DensePolyRing::new(into_closure.codomain(), "X");
+        let (factors, _) = <_ as FactorPolyField>::factor_poly(&KX, &number_field.generating_poly(&KX, KX.base_ring().inclusion()));
+        assert_eq!(3, factors.len());
     }
 
-    // // the galois group in this case is D5
-    // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(10) - 2 * X.pow_ref(8) - 9 * X.pow_ref(6) + 57 * X.pow_ref(4) - 69 * X.pow_ref(2) + 47]);
-    // let number_field = NumberField::new(&ZZX, &f);
-    // let galois_group = compute_galois_group(&number_field).ok().unwrap();
-    // assert_eq!(10, galois_group.len());
-    // let id = &galois_group[0];
-    // assert!(id.is_identity());
-    // let mut g1 = &galois_group[1];
-    // assert!(!g1.is_identity());
-    // let subgroup: Vec<_> = [id.clone()].into_iter().chain((1..).map(|i| g1.clone().pow(i)).take_while(|g| !g.is_identity())).collect();
-    // let mut g2 = galois_group.iter().filter(|g| !subgroup.contains(g)).next().unwrap();
-    // if g1.clone().pow(2).is_identity() {
-    //     std::mem::swap(&mut g1, &mut g2);
-    // }
-    // // now g1 has order 5 and g2 has order 2, and together they generate the Dihedral group D5
-    // assert!(!g1.is_identity());
-    // assert!(!g2.is_identity());
-    // assert!(g1.clone().pow(5).is_identity());
-    // assert!(g2.clone().pow(2).is_identity());
-    // assert_eq!(g2.clone().compose_gal(&g1).compose_gal(&g2), g1.clone().invert());
-}
+    #[test]
+    fn test_compute_galois_group() {
+        feanor_tracing::DelayedLogger::init_test();
+        // use tracing_subscriber::Layer;
+        // use tracing_subscriber::prelude::__tracing_subscriber_SubscriberExt;
+        // use tracing_subscriber::util::SubscriberInitExt;
+        // let (chrome_layer, _guard) = tracing_chrome::ChromeLayerBuilder::new().build();
+        // let filtered_chrome_layer = chrome_layer.with_filter(tracing_subscriber::filter::filter_fn(|metadata| 
+        //     !["feanor_math::algorithms::bigint_ops", "feanor_math::algorithms::convolution::karatsuba", "feanor_math::algorithms::eea", "feanor_math::algorithms::sqr_mul"].contains(&metadata.target())
+        // ));
+        // tracing_subscriber::registry().with(filtered_chrome_layer).init();
 
-#[test]
-fn test_complex_conjugation() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ZZX = DensePolyRing::new(&ZZ, "X");
-    
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
-    let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
-    let complex_embedding = number_field.choose_complex_embedding();
-    let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
-    assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), conjugation.map(number_field.canonical_gen()));
-    
-    let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
-    let number_field = NumberField::new(&ZZX, &f);
-    let galois_group = compute_galois_group(&number_field).ok().unwrap();
-    let complex_embedding = number_field.choose_complex_embedding();
-    let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
-    assert_el_eq!(&number_field, number_field.invert(&number_field.canonical_gen()).unwrap(), conjugation.map(number_field.canonical_gen()));
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(&ZZ, "X");
+
+        // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(3) - X.pow_ref(2) - 6 * X + 7]);
+        // let number_field = NumberField::new(&ZZX, &f);
+        // let galois_group = compute_galois_group(&number_field).ok().unwrap();
+        // assert_eq!(3, galois_group.len());
+        // assert!(galois_group[0].is_identity());
+        // let g = &galois_group[1];
+        // assert_eq!(&g.clone().pow(2), &galois_group[2]);
+        // assert_eq!(&g.clone().pow(3), &galois_group[0]);
+
+        // the galois group in this case is C12
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(12) - X.pow_ref(11) + 3 * X.pow_ref(10) - 4 * X.pow_ref(9) + 9 * X.pow_ref(8) + 2 * X.pow_ref(7) + 12 * X.pow_ref(6) + X.pow_ref(5) + 25 * X.pow_ref(4) - 11 * X.pow_ref(3) + 5 * X.pow_ref(2) - 2 * X + 1]);
+        let number_field = NumberField::new(&ZZX, &f);
+        let galois_group = compute_galois_group(&number_field).ok().unwrap();
+        assert_eq!(12, galois_group.len());
+        let g = galois_group.iter().filter(|g| !(*g).clone().pow(4).is_identity() && !(*g).clone().pow(6).is_identity()).next().unwrap();
+        assert!(g.clone().pow(12).is_identity());
+        for i in 0..12 {
+            assert!(galois_group.contains(&g.clone().pow(i)));
+        }
+
+        // // the galois group in this case is D5
+        // let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(10) - 2 * X.pow_ref(8) - 9 * X.pow_ref(6) + 57 * X.pow_ref(4) - 69 * X.pow_ref(2) + 47]);
+        // let number_field = NumberField::new(&ZZX, &f);
+        // let galois_group = compute_galois_group(&number_field).ok().unwrap();
+        // assert_eq!(10, galois_group.len());
+        // let id = &galois_group[0];
+        // assert!(id.is_identity());
+        // let mut g1 = &galois_group[1];
+        // assert!(!g1.is_identity());
+        // let subgroup: Vec<_> = [id.clone()].into_iter().chain((1..).map(|i| g1.clone().pow(i)).take_while(|g| !g.is_identity())).collect();
+        // let mut g2 = galois_group.iter().filter(|g| !subgroup.contains(g)).next().unwrap();
+        // if g1.clone().pow(2).is_identity() {
+        //     std::mem::swap(&mut g1, &mut g2);
+        // }
+        // // now g1 has order 5 and g2 has order 2, and together they generate the Dihedral group D5
+        // assert!(!g1.is_identity());
+        // assert!(!g2.is_identity());
+        // assert!(g1.clone().pow(5).is_identity());
+        // assert!(g2.clone().pow(2).is_identity());
+        // assert_eq!(g2.clone().compose_gal(&g1).compose_gal(&g2), g1.clone().invert());
+    }
+
+    #[test]
+    fn test_complex_conjugation() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ZZX = DensePolyRing::new(&ZZ, "X");
+
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 1]);
+        let number_field = NumberField::new(&ZZX, &f);
+        let galois_group = compute_galois_group(&number_field).ok().unwrap();
+        let complex_embedding = number_field.choose_complex_embedding();
+        let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
+        assert_el_eq!(&number_field, number_field.negate(number_field.canonical_gen()), conjugation.map(number_field.canonical_gen()));
+
+        let [f] = ZZX.with_wrapped_indeterminate(|X| [X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]);
+        let number_field = NumberField::new(&ZZX, &f);
+        let galois_group = compute_galois_group(&number_field).ok().unwrap();
+        let complex_embedding = number_field.choose_complex_embedding();
+        let conjugation = find_complex_conjugation(&number_field, &complex_embedding, &galois_group);
+        assert_el_eq!(&number_field, number_field.invert(&number_field.canonical_gen()).unwrap(), conjugation.map(number_field.canonical_gen()));
+    }
 }

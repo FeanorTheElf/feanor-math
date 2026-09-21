@@ -414,32 +414,6 @@ where
     }
 }
 
-#[test]
-fn test_choose_zn_impl() {
-    feanor_tracing::DelayedLogger::init_test();
-    let int_value = 4;
-    // work in Z/17Z without explicitly choosing an implementation
-    struct DoStuff {
-        int_value: i64,
-    }
-    impl ZnOperation for DoStuff {
-        type Output<'a>
-            = ()
-        where
-            Self: 'a;
-
-        fn call<'a, R>(self, Zn: R)
-        where
-            R: 'a + RingStore,
-            R::Ring: ZnRing,
-        {
-            let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &ZZi64));
-            assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));
-        }
-    }
-    choose_zn_impl(ZZi64, 17, DoStuff { int_value });
-}
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ReductionMapRequirements {
     SmallestLift,
@@ -658,46 +632,77 @@ pub mod generic_tests {
     }
 }
 
-#[test]
-fn test_reduction_map_large_value() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring1 = zn_64b::Zn64B::new(1 << 42);
-    let ring2 = zn_big::ZnGB::new(ZZbig, ZZbig.power_of_two(666));
-    let reduce = ZnReductionMap::new(&ring2, ring1).unwrap();
-    assert_el_eq!(ring1, ring1.zero(), reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
-}
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-#[test]
-fn test_reduction_map() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring1 = zn_64b::Zn64B::new(257);
-    let ring2 = zn_big::ZnGB::new(StaticRing::<i128>::RING, 257 * 7);
+    #[test]
+    fn test_choose_zn_impl() {
+        feanor_tracing::DelayedLogger::init_test();
+        let int_value = 4;
+        // work in Z/17Z without explicitly choosing an implementation
+        struct DoStuff {
+            int_value: i64,
+        }
+        impl ZnOperation for DoStuff {
+            type Output<'a>
+                = ()
+            where
+                Self: 'a;
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(
-        ZnReductionMap::new(&ring2, &ring1).unwrap(),
-        (0..(257 * 7)).step_by(32).map(|x| ring2.int_hom().map(x)),
-    );
+            fn call<'a, R>(self, Zn: R)
+            where
+                R: 'a + RingStore,
+                R::Ring: ZnRing,
+            {
+                let value = Zn.coerce(Zn.integer_ring(), int_cast(self.int_value, Zn.integer_ring(), &ZZi64));
+                assert_el_eq!(Zn, Zn.int_hom().map(-1), Zn.mul_ref(&value, &value));
+            }
+        }
+        choose_zn_impl(ZZi64, 17, DoStuff { int_value });
+    }
 
-    let ring1 = zn_big::ZnGB::new(StaticRing::<i16>::RING, 3);
-    let ring2 = zn_big::ZnGB::new(ZZbig, ZZbig.int_hom().map(65537 * 3));
+    #[test]
+    fn test_reduction_map_large_value() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring1 = zn_64b::Zn64B::new(1 << 42);
+        let ring2 = zn_big::ZnGB::new(ZZbig, ZZbig.power_of_two(666));
+        let reduce = ZnReductionMap::new(&ring2, ring1).unwrap();
+        assert_el_eq!(ring1, ring1.zero(), reduce.map(ring2.pow(ring2.int_hom().map(2), 665)));
+    }
 
-    crate::homomorphism::generic_tests::test_homomorphism_axioms(
-        ZnReductionMap::new(&ring2, &ring1).unwrap(),
-        (0..(65537 * 3)).step_by(4096).map(|x| ring2.int_hom().map(x)),
-    );
-}
+    #[test]
+    fn test_reduction_map() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring1 = zn_64b::Zn64B::new(257);
+        let ring2 = zn_big::ZnGB::new(StaticRing::<i128>::RING, 257 * 7);
 
-#[test]
-fn test_generic_impl_checked_div_min() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(5 * 7 * 11 * 13);
-    let actual = ring.annihilator(&ring.int_hom().map(1001));
-    let expected = ring.int_hom().map(5);
-    assert!(ring.checked_div(&expected, &actual).is_some());
-    assert!(ring.checked_div(&actual, &expected).is_some());
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(
+            ZnReductionMap::new(&ring2, &ring1).unwrap(),
+            (0..(257 * 7)).step_by(32).map(|x| ring2.int_hom().map(x)),
+        );
 
-    let actual = ring.annihilator(&ring.zero());
-    let expected = ring.one();
-    assert!(ring.checked_div(&expected, &actual).is_some());
-    assert!(ring.checked_div(&actual, &expected).is_some());
+        let ring1 = zn_big::ZnGB::new(StaticRing::<i16>::RING, 3);
+        let ring2 = zn_big::ZnGB::new(ZZbig, ZZbig.int_hom().map(65537 * 3));
+
+        crate::homomorphism::generic_tests::test_homomorphism_axioms(
+            ZnReductionMap::new(&ring2, &ring1).unwrap(),
+            (0..(65537 * 3)).step_by(4096).map(|x| ring2.int_hom().map(x)),
+        );
+    }
+
+    #[test]
+    fn test_generic_impl_checked_div_min() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(5 * 7 * 11 * 13);
+        let actual = ring.annihilator(&ring.int_hom().map(1001));
+        let expected = ring.int_hom().map(5);
+        assert!(ring.checked_div(&expected, &actual).is_some());
+        assert!(ring.checked_div(&actual, &expected).is_some());
+
+        let actual = ring.annihilator(&ring.zero());
+        let expected = ring.one();
+        assert!(ring.checked_div(&expected, &actual).is_some());
+        assert!(ring.checked_div(&actual, &expected).is_some());
+    }
 }

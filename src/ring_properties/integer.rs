@@ -602,9 +602,6 @@ where
     })
 }
 
-#[cfg(test)]
-use generic_impls::map_from_integer_ring;
-
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
@@ -742,139 +739,146 @@ pub mod generic_tests {
     }
 }
 
-#[test]
-fn test_int_div_assumption() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(-1, -10 / 8);
-    assert_eq!(-1, 10 / -8);
-    assert_eq!(1, 10 / 8);
-    assert_eq!(1, -10 / -8);
-}
+#[cfg(test)]
+mod tests {
+    use generic_impls::map_from_integer_ring;
 
-#[test]
-fn test_rounded_div() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i32>::RING;
-    assert_el_eq!(ZZ, 3, ZZ.rounded_div(20, &7));
-    assert_el_eq!(ZZ, -3, ZZ.rounded_div(-20, &7));
-    assert_el_eq!(ZZ, -3, ZZ.rounded_div(20, &-7));
-    assert_el_eq!(ZZ, 3, ZZ.rounded_div(-20, &-7));
-    assert_el_eq!(ZZ, 3, ZZ.rounded_div(22, &7));
-    assert_el_eq!(ZZ, -3, ZZ.rounded_div(-22, &7));
-    assert_el_eq!(ZZ, -3, ZZ.rounded_div(22, &-7));
-    assert_el_eq!(ZZ, 3, ZZ.rounded_div(-22, &-7));
-}
+    use super::*;
 
-#[test]
-fn test_binomial() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i32>::RING;
-    assert_eq!(0, binomial(ZZ, -4, &-1));
-    assert_eq!(1, binomial(ZZ, -4, &0));
-    assert_eq!(-4, binomial(ZZ, -4, &1));
-    assert_eq!(10, binomial(ZZ, -4, &2));
-    assert_eq!(-20, binomial(ZZ, -4, &3));
-    assert_eq!(35, binomial(ZZ, -4, &4));
-    assert_eq!(-56, binomial(ZZ, -4, &5));
+    #[test]
+    fn test_int_div_assumption() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(-1, -10 / 8);
+        assert_eq!(-1, 10 / -8);
+        assert_eq!(1, 10 / 8);
+        assert_eq!(1, -10 / -8);
+    }
 
-    assert_eq!(0, binomial(ZZ, 3, &-1));
-    assert_eq!(1, binomial(ZZ, 3, &0));
-    assert_eq!(3, binomial(ZZ, 3, &1));
-    assert_eq!(3, binomial(ZZ, 3, &2));
-    assert_eq!(1, binomial(ZZ, 3, &3));
-    assert_eq!(0, binomial(ZZ, 3, &4));
+    #[test]
+    fn test_rounded_div() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = StaticRing::<i32>::RING;
+        assert_el_eq!(ZZ, 3, ZZ.rounded_div(20, &7));
+        assert_el_eq!(ZZ, -3, ZZ.rounded_div(-20, &7));
+        assert_el_eq!(ZZ, -3, ZZ.rounded_div(20, &-7));
+        assert_el_eq!(ZZ, 3, ZZ.rounded_div(-20, &-7));
+        assert_el_eq!(ZZ, 3, ZZ.rounded_div(22, &7));
+        assert_el_eq!(ZZ, -3, ZZ.rounded_div(-22, &7));
+        assert_el_eq!(ZZ, -3, ZZ.rounded_div(22, &-7));
+        assert_el_eq!(ZZ, 3, ZZ.rounded_div(-22, &-7));
+    }
 
-    assert_eq!(0, binomial(ZZ, 8, &-1));
-    assert_eq!(1, binomial(ZZ, 8, &0));
-    assert_eq!(8, binomial(ZZ, 8, &1));
-    assert_eq!(28, binomial(ZZ, 8, &2));
-    assert_eq!(56, binomial(ZZ, 8, &3));
-    assert_eq!(70, binomial(ZZ, 8, &4));
+    #[test]
+    fn test_binomial() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = StaticRing::<i32>::RING;
+        assert_eq!(0, binomial(ZZ, -4, &-1));
+        assert_eq!(1, binomial(ZZ, -4, &0));
+        assert_eq!(-4, binomial(ZZ, -4, &1));
+        assert_eq!(10, binomial(ZZ, -4, &2));
+        assert_eq!(-20, binomial(ZZ, -4, &3));
+        assert_eq!(35, binomial(ZZ, -4, &4));
+        assert_eq!(-56, binomial(ZZ, -4, &5));
 
-    // a naive computation would overflow
-    assert_eq!(145422675, binomial(ZZ, 30, &14));
-}
+        assert_eq!(0, binomial(ZZ, 3, &-1));
+        assert_eq!(1, binomial(ZZ, 3, &0));
+        assert_eq!(3, binomial(ZZ, 3, &1));
+        assert_eq!(3, binomial(ZZ, 3, &2));
+        assert_eq!(1, binomial(ZZ, 3, &3));
+        assert_eq!(0, binomial(ZZ, 3, &4));
 
-#[test]
-fn test_factorial() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i32>::RING;
-    assert_eq!(1, factorial(ZZ, &0));
-    assert_eq!(1, factorial(ZZ, &1));
-    assert_eq!(2, factorial(ZZ, &2));
-    assert_eq!(6, factorial(ZZ, &3));
-    assert_eq!(24, factorial(ZZ, &4));
-}
+        assert_eq!(0, binomial(ZZ, 8, &-1));
+        assert_eq!(1, binomial(ZZ, 8, &0));
+        assert_eq!(8, binomial(ZZ, 8, &1));
+        assert_eq!(28, binomial(ZZ, 8, &2));
+        assert_eq!(56, binomial(ZZ, 8, &3));
+        assert_eq!(70, binomial(ZZ, 8, &4));
 
-#[test]
-fn test_ceil_floor_div() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = StaticRing::<i32>::RING;
-    for rhs in [-10, -3, -2, -1, 1, 2, 3, 10] {
-        for lhs in [-10, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 10] {
-            let result = ZZ.ceil_div(lhs, &rhs);
-            assert_eq!(i32::div_ceil(lhs, rhs), result);
-            assert_eq!((lhs as f64 / rhs as f64).ceil() as i32, result);
+        // a naive computation would overflow
+        assert_eq!(145422675, binomial(ZZ, 30, &14));
+    }
 
-            let result = ZZ.floor_div(lhs, &rhs);
-            assert_eq!(i32::div_floor(lhs, rhs), result);
-            assert_eq!((lhs as f64 / rhs as f64).floor() as i32, result);
+    #[test]
+    fn test_factorial() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = StaticRing::<i32>::RING;
+        assert_eq!(1, factorial(ZZ, &0));
+        assert_eq!(1, factorial(ZZ, &1));
+        assert_eq!(2, factorial(ZZ, &2));
+        assert_eq!(6, factorial(ZZ, &3));
+        assert_eq!(24, factorial(ZZ, &4));
+    }
+
+    #[test]
+    fn test_ceil_floor_div() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = StaticRing::<i32>::RING;
+        for rhs in [-10, -3, -2, -1, 1, 2, 3, 10] {
+            for lhs in [-10, -6, -5, -4, -3, -2, -1, 0, 1, 2, 3, 4, 5, 6, 10] {
+                let result = ZZ.ceil_div(lhs, &rhs);
+                assert_eq!(i32::div_ceil(lhs, rhs), result);
+                assert_eq!((lhs as f64 / rhs as f64).ceil() as i32, result);
+
+                let result = ZZ.floor_div(lhs, &rhs);
+                assert_eq!(i32::div_floor(lhs, rhs), result);
+                assert_eq!((lhs as f64 / rhs as f64).floor() as i32, result);
+            }
         }
     }
-}
 
-#[test]
-fn test_parse() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_el_eq!(&ZZbig, &ZZbig.int_hom().map(3), ZZbig.parse("3", 10).unwrap());
-    assert_el_eq!(
-        &ZZbig,
-        &ZZbig.power_of_two(100),
-        ZZbig.parse("1267650600228229401496703205376", 10).unwrap()
-    );
-    assert_el_eq!(
-        &ZZbig,
-        &ZZbig.power_of_two(100),
-        ZZbig.parse("+1267650600228229401496703205376", 10).unwrap()
-    );
-    assert_el_eq!(
-        &ZZbig,
-        &ZZbig.neg(ZZbig.power_of_two(100)),
-        ZZbig.parse("-1267650600228229401496703205376", 10).unwrap()
-    );
-    assert_el_eq!(
-        &ZZbig,
-        &ZZbig.mul(ZZbig.pow(ZZbig.int_hom().map(11), 26), ZZbig.int_hom().map(10)),
-        ZZbig.parse("a00000000000000000000000000", 11).unwrap()
-    );
-    assert!(ZZbig.parse("238597a", 10).is_err());
-}
+    #[test]
+    fn test_parse() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_el_eq!(&ZZbig, &ZZbig.int_hom().map(3), ZZbig.parse("3", 10).unwrap());
+        assert_el_eq!(
+            &ZZbig,
+            &ZZbig.power_of_two(100),
+            ZZbig.parse("1267650600228229401496703205376", 10).unwrap()
+        );
+        assert_el_eq!(
+            &ZZbig,
+            &ZZbig.power_of_two(100),
+            ZZbig.parse("+1267650600228229401496703205376", 10).unwrap()
+        );
+        assert_el_eq!(
+            &ZZbig,
+            &ZZbig.neg(ZZbig.power_of_two(100)),
+            ZZbig.parse("-1267650600228229401496703205376", 10).unwrap()
+        );
+        assert_el_eq!(
+            &ZZbig,
+            &ZZbig.mul(ZZbig.pow(ZZbig.int_hom().map(11), 26), ZZbig.int_hom().map(10)),
+            ZZbig.parse("a00000000000000000000000000", 11).unwrap()
+        );
+        assert!(ZZbig.parse("238597a", 10).is_err());
+    }
 
-#[test]
-fn test_map_from_integer() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_el_eq!(
-        &ZZbig,
-        ZZbig.parse("0", 10).unwrap(),
-        map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("0", 10).unwrap())
-    );
-    assert_el_eq!(
-        &ZZbig,
-        ZZbig.parse("-1", 10).unwrap(),
-        map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("-1", 10).unwrap())
-    );
-    assert_el_eq!(
-        &ZZbig,
-        ZZbig.parse("80934517340527398320561", 10).unwrap(),
-        map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("80934517340527398320561", 10).unwrap())
-    );
-    assert_el_eq!(
-        &ZZbig,
-        ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap(),
-        map_from_integer_ring(
-            ZZbig,
-            ZZbig,
-            ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap()
-        )
-    );
+    #[test]
+    fn test_map_from_integer() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_el_eq!(
+            &ZZbig,
+            ZZbig.parse("0", 10).unwrap(),
+            map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("0", 10).unwrap())
+        );
+        assert_el_eq!(
+            &ZZbig,
+            ZZbig.parse("-1", 10).unwrap(),
+            map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("-1", 10).unwrap())
+        );
+        assert_el_eq!(
+            &ZZbig,
+            ZZbig.parse("80934517340527398320561", 10).unwrap(),
+            map_from_integer_ring(ZZbig, ZZbig, ZZbig.parse("80934517340527398320561", 10).unwrap())
+        );
+        assert_el_eq!(
+            &ZZbig,
+            ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap(),
+            map_from_integer_ring(
+                ZZbig,
+                ZZbig,
+                ZZbig.parse("-4861235897136598713465987138952643", 10).unwrap()
+            )
+        );
+    }
 }

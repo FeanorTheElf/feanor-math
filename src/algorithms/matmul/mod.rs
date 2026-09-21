@@ -271,76 +271,79 @@ pub fn schoolbook_matmul<R, V1, V2, V3, const ADD_ASSIGN: bool, const T1: bool, 
 }
 
 #[cfg(test)]
-use test;
+mod tests {
+    use test;
 
-#[cfg(test)]
-const BENCH_SIZE: usize = 128;
-#[cfg(test)]
-type BenchInt = i64;
+    use super::*;
 
-#[bench]
-fn bench_schoolbook_matmul(bencher: &mut test::Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let lhs = OwnedMatrix::from_fn_in(
-        BENCH_SIZE,
-        BENCH_SIZE,
-        |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
-        Global,
-    );
-    let rhs = OwnedMatrix::from_fn_in(
-        BENCH_SIZE,
-        BENCH_SIZE,
-        |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
-        Global,
-    );
-    let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
-    bencher.iter(|| {
-        strassen::<_, _, _, _, _, false, false, false>(
-            false,
-            100,
-            std::hint::black_box(TransposableSubmatrix::from(lhs.data())),
-            std::hint::black_box(TransposableSubmatrix::from(rhs.data())),
-            std::hint::black_box(TransposableSubmatrixMut::from(result.data_mut())),
-            StaticRing::<BenchInt>::RING,
-            &Global,
-        );
-        assert_eq!(
-            (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt,
-            *result.at(0, 0)
-        );
-    });
-}
+    const BENCH_SIZE: usize = 128;
 
-#[bench]
-fn bench_strassen_matmul(bencher: &mut test::Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let threshold_log_2 = 4;
-    let lhs = OwnedMatrix::from_fn_in(
-        BENCH_SIZE,
-        BENCH_SIZE,
-        |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
-        Global,
-    );
-    let rhs = OwnedMatrix::from_fn_in(
-        BENCH_SIZE,
-        BENCH_SIZE,
-        |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
-        Global,
-    );
-    let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
-    bencher.iter(|| {
-        strassen::<_, _, _, _, _, false, false, false>(
-            false,
-            threshold_log_2,
-            std::hint::black_box(TransposableSubmatrix::from(lhs.data())),
-            std::hint::black_box(TransposableSubmatrix::from(rhs.data())),
-            std::hint::black_box(TransposableSubmatrixMut::from(result.data_mut())),
-            StaticRing::<BenchInt>::RING,
-            &Global,
+    type BenchInt = i64;
+
+    #[bench]
+    fn bench_schoolbook_matmul(bencher: &mut test::Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let lhs = OwnedMatrix::from_fn_in(
+            BENCH_SIZE,
+            BENCH_SIZE,
+            |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
+            Global,
         );
-        assert_eq!(
-            (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt,
-            *result.at(0, 0)
+        let rhs = OwnedMatrix::from_fn_in(
+            BENCH_SIZE,
+            BENCH_SIZE,
+            |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
+            Global,
         );
-    });
+        let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
+        bencher.iter(|| {
+            strassen::<_, _, _, _, _, false, false, false>(
+                false,
+                100,
+                std::hint::black_box(TransposableSubmatrix::from(lhs.data())),
+                std::hint::black_box(TransposableSubmatrix::from(rhs.data())),
+                std::hint::black_box(TransposableSubmatrixMut::from(result.data_mut())),
+                StaticRing::<BenchInt>::RING,
+                &Global,
+            );
+            assert_eq!(
+                (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt,
+                *result.at(0, 0)
+            );
+        });
+    }
+
+    #[bench]
+    fn bench_strassen_matmul(bencher: &mut test::Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let threshold_log_2 = 4;
+        let lhs = OwnedMatrix::from_fn_in(
+            BENCH_SIZE,
+            BENCH_SIZE,
+            |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
+            Global,
+        );
+        let rhs = OwnedMatrix::from_fn_in(
+            BENCH_SIZE,
+            BENCH_SIZE,
+            |i, j| std::hint::black_box(i as BenchInt + j as BenchInt),
+            Global,
+        );
+        let mut result: OwnedMatrix<BenchInt> = OwnedMatrix::zero(BENCH_SIZE, BENCH_SIZE, StaticRing::<BenchInt>::RING);
+        bencher.iter(|| {
+            strassen::<_, _, _, _, _, false, false, false>(
+                false,
+                threshold_log_2,
+                std::hint::black_box(TransposableSubmatrix::from(lhs.data())),
+                std::hint::black_box(TransposableSubmatrix::from(rhs.data())),
+                std::hint::black_box(TransposableSubmatrixMut::from(result.data_mut())),
+                StaticRing::<BenchInt>::RING,
+                &Global,
+            );
+            assert_eq!(
+                (BENCH_SIZE * (BENCH_SIZE + 1) * (BENCH_SIZE * 2 + 1) / 6 - BENCH_SIZE * BENCH_SIZE) as BenchInt,
+                *result.at(0, 0)
+            );
+        });
+    }
 }

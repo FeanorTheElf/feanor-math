@@ -361,368 +361,367 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::extension::MonogenicExtensionStore;
-#[cfg(test)]
-use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
-#[cfg(test)]
-use crate::ring_impls::extension::galois_field::GaloisField;
-#[cfg(test)]
-use crate::ring_impls::poly::PolyRingStore;
-#[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::{Fp, Zn};
+mod tests {
+    use super::*;
+    use crate::ring_impls::extension::MonogenicExtensionStore;
+    use crate::ring_impls::extension::extension_impl::MonogenicExtensionSparse;
+    use crate::ring_impls::extension::galois_field::GaloisField;
+    use crate::ring_impls::poly::PolyRingStore;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
+    use crate::ring_impls::zn::zn_static::{Fp, Zn};
 
-#[test]
-fn test_cyclotomic_polynomial() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 1), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 2)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 2), (1, 1), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 3)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 2), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 4)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 4), (1, 3), (1, 2), (1, 1), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 5)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 2), (6, 1), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 6)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 6), (1, 5), (1, 4), (1, 3), (1, 2), (1, 1), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 7)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([(1, 6), (6, 3), (1, 0)]),
-        &cyclotomic_polynomial(&poly_ring, 18)
-    ));
-    assert!(poly_ring.eq_el(
-        &poly_ring.from_terms([
-            (1, 48),
-            (1, 47),
-            (1, 46),
-            (6, 43),
-            (6, 42),
-            (5, 41),
-            (6, 40),
-            (6, 39),
-            (1, 36),
-            (1, 35),
-            (1, 34),
-            (1, 33),
-            (1, 32),
-            (1, 31),
-            (6, 28),
-            (6, 26),
-            (6, 24),
-            (6, 22),
-            (6, 20),
-            (1, 17),
-            (1, 16),
-            (1, 15),
-            (1, 14),
-            (1, 13),
-            (1, 12),
-            (6, 9),
-            (6, 8),
-            (5, 7),
-            (6, 6),
-            (6, 5),
-            (1, 2),
-            (1, 1),
-            (1, 0)
-        ]),
-        &cyclotomic_polynomial(&poly_ring, 105)
-    ));
+    #[test]
+    fn test_cyclotomic_polynomial() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 1), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 2)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 2), (1, 1), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 3)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 2), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 4)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 4), (1, 3), (1, 2), (1, 1), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 5)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 2), (6, 1), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 6)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 6), (1, 5), (1, 4), (1, 3), (1, 2), (1, 1), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 7)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([(1, 6), (6, 3), (1, 0)]),
+            &cyclotomic_polynomial(&poly_ring, 18)
+        ));
+        assert!(poly_ring.eq_el(
+            &poly_ring.from_terms([
+                (1, 48),
+                (1, 47),
+                (1, 46),
+                (6, 43),
+                (6, 42),
+                (5, 41),
+                (6, 40),
+                (6, 39),
+                (1, 36),
+                (1, 35),
+                (1, 34),
+                (1, 33),
+                (1, 32),
+                (1, 31),
+                (6, 28),
+                (6, 26),
+                (6, 24),
+                (6, 22),
+                (6, 20),
+                (1, 17),
+                (1, 16),
+                (1, 15),
+                (1, 14),
+                (1, 13),
+                (1, 12),
+                (6, 9),
+                (6, 8),
+                (5, 7),
+                (6, 6),
+                (6, 5),
+                (1, 2),
+                (1, 1),
+                (1, 0)
+            ]),
+            &cyclotomic_polynomial(&poly_ring, 105)
+        ));
+    }
+
+    #[test]
+    fn test_is_prim_root_of_unity_pow2() {
+        assert_eq!(true, is_prim_root_of_unity_pow2(ZZi64, &1, 0));
+        assert_eq!(false, is_prim_root_of_unity_pow2(ZZi64, &1, 1));
+        assert_eq!(true, is_prim_root_of_unity_pow2(ZZi64, &-1, 1));
+
+        assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 1));
+        assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 2));
+        assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 0));
+
+        assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 1));
+        assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 2));
+
+        let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+            .as_field()
+            .unwrap();
+        let FEl = |x: [u64; 2]| F.from_power_basis(x);
+        assert_eq!(true, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 3));
+        assert_eq!(false, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 4));
+        assert_eq!(false, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 2));
+
+        assert_eq!(true, is_prim_root_of_unity_pow2(Zn::<{ 17 * 29 }>::RING, &302, 2));
+
+        let F = Zn64B::new(65537);
+        assert_eq!(true, is_prim_root_of_unity_pow2(&F, &F.int_hom().map(65281), 2));
+    }
+
+    #[test]
+    fn test_is_prim_root_of_unity() {
+        assert_eq!(true, is_prim_root_of_unity(ZZi64, &1, &ZZbig.int_hom().map(1)));
+        assert_eq!(false, is_prim_root_of_unity(ZZi64, &1, &ZZbig.int_hom().map(2)));
+        assert_eq!(true, is_prim_root_of_unity(ZZi64, &-1, &ZZbig.int_hom().map(2)));
+
+        assert_eq!(true, is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(2)));
+        assert_eq!(false, is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(4)));
+        assert_eq!(false, is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(1)));
+
+        assert_eq!(true, is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(9)));
+        assert_eq!(
+            false,
+            is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(3))
+        );
+        assert_eq!(
+            false,
+            is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(18))
+        );
+
+        let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+            .as_field()
+            .unwrap();
+        let FEl = |x: [u64; 2]| F.from_power_basis(x);
+        assert_eq!(true, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(6)));
+        assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(9)));
+        assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(4)));
+        assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(8)));
+    }
+
+    #[test]
+    fn test_is_prim_root_of_unity_general() {
+        assert_eq!(true, is_prim_root_of_unity_general(ZZi64, &1, 1));
+        assert_eq!(false, is_prim_root_of_unity_general(ZZi64, &1, 2));
+        assert_eq!(true, is_prim_root_of_unity_general(ZZi64, &-1, 2));
+
+        assert_eq!(true, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 2));
+        assert_eq!(false, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 4));
+        assert_eq!(false, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 1));
+
+        assert_eq!(true, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 9));
+        assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 3));
+        assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 18));
+
+        let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1]);
+        let FEl = |x: [u64; 2]| F.from_power_basis(x);
+        assert_eq!(true, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 6));
+        assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 9));
+        assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 4));
+        assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 8));
+
+        assert_eq!(false, is_prim_root_of_unity_general(Zn::<85>::RING, &16, 2));
+        assert_eq!(true, is_prim_root_of_unity_general(Zn::<85>::RING, &84, 2));
+        assert_eq!(false, is_prim_root_of_unity_general(Zn::<85>::RING, &3, 16));
+        assert_eq!(false, is_prim_root_of_unity_general(Zn::<85>::RING, &3, 4));
+        assert_eq!(true, is_prim_root_of_unity_general(Zn::<85>::RING, &13, 4));
+
+        assert_eq!(true, is_prim_root_of_unity_general(Zn::<{ 17 * 29 }>::RING, &302, 4));
+    }
+
+    #[test]
+    fn test_get_prim_root_of_unity() {
+        assert!(is_prim_root_of_unity(
+            Fp::<17>::RING,
+            &get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(4)).unwrap(),
+            &ZZbig.int_hom().map(4)
+        ));
+        assert!(is_prim_root_of_unity(
+            Fp::<17>::RING,
+            &get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(16)).unwrap(),
+            &ZZbig.int_hom().map(16)
+        ));
+        assert!(get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(32)).is_none());
+
+        assert!(is_prim_root_of_unity(
+            Fp::<19>::RING,
+            &get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(9)).unwrap(),
+            &ZZbig.int_hom().map(9)
+        ));
+        assert!(is_prim_root_of_unity(
+            Fp::<19>::RING,
+            &get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(6)).unwrap(),
+            &ZZbig.int_hom().map(6)
+        ));
+        assert!(get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(4)).is_none());
+
+        let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+            .as_field()
+            .unwrap();
+        assert!(is_prim_root_of_unity(
+            &F,
+            &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(6)).unwrap(),
+            &ZZbig.int_hom().map(6)
+        ));
+        assert!(is_prim_root_of_unity(
+            &F,
+            &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(4)).unwrap(),
+            &ZZbig.int_hom().map(4)
+        ));
+        assert!(is_prim_root_of_unity(
+            &F,
+            &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(8)).unwrap(),
+            &ZZbig.int_hom().map(8)
+        ));
+        assert!(&get_prim_root_of_unity(&F, &ZZbig.int_hom().map(89)).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_prim_root_of_unity_ramified() {
+        _ = get_prim_root_of_unity(GaloisField::new(17, 2), &ZZbig.int_hom().map(17));
+    }
+
+    #[test]
+    fn test_get_prim_root_of_unity_zn() {
+        assert!(is_prim_root_of_unity_general(
+            Zn::<17>::RING,
+            &get_prim_root_of_unity_zn(Zn::<17>::RING, 4).unwrap(),
+            4
+        ));
+        assert!(is_prim_root_of_unity_general(
+            Zn::<17>::RING,
+            &get_prim_root_of_unity_zn(Zn::<17>::RING, 16).unwrap(),
+            16
+        ));
+        assert!(get_prim_root_of_unity_zn(Zn::<17>::RING, 32).is_none());
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<19>::RING,
+            &get_prim_root_of_unity_zn(Zn::<19>::RING, 9).unwrap(),
+            9
+        ));
+        assert!(is_prim_root_of_unity_general(
+            Zn::<19>::RING,
+            &get_prim_root_of_unity_zn(Zn::<19>::RING, 6).unwrap(),
+            6
+        ));
+        assert!(get_prim_root_of_unity_zn(Zn::<19>::RING, 4).is_none());
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<{ 19 * 19 }>::RING,
+            &get_prim_root_of_unity_zn(Zn::<{ 19 * 19 }>::RING, 9).unwrap(),
+            9
+        ));
+        assert!(is_prim_root_of_unity_general(
+            Zn::<{ 19 * 19 }>::RING,
+            &get_prim_root_of_unity_zn(Zn::<{ 19 * 19 }>::RING, 6).unwrap(),
+            6
+        ));
+        assert!(get_prim_root_of_unity_zn(Zn::<{ 19 * 19 }>::RING, 4).is_none());
+
+        assert!(get_prim_root_of_unity_zn(Zn::<1024>::RING, 3).is_none());
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<{ 29 * 17 }>::RING,
+            &get_prim_root_of_unity_zn(Zn::<{ 29 * 17 }>::RING, 4).unwrap(),
+            4
+        ));
+        assert!(get_prim_root_of_unity_zn(Zn::<{ 29 * 17 }>::RING, 7).is_none());
+        assert!(get_prim_root_of_unity_zn(Zn::<{ 29 * 17 }>::RING, 8).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_prim_root_of_unity_zn_ramified() { _ = get_prim_root_of_unity_zn(Zn::<{ 17 * 17 }>::RING, 17); }
+
+    #[test]
+    fn test_get_prim_root_of_unity_pow2() {
+        assert!(is_prim_root_of_unity(
+            Fp::<17>::RING,
+            &get_prim_root_of_unity_pow2(Fp::<17>::RING, 2).unwrap(),
+            &ZZbig.int_hom().map(4)
+        ));
+        assert!(is_prim_root_of_unity(
+            Fp::<17>::RING,
+            &get_prim_root_of_unity_pow2(Fp::<17>::RING, 4).unwrap(),
+            &ZZbig.int_hom().map(16)
+        ));
+        assert!(get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(32)).is_none());
+
+        assert!(get_prim_root_of_unity_pow2(Fp::<19>::RING, 2).is_none());
+
+        let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
+            .as_field()
+            .unwrap();
+        assert!(is_prim_root_of_unity(
+            &F,
+            &get_prim_root_of_unity_pow2(&F, 1).unwrap(),
+            &ZZbig.int_hom().map(2)
+        ));
+        assert!(is_prim_root_of_unity(
+            &F,
+            &get_prim_root_of_unity_pow2(&F, 2).unwrap(),
+            &ZZbig.int_hom().map(4)
+        ));
+        assert!(is_prim_root_of_unity(
+            &F,
+            &get_prim_root_of_unity_pow2(&F, 3).unwrap(),
+            &ZZbig.int_hom().map(8)
+        ));
+        assert!(&get_prim_root_of_unity_pow2(&F, 4).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_prim_root_of_unity_pow2_ramified() { _ = get_prim_root_of_unity_pow2(Fp::<2>::RING, 1).unwrap(); }
+
+    #[test]
+    fn test_get_prim_root_of_unity_pow2_zn() {
+        assert!(is_prim_root_of_unity_general(
+            Zn::<17>::RING,
+            &get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 0).unwrap(),
+            1
+        ));
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<17>::RING,
+            &get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 2).unwrap(),
+            4
+        ));
+        assert!(is_prim_root_of_unity_general(
+            Zn::<17>::RING,
+            &get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 4).unwrap(),
+            16
+        ));
+        assert!(get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 32).is_none());
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<{ 17 * 17 }>::RING,
+            &get_prim_root_of_unity_pow2_zn(Zn::<{ 17 * 17 }>::RING, 4).unwrap(),
+            16
+        ));
+        assert!(get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 32).is_none());
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<19>::RING,
+            &get_prim_root_of_unity_pow2_zn(Zn::<19>::RING, 1).unwrap(),
+            2
+        ));
+        assert!(get_prim_root_of_unity_pow2_zn(Zn::<19>::RING, 2).is_none());
+
+        assert!(is_prim_root_of_unity_general(
+            Zn::<{ 29 * 17 }>::RING,
+            &get_prim_root_of_unity_pow2_zn(Zn::<{ 29 * 17 }>::RING, 2).unwrap(),
+            4
+        ));
+        assert!(get_prim_root_of_unity_pow2_zn(Zn::<{ 29 * 17 }>::RING, 3).is_none());
+    }
+
+    #[test]
+    #[should_panic]
+    fn test_get_prim_root_of_unity_pow2_zn_ramified() {
+        _ = get_prim_root_of_unity_pow2_zn(Zn::<1024>::RING, 8).unwrap();
+    }
 }
-
-#[test]
-fn test_is_prim_root_of_unity_pow2() {
-    assert_eq!(true, is_prim_root_of_unity_pow2(ZZi64, &1, 0));
-    assert_eq!(false, is_prim_root_of_unity_pow2(ZZi64, &1, 1));
-    assert_eq!(true, is_prim_root_of_unity_pow2(ZZi64, &-1, 1));
-
-    assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 1));
-    assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 2));
-    assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<3>::RING, &2, 0));
-
-    assert_eq!(true, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 1));
-    assert_eq!(false, is_prim_root_of_unity_pow2(Fp::<19>::RING, &18, 2));
-
-    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
-        .as_field()
-        .unwrap();
-    let FEl = |x: [u64; 2]| F.from_power_basis(x);
-    assert_eq!(true, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 3));
-    assert_eq!(false, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 4));
-    assert_eq!(false, is_prim_root_of_unity_pow2(&F, &FEl([3, 4]), 2));
-
-    assert_eq!(true, is_prim_root_of_unity_pow2(Zn::<{ 17 * 29 }>::RING, &302, 2));
-
-    let F = Zn64B::new(65537);
-    assert_eq!(true, is_prim_root_of_unity_pow2(&F, &F.int_hom().map(65281), 2));
-}
-
-#[test]
-fn test_is_prim_root_of_unity() {
-    assert_eq!(true, is_prim_root_of_unity(ZZi64, &1, &ZZbig.int_hom().map(1)));
-    assert_eq!(false, is_prim_root_of_unity(ZZi64, &1, &ZZbig.int_hom().map(2)));
-    assert_eq!(true, is_prim_root_of_unity(ZZi64, &-1, &ZZbig.int_hom().map(2)));
-
-    assert_eq!(true, is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(2)));
-    assert_eq!(false, is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(4)));
-    assert_eq!(false, is_prim_root_of_unity(Fp::<3>::RING, &2, &ZZbig.int_hom().map(1)));
-
-    assert_eq!(true, is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(9)));
-    assert_eq!(
-        false,
-        is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(3))
-    );
-    assert_eq!(
-        false,
-        is_prim_root_of_unity(Fp::<19>::RING, &6, &ZZbig.int_hom().map(18))
-    );
-
-    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
-        .as_field()
-        .unwrap();
-    let FEl = |x: [u64; 2]| F.from_power_basis(x);
-    assert_eq!(true, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(6)));
-    assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(9)));
-    assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(4)));
-    assert_eq!(false, is_prim_root_of_unity(&F, &FEl([2, 2]), &ZZbig.int_hom().map(8)));
-}
-
-#[test]
-fn test_is_prim_root_of_unity_general() {
-    assert_eq!(true, is_prim_root_of_unity_general(ZZi64, &1, 1));
-    assert_eq!(false, is_prim_root_of_unity_general(ZZi64, &1, 2));
-    assert_eq!(true, is_prim_root_of_unity_general(ZZi64, &-1, 2));
-
-    assert_eq!(true, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 2));
-    assert_eq!(false, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 4));
-    assert_eq!(false, is_prim_root_of_unity_general(Fp::<3>::RING, &2, 1));
-
-    assert_eq!(true, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 9));
-    assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 3));
-    assert_eq!(false, is_prim_root_of_unity_general(Fp::<19>::RING, &6, 18));
-
-    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1]);
-    let FEl = |x: [u64; 2]| F.from_power_basis(x);
-    assert_eq!(true, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 6));
-    assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 9));
-    assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 4));
-    assert_eq!(false, is_prim_root_of_unity_general(&F, &FEl([2, 2]), 8));
-
-    assert_eq!(false, is_prim_root_of_unity_general(Zn::<85>::RING, &16, 2));
-    assert_eq!(true, is_prim_root_of_unity_general(Zn::<85>::RING, &84, 2));
-    assert_eq!(false, is_prim_root_of_unity_general(Zn::<85>::RING, &3, 16));
-    assert_eq!(false, is_prim_root_of_unity_general(Zn::<85>::RING, &3, 4));
-    assert_eq!(true, is_prim_root_of_unity_general(Zn::<85>::RING, &13, 4));
-
-    assert_eq!(true, is_prim_root_of_unity_general(Zn::<{ 17 * 29 }>::RING, &302, 4));
-}
-
-#[test]
-fn test_get_prim_root_of_unity() {
-    assert!(is_prim_root_of_unity(
-        Fp::<17>::RING,
-        &get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(4)).unwrap(),
-        &ZZbig.int_hom().map(4)
-    ));
-    assert!(is_prim_root_of_unity(
-        Fp::<17>::RING,
-        &get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(16)).unwrap(),
-        &ZZbig.int_hom().map(16)
-    ));
-    assert!(get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(32)).is_none());
-
-    assert!(is_prim_root_of_unity(
-        Fp::<19>::RING,
-        &get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(9)).unwrap(),
-        &ZZbig.int_hom().map(9)
-    ));
-    assert!(is_prim_root_of_unity(
-        Fp::<19>::RING,
-        &get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(6)).unwrap(),
-        &ZZbig.int_hom().map(6)
-    ));
-    assert!(get_prim_root_of_unity(Fp::<19>::RING, &ZZbig.int_hom().map(4)).is_none());
-
-    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
-        .as_field()
-        .unwrap();
-    assert!(is_prim_root_of_unity(
-        &F,
-        &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(6)).unwrap(),
-        &ZZbig.int_hom().map(6)
-    ));
-    assert!(is_prim_root_of_unity(
-        &F,
-        &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(4)).unwrap(),
-        &ZZbig.int_hom().map(4)
-    ));
-    assert!(is_prim_root_of_unity(
-        &F,
-        &get_prim_root_of_unity(&F, &ZZbig.int_hom().map(8)).unwrap(),
-        &ZZbig.int_hom().map(8)
-    ));
-    assert!(&get_prim_root_of_unity(&F, &ZZbig.int_hom().map(89)).is_none());
-}
-
-#[test]
-#[should_panic]
-fn test_get_prim_root_of_unity_ramified() {
-    _ = get_prim_root_of_unity(GaloisField::new(17, 2), &ZZbig.int_hom().map(17));
-}
-
-#[test]
-fn test_get_prim_root_of_unity_zn() {
-    assert!(is_prim_root_of_unity_general(
-        Zn::<17>::RING,
-        &get_prim_root_of_unity_zn(Zn::<17>::RING, 4).unwrap(),
-        4
-    ));
-    assert!(is_prim_root_of_unity_general(
-        Zn::<17>::RING,
-        &get_prim_root_of_unity_zn(Zn::<17>::RING, 16).unwrap(),
-        16
-    ));
-    assert!(get_prim_root_of_unity_zn(Zn::<17>::RING, 32).is_none());
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<19>::RING,
-        &get_prim_root_of_unity_zn(Zn::<19>::RING, 9).unwrap(),
-        9
-    ));
-    assert!(is_prim_root_of_unity_general(
-        Zn::<19>::RING,
-        &get_prim_root_of_unity_zn(Zn::<19>::RING, 6).unwrap(),
-        6
-    ));
-    assert!(get_prim_root_of_unity_zn(Zn::<19>::RING, 4).is_none());
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<{ 19 * 19 }>::RING,
-        &get_prim_root_of_unity_zn(Zn::<{ 19 * 19 }>::RING, 9).unwrap(),
-        9
-    ));
-    assert!(is_prim_root_of_unity_general(
-        Zn::<{ 19 * 19 }>::RING,
-        &get_prim_root_of_unity_zn(Zn::<{ 19 * 19 }>::RING, 6).unwrap(),
-        6
-    ));
-    assert!(get_prim_root_of_unity_zn(Zn::<{ 19 * 19 }>::RING, 4).is_none());
-
-    assert!(get_prim_root_of_unity_zn(Zn::<1024>::RING, 3).is_none());
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<{ 29 * 17 }>::RING,
-        &get_prim_root_of_unity_zn(Zn::<{ 29 * 17 }>::RING, 4).unwrap(),
-        4
-    ));
-    assert!(get_prim_root_of_unity_zn(Zn::<{ 29 * 17 }>::RING, 7).is_none());
-    assert!(get_prim_root_of_unity_zn(Zn::<{ 29 * 17 }>::RING, 8).is_none());
-}
-
-#[test]
-#[should_panic]
-fn test_get_prim_root_of_unity_zn_ramified() { _ = get_prim_root_of_unity_zn(Zn::<{ 17 * 17 }>::RING, 17); }
-
-#[test]
-fn test_get_prim_root_of_unity_pow2() {
-    assert!(is_prim_root_of_unity(
-        Fp::<17>::RING,
-        &get_prim_root_of_unity_pow2(Fp::<17>::RING, 2).unwrap(),
-        &ZZbig.int_hom().map(4)
-    ));
-    assert!(is_prim_root_of_unity(
-        Fp::<17>::RING,
-        &get_prim_root_of_unity_pow2(Fp::<17>::RING, 4).unwrap(),
-        &ZZbig.int_hom().map(16)
-    ));
-    assert!(get_prim_root_of_unity(Fp::<17>::RING, &ZZbig.int_hom().map(32)).is_none());
-
-    assert!(get_prim_root_of_unity_pow2(Fp::<19>::RING, 2).is_none());
-
-    let F = MonogenicExtensionSparse::new(Fp::<5>::RING, vec![3, 1])
-        .as_field()
-        .unwrap();
-    assert!(is_prim_root_of_unity(
-        &F,
-        &get_prim_root_of_unity_pow2(&F, 1).unwrap(),
-        &ZZbig.int_hom().map(2)
-    ));
-    assert!(is_prim_root_of_unity(
-        &F,
-        &get_prim_root_of_unity_pow2(&F, 2).unwrap(),
-        &ZZbig.int_hom().map(4)
-    ));
-    assert!(is_prim_root_of_unity(
-        &F,
-        &get_prim_root_of_unity_pow2(&F, 3).unwrap(),
-        &ZZbig.int_hom().map(8)
-    ));
-    assert!(&get_prim_root_of_unity_pow2(&F, 4).is_none());
-}
-
-#[test]
-#[should_panic]
-fn test_get_prim_root_of_unity_pow2_ramified() { _ = get_prim_root_of_unity_pow2(Fp::<2>::RING, 1).unwrap(); }
-
-#[test]
-fn test_get_prim_root_of_unity_pow2_zn() {
-    assert!(is_prim_root_of_unity_general(
-        Zn::<17>::RING,
-        &get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 0).unwrap(),
-        1
-    ));
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<17>::RING,
-        &get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 2).unwrap(),
-        4
-    ));
-    assert!(is_prim_root_of_unity_general(
-        Zn::<17>::RING,
-        &get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 4).unwrap(),
-        16
-    ));
-    assert!(get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 32).is_none());
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<{ 17 * 17 }>::RING,
-        &get_prim_root_of_unity_pow2_zn(Zn::<{ 17 * 17 }>::RING, 4).unwrap(),
-        16
-    ));
-    assert!(get_prim_root_of_unity_pow2_zn(Zn::<17>::RING, 32).is_none());
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<19>::RING,
-        &get_prim_root_of_unity_pow2_zn(Zn::<19>::RING, 1).unwrap(),
-        2
-    ));
-    assert!(get_prim_root_of_unity_pow2_zn(Zn::<19>::RING, 2).is_none());
-
-    assert!(is_prim_root_of_unity_general(
-        Zn::<{ 29 * 17 }>::RING,
-        &get_prim_root_of_unity_pow2_zn(Zn::<{ 29 * 17 }>::RING, 2).unwrap(),
-        4
-    ));
-    assert!(get_prim_root_of_unity_pow2_zn(Zn::<{ 29 * 17 }>::RING, 3).is_none());
-}
-
-#[test]
-#[should_panic]
-fn test_get_prim_root_of_unity_pow2_zn_ramified() { _ = get_prim_root_of_unity_pow2_zn(Zn::<1024>::RING, 8).unwrap(); }

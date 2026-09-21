@@ -1202,158 +1202,6 @@ impl<R: RingBase + ?Sized> RingStore for RingArc<R> {
     fn get_ring(&self) -> &R { &*self.ring }
 }
 
-#[cfg(test)]
-use std::rc::Rc;
-
-#[cfg(test)]
-use crate::impl_eq_based_self_iso;
-
-#[test]
-fn test_ring_rc_lifetimes() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Rc::new(ZZi64);
-    let mut ring_ref = None;
-    assert!(ring_ref.is_none());
-    {
-        ring_ref = Some(ring.get_ring());
-    }
-    assert!(ring_ref.is_some());
-}
-
-#[test]
-fn test_internal_wrappings_dont_matter() {
-    feanor_tracing::DelayedLogger::init_test();
-
-    #[derive(Clone, PartialEq, Debug)]
-    pub struct ABase;
-
-    #[allow(unused)]
-    #[derive(Clone, Debug)]
-    pub struct BBase<R: RingStore> {
-        base: R,
-    }
-
-    impl<R: RingStore> PartialEq for BBase<R> {
-        fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
-    }
-
-    impl RingBase for ABase {
-        type Element = i32;
-
-        fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
-
-        fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
-
-        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
-
-        fn from_int(&self, value: i32) -> Self::Element { value }
-
-        fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
-
-        fn fmt_el_within<'a>(
-            &self,
-            _: &Self::Element,
-            _: &mut std::fmt::Formatter<'a>,
-            _: EnvBindingStrength,
-        ) -> std::fmt::Result {
-            Ok(())
-        }
-
-        fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
-        where
-            I::Ring: IntegerRing,
-        {
-            Some(ZZ.zero())
-        }
-
-        fn is_approximate(&self) -> bool { false }
-    }
-
-    impl_eq_based_self_iso! { ABase }
-
-    impl<R: RingStore + Debug> RingBase for BBase<R> {
-        type Element = i32;
-
-        fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
-
-        fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
-
-        fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
-
-        fn from_int(&self, value: i32) -> Self::Element { value }
-
-        fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
-
-        fn fmt_el_within<'a>(
-            &self,
-            _: &Self::Element,
-            _: &mut std::fmt::Formatter<'a>,
-            _: EnvBindingStrength,
-        ) -> std::fmt::Result {
-            Ok(())
-        }
-
-        fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
-        where
-            I::Ring: IntegerRing,
-        {
-            Some(ZZ.zero())
-        }
-
-        fn is_approximate(&self) -> bool { false }
-    }
-
-    impl<R: RingStore + Debug> CanHomFrom<ABase> for BBase<R> {
-        type Homomorphism = ();
-
-        fn has_canonical_hom(&self, _: &ABase) -> Option<()> { Some(()) }
-
-        fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element { el }
-    }
-
-    impl<R: RingStore + Debug, S: RingStore + Debug> CanHomFrom<BBase<S>> for BBase<R>
-    where
-        R::Ring: CanHomFrom<S::Ring>,
-    {
-        type Homomorphism = ();
-
-        fn has_canonical_hom(&self, _: &BBase<S>) -> Option<()> { Some(()) }
-
-        fn map_in(&self, _: &BBase<S>, el: <BBase<S> as RingBase>::Element, _: &()) -> Self::Element { el }
-    }
-
-    impl<R: RingStore + Debug> CanIsoFromTo<BBase<R>> for BBase<R>
-    where
-        R::Ring: CanHomFrom<R::Ring>,
-    {
-        type Isomorphism = ();
-
-        fn has_canonical_iso(&self, _: &BBase<R>) -> Option<()> { Some(()) }
-
-        fn map_out(&self, _: &BBase<R>, el: <BBase<R> as RingBase>::Element, _: &()) -> Self::Element { el }
-    }
-
-    type A = RingValue<ABase>;
-    type B<R> = RingValue<BBase<R>>;
-
-    let a: A = RingValue { ring: ABase };
-    let b1: B<A> = RingValue {
-        ring: BBase { base: a.clone() },
-    };
-    let b2: B<&B<A>> = RingValue {
-        ring: BBase { base: &b1 },
-    };
-    let b3: B<&A> = RingValue {
-        ring: BBase { base: &a },
-    };
-    _ = b1.coerce(&a, 0);
-    _ = b2.coerce(&a, 0);
-    _ = b2.coerce(&b1, 0);
-    _ = b2.coerce(&b3, 0);
-    _ = (&b2).coerce(&b3, 0);
-    _ = (&b2).coerce(&&&b3, 0);
-}
-
 #[allow(missing_docs)]
 #[cfg(any(test, feature = "generic_tests"))]
 pub mod generic_tests {
@@ -1684,11 +1532,165 @@ pub mod generic_tests {
     }
 }
 
-#[test]
-fn test_environment_binding() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert!(EnvBindingStrength::Strongest > EnvBindingStrength::Power);
-    assert!(EnvBindingStrength::Power > EnvBindingStrength::Product);
-    assert!(EnvBindingStrength::Product > EnvBindingStrength::Sum);
-    assert!(EnvBindingStrength::Sum > EnvBindingStrength::Weakest);
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use super::*;
+    use crate::impl_eq_based_self_iso;
+
+    #[test]
+    fn test_ring_rc_lifetimes() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Rc::new(ZZi64);
+        let mut ring_ref = None;
+        assert!(ring_ref.is_none());
+        {
+            ring_ref = Some(ring.get_ring());
+        }
+        assert!(ring_ref.is_some());
+    }
+
+    #[test]
+    fn test_internal_wrappings_dont_matter() {
+        feanor_tracing::DelayedLogger::init_test();
+
+        #[derive(Clone, PartialEq, Debug)]
+        pub struct ABase;
+
+        #[allow(unused)]
+        #[derive(Clone, Debug)]
+        pub struct BBase<R: RingStore> {
+            base: R,
+        }
+
+        impl<R: RingStore> PartialEq for BBase<R> {
+            fn eq(&self, other: &Self) -> bool { self.base.get_ring() == other.base.get_ring() }
+        }
+
+        impl RingBase for ABase {
+            type Element = i32;
+
+            fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
+
+            fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
+
+            fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
+
+            fn from_int(&self, value: i32) -> Self::Element { value }
+
+            fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
+
+            fn fmt_el_within<'a>(
+                &self,
+                _: &Self::Element,
+                _: &mut std::fmt::Formatter<'a>,
+                _: EnvBindingStrength,
+            ) -> std::fmt::Result {
+                Ok(())
+            }
+
+            fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+            where
+                I::Ring: IntegerRing,
+            {
+                Some(ZZ.zero())
+            }
+
+            fn is_approximate(&self) -> bool { false }
+        }
+
+        impl_eq_based_self_iso! { ABase }
+
+        impl<R: RingStore + Debug> RingBase for BBase<R> {
+            type Element = i32;
+
+            fn add_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs += rhs; }
+
+            fn negate_inplace(&self, lhs: &mut Self::Element) { *lhs = -*lhs; }
+
+            fn eq_el(&self, lhs: &Self::Element, rhs: &Self::Element) -> bool { *lhs == *rhs }
+
+            fn from_int(&self, value: i32) -> Self::Element { value }
+
+            fn mul_assign(&self, lhs: &mut Self::Element, rhs: Self::Element) { *lhs *= rhs; }
+
+            fn fmt_el_within<'a>(
+                &self,
+                _: &Self::Element,
+                _: &mut std::fmt::Formatter<'a>,
+                _: EnvBindingStrength,
+            ) -> std::fmt::Result {
+                Ok(())
+            }
+
+            fn characteristic<I: RingStore + Copy>(&self, ZZ: I) -> Option<El<I>>
+            where
+                I::Ring: IntegerRing,
+            {
+                Some(ZZ.zero())
+            }
+
+            fn is_approximate(&self) -> bool { false }
+        }
+
+        impl<R: RingStore + Debug> CanHomFrom<ABase> for BBase<R> {
+            type Homomorphism = ();
+
+            fn has_canonical_hom(&self, _: &ABase) -> Option<()> { Some(()) }
+
+            fn map_in(&self, _: &ABase, el: <ABase as RingBase>::Element, _: &()) -> Self::Element { el }
+        }
+
+        impl<R: RingStore + Debug, S: RingStore + Debug> CanHomFrom<BBase<S>> for BBase<R>
+        where
+            R::Ring: CanHomFrom<S::Ring>,
+        {
+            type Homomorphism = ();
+
+            fn has_canonical_hom(&self, _: &BBase<S>) -> Option<()> { Some(()) }
+
+            fn map_in(&self, _: &BBase<S>, el: <BBase<S> as RingBase>::Element, _: &()) -> Self::Element { el }
+        }
+
+        impl<R: RingStore + Debug> CanIsoFromTo<BBase<R>> for BBase<R>
+        where
+            R::Ring: CanHomFrom<R::Ring>,
+        {
+            type Isomorphism = ();
+
+            fn has_canonical_iso(&self, _: &BBase<R>) -> Option<()> { Some(()) }
+
+            fn map_out(&self, _: &BBase<R>, el: <BBase<R> as RingBase>::Element, _: &()) -> Self::Element { el }
+        }
+
+        type A = RingValue<ABase>;
+        type B<R> = RingValue<BBase<R>>;
+
+        let a: A = RingValue { ring: ABase };
+        let b1: B<A> = RingValue {
+            ring: BBase { base: a.clone() },
+        };
+        let b2: B<&B<A>> = RingValue {
+            ring: BBase { base: &b1 },
+        };
+        let b3: B<&A> = RingValue {
+            ring: BBase { base: &a },
+        };
+        _ = b1.coerce(&a, 0);
+        _ = b2.coerce(&a, 0);
+        _ = b2.coerce(&b1, 0);
+        _ = b2.coerce(&b3, 0);
+        _ = (&b2).coerce(&b3, 0);
+        _ = (&b2).coerce(&&&b3, 0);
+    }
+
+    #[test]
+    fn test_environment_binding() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert!(EnvBindingStrength::Strongest > EnvBindingStrength::Power);
+        assert!(EnvBindingStrength::Power > EnvBindingStrength::Product);
+        assert!(EnvBindingStrength::Product > EnvBindingStrength::Sum);
+        assert!(EnvBindingStrength::Sum > EnvBindingStrength::Weakest);
+    }
 }

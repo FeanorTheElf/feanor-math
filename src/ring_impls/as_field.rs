@@ -604,48 +604,51 @@ macro_rules! impl_field_wrap_unwrap_isos {
 }
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_big::ZnGB;
+mod tests {
+    use super::*;
+    use crate::ring_impls::zn::zn_big::ZnGB;
 
-#[test]
-fn test_canonical_hom_axioms_static_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    crate::ring::generic_tests::test_hom_axioms(ZZi64, &R, 0..17);
-}
+    #[test]
+    fn test_canonical_hom_axioms_static_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
+        crate::ring::generic_tests::test_hom_axioms(ZZi64, &R, 0..17);
+    }
 
-#[test]
-fn test_divisibility_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
-        &R,
-        (0..17).map(|x| R.int_hom().map(x)),
-    );
-}
+    #[test]
+    fn test_divisibility_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+            &R,
+            (0..17).map(|x| R.int_hom().map(x)),
+        );
+    }
 
-#[test]
-fn test_canonical_hom_axioms_wrap_unwrap() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    let int_hom = RingRef::from(R.get_ring().get_delegate()).into_int_hom();
-    crate::ring::generic_tests::test_hom_axioms(int_hom.codomain(), &R, (0..17).map(|x| int_hom.map(x)));
-    crate::ring::generic_tests::test_iso_axioms(int_hom.codomain(), &R, (0..17).map(|x| int_hom.map(x)));
-}
+    #[test]
+    fn test_canonical_hom_axioms_wrap_unwrap() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
+        let int_hom = RingRef::from(R.get_ring().get_delegate()).into_int_hom();
+        crate::ring::generic_tests::test_hom_axioms(int_hom.codomain(), &R, (0..17).map(|x| int_hom.map(x)));
+        crate::ring::generic_tests::test_iso_axioms(int_hom.codomain(), &R, (0..17).map(|x| int_hom.map(x)));
+    }
 
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &R,
-        (0..17).map(|x| R.int_hom().map(x)),
-    );
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
-}
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &R,
+            (0..17).map(|x| R.int_hom().map(x)),
+        );
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    }
 
-#[test]
-fn test_field_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
-    crate::ring_properties::field::generic_tests::test_field_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    #[test]
+    fn test_field_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let R = ZnGB::new(ZZi64, 17).as_field().ok().unwrap();
+        crate::ring_properties::field::generic_tests::test_field_axioms(&R, (0..17).map(|x| R.int_hom().map(x)));
+    }
 }

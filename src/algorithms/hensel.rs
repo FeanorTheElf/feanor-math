@@ -463,49 +463,54 @@ pub fn create_power_p_poly_ring(prime: El<BigIntRing>, power: usize) -> DensePol
     }
 }
 
-#[test]
-fn test_hensel_lift() {
-    feanor_tracing::DelayedLogger::init_test();
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    let FpX = DensePolyRing::new(Zn64B::new(5).as_field().unwrap(), "X");
-    let ZpeX = DensePolyRing::new(Zn64B::new(5 * 5 * 5 * 5 * 5 * 5), "X");
-    let [g, h] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 3, X + 1]);
-    let target = ZpeX.mul_ref(&g, &h);
-    let mod_p = ZnReductionMap::new(ZpeX.base_ring(), FpX.base_ring()).unwrap();
-    let poly_mod_p = FpX.lifted_hom(&ZpeX, &mod_p);
-    let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
-    {
-        let lifted = lifter
-            .clone()
-            .lift_to(6, &ZpeX, &target, |_, _, x| mod_p.any_preimage(*x));
-        let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
-        assert_el_eq!(&ZpeX, &g, &actual_g);
-        assert_el_eq!(&ZpeX, &h, &actual_h);
-    }
-    {
-        let ZpfX = DensePolyRing::new(Zn64B::new(5 * 5 * 5), "X");
-        let Zpf_to_Zp = ZnReductionMap::new(ZpfX.base_ring(), FpX.base_ring()).unwrap();
-        let Zpe_to_Zpf = ZnReductionMap::new(ZpeX.base_ring(), ZpfX.base_ring()).unwrap();
-        let ZpeX_to_ZpfX = ZpfX.lifted_hom(&ZpeX, &Zpe_to_Zpf);
-        let lifted = lifter
-            .lift_to(3, &ZpfX, &ZpeX_to_ZpfX.map_ref(&target), |_, _, x| {
-                Zpf_to_Zp.any_preimage(*x)
-            })
-            .lift_to(6, &ZpeX, &target, |_, _, x| Zpe_to_Zpf.any_preimage(*x));
-        let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
-        assert_el_eq!(&ZpeX, &g, &actual_g);
-        assert_el_eq!(&ZpeX, &h, &actual_h);
-    }
+    #[test]
+    fn test_hensel_lift() {
+        feanor_tracing::DelayedLogger::init_test();
 
-    let [g, h] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 25 * X + 3 + 625, X + 1 + 125]);
-    let target = ZpeX.mul_ref(&g, &h);
-    let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
-    {
-        let lifted = lifter
-            .clone()
-            .lift_to(6, &ZpeX, &target, |_, _, x| mod_p.any_preimage(*x));
-        let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
-        assert_el_eq!(&ZpeX, &g, &actual_g);
-        assert_el_eq!(&ZpeX, &h, &actual_h);
+        let FpX = DensePolyRing::new(Zn64B::new(5).as_field().unwrap(), "X");
+        let ZpeX = DensePolyRing::new(Zn64B::new(5 * 5 * 5 * 5 * 5 * 5), "X");
+        let [g, h] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 3, X + 1]);
+        let target = ZpeX.mul_ref(&g, &h);
+        let mod_p = ZnReductionMap::new(ZpeX.base_ring(), FpX.base_ring()).unwrap();
+        let poly_mod_p = FpX.lifted_hom(&ZpeX, &mod_p);
+        let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
+        {
+            let lifted = lifter
+                .clone()
+                .lift_to(6, &ZpeX, &target, |_, _, x| mod_p.any_preimage(*x));
+            let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
+            assert_el_eq!(&ZpeX, &g, &actual_g);
+            assert_el_eq!(&ZpeX, &h, &actual_h);
+        }
+        {
+            let ZpfX = DensePolyRing::new(Zn64B::new(5 * 5 * 5), "X");
+            let Zpf_to_Zp = ZnReductionMap::new(ZpfX.base_ring(), FpX.base_ring()).unwrap();
+            let Zpe_to_Zpf = ZnReductionMap::new(ZpeX.base_ring(), ZpfX.base_ring()).unwrap();
+            let ZpeX_to_ZpfX = ZpfX.lifted_hom(&ZpeX, &Zpe_to_Zpf);
+            let lifted = lifter
+                .lift_to(3, &ZpfX, &ZpeX_to_ZpfX.map_ref(&target), |_, _, x| {
+                    Zpf_to_Zp.any_preimage(*x)
+                })
+                .lift_to(6, &ZpeX, &target, |_, _, x| Zpe_to_Zpf.any_preimage(*x));
+            let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
+            assert_el_eq!(&ZpeX, &g, &actual_g);
+            assert_el_eq!(&ZpeX, &h, &actual_h);
+        }
+
+        let [g, h] = ZpeX.with_wrapped_indeterminate(|X| [X.pow_ref(2) + 25 * X + 3 + 625, X + 1 + 125]);
+        let target = ZpeX.mul_ref(&g, &h);
+        let lifter = HenselLift::new(&FpX, vec![poly_mod_p.map_ref(&g), poly_mod_p.map_ref(&h)]).unwrap();
+        {
+            let lifted = lifter
+                .clone()
+                .lift_to(6, &ZpeX, &target, |_, _, x| mod_p.any_preimage(*x));
+            let [actual_g, actual_h] = lifted.factorization().collect::<Vec<_>>().try_into().unwrap();
+            assert_el_eq!(&ZpeX, &g, &actual_g);
+            assert_el_eq!(&ZpeX, &h, &actual_h);
+        }
     }
 }

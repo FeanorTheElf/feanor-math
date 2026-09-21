@@ -145,56 +145,58 @@ pub fn largest_nonzero_minor<R, V>(A: SubmatrixMut<V, El<R>>, ring: R) -> (Vec<u
 }
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::Fp;
-#[cfg(test)]
-use crate::homomorphism::Homomorphism;
+mod tests {
+    use super::*;
 
-#[test]
-fn test_largest_nonzero_minor_field() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Fp::<17>::RING;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
+    use crate::ring_impls::zn::zn_static::Fp;
+    use crate::homomorphism::Homomorphism;
 
-    let mut matrix = [vec![1, 0], vec![1, 0]];
-    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
-    assert_eq!(1, rows.len());
-    assert_eq!(vec![0], cols);
+    #[test]
+    fn test_largest_nonzero_minor_field() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = Fp::<17>::RING;
 
-    let mut matrix = [vec![0, 0], vec![0, 1]];
-    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
-    assert_eq!(vec![1], rows);
-    assert_eq!(vec![1], cols);
+        let mut matrix = [vec![1, 0], vec![1, 0]];
+        let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+        assert_eq!(1, rows.len());
+        assert_eq!(vec![0], cols);
 
-    let mut matrix = [vec![1, 2, 3], vec![1, 2, 3], vec![2, 3, 4]];
-    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
-    assert!(rows == vec![0, 2] || rows == vec![1, 2]);
-    assert_eq!(2, cols.len());
+        let mut matrix = [vec![0, 0], vec![0, 1]];
+        let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+        assert_eq!(vec![1], rows);
+        assert_eq!(vec![1], cols);
 
-    let mut matrix = [
-        vec![15,  3,  9, 15,  9,],
-        vec![10,  6,  7,  3,  9,],
-        vec![ 2, 14, 14,  8,  6,],
-        vec![12, 16,  8,  6, 16,],
-        vec![15,  4, 14,  1, 11,]
-    ];
-    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
-    assert_eq!(3, rows.len());
-    assert_eq!(3, cols.len());
-}
+        let mut matrix = [vec![1, 2, 3], vec![1, 2, 3], vec![2, 3, 4]];
+        let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+        assert!(rows == vec![0, 2] || rows == vec![1, 2]);
+        assert_eq!(2, cols.len());
 
-#[test]
-fn test_largest_nonzero_minor_localpir() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(8);
-    let i = |x: i32| ring.int_hom().map(x);
+        let mut matrix = [
+            vec![15,  3,  9, 15,  9,],
+            vec![10,  6,  7,  3,  9,],
+            vec![ 2, 14, 14,  8,  6,],
+            vec![12, 16,  8,  6, 16,],
+            vec![15,  4, 14,  1, 11,]
+        ];
+        let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), field);
+        assert_eq!(3, rows.len());
+        assert_eq!(3, cols.len());
+    }
 
-    let mut matrix = [vec![i(0), i(0)], vec![i(0), i(1)]];
-    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), ring);
-    assert_eq!(vec![1], rows);
-    assert_eq!(vec![1], cols);
+    #[test]
+    fn test_largest_nonzero_minor_localpir() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(8);
+        let i = |x: i32| ring.int_hom().map(x);
 
-    let mut matrix = [vec![i(4), i(0), i(0)], vec![i(0), i(0), i(2)], vec![i(0), i(1), i(0)]];
-    let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), ring);
-    assert!((&vec![0, 2], &vec![0, 1]) == (&rows, &cols) || (&vec![1, 2], &vec![1, 2]) == (&rows, &cols));
+        let mut matrix = [vec![i(0), i(0)], vec![i(0), i(1)]];
+        let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), ring);
+        assert_eq!(vec![1], rows);
+        assert_eq!(vec![1], cols);
+
+        let mut matrix = [vec![i(4), i(0), i(0)], vec![i(0), i(0), i(2)], vec![i(0), i(1), i(0)]];
+        let (rows, cols) = largest_nonzero_minor(SubmatrixMut::<Vec<_>, _>::from_2d(&mut matrix), ring);
+        assert!((&vec![0, 2], &vec![0, 1]) == (&rows, &cols) || (&vec![1, 2], &vec![1, 2]) == (&rows, &cols));
+    }
 }

@@ -204,101 +204,104 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::rust_bigint::RustBigIntRing;
+mod tests {
+    use super::*;
+    use crate::ring_impls::rust_bigint::RustBigIntRing;
 
-#[test]
-fn test_is_prime() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert!(is_prime(StaticRing::<i128>::RING, &2, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &3, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &5, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &7, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &11, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &22531, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &417581, 5));
-    assert!(is_prime(StaticRing::<i128>::RING, &68719476767, 5));
+    #[test]
+    fn test_is_prime() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert!(is_prime(StaticRing::<i128>::RING, &2, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &3, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &5, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &7, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &11, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &22531, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &417581, 5));
+        assert!(is_prime(StaticRing::<i128>::RING, &68719476767, 5));
 
-    assert!(!is_prime(StaticRing::<i128>::RING, &1, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &4, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &6, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &8, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &9, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &10, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &22532, 5));
-    assert!(!is_prime(StaticRing::<i128>::RING, &347584, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &1, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &4, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &6, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &8, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &9, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &10, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &22532, 5));
+        assert!(!is_prime(StaticRing::<i128>::RING, &347584, 5));
 
-    assert!(is_prime(
-        RustBigIntRing::RING,
-        &RustBigIntRing::RING
-            .get_ring()
-            .parse("170141183460469231731687303715884105727", 10)
-            .unwrap(),
-        10
-    ));
-}
+        assert!(is_prime(
+            RustBigIntRing::RING,
+            &RustBigIntRing::RING
+                .get_ring()
+                .parse("170141183460469231731687303715884105727", 10)
+                .unwrap(),
+            10
+        ));
+    }
 
-#[test]
-fn test_prev_prime() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(Some(7), prev_prime(ZZi64, 11));
-    assert_eq!(Some(7), prev_prime(ZZi64, 10));
-    assert_eq!(Some(7), prev_prime(ZZi64, 9));
-    assert_eq!(Some(7), prev_prime(ZZi64, 8));
-    assert_eq!(Some(5), prev_prime(ZZi64, 7));
-    assert_eq!(Some(5), prev_prime(ZZi64, 6));
-    assert_eq!(Some(3), prev_prime(ZZi64, 5));
-    assert_eq!(Some(3), prev_prime(ZZi64, 4));
-    assert_eq!(Some(2), prev_prime(ZZi64, 3));
-    assert_eq!(None, prev_prime(ZZi64, 2));
-    assert_eq!(None, prev_prime(ZZi64, 1));
-    assert_eq!(None, prev_prime(ZZi64, 0));
+    #[test]
+    fn test_prev_prime() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(Some(7), prev_prime(ZZi64, 11));
+        assert_eq!(Some(7), prev_prime(ZZi64, 10));
+        assert_eq!(Some(7), prev_prime(ZZi64, 9));
+        assert_eq!(Some(7), prev_prime(ZZi64, 8));
+        assert_eq!(Some(5), prev_prime(ZZi64, 7));
+        assert_eq!(Some(5), prev_prime(ZZi64, 6));
+        assert_eq!(Some(3), prev_prime(ZZi64, 5));
+        assert_eq!(Some(3), prev_prime(ZZi64, 4));
+        assert_eq!(Some(2), prev_prime(ZZi64, 3));
+        assert_eq!(None, prev_prime(ZZi64, 2));
+        assert_eq!(None, prev_prime(ZZi64, 1));
+        assert_eq!(None, prev_prime(ZZi64, 0));
 
-    let mut last_prime = 11;
-    for i in 12..1000 {
-        assert_eq!(Some(last_prime), prev_prime(ZZi64, i));
-        if is_prime(ZZi64, &i, PROBABILISTIC_REPETITIONS) {
-            last_prime = i;
+        let mut last_prime = 11;
+        for i in 12..1000 {
+            assert_eq!(Some(last_prime), prev_prime(ZZi64, i));
+            if is_prime(ZZi64, &i, PROBABILISTIC_REPETITIONS) {
+                last_prime = i;
+            }
         }
     }
-}
 
-#[test]
-fn test_next_prime() {
-    feanor_tracing::DelayedLogger::init_test();
-    let mut last_prime = 1009;
-    for i in (2..1000).rev() {
-        assert_eq!(last_prime, next_prime(ZZi64, i));
-        if is_prime(ZZi64, &i, PROBABILISTIC_REPETITIONS) {
-            last_prime = i;
+    #[test]
+    fn test_next_prime() {
+        feanor_tracing::DelayedLogger::init_test();
+        let mut last_prime = 1009;
+        for i in (2..1000).rev() {
+            assert_eq!(last_prime, next_prime(ZZi64, i));
+            if is_prime(ZZi64, &i, PROBABILISTIC_REPETITIONS) {
+                last_prime = i;
+            }
         }
-    }
-    assert_eq!(2, next_prime(ZZi64, 1));
-    assert_eq!(2, next_prime(ZZi64, 0));
-}
-
-#[test]
-fn test_search_prime() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(None, search_prime(ZZi64, 1, -2));
-    for (p, n) in [(3, 3), (5, 5), (7, 7), (7, 9), (11, 11)] {
-        assert_eq!(Some(p), search_prime(ZZi64, n, -2));
+        assert_eq!(2, next_prime(ZZi64, 1));
+        assert_eq!(2, next_prime(ZZi64, 0));
     }
 
-    assert_eq!(None, search_prime(ZZi64, 1, -3));
-    assert_eq!(None, search_prime(ZZi64, 4, -3));
-    for (p, n) in [
-        (2, 2),
-        (5, 5),
-        (7, 7),
-        (5, 8),
-        (7, 10),
-        (11, 11),
-        (13, 13),
-        (11, 14),
-        (13, 16),
-        (17, 17),
-    ] {
-        assert_eq!(Some(p), search_prime(ZZi64, n, -3));
+    #[test]
+    fn test_search_prime() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(None, search_prime(ZZi64, 1, -2));
+        for (p, n) in [(3, 3), (5, 5), (7, 7), (7, 9), (11, 11)] {
+            assert_eq!(Some(p), search_prime(ZZi64, n, -2));
+        }
+
+        assert_eq!(None, search_prime(ZZi64, 1, -3));
+        assert_eq!(None, search_prime(ZZi64, 4, -3));
+        for (p, n) in [
+            (2, 2),
+            (5, 5),
+            (7, 7),
+            (5, 8),
+            (7, 10),
+            (11, 11),
+            (13, 13),
+            (11, 14),
+            (13, 16),
+            (17, 17),
+        ] {
+            assert_eq!(Some(p), search_prime(ZZi64, n, -3));
+        }
+        assert_eq!(Some(359), search_prime(ZZi64, 380, -3));
     }
-    assert_eq!(Some(359), search_prime(ZZi64, 380, -3));
 }

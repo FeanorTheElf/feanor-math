@@ -52,32 +52,35 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
+mod tests {
+    use super::*;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
 
-#[test]
-fn test_poly_root() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZbig;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]
-    });
-    for k in 1..5 {
-        assert_el_eq!(
-            &poly_ring,
-            &f,
-            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
-        );
-    }
+    #[test]
+    fn test_poly_root() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZbig;
+        let poly_ring = DensePolyRing::new(ring, "X");
+        let [f] = poly_ring.with_wrapped_indeterminate(|X| {
+            [X.pow_ref(7) + X.pow_ref(6) + X.pow_ref(5) + X.pow_ref(4) + X.pow_ref(3) + X.pow_ref(2) + X + 1]
+        });
+        for k in 1..5 {
+            assert_el_eq!(
+                &poly_ring,
+                &f,
+                poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
+            );
+        }
 
-    let [f] = poly_ring.with_wrapped_indeterminate(|X| {
-        [X.pow_ref(5) + 2 * X.pow_ref(4) + 3 * X.pow_ref(3) + 4 * X.pow_ref(2) + 5 * X + 6]
-    });
-    for k in 1..5 {
-        assert_el_eq!(
-            &poly_ring,
-            &f,
-            poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
-        );
+        let [f] = poly_ring.with_wrapped_indeterminate(|X| {
+            [X.pow_ref(5) + 2 * X.pow_ref(4) + 3 * X.pow_ref(3) + 4 * X.pow_ref(2) + 5 * X + 6]
+        });
+        for k in 1..5 {
+            assert_el_eq!(
+                &poly_ring,
+                &f,
+                poly_root(&poly_ring, &poly_ring.pow(f.clone(), k), k).unwrap()
+            );
+        }
     }
 }

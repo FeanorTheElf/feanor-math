@@ -465,104 +465,104 @@ where
 }
 
 #[cfg(test)]
-use crate::algorithms::cyclotomic::get_prim_root_of_unity_zn;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::*;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::*;
+mod tests {
+    use super::*;
+    use crate::algorithms::cyclotomic::get_prim_root_of_unity_zn;
+    use crate::ring_impls::zn::zn_64b::*;
+    use crate::ring_impls::zn::zn_static::*;
 
-#[test]
-fn test_fft_base() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<241>::RING;
-    // a 5-th root of unity is 91
-    let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
-    let mut values = [1, 3, 2, 0, 7];
-    fft.fft(&mut values, ring);
-    let expected = [13, 137, 202, 206, 170];
-    assert_eq!(expected, values);
-}
-
-#[test]
-fn test_fft_fastmul() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(241);
-    let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
-    let fft = BluesteinFFT::new_with_hom(
-        ring.can_hom(&fastmul_ring).unwrap(),
-        fastmul_ring.int_hom().map(36),
-        fastmul_ring.int_hom().map(111),
-        5,
-        4,
-        Global,
-    );
-    let mut values: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([1, 3, 2, 0, 7][i]));
-    fft.fft(&mut values, ring);
-    let expected: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([13, 137, 202, 206, 170][i]));
-    for i in 0..values.len() {
-        assert_el_eq!(ring, expected[i], values[i]);
+    #[test]
+    fn test_fft_base() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<241>::RING;
+        // a 5-th root of unity is 91
+        let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
+        let mut values = [1, 3, 2, 0, 7];
+        fft.fft(&mut values, ring);
+        let expected = [13, 137, 202, 206, 170];
+        assert_eq!(expected, values);
     }
-}
 
-#[test]
-fn test_inv_fft_base() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn::<241>::RING;
-    // a 5-th root of unity is 91
-    let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
-    let values = [1, 3, 2, 0, 7];
-    let mut work = values;
-    fft.fft(&mut work, ring);
-    fft.inv_fft(&mut work, ring);
-    assert_eq!(values, work);
-}
-
-#[test]
-fn test_approximate_fft() {
-    feanor_tracing::DelayedLogger::init_test();
-    let CC = Complex64::RING;
-    for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
-        let fft = BluesteinFFT::for_complex(&CC, p, Global);
-        let mut array = (0..p)
-            .map(|i| CC.root_of_unity(i.try_into().unwrap(), p.try_into().unwrap()))
-            .collect::<Vec<_>>();
-        fft.fft(&mut array, CC);
-        let err = fft.expected_absolute_error(1.0, 0.0);
-        assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
-        assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
-        for i in 2..fft.len() {
-            assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+    #[test]
+    fn test_fft_fastmul() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(241);
+        let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
+        let fft = BluesteinFFT::new_with_hom(
+            ring.can_hom(&fastmul_ring).unwrap(),
+            fastmul_ring.int_hom().map(36),
+            fastmul_ring.int_hom().map(111),
+            5,
+            4,
+            Global,
+        );
+        let mut values: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([1, 3, 2, 0, 7][i]));
+        fft.fft(&mut values, ring);
+        let expected: [_; 5] = std::array::from_fn(|i| ring.int_hom().map([13, 137, 202, 206, 170][i]));
+        for i in 0..values.len() {
+            assert_el_eq!(ring, expected[i], values[i]);
         }
     }
-}
 
-#[cfg(test)]
-const BENCH_SIZE: usize = 1009;
+    #[test]
+    fn test_inv_fft_base() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn::<241>::RING;
+        // a 5-th root of unity is 91
+        let fft = BluesteinFFT::new(ring, ring.int_hom().map(36), ring.int_hom().map(111), 5, 4, Global);
+        let values = [1, 3, 2, 0, 7];
+        let mut work = values;
+        fft.fft(&mut work, ring);
+        fft.inv_fft(&mut work, ring);
+        assert_eq!(values, work);
+    }
 
-#[bench]
-fn bench_bluestein(bencher: &mut test::Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(18597889);
-    let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
-    let embedding = ring.can_hom(&fastmul_ring).unwrap();
-    let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * BENCH_SIZE).unwrap());
-    let fft = BluesteinFFT::new_with_hom(
-        embedding.clone(),
-        root_of_unity,
-        get_prim_root_of_unity_zn(&fastmul_ring, 1 << 11).unwrap(),
-        BENCH_SIZE,
-        11,
-        Global,
-    );
-    let data = (0..BENCH_SIZE)
-        .map(|i| ring.int_hom().map(i as i32))
-        .collect::<Vec<_>>();
-    let mut copy = Vec::with_capacity(BENCH_SIZE);
-    bencher.iter(|| {
-        copy.clear();
-        copy.extend(data.iter().map(|x| x.clone()));
-        fft.unordered_fft(std::hint::black_box(&mut copy[..]), &ring);
-        fft.unordered_inv_fft(std::hint::black_box(&mut copy[..]), &ring);
-        assert_el_eq!(ring, copy[0], data[0]);
-    });
+    #[test]
+    fn test_approximate_fft() {
+        feanor_tracing::DelayedLogger::init_test();
+        let CC = Complex64::RING;
+        for (p, _log2_m) in [(5, 4), (53, 7), (1009, 11)] {
+            let fft = BluesteinFFT::for_complex(&CC, p, Global);
+            let mut array = (0..p)
+                .map(|i| CC.root_of_unity(i.try_into().unwrap(), p.try_into().unwrap()))
+                .collect::<Vec<_>>();
+            fft.fft(&mut array, CC);
+            let err = fft.expected_absolute_error(1.0, 0.0);
+            assert!(CC.is_absolute_approx_eq(array[0], CC.zero(), err));
+            assert!(CC.is_absolute_approx_eq(array[1], CC.from_f64(fft.len() as f64), err));
+            for i in 2..fft.len() {
+                assert!(CC.is_absolute_approx_eq(array[i], CC.zero(), err));
+            }
+        }
+    }
+
+    const BENCH_SIZE: usize = 1009;
+
+    #[bench]
+    fn bench_bluestein(bencher: &mut test::Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(18597889);
+        let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
+        let embedding = ring.can_hom(&fastmul_ring).unwrap();
+        let root_of_unity = fastmul_ring.coerce(&ring, get_prim_root_of_unity_zn(&ring, 2 * BENCH_SIZE).unwrap());
+        let fft = BluesteinFFT::new_with_hom(
+            embedding.clone(),
+            root_of_unity,
+            get_prim_root_of_unity_zn(&fastmul_ring, 1 << 11).unwrap(),
+            BENCH_SIZE,
+            11,
+            Global,
+        );
+        let data = (0..BENCH_SIZE)
+            .map(|i| ring.int_hom().map(i as i32))
+            .collect::<Vec<_>>();
+        let mut copy = Vec::with_capacity(BENCH_SIZE);
+        bencher.iter(|| {
+            copy.clear();
+            copy.extend(data.iter().map(|x| x.clone()));
+            fft.unordered_fft(std::hint::black_box(&mut copy[..]), &ring);
+            fft.unordered_inv_fft(std::hint::black_box(&mut copy[..]), &ring);
+            assert_el_eq!(ring, copy[0], data[0]);
+        });
+    }
 }

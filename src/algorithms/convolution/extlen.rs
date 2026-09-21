@@ -205,18 +205,23 @@ where
 }
 
 #[cfg(test)]
-use crate::algorithms::convolution::ntt::NTTConvolution;
-#[cfg(test)]
-use crate::ring_impls::zn::ZnRingStore;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+mod tests {
+    use super::*;
+    use crate::algorithms::convolution::ntt::NTTConvolution;
+    use crate::ring_impls::zn::ZnRingStore;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_convolution() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(65537).as_field().unwrap();
-    let base_convolution = NTTConvolution::for_fp(ring);
-    for l in [2, 3, 4, 8] {
-        super::generic_tests::test_convolution(LengthExtendedConvolution::new(&base_convolution, l), &ring, ring.one());
+    #[test]
+    fn test_convolution() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(65537).as_field().unwrap();
+        let base_convolution = NTTConvolution::for_fp(ring);
+        for l in [2, 3, 4, 8] {
+            super::super::generic_tests::test_convolution(
+                LengthExtendedConvolution::new(&base_convolution, l),
+                &ring,
+                ring.one(),
+            );
+        }
     }
 }

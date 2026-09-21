@@ -298,29 +298,33 @@ fn karatsuba_mem_size(block_size_log2: usize, threshold_size_log2: usize) -> usi
 }
 
 #[cfg(test)]
-use std::alloc::Global;
+mod tests {
+    use std::alloc::Global;
 
-#[test]
-fn test_karatsuba_impl() {
-    feanor_tracing::DelayedLogger::init_test();
-    let a = [1, 2, 3, 0];
-    let b = [3, 4, 5, 0];
-    let mut c = [0; 8];
-    let mut tmp = [0; 4];
-    dispatch_karatsuba_impl::<_, _, _, true>(2, 1, &mut c[..], &a[..], &b[..], &mut tmp[..], ZZi64);
-    assert_eq!([3, 10, 22, 22, 15, 0, 0, 0], c);
-}
+    use super::*;
 
-#[test]
-fn test_karatsuba_mul() {
-    feanor_tracing::DelayedLogger::init_test();
-    let mut c = vec![0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], ZZi64, &Global);
-    assert_eq!(vec![-1, 0, 0, 0], c);
+    #[test]
+    fn test_karatsuba_impl() {
+        feanor_tracing::DelayedLogger::init_test();
+        let a = [1, 2, 3, 0];
+        let b = [3, 4, 5, 0];
+        let mut c = [0; 8];
+        let mut tmp = [0; 4];
+        dispatch_karatsuba_impl::<_, _, _, true>(2, 1, &mut c[..], &a[..], &b[..], &mut tmp[..], ZZi64);
+        assert_eq!([3, 10, 22, 22, 15, 0, 0, 0], c);
+    }
 
-    let a = vec![1, 0, 1, 0, 1, 2, 3];
-    let b = vec![3, 4];
-    let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
-    karatsuba(0, &mut c[..], &a[..], &b[..], ZZi64, &Global);
-    assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
+    #[test]
+    fn test_karatsuba_mul() {
+        feanor_tracing::DelayedLogger::init_test();
+        let mut c = vec![0, 0, 0, 0];
+        karatsuba(0, &mut c[..], &[-1, 0][..], &[1, 0][..], ZZi64, &Global);
+        assert_eq!(vec![-1, 0, 0, 0], c);
+
+        let a = vec![1, 0, 1, 0, 1, 2, 3];
+        let b = vec![3, 4];
+        let mut c = vec![0, 0, 0, 0, 0, 0, 0, 0, 0];
+        karatsuba(0, &mut c[..], &a[..], &b[..], ZZi64, &Global);
+        assert_eq!(vec![3, 4, 3, 4, 3, 10, 17, 12, 0], c);
+    }
 }

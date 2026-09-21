@@ -36,23 +36,25 @@ where
 }
 
 #[cfg(test)]
-use crate::PROBABILISTIC_REPETITIONS;
-#[cfg(test)]
-use crate::algorithms::miller_rabin::is_prime;
+mod tests {
+    use super::*;
+    use crate::PROBABILISTIC_REPETITIONS;
+    use crate::algorithms::miller_rabin::is_prime;
 
-#[test]
-fn test_enumerate_primes() {
-    feanor_tracing::DelayedLogger::init_test();
-    assert_eq!(vec![2], erathostenes(3));
-    assert_eq!(vec![2, 3], erathostenes(4));
-    assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19], erathostenes(20));
-    assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31], erathostenes(32));
-}
+    #[test]
+    fn test_enumerate_primes() {
+        feanor_tracing::DelayedLogger::init_test();
+        assert_eq!(vec![2], erathostenes(3));
+        assert_eq!(vec![2, 3], erathostenes(4));
+        assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19], erathostenes(20));
+        assert_eq!(vec![2, 3, 5, 7, 11, 13, 17, 19, 23, 29, 31], erathostenes(32));
+    }
 
-#[test]
-fn test_enumerate_primes_large() {
-    feanor_tracing::DelayedLogger::init_test();
-    for p in enumerate_primes(&ZZi64, &100000) {
-        assert!(is_prime(&ZZi64, &p, PROBABILISTIC_REPETITIONS));
+    #[test]
+    fn test_enumerate_primes_large() {
+        feanor_tracing::DelayedLogger::init_test();
+        for p in enumerate_primes(&ZZi64, &100000) {
+            assert!(is_prime(&ZZi64, &p, PROBABILISTIC_REPETITIONS));
+        }
     }
 }

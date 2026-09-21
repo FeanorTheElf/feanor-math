@@ -440,97 +440,100 @@ impl<R: RingStore> Deref for RingElementWrapper<R> {
 }
 
 #[cfg(test)]
-use crate::ring_impls::zn::zn_64b;
+mod tests {
+    use super::*;
+    use crate::ring_impls::zn::zn_64b;
 
-#[test]
-fn test_arithmetic_expression() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(17);
+    #[test]
+    fn test_arithmetic_expression() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(17);
 
-    for x in (0..17).map(|x| ring.int_hom().map(x)) {
-        for y in (0..17).map(|x| ring.int_hom().map(x)) {
-            for z in (0..17).map(|x| ring.int_hom().map(x)) {
-                let expected = ring.add(ring.mul(x, y), ring.mul(ring.add(x, z), ring.sub(y, z)));
-                let x = RingElementWrapper::new(&ring, x);
-                let y = RingElementWrapper::new(&ring, y);
-                let z = RingElementWrapper::new(&ring, z);
-                assert_el_eq!(ring, expected, (x * y + (x + z) * (y - z)).unwrap());
+        for x in (0..17).map(|x| ring.int_hom().map(x)) {
+            for y in (0..17).map(|x| ring.int_hom().map(x)) {
+                for z in (0..17).map(|x| ring.int_hom().map(x)) {
+                    let expected = ring.add(ring.mul(x, y), ring.mul(ring.add(x, z), ring.sub(y, z)));
+                    let x = RingElementWrapper::new(&ring, x);
+                    let y = RingElementWrapper::new(&ring, y);
+                    let z = RingElementWrapper::new(&ring, z);
+                    assert_el_eq!(ring, expected, (x * y + (x + z) * (y - z)).unwrap());
+                }
             }
         }
     }
-}
 
-#[test]
-fn test_arithmetic_expression_int() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(17);
+    #[test]
+    fn test_arithmetic_expression_int() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(17);
 
-    for x in (0..17).map(|x| ring.int_hom().map(x)) {
-        for y in (0..17).map(|x| ring.int_hom().map(x)) {
-            for z in (0..17).map(|x| ring.int_hom().map(x)) {
-                let expected = ring.add(
-                    ring.add(
-                        ring.int_hom().mul_map(ring.mul(x, y), 8),
-                        ring.mul(
-                            ring.add(ring.add(ring.one(), x), ring.int_hom().mul_map(z, 2)),
-                            ring.sub(y, ring.int_hom().mul_map(z, 2)),
+        for x in (0..17).map(|x| ring.int_hom().map(x)) {
+            for y in (0..17).map(|x| ring.int_hom().map(x)) {
+                for z in (0..17).map(|x| ring.int_hom().map(x)) {
+                    let expected = ring.add(
+                        ring.add(
+                            ring.int_hom().mul_map(ring.mul(x, y), 8),
+                            ring.mul(
+                                ring.add(ring.add(ring.one(), x), ring.int_hom().mul_map(z, 2)),
+                                ring.sub(y, ring.int_hom().mul_map(z, 2)),
+                            ),
                         ),
-                    ),
-                    ring.int_hom().map(5),
-                );
-                let x = RingElementWrapper::new(&ring, x);
-                let y = RingElementWrapper::new(&ring, y);
-                let z = RingElementWrapper::new(&ring, z);
-                assert_el_eq!(ring, expected, (x * 8 * y + (1 + x + 2 * z) * (y - z * 2) + 5).unwrap());
+                        ring.int_hom().map(5),
+                    );
+                    let x = RingElementWrapper::new(&ring, x);
+                    let y = RingElementWrapper::new(&ring, y);
+                    let z = RingElementWrapper::new(&ring, z);
+                    assert_el_eq!(ring, expected, (x * 8 * y + (1 + x + 2 * z) * (y - z * 2) + 5).unwrap());
+                }
             }
         }
     }
-}
 
-#[test]
-fn test_arithmetic_expression_ref() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(17);
+    #[test]
+    fn test_arithmetic_expression_ref() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(17);
 
-    for x in (0..17).map(|x| ring.int_hom().map(x)) {
-        for y in (0..17).map(|x| ring.int_hom().map(x)) {
-            for z in (0..17).map(|x| ring.int_hom().map(x)) {
-                let expected = ring.add(ring.mul(x, y), ring.mul(ring.add(x, z), ring.sub(y, z)));
-                let x = RingElementWrapper::new(&ring, x);
-                let y = RingElementWrapper::new(&ring, y);
-                let z = RingElementWrapper::new(&ring, z);
-                assert_el_eq!(ring, expected, (x * &y + (&x + &z) * (&y - z)).unwrap());
+        for x in (0..17).map(|x| ring.int_hom().map(x)) {
+            for y in (0..17).map(|x| ring.int_hom().map(x)) {
+                for z in (0..17).map(|x| ring.int_hom().map(x)) {
+                    let expected = ring.add(ring.mul(x, y), ring.mul(ring.add(x, z), ring.sub(y, z)));
+                    let x = RingElementWrapper::new(&ring, x);
+                    let y = RingElementWrapper::new(&ring, y);
+                    let z = RingElementWrapper::new(&ring, z);
+                    assert_el_eq!(ring, expected, (x * &y + (&x + &z) * (&y - z)).unwrap());
+                }
             }
         }
     }
-}
 
-#[test]
-fn test_arithmetic_expression_int_ref() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = zn_64b::Zn64B::new(17);
+    #[test]
+    fn test_arithmetic_expression_int_ref() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = zn_64b::Zn64B::new(17);
 
-    for x in (0..17).map(|x| ring.int_hom().map(x)) {
-        for y in (0..17).map(|x| ring.int_hom().map(x)) {
-            for z in (0..17).map(|x| ring.int_hom().map(x)) {
-                let expected = ring.add(
-                    ring.add(
-                        ring.int_hom().mul_map(ring.mul(x, y), 8),
-                        ring.mul(
-                            ring.add(ring.add(ring.one(), x), ring.int_hom().mul_map(z, 2)),
-                            ring.sub(y, ring.int_hom().mul_map(z, 2)),
+        for x in (0..17).map(|x| ring.int_hom().map(x)) {
+            for y in (0..17).map(|x| ring.int_hom().map(x)) {
+                for z in (0..17).map(|x| ring.int_hom().map(x)) {
+                    let expected = ring.add(
+                        ring.add(
+                            ring.int_hom().mul_map(ring.mul(x, y), 8),
+                            ring.mul(
+                                ring.add(ring.add(ring.one(), x), ring.int_hom().mul_map(z, 2)),
+                                ring.sub(y, ring.int_hom().mul_map(z, 2)),
+                            ),
                         ),
-                    ),
-                    ring.int_hom().map(5),
-                );
-                let x = RingElementWrapper::new(&ring, x);
-                let y = RingElementWrapper::new(&ring, y);
-                let z = RingElementWrapper::new(&ring, z);
-                assert_el_eq!(
-                    ring,
-                    expected,
-                    (x * 8 * &y + (1 + &x + 2 * &z) * (&y - z * 2) + 5).unwrap()
-                );
+                        ring.int_hom().map(5),
+                    );
+                    let x = RingElementWrapper::new(&ring, x);
+                    let y = RingElementWrapper::new(&ring, y);
+                    let z = RingElementWrapper::new(&ring, z);
+                    assert_el_eq!(
+                        ring,
+                        expected,
+                        (x * 8 * &y + (1 + &x + 2 * &z) * (&y - z * 2) + 5).unwrap()
+                    );
+                }
             }
         }
     }

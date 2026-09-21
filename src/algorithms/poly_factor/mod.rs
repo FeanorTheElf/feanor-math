@@ -99,26 +99,28 @@ where
 }
 
 #[cfg(test)]
-use crate::ring_impls::poly::dense_poly::DensePolyRing;
-#[cfg(test)]
-use crate::ring_impls::zn::*;
+mod tests {
+    use super::*;
+    use crate::ring_impls::poly::dense_poly::DensePolyRing;
+    use crate::ring_impls::zn::*;
 
-#[test]
-fn test_factor_fp() {
-    feanor_tracing::DelayedLogger::init_test();
-    let Fp = zn_static::Fp::<5>::RING;
-    let poly_ring = DensePolyRing::new(Fp, "X");
-    let f = poly_ring.from_terms([(1, 0), (2, 1), (1, 3)].into_iter());
-    let g = poly_ring.from_terms([(1, 0), (1, 1)].into_iter());
-    let h = poly_ring.from_terms([(2, 0), (1, 2)].into_iter());
-    let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| (*poly).clone()));
-    let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &fgghhh);
-    assert_el_eq!(Fp, Fp.one(), unit);
+    #[test]
+    fn test_factor_fp() {
+        feanor_tracing::DelayedLogger::init_test();
+        let Fp = zn_static::Fp::<5>::RING;
+        let poly_ring = DensePolyRing::new(Fp, "X");
+        let f = poly_ring.from_terms([(1, 0), (2, 1), (1, 3)].into_iter());
+        let g = poly_ring.from_terms([(1, 0), (1, 1)].into_iter());
+        let h = poly_ring.from_terms([(2, 0), (1, 2)].into_iter());
+        let fgghhh = poly_ring.prod([&f, &g, &g, &h, &h, &h].iter().map(|poly| (*poly).clone()));
+        let (factorization, unit) = <_ as FactorPolyField>::factor_poly(&poly_ring, &fgghhh);
+        assert_el_eq!(Fp, Fp.one(), unit);
 
-    assert_eq!(2, factorization[0].1);
-    assert_el_eq!(poly_ring, g, factorization[0].0);
-    assert_eq!(3, factorization[1].1);
-    assert_el_eq!(poly_ring, h, factorization[1].0);
-    assert_eq!(1, factorization[2].1);
-    assert_el_eq!(poly_ring, f, factorization[2].0);
+        assert_eq!(2, factorization[0].1);
+        assert_el_eq!(poly_ring, g, factorization[0].0);
+        assert_eq!(3, factorization[1].1);
+        assert_el_eq!(poly_ring, h, factorization[1].0);
+        assert_eq!(1, factorization[2].1);
+        assert_el_eq!(poly_ring, f, factorization[2].0);
+    }
 }

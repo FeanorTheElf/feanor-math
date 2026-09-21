@@ -960,251 +960,247 @@ where
 }
 
 #[cfg(test)]
-use std::time::Instant;
+mod tests {
+    use std::time::Instant;
 
-#[cfg(test)]
-use test::Bencher;
+    use test::Bencher;
 
-#[cfg(test)]
-use super::sparse_poly::SparsePolyRing;
-#[cfg(test)]
-use crate::algorithms::cyclotomic::cyclotomic_polynomial;
-#[cfg(test)]
-use crate::iters::multiset_combinations;
-#[cfg(test)]
-use crate::ring_impls::approx_real::float::Real64;
-#[cfg(test)]
-use crate::ring_impls::extension::MonogenicExtensionStore;
-#[cfg(test)]
-use crate::ring_impls::extension::galois_field::GaloisField;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_static::{Fp, Zn};
-#[cfg(test)]
-use crate::ring_impls::zn::*;
-#[cfg(test)]
-use crate::ring_properties::finite::FiniteRingStore;
-#[cfg(test)]
-use crate::ring_properties::ordered::OrderedRingStore;
+    use super::super::sparse_poly::SparsePolyRing;
+    use super::*;
+    use crate::algorithms::cyclotomic::cyclotomic_polynomial;
+    use crate::iters::multiset_combinations;
+    use crate::ring_impls::approx_real::float::Real64;
+    use crate::ring_impls::extension::MonogenicExtensionStore;
+    use crate::ring_impls::extension::galois_field::GaloisField;
+    use crate::ring_impls::zn::zn_static::{Fp, Zn};
+    use crate::ring_impls::zn::*;
+    use crate::ring_properties::finite::FiniteRingStore;
+    use crate::ring_properties::ordered::OrderedRingStore;
 
-#[cfg(test)]
-fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
-where
-    P::Ring: PolyRing,
-{
-    let base_ring = poly_ring.base_ring();
-    vec![
-        poly_ring.from_terms([].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
-        poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
-    ]
-    .into_iter()
-}
-
-#[test]
-fn test_prod() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(ZZi64, "X");
-    assert_el_eq!(&poly_ring, poly_ring.one(), poly_ring.prod([].into_iter()));
-
-    let product =
-        poly_ring.prod((0..10).map(|n| poly_ring.add(poly_ring.indeterminate(), poly_ring.inclusion().map(n))));
-    assert_eq!(Some(10), poly_ring.degree(&product));
-    for i in 0..10 {
-        let expected = multiset_combinations(&[1; 10], 10 - i, |indices| {
-            indices
-                .iter()
-                .enumerate()
-                .filter(|(_, count)| **count > 0)
-                .map(|(n, _)| n)
-                .product::<usize>()
-        })
-        .sum::<usize>();
-        assert_eq!(expected as i64, *poly_ring.coefficient_at(&product, i));
+    fn edge_case_elements<P: PolyRingStore>(poly_ring: P) -> impl Iterator<Item = El<P>>
+    where
+        P::Ring: PolyRing,
+    {
+        let base_ring = poly_ring.base_ring();
+        vec![
+            poly_ring.from_terms([].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 0)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(-1), 0), (base_ring.int_hom().map(1), 1)].into_iter()),
+            poly_ring.from_terms([(base_ring.int_hom().map(1), 0), (base_ring.int_hom().map(-1), 1)].into_iter()),
+        ]
+        .into_iter()
     }
-}
 
-#[test]
-fn test_fma_base() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
-    assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+    #[test]
+    fn test_prod() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(ZZi64, "X");
+        assert_el_eq!(&poly_ring, poly_ring.one(), poly_ring.prod([].into_iter()));
 
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| {
-        [
-            X.pow_ref(3) + X,
-            X.pow_ref(2) - 1,
-            2 * X.pow_ref(3) + X.pow_ref(2) + 2 * X - 1,
-        ]
-    });
-    assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
-
-    let poly_ring = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [3 * X.pow_ref(2) + 5, 5 * X.pow_ref(2) + 6]);
-    assert_el_eq!(
-        &poly_ring,
-        g,
-        poly_ring
-            .get_ring()
-            .fma_base(&f, &poly_ring.base_ring().int_hom().map(4), poly_ring.zero())
-    );
-}
-
-#[test]
-fn test_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
-}
-
-#[test]
-fn test_hash_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    crate::ring::generic_tests::test_hash_axioms(&poly_ring, edge_case_elements(&poly_ring));
-}
-
-#[test]
-fn test_poly_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
-}
-
-#[test]
-fn test_divisibility_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
-}
-
-#[test]
-fn test_euclidean_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
-}
-
-#[test]
-fn test_principal_ideal_ring_axioms() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
-    crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
-}
-
-#[test]
-fn test_canonical_iso_axioms_different_base_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring1 = DensePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
-    let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-}
-
-#[test]
-fn test_canonical_iso_sparse_poly_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring1 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
-    crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-    crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
-}
-
-#[test]
-fn test_print() {
-    feanor_tracing::DelayedLogger::init_test();
-    let base_poly_ring = DensePolyRing::new(ZZi64, "X");
-    let poly_ring = DensePolyRing::new(&base_poly_ring, "Y");
-
-    let poly = poly_ring.from_terms(
-        [
-            (base_poly_ring.from_terms([(1, 0), (2, 2)].into_iter()), 0),
-            (base_poly_ring.from_terms([(3, 0), (4, 2)].into_iter()), 2),
-        ]
-        .into_iter(),
-    );
-    assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.formatted_el(&poly)));
-
-    let poly = poly_ring.from_terms(
-        [
-            (base_poly_ring.zero(), 0),
-            (base_poly_ring.from_terms([(4, 2)].into_iter()), 2),
-        ]
-        .into_iter(),
-    );
-    assert_eq!("4X^2Y^2", format!("{}", poly_ring.formatted_el(&poly)));
-}
-
-#[test]
-#[ignore]
-fn test_expensive_prod() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = GaloisField::new(17, 2048);
-    let poly_ring = DensePolyRing::new(&ring, "X");
-    let mut rng = oorandom::Rand64::new(0);
-    let a = ring.random_element(|| rng.rand_u64());
-
-    let start = Instant::now();
-    let product = poly_ring.prod((0..2048).scan(a.clone(), |current, _| {
-        let result = poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map_ref(&current));
-        *current = ring.pow(std::mem::replace(current, ring.zero()), 17);
-        return Some(result);
-    }));
-    let end = Instant::now();
-
-    println!("Computed product in {} ms", (end - start).as_millis());
-    for i in 0..2048 {
-        let coeff_wrt_basis = ring.wrt_power_basis(poly_ring.coefficient_at(&product, i));
-        assert!((1..2028).all(|j| ring.base_ring().is_zero(&coeff_wrt_basis.at(j))));
-    }
-}
-
-#[test]
-fn test_serialize() {
-    feanor_tracing::DelayedLogger::init_test();
-    let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
-    crate::ring_properties::serialization::generic_tests::test_serialization(
-        &poly_ring,
-        edge_case_elements(&poly_ring),
-    );
-}
-
-#[test]
-fn test_evaluate_approximate_ring() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = DensePolyRing::new(Real64::RING, "X");
-    let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
-    let x = 0.47312;
-    assert!(Real64::RING.abs((x * x * x - x + 1.0) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001);
-}
-
-#[bench]
-fn bench_div_rem_monic(bencher: &mut Bencher) {
-    feanor_tracing::DelayedLogger::init_test();
-    let ZZ = ZZbig;
-    let ring = DensePolyRing::new(ZZ, "X");
-    let phi_n = 30 * 40;
-    let n = 31 * 41;
-    let cyclotomic_poly = cyclotomic_polynomial(&ring, n);
-    assert!(ring.degree(&cyclotomic_poly).unwrap() == phi_n);
-    bencher.iter(|| {
-        let mut current = ring.pow(ring.indeterminate(), phi_n - 1);
-        for _ in phi_n..=n {
-            ring.mul_assign_monomial(&mut current, 1);
-            current = ring.div_rem_monic(current, &cyclotomic_poly).1;
+        let product =
+            poly_ring.prod((0..10).map(|n| poly_ring.add(poly_ring.indeterminate(), poly_ring.inclusion().map(n))));
+        assert_eq!(Some(10), poly_ring.degree(&product));
+        for i in 0..10 {
+            let expected = multiset_combinations(&[1; 10], 10 - i, |indices| {
+                indices
+                    .iter()
+                    .enumerate()
+                    .filter(|(_, count)| **count > 0)
+                    .map(|(n, _)| n)
+                    .product::<usize>()
+            })
+            .sum::<usize>();
+            assert_eq!(expected as i64, *poly_ring.coefficient_at(&product, i));
         }
-        assert_el_eq!(&ring, &ring.one(), &current);
-    });
+    }
+
+    #[test]
+    fn test_fma_base() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+        let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| [X + 3, X.pow_ref(2) - 1, X.pow_ref(2) + 2 * X + 5]);
+        assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+
+        let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+        let [f, g, h] = poly_ring.with_wrapped_indeterminate(|X| {
+            [
+                X.pow_ref(3) + X,
+                X.pow_ref(2) - 1,
+                2 * X.pow_ref(3) + X.pow_ref(2) + 2 * X - 1,
+            ]
+        });
+        assert_el_eq!(&poly_ring, h, poly_ring.get_ring().fma_base(&f, &2, g));
+
+        let poly_ring = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        let [f, g] = poly_ring.with_wrapped_indeterminate(|X| [3 * X.pow_ref(2) + 5, 5 * X.pow_ref(2) + 6]);
+        assert_el_eq!(
+            &poly_ring,
+            g,
+            poly_ring
+                .get_ring()
+                .fma_base(&f, &poly_ring.base_ring().int_hom().map(4), poly_ring.zero())
+        );
+    }
+
+    #[test]
+    fn test_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+        crate::ring::generic_tests::test_ring_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    }
+
+    #[test]
+    fn test_hash_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+        crate::ring::generic_tests::test_hash_axioms(&poly_ring, edge_case_elements(&poly_ring));
+    }
+
+    #[test]
+    fn test_poly_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+        super::super::generic_tests::test_poly_ring_axioms(poly_ring, 0..7);
+    }
+
+    #[test]
+    fn test_divisibility_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
+        crate::ring_properties::divisibility::generic_tests::test_divisibility_axioms(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
+
+    #[test]
+    fn test_euclidean_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
+        crate::ring_properties::pid::generic_tests::test_euclidean_ring_axioms(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
+
+    #[test]
+    fn test_principal_ideal_ring_axioms() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Fp::<7>::RING, "X");
+        crate::ring_properties::pid::generic_tests::test_principal_ideal_ring_axioms(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
+
+    #[test]
+    fn test_canonical_iso_axioms_different_base_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring1 = DensePolyRing::new(zn_big::ZnGB::new(StaticRing::<i128>::RING, 7), "X");
+        let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+        crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    }
+
+    #[test]
+    fn test_canonical_iso_sparse_poly_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring1 = SparsePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        let poly_ring2 = DensePolyRing::new(zn_64b::Zn64B::new(7), "X");
+        crate::ring::generic_tests::test_hom_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+        crate::ring::generic_tests::test_iso_axioms(&poly_ring1, &poly_ring2, edge_case_elements(&poly_ring1));
+    }
+
+    #[test]
+    fn test_print() {
+        feanor_tracing::DelayedLogger::init_test();
+        let base_poly_ring = DensePolyRing::new(ZZi64, "X");
+        let poly_ring = DensePolyRing::new(&base_poly_ring, "Y");
+
+        let poly = poly_ring.from_terms(
+            [
+                (base_poly_ring.from_terms([(1, 0), (2, 2)].into_iter()), 0),
+                (base_poly_ring.from_terms([(3, 0), (4, 2)].into_iter()), 2),
+            ]
+            .into_iter(),
+        );
+        assert_eq!("(4X^2 + 3)Y^2 + 2X^2 + 1", format!("{}", poly_ring.formatted_el(&poly)));
+
+        let poly = poly_ring.from_terms(
+            [
+                (base_poly_ring.zero(), 0),
+                (base_poly_ring.from_terms([(4, 2)].into_iter()), 2),
+            ]
+            .into_iter(),
+        );
+        assert_eq!("4X^2Y^2", format!("{}", poly_ring.formatted_el(&poly)));
+    }
+
+    #[test]
+    #[ignore]
+    fn test_expensive_prod() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = GaloisField::new(17, 2048);
+        let poly_ring = DensePolyRing::new(&ring, "X");
+        let mut rng = oorandom::Rand64::new(0);
+        let a = ring.random_element(|| rng.rand_u64());
+
+        let start = Instant::now();
+        let product = poly_ring.prod((0..2048).scan(a.clone(), |current, _| {
+            let result = poly_ring.sub(poly_ring.indeterminate(), poly_ring.inclusion().map_ref(&current));
+            *current = ring.pow(std::mem::replace(current, ring.zero()), 17);
+            return Some(result);
+        }));
+        let end = Instant::now();
+
+        println!("Computed product in {} ms", (end - start).as_millis());
+        for i in 0..2048 {
+            let coeff_wrt_basis = ring.wrt_power_basis(poly_ring.coefficient_at(&product, i));
+            assert!((1..2028).all(|j| ring.base_ring().is_zero(&coeff_wrt_basis.at(j))));
+        }
+    }
+
+    #[test]
+    fn test_serialize() {
+        feanor_tracing::DelayedLogger::init_test();
+        let poly_ring = DensePolyRing::new(Zn::<7>::RING, "X");
+        crate::ring_properties::serialization::generic_tests::test_serialization(
+            &poly_ring,
+            edge_case_elements(&poly_ring),
+        );
+    }
+
+    #[test]
+    fn test_evaluate_approximate_ring() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = DensePolyRing::new(Real64::RING, "X");
+        let [f] = ring.with_wrapped_indeterminate(|X| [X * X * X - X + 1]);
+        let x = 0.47312;
+        assert!(
+            Real64::RING.abs((x * x * x - x + 1.0) - ring.evaluate(&f, &x, &Real64::RING.identity())) <= 0.000000001
+        );
+    }
+
+    #[bench]
+    fn bench_div_rem_monic(bencher: &mut Bencher) {
+        feanor_tracing::DelayedLogger::init_test();
+        let ZZ = ZZbig;
+        let ring = DensePolyRing::new(ZZ, "X");
+        let phi_n = 30 * 40;
+        let n = 31 * 41;
+        let cyclotomic_poly = cyclotomic_polynomial(&ring, n);
+        assert!(ring.degree(&cyclotomic_poly).unwrap() == phi_n);
+        bencher.iter(|| {
+            let mut current = ring.pow(ring.indeterminate(), phi_n - 1);
+            for _ in phi_n..=n {
+                ring.mul_assign_monomial(&mut current, 1);
+                current = ring.div_rem_monic(current, &cyclotomic_poly).1;
+            }
+            assert_el_eq!(&ring, &ring.one(), &current);
+        });
+    }
 }

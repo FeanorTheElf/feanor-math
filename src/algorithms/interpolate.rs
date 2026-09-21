@@ -274,168 +274,166 @@ where
 }
 
 #[cfg(test)]
-use std::alloc::Global;
+mod tests {
+    use std::alloc::Global;
 
-#[cfg(test)]
-use multivariate_impl::MultivariatePolyRingImpl;
+    use multivariate_impl::MultivariatePolyRingImpl;
 
-#[cfg(test)]
-use crate::ring_impls::fraction::FractionFieldStore;
-#[cfg(test)]
-use crate::ring_impls::rational::RationalField;
-#[cfg(test)]
-use crate::ring_impls::zn::ZnRingStore;
-#[cfg(test)]
-use crate::ring_impls::zn::zn_64b::Zn64B;
+    use super::*;
+    use crate::ring_impls::fraction::FractionFieldStore;
+    use crate::ring_impls::rational::RationalField;
+    use crate::ring_impls::zn::ZnRingStore;
+    use crate::ring_impls::zn::zn_64b::Zn64B;
 
-#[test]
-fn test_product_except_one() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZi64;
-    let data = [2, 3, 5, 7, 11, 13, 17, 19];
-    let mut actual = [0; 8];
-    let expected = [
-        3 * 5 * 7 * 11 * 13 * 17 * 19,
-        2 * 5 * 7 * 11 * 13 * 17 * 19,
-        2 * 3 * 7 * 11 * 13 * 17 * 19,
-        2 * 3 * 5 * 11 * 13 * 17 * 19,
-        2 * 3 * 5 * 7 * 13 * 17 * 19,
-        2 * 3 * 5 * 7 * 11 * 17 * 19,
-        2 * 3 * 5 * 7 * 11 * 13 * 19,
-        2 * 3 * 5 * 7 * 11 * 13 * 17,
-    ];
-    product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
-    assert_eq!(expected, actual);
+    #[test]
+    fn test_product_except_one() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZi64;
+        let data = [2, 3, 5, 7, 11, 13, 17, 19];
+        let mut actual = [0; 8];
+        let expected = [
+            3 * 5 * 7 * 11 * 13 * 17 * 19,
+            2 * 5 * 7 * 11 * 13 * 17 * 19,
+            2 * 3 * 7 * 11 * 13 * 17 * 19,
+            2 * 3 * 5 * 11 * 13 * 17 * 19,
+            2 * 3 * 5 * 7 * 13 * 17 * 19,
+            2 * 3 * 5 * 7 * 11 * 17 * 19,
+            2 * 3 * 5 * 7 * 11 * 13 * 19,
+            2 * 3 * 5 * 7 * 11 * 13 * 17,
+        ];
+        product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
+        assert_eq!(expected, actual);
 
-    let data = [2, 3, 5, 7, 11, 13, 17];
-    let mut actual = [0; 7];
-    let expected = [
-        3 * 5 * 7 * 11 * 13 * 17,
-        2 * 5 * 7 * 11 * 13 * 17,
-        2 * 3 * 7 * 11 * 13 * 17,
-        2 * 3 * 5 * 11 * 13 * 17,
-        2 * 3 * 5 * 7 * 13 * 17,
-        2 * 3 * 5 * 7 * 11 * 17,
-        2 * 3 * 5 * 7 * 11 * 13,
-    ];
-    product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
-    assert_eq!(expected, actual);
+        let data = [2, 3, 5, 7, 11, 13, 17];
+        let mut actual = [0; 7];
+        let expected = [
+            3 * 5 * 7 * 11 * 13 * 17,
+            2 * 5 * 7 * 11 * 13 * 17,
+            2 * 3 * 7 * 11 * 13 * 17,
+            2 * 3 * 5 * 11 * 13 * 17,
+            2 * 3 * 5 * 7 * 13 * 17,
+            2 * 3 * 5 * 7 * 11 * 17,
+            2 * 3 * 5 * 7 * 11 * 13,
+        ];
+        product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
+        assert_eq!(expected, actual);
 
-    let data = [2, 3, 5, 7, 11, 13];
-    let mut actual = [0; 6];
-    let expected = [
-        3 * 5 * 7 * 11 * 13,
-        2 * 5 * 7 * 11 * 13,
-        2 * 3 * 7 * 11 * 13,
-        2 * 3 * 5 * 11 * 13,
-        2 * 3 * 5 * 7 * 13,
-        2 * 3 * 5 * 7 * 11,
-    ];
-    product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
-    assert_eq!(expected, actual);
-}
-
-#[test]
-fn test_interpolate() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = ZZi64;
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
-    let x = (0..6).map_fn(|i| i.try_into().unwrap());
-    let actual = interpolate(
-        &poly_ring,
-        x.clone(),
-        x.map_fn(|x| poly_ring.evaluate(&poly, &x, &ring.identity())),
-        Global,
-    )
-    .unwrap();
-    assert_el_eq!(&poly_ring, &poly, &actual);
-
-    let ring = RationalField::new(ZZi64);
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let x = (0..4).map_fn(|i| ring.from_fraction(i.try_into().unwrap(), 1));
-    let y = (0..4).map_fn(|_| ring.zero());
-    let actual = interpolate(&poly_ring, x.clone(), y, Global).unwrap();
-    for i in 0..4 {
-        assert_el_eq!(
-            ring,
-            ring.zero(),
-            poly_ring.evaluate(&actual, &ring.from_fraction(i, 1), ring.identity())
-        );
+        let data = [2, 3, 5, 7, 11, 13];
+        let mut actual = [0; 6];
+        let expected = [
+            3 * 5 * 7 * 11 * 13,
+            2 * 5 * 7 * 11 * 13,
+            2 * 3 * 7 * 11 * 13,
+            2 * 3 * 5 * 11 * 13,
+            2 * 3 * 5 * 7 * 13,
+            2 * 3 * 5 * 7 * 11,
+        ];
+        product_except_one(&ring, (&data[..]).clone_els_by(|x| *x), &mut actual);
+        assert_eq!(expected, actual);
     }
 
-    let ring = Zn64B::new(29).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(ring, "X");
-    let x = (0..5).map_fn(|i| ring.int_hom().map(i as i32));
-    let y = (0..5).map_fn(|i| if i == 3 { ring.int_hom().map(6) } else { ring.zero() });
-    let poly = interpolate(&poly_ring, x.clone(), y.clone(), Global).unwrap();
-    for i in 0..5 {
-        assert_el_eq!(ring, y.at(i), poly_ring.evaluate(&poly, &x.at(i), &ring.identity()));
-    }
-}
+    #[test]
+    fn test_interpolate() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = ZZi64;
+        let poly_ring = DensePolyRing::new(ring, "X");
+        let poly = poly_ring.from_terms([(3, 0), (1, 1), (-1, 3), (2, 4), (1, 5)].into_iter());
+        let x = (0..6).map_fn(|i| i.try_into().unwrap());
+        let actual = interpolate(
+            &poly_ring,
+            x.clone(),
+            x.map_fn(|x| poly_ring.evaluate(&poly, &x, &ring.identity())),
+            Global,
+        )
+        .unwrap();
+        assert_el_eq!(&poly_ring, &poly, &actual);
 
-#[test]
-fn test_interpolate_multivariate() {
-    feanor_tracing::DelayedLogger::init_test();
-    let ring = Zn64B::new(29).as_field().ok().unwrap();
-    let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
-
-    let interpolation_points = (0..2).map_fn(|_| (0..5).map_fn(|x| ring.int_hom().map(x as i32)));
-    let values = (0..25).map(|x| ring.int_hom().map(x & 1)).collect::<Vec<_>>();
-    let poly = interpolate_multivariate(&poly_ring, &interpolation_points, values, Global).unwrap();
-
-    for x in 0..5 {
-        for y in 0..5 {
-            let expected = (x * 5 + y) & 1;
+        let ring = RationalField::new(ZZi64);
+        let poly_ring = DensePolyRing::new(ring, "X");
+        let x = (0..4).map_fn(|i| ring.from_fraction(i.try_into().unwrap(), 1));
+        let y = (0..4).map_fn(|_| ring.zero());
+        let actual = interpolate(&poly_ring, x.clone(), y, Global).unwrap();
+        for i in 0..4 {
             assert_el_eq!(
                 ring,
-                ring.int_hom().map(expected),
-                poly_ring.evaluate(
-                    &poly,
-                    [ring.int_hom().map(x), ring.int_hom().map(y)].into_clone_els(),
-                    &ring.identity()
-                )
+                ring.zero(),
+                poly_ring.evaluate(&actual, &ring.from_fraction(i, 1), ring.identity())
             );
+        }
+
+        let ring = Zn64B::new(29).as_field().ok().unwrap();
+        let poly_ring = DensePolyRing::new(ring, "X");
+        let x = (0..5).map_fn(|i| ring.int_hom().map(i as i32));
+        let y = (0..5).map_fn(|i| if i == 3 { ring.int_hom().map(6) } else { ring.zero() });
+        let poly = interpolate(&poly_ring, x.clone(), y.clone(), Global).unwrap();
+        for i in 0..5 {
+            assert_el_eq!(ring, y.at(i), poly_ring.evaluate(&poly, &x.at(i), &ring.identity()));
         }
     }
 
-    let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 3);
+    #[test]
+    fn test_interpolate_multivariate() {
+        feanor_tracing::DelayedLogger::init_test();
+        let ring = Zn64B::new(29).as_field().ok().unwrap();
+        let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 2);
 
-    let interpolation_points = (0..3).map_fn(|i| (0..(i + 2)).map_fn(|x| ring.int_hom().map(x as i32)));
-    let values = (0..24).map(|x| ring.int_hom().map(x / 2)).collect::<Vec<_>>();
-    let poly = interpolate_multivariate(&poly_ring, &interpolation_points, values, Global).unwrap();
+        let interpolation_points = (0..2).map_fn(|_| (0..5).map_fn(|x| ring.int_hom().map(x as i32)));
+        let values = (0..25).map(|x| ring.int_hom().map(x & 1)).collect::<Vec<_>>();
+        let poly = interpolate_multivariate(&poly_ring, &interpolation_points, values, Global).unwrap();
 
-    for x in 0..2 {
-        for y in 0..3 {
-            for z in 0..4 {
-                let expected = (x * 12 + y * 4 + z) / 2;
+        for x in 0..5 {
+            for y in 0..5 {
+                let expected = (x * 5 + y) & 1;
                 assert_el_eq!(
                     ring,
                     ring.int_hom().map(expected),
                     poly_ring.evaluate(
                         &poly,
-                        [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)].into_clone_els(),
+                        [ring.int_hom().map(x), ring.int_hom().map(y)].into_clone_els(),
                         &ring.identity()
                     )
                 );
             }
         }
-    }
-}
 
-#[test]
-#[ignore]
-fn large_polynomial_interpolation() {
-    feanor_tracing::DelayedLogger::init_test();
-    let field = Zn64B::new(65537).as_field().ok().unwrap();
-    let poly_ring = DensePolyRing::new(field, "X");
-    let hom = poly_ring.base_ring().can_hom(&ZZi64).unwrap();
-    let actual = interpolate(
-        &poly_ring,
-        (0..65536).map_fn(|x| hom.map(x as i64)),
-        (0..65536).map_fn(|x| hom.map(x as i64)),
-        Global,
-    )
-    .unwrap();
-    assert_el_eq!(&poly_ring, poly_ring.indeterminate(), actual);
+        let poly_ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ring, 3);
+
+        let interpolation_points = (0..3).map_fn(|i| (0..(i + 2)).map_fn(|x| ring.int_hom().map(x as i32)));
+        let values = (0..24).map(|x| ring.int_hom().map(x / 2)).collect::<Vec<_>>();
+        let poly = interpolate_multivariate(&poly_ring, &interpolation_points, values, Global).unwrap();
+
+        for x in 0..2 {
+            for y in 0..3 {
+                for z in 0..4 {
+                    let expected = (x * 12 + y * 4 + z) / 2;
+                    assert_el_eq!(
+                        ring,
+                        ring.int_hom().map(expected),
+                        poly_ring.evaluate(
+                            &poly,
+                            [ring.int_hom().map(x), ring.int_hom().map(y), ring.int_hom().map(z)].into_clone_els(),
+                            &ring.identity()
+                        )
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    #[ignore]
+    fn large_polynomial_interpolation() {
+        feanor_tracing::DelayedLogger::init_test();
+        let field = Zn64B::new(65537).as_field().ok().unwrap();
+        let poly_ring = DensePolyRing::new(field, "X");
+        let hom = poly_ring.base_ring().can_hom(&ZZi64).unwrap();
+        let actual = interpolate(
+            &poly_ring,
+            (0..65536).map_fn(|x| hom.map(x as i64)),
+            (0..65536).map_fn(|x| hom.map(x as i64)),
+            Global,
+        )
+        .unwrap();
+        assert_el_eq!(&poly_ring, poly_ring.indeterminate(), actual);
+    }
 }
