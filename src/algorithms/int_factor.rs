@@ -2,12 +2,11 @@ use tracing::instrument;
 
 use crate::PROBABILISTIC_REPETITIONS;
 use crate::algorithms::ec_factor::lenstra_ec_factor;
-use crate::algorithms::eratosthenes::enumerate_primes;
 use crate::algorithms::int_bisect::root_floor;
 use crate::algorithms::miller_rabin::is_prime;
+use crate::algorithms::primelist::SMALL_PRIMES;
 use crate::homomorphism::*;
 use crate::prelude::*;
-use crate::ring_impls::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring_impls::zn::{ZnOperation, ZnRing, ZnRingStore, choose_zn_impl};
 use crate::ring_properties::divisibility::DivisibilityRingStore;
 use crate::ring_properties::ordered::{OrderedRing, OrderedRingStore};
@@ -82,7 +81,6 @@ where
     I: RingStore + Copy,
     I::Ring: IntegerRing + OrderedRing + CanIsoFromTo<BigIntRingBase> + CanIsoFromTo<StaticRingBase<i128>>,
 {
-    const SMALL_PRIME_BOUND: i32 = 10000;
     let mut result = Vec::new();
 
     // first make it nonnegative
@@ -91,14 +89,10 @@ where
         ZZ.negate_inplace(&mut n);
     }
 
-    // check for special cases
     if ZZ.is_zero(&n) {
         result.push((ZZ.zero(), 1));
         return result;
-    }
-
-    // check if we are done
-    if ZZ.is_one(&n) {
+    } else if ZZ.is_one(&n) {
         return result;
     } else if is_prime(ZZ, &n, PROBABILISTIC_REPETITIONS) {
         result.push((n, 1));
@@ -106,8 +100,14 @@ where
     }
 
     // then we remove small factors
-    for p in enumerate_primes(StaticRing::<i32>::RING, &SMALL_PRIME_BOUND) {
-        let ZZ_p = ZZ.int_hom().map(p);
+    for p in SMALL_PRIMES {
+        if ZZ.is_lt(&n, &ZZ.int_hom().map(i32::from(p) * i32::from(p))) {
+            if !ZZ.is_one(&n) {
+                result.push((n, 1));
+            }
+            return result;
+        }
+        let ZZ_p = ZZ.int_hom().map(p.into());
         let mut count = 0;
         while let Some(quo) = ZZ.checked_div(&n, &ZZ_p) {
             n = quo;
@@ -116,14 +116,6 @@ where
         if count >= 1 {
             result.push((ZZ_p, count));
         }
-    }
-
-    // check again if we are done
-    if ZZ.is_one(&n) {
-        return result;
-    } else if is_prime(ZZ, &n, PROBABILISTIC_REPETITIONS) {
-        result.push((n, 1));
-        return result;
     }
 
     // then check for powers, as EC factor fails for those

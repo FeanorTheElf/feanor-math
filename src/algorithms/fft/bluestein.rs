@@ -4,8 +4,8 @@ use std::fmt::Debug;
 use tracing::instrument;
 
 use crate::algorithms::cyclotomic::is_prim_root_of_unity_general;
-use crate::algorithms::fft::{FFTAlgorithm, FFTErrorEstimate, root_of_unity_error};
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
+use crate::algorithms::fft::{FFTAlgorithm, FFTErrorEstimate, root_of_unity_error};
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;

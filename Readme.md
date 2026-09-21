@@ -52,8 +52,10 @@ The following algorithms are implemented
  - The Finke-Pohst lattice point enumeration algorithm.
  - Basic linear algebra over various rings, including finite integral extensions of principal ideal rings.
  - Miller-Rabin test to check primality of integers.
- - A baby-step-giant-step and factorization-based algorithm to compute arbitrary discrete logarithms.
  - Buchberger's algorithm (F4-style) to compute Gröbner basis.
+
+Generic abelian groups (the traits `AbelianGroupBase`/`AbelianGroupStore`) and the algorithms on them - in particular baby-step-giant-step and factorization-based discrete logarithms, and the structure of finitely generated subgroups - used to be part of this library.
+As of version 4.0.0, they live in the separate crate [`feanor-group`](https://github.com/FeanorTheElf/feanor-group).
 
 Unfortunately, operations with polynomials over infinite rings (integers, rationals, number fields) are currently very slow, since efficient implementation require a lot of care to prevent coefficient blowup, which I did not have time or need to invest.
 

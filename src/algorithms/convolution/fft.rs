@@ -6,8 +6,8 @@ use elsa::sync::FrozenMap;
 use tracing::instrument;
 
 use super::ConvolutionAlgorithm;
-use crate::algorithms::fft::{FFTAlgorithm, FFTErrorEstimate};
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
+use crate::algorithms::fft::{FFTAlgorithm, FFTErrorEstimate};
 use crate::homomorphism::*;
 use crate::prelude::*;
 use crate::ring_impls::float_complex::*;
