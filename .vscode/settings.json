@@ -4,6 +4,12 @@
         "generic_tests"
     ],
     "rust-analyzer.showUnlinkedFileNotification": false,
+    // The `#[stability::unstable]` macro always expands to two copies of the item, one behind
+    // `cfg(feature = "unstable-enable")` and one behind `cfg(not(...))`. One of them is always
+    // inactive, so rust-analyzer greys out every unstable item no matter how the feature is set.
+    "rust-analyzer.diagnostics.disabled": [
+        "inactive_code"
+    ],
     "spellright.language": [
         "en-US-10-1."
     ],
