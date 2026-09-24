@@ -2,8 +2,6 @@
 /// integers. Unless you are implementing your own big integer type, you should use
 /// [`crate::ring_properties::integer::BigIntRing`] instead.
 pub mod bigint_ops;
-/// Contains Buchberger's algorithm for computing Groebner basis.
-pub mod buchberger;
 /// Contains [`convolution::ConvolutionAlgorithm`], an abstraction for algorithms
 /// for computing convolutions, together with various implementations.
 pub mod convolution;
@@ -25,6 +23,8 @@ pub mod extension_ops;
 pub mod fft;
 /// Contains an implementation of the Fincke-Pohst lattice point enumeration algorithm.
 pub mod fincke_pohst;
+/// Contains algorithms for computing Groebner basis.
+pub mod groebner;
 /// Contains an implementation of Hensel lifting, to lift a factorization modulo
 /// a maximal ideal to a factorization modulo a power of this ideal.
 pub mod hensel;

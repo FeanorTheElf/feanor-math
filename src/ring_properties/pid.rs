@@ -21,6 +21,13 @@ pub trait PrincipalIdealRing: DivisibilityRing {
     /// of an element `x`, by using it as `checked_div_min(0, x)`.
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element>;
 
+    /// If this ring is local (i.e. ideals are totally ordered by inclusion), returns a generator of
+    /// the unique maximal ideal. Otherwise, returns `None`.
+    fn local_ideal_gen(&self) -> Option<Self::Element>;
+
+    /// Returns `true` if this ring is local (i.e. ideals are totally ordered by inclusion).
+    fn is_local(&self) -> bool { self.local_ideal_gen().is_some() }
+
     /// Returns the (w.r.t. divisibility) smallest element `x` such that `x * val = 0`.
     ///
     /// If the ring is a domain, this returns `0` for all ring elements except zero (for
@@ -263,6 +270,12 @@ pub mod generic_tests {
             ring.formatted_el(&ring.one()),
             ring.formatted_el(&ring.zero())
         );
+        if let Some(g) = ring.get_ring().local_ideal_gen() {
+            assert!(!ring.is_unit(&g));
+            for a in &elements {
+                assert!(ring.is_unit(a) || ring.divides(a, &g));
+            }
+        }
 
         for a in &elements {
             let expected_unit = ring.checked_div_min(a, a).unwrap();

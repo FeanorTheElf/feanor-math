@@ -138,6 +138,8 @@ impl PrincipalIdealRing for Real64Base {
         self.checked_div(lhs, rhs)
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> { Some(0.0) }
+
     fn extended_ideal_gen(
         &self,
         _lhs: &Self::Element,

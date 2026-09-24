@@ -345,6 +345,8 @@ impl<A: Allocator + Send + Sync + Clone> PrincipalIdealRing for RustBigIntRingBa
         self.checked_div(lhs, rhs)
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> { None }
+
     #[instrument(skip_all, level = "trace")]
     fn extended_ideal_gen(
         &self,

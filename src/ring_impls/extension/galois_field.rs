@@ -602,6 +602,8 @@ where
         }
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> { Some(self.zero()) }
+
     fn extended_ideal_gen(
         &self,
         lhs: &Self::Element,

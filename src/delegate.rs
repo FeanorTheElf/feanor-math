@@ -646,6 +646,10 @@ where
             .map(|res| self.rev_delegate(res))
     }
 
+    default fn local_ideal_gen(&self) -> Option<Self::Element> {
+        self.get_delegate().local_ideal_gen().map(|x| self.rev_delegate(x))
+    }
+
     default fn extended_ideal_gen(
         &self,
         lhs: &Self::Element,

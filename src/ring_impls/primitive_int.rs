@@ -213,6 +213,8 @@ impl<T: PrimitiveInt> PrincipalIdealRing for StaticRingBase<T> {
         self.checked_div(lhs, rhs)
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> { None }
+
     fn extended_ideal_gen(
         &self,
         lhs: &Self::Element,

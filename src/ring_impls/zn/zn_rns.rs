@@ -763,6 +763,17 @@ where
         return Some(ZnRNSEl { data });
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> {
+        if self.len() == 1 {
+            self.at(0)
+                .get_ring()
+                .local_ideal_gen()
+                .map(|x| self.from_congruence([x]))
+        } else {
+            None
+        }
+    }
+
     fn extended_ideal_gen(
         &self,
         lhs: &Self::Element,

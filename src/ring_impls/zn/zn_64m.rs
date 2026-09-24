@@ -9,6 +9,7 @@ use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use super::{zn_big, *};
 use crate::algorithms::convolution::*;
 use crate::algorithms::euclid::const_extended_euclid;
+use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
 use crate::function::no_error;
@@ -502,6 +503,14 @@ impl FiniteRing for Zn64MBase {
 impl PrincipalIdealRing for Zn64MBase {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         super::generic_impls::checked_div_min(RingRef::from(self), lhs, rhs)
+    }
+
+    fn local_ideal_gen(&self) -> Option<Self::Element> {
+        if let Some((p, _)) = is_prime_power(self.integer_ring(), self.modulus()) {
+            Some(self.from_int_promise_reduced(p))
+        } else {
+            None
+        }
     }
 
     fn extended_ideal_gen(

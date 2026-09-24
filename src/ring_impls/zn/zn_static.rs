@@ -3,6 +3,7 @@ use std::fmt::Debug;
 use serde::{Deserialize, Deserializer, Serialize, Serializer, de};
 
 use crate::algorithms::convolution::DynConvolution;
+use crate::algorithms::int_factor::is_prime_power;
 use crate::homomorphism::*;
 use crate::iters::multi_cartesian_product;
 use crate::prelude::*;
@@ -147,6 +148,14 @@ impl<const N: u64, const IS_FIELD: bool> DivisibilityRing for ZnSBase<N, IS_FIEL
 impl<const N: u64, const IS_FIELD: bool> PrincipalIdealRing for ZnSBase<N, IS_FIELD> {
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
         generic_impls::checked_div_min(RingRef::from(self), lhs, rhs)
+    }
+
+    fn local_ideal_gen(&self) -> Option<Self::Element> {
+        if let Some((p, _)) = is_prime_power(self.integer_ring(), self.modulus()) {
+            Some(RingRef::from(self).coerce(self.integer_ring(), p))
+        } else {
+            None
+        }
     }
 
     fn extended_ideal_gen(

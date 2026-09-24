@@ -492,6 +492,8 @@ mod tests {
                 self.get_delegate().extended_ideal_gen(lhs, rhs)
             }
 
+            fn local_ideal_gen(&self) -> Option<Self::Element> { None }
+
             fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
                 self.get_delegate().checked_div_min(lhs, rhs)
             }

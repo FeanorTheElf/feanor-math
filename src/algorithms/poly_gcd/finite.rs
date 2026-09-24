@@ -85,10 +85,11 @@ where
 /// time, we find `deg(x') <= target_deg`.
 ///
 /// # Invariants
-/// 
+///
 /// Setting up euclid's algorithm as `s0 = t1 = 1`, `s1 = t0 = 0`, `a0 = a` and `a1 = b`,
-/// and then using the recursion `a(i - 2) = qi * a(i - 1) + ri`, `ai = ri`, `si = s(i - 2) - qi s(i - 1)`,
-/// `ti = t(i - 2) - qi t(i - 1)`, we find that (assuming at least a single remainder step was done)
+/// and then using the recursion `a(i - 2) = qi * a(i - 1) + ri`, `ai = ri`, `si = s(i - 2) - qi s(i
+/// - 1)`, `ti = t(i - 2) - qi t(i - 1)`, we find that (assuming at least a single remainder step
+/// was done)
 /// ```text
 ///   deg(s), deg(s') <= deg(b) - deg(x) <= deg(b) - target_deg
 ///   deg(t), deg(t') <= deg(a) - deg(x) <= deg(a) - target_deg
@@ -147,7 +148,8 @@ where
 
 const HALF_GCD_THRESHOLD: usize = 32;
 
-/// The half-gcd algorithm. Computes the same output as [`partial_eea_poly()`] but with sub-quadratic complexity. 
+/// The half-gcd algorithm. Computes the same output as [`partial_eea_poly()`] but with
+/// sub-quadratic complexity.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
 pub fn half_gcd<P>(poly_ring: P, lhs: El<P>, rhs: El<P>, n_half: usize) -> ([El<P>; 4], [El<P>; 2])
@@ -244,10 +246,7 @@ where
         debug_assert!(poly_ring.degree(&result[2]).unwrap_or(0) <= rdeg - deg_f);
         debug_assert!(poly_ring.degree(&result[3]).unwrap_or(0) <= ldeg - deg_f);
     }
-    return (
-        result,
-        [f, g]
-    );
+    return (result, [f, g]);
 }
 
 /// Computes a Bezout identity for polynomials, using a fast divide-and-conquer
@@ -313,7 +312,7 @@ where
     return (
         poly_ring.fma(&s_, &s1, poly_ring.mul_ref_fst(&t_, s2)),
         poly_ring.fma(&s_, &t1, poly_ring.mul(t_, t2)),
-        d
+        d,
     );
 }
 
@@ -463,16 +462,22 @@ mod tests {
         let field = Zn64B::new(65537).as_field().ok().unwrap();
         let poly_ring = DensePolyRing::new(field, "X");
         let mut rng = oorandom::Rand64::new(1);
-        let mut random_poly = |deg: usize| poly_ring.from_terms((0..=deg).map(|i| (field.random_element(|| rng.rand_u64()), i)));
+        let mut random_poly =
+            |deg: usize| poly_ring.from_terms((0..=deg).map(|i| (field.random_element(|| rng.rand_u64()), i)));
         for ldeg in [40, 41, 100, 101, 128, 129, 200, 201] {
             for rdeg_ in [3, 39, 40, 41, 70, 99, 100, 101] {
                 let rdeg = usize::min(rdeg_, ldeg);
                 let f = random_poly(ldeg);
                 let g = random_poly(rdeg);
-                for n_half in [(usize::max(ldeg, rdeg) + 1) / 2, usize::max(ldeg, rdeg), usize::max(ldeg, rdeg) * 2 / 3] {
+                for n_half in [
+                    (usize::max(ldeg, rdeg) + 1) / 2,
+                    usize::max(ldeg, rdeg),
+                    usize::max(ldeg, rdeg) * 2 / 3,
+                ] {
                     // also test with swapped inputs, i.e. `deg(lhs) < deg(rhs)`
                     for (lhs, rhs) in [(&f, &g), (&g, &f)] {
-                        let (expected_m, [expected_f, expected_g]) = partial_eea_poly(&poly_ring, lhs.clone(), rhs.clone(), n_half);
+                        let (expected_m, [expected_f, expected_g]) =
+                            partial_eea_poly(&poly_ring, lhs.clone(), rhs.clone(), n_half);
                         let (actual_m, [actual_f, actual_g]) = half_gcd(&poly_ring, lhs.clone(), rhs.clone(), n_half);
                         assert_el_eq!(&poly_ring, &expected_f, &actual_f);
                         assert_el_eq!(&poly_ring, &expected_g, &actual_g);
@@ -482,19 +487,29 @@ mod tests {
                         assert_el_eq!(
                             &poly_ring,
                             &actual_f,
-                            poly_ring.add(poly_ring.mul_ref(&actual_m[0], lhs), poly_ring.mul_ref(&actual_m[1], rhs))
+                            poly_ring.add(
+                                poly_ring.mul_ref(&actual_m[0], lhs),
+                                poly_ring.mul_ref(&actual_m[1], rhs)
+                            )
                         );
                         assert_el_eq!(
                             &poly_ring,
                             &actual_g,
-                            poly_ring.add(poly_ring.mul_ref(&actual_m[2], lhs), poly_ring.mul_ref(&actual_m[3], rhs))
+                            poly_ring.add(
+                                poly_ring.mul_ref(&actual_m[2], lhs),
+                                poly_ring.mul_ref(&actual_m[3], rhs)
+                            )
                         );
                     }
                 }
                 // and the full gcd, again in both orders
                 for (lhs, rhs) in [(&f, &g), (&g, &f)] {
                     let (s, t, d) = fast_poly_eea(&poly_ring, lhs.clone(), rhs.clone());
-                    assert_el_eq!(&poly_ring, &d, poly_ring.add(poly_ring.mul_ref(&s, lhs), poly_ring.mul_ref(&t, rhs)));
+                    assert_el_eq!(
+                        &poly_ring,
+                        &d,
+                        poly_ring.add(poly_ring.mul_ref(&s, lhs), poly_ring.mul_ref(&t, rhs))
+                    );
                     let expected_d = poly_ring.ideal_gen(lhs, rhs);
                     assert_el_eq!(&poly_ring, poly_ring.normalize(expected_d).0, poly_ring.normalize(d).0);
                 }

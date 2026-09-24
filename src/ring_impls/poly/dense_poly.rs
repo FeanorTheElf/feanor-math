@@ -900,6 +900,8 @@ where
         }
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> { None }
+
     fn extended_ideal_gen(
         &self,
         lhs: &Self::Element,

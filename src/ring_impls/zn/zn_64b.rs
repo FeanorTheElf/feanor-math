@@ -15,6 +15,7 @@ use crate::algorithms::convolution::ntt::NTTConvolution;
 use crate::algorithms::convolution::*;
 use crate::algorithms::cyclotomic::get_prim_root_of_unity_pow2;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyButterfly;
+use crate::algorithms::int_factor::is_prime_power;
 use crate::algorithms::matmul::{ComputeInnerProduct, StrassenHint};
 use crate::algorithms::sqr_mul::try_generic_abs_square_and_multiply_uninstrumented;
 use crate::delegate::{DelegateRing, DelegateRingImplFiniteRing};
@@ -770,6 +771,14 @@ impl PrincipalIdealRing for Zn64BBase {
         super::generic_impls::checked_div_min(RingRef::from(self), lhs, rhs)
     }
 
+    fn local_ideal_gen(&self) -> Option<Self::Element> {
+        if let Some((p, _)) = is_prime_power(self.integer_ring(), self.modulus()) {
+            Some(self.from_int_promise_reduced(p))
+        } else {
+            None
+        }
+    }
+
     fn extended_ideal_gen(
         &self,
         lhs: &Self::Element,
@@ -944,6 +953,10 @@ impl PrincipalIdealRing for Zn64BFastmulBase {
             .get_delegate()
             .checked_div_min(self.delegate_ref(lhs), self.delegate_ref(rhs));
         result.map(|x| self.rev_delegate(x))
+    }
+
+    fn local_ideal_gen(&self) -> Option<Self::Element> {
+        self.get_delegate().local_ideal_gen().map(|x| self.rev_delegate(x))
     }
 
     fn extended_ideal_gen(
