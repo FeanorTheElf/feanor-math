@@ -96,6 +96,7 @@ where
 /// `signed_eea(-6, 8) == (-1, -1, -2)`,
 /// `signed_eea(8, -6) == (1, 1, 2)`,
 /// `signed_eea(0, 0) == (0, 0, 0)`
+#[deprecated(note = "use PrincipalIdealRing::extended_ideal_gen() with manual normalization instead")]
 pub fn signed_eea<R>(fst: El<R>, snd: El<R>, ring: R) -> (El<R>, El<R>, El<R>)
 where
     R: RingStore,
@@ -131,8 +132,7 @@ where
 /// cases, it is instead recommended to use [`PrincipalIdealRing::ideal_gen()`], which uses
 /// a ring-specific algorithm to compute the gcd (which will of course be [`gcd()`] in some cases).
 ///
-/// In general, the gcd is only unique up to multiplication by units. For integers, the function
-/// [`signed_gcd()`] gives more guarantees.
+/// Note that the gcd is only unique up to multiplication by units.
 pub fn gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 where
     R: RingStore,
@@ -160,6 +160,7 @@ where
 ///   sign of b is irrelevant
 ///   gcd(0, 0) = 0
 /// ```
+#[deprecated(note = "use PrincipalIdealRing::ideal_gen() with manual normalization instead")]
 pub fn signed_gcd<R>(a: El<R>, b: El<R>, ring: R) -> El<R>
 where
     R: RingStore,
@@ -179,6 +180,7 @@ where
 ///   b < 0 => lcm(a, b) <= 0
 ///   lcm(0, b) = lcm(a, 0) = lcm(0, 0) = 0
 /// ```
+#[deprecated(note = "use PrincipalIdealRing::lcm() with manual normalization instead")]
 pub fn signed_lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 where
     R: RingStore,
@@ -199,6 +201,7 @@ where
 ///
 /// In general, the lcm is only unique up to multiplication by units. For integers, the function
 /// [`signed_lcm()`] gives more guarantees.
+#[deprecated(note = "use PrincipalIdealRing::lcm() instead")]
 pub fn lcm<R>(fst: El<R>, snd: El<R>, ring: R) -> El<R>
 where
     R: RingStore,
@@ -233,6 +236,7 @@ where
 use crate::primitive_int::*;
 
 #[test]
+#[allow(deprecated)]
 fn test_gcd() {
     assert_eq!(3, gcd(15, 6, &StaticRing::<i64>::RING).abs());
     assert_eq!(3, gcd(6, 15, &StaticRing::<i64>::RING).abs());
@@ -253,6 +257,7 @@ fn test_gcd() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_signed_gcd() {
     assert_eq!(3, signed_gcd(15, 6, &StaticRing::<i64>::RING));
     assert_eq!(3, signed_gcd(6, 15, &StaticRing::<i64>::RING));
@@ -273,6 +278,7 @@ fn test_signed_gcd() {
 }
 
 #[test]
+#[allow(deprecated)]
 fn test_eea_sign() {
     assert_eq!((2, -1, 1), signed_eea(3, 5, &StaticRing::<i64>::RING));
     assert_eq!((-1, 2, 1), signed_eea(5, 3, &StaticRing::<i64>::RING));
@@ -290,13 +296,7 @@ fn test_eea_sign() {
 }
 
 #[test]
-fn test_signed_eea() {
-    assert_eq!((-1, 1, 2), signed_eea(6, 8, &StaticRing::<i64>::RING));
-    assert_eq!((2, -1, 5), signed_eea(15, 25, &StaticRing::<i64>::RING));
-    assert_eq!((4, -7, 2), signed_eea(32, 18, &StaticRing::<i64>::RING));
-}
-
-#[test]
+#[allow(deprecated)]
 fn test_signed_lcm() {
     assert_eq!(24, signed_lcm(6, 8, &StaticRing::<i64>::RING));
     assert_eq!(24, signed_lcm(-6, 8, &StaticRing::<i64>::RING));

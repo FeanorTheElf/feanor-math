@@ -83,6 +83,8 @@ unsafe extern "C" {
     pub fn __gmpz_tstbit(val: mpz_srcptr, bit_index: mpir_ui) -> libc::c_int;
     pub fn __gmpz_fdiv_q(dst: mpz_ptr, lhs: mpz_srcptr, rhs: mpz_srcptr);
     pub fn __gmpz_nthroot(dst: mpz_ptr, val: mpz_srcptr, n: mpir_ui);
+    pub fn __gmpz_gcd(dst: mpz_ptr, fst: mpz_srcptr, snd: mpz_srcptr);
+    pub fn __gmpz_gcdext(g: mpz_ptr, s: mpz_ptr, t: mpz_ptr, fst: mpz_srcptr, snd: mpz_srcptr);
     pub fn __gmpz_export(
         dst: *mut libc::c_void,
         countp: *mut libc::size_t,

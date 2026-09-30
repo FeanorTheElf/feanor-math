@@ -6,8 +6,9 @@ use feanor_serde::seq::{DeserializeSeedSeq, SerializableSeq};
 use serde::de::DeserializeSeed;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
+use super::fraction::FractionField;
+use super::poly::PolyRing;
 use crate::algorithms::convolution::KaratsubaHint;
-use crate::algorithms::eea::{signed_gcd, signed_lcm};
 use crate::algorithms::matmul::StrassenHint;
 use crate::algorithms::poly_gcd::PolyTFracGCDRing;
 use crate::algorithms::poly_gcd::gcd::poly_gcd_local;
@@ -20,7 +21,7 @@ use crate::homomorphism::*;
 use crate::impl_interpolation_base_ring_char_zero;
 use crate::integer::*;
 use crate::ordered::{OrderedRing, OrderedRingStore};
-use crate::pid::{EuclideanRing, PrincipalIdealRing};
+use crate::pid::{EuclideanRing, PrincipalIdealRing, PrincipalIdealRingStore};
 use crate::ring::*;
 use crate::rings::poly::dense_poly::DensePolyRing;
 use crate::rings::poly::*;
@@ -169,11 +170,7 @@ where
     /// );
     /// ```
     pub fn num<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
-        debug_assert!(self.base_ring().is_one(&signed_gcd(
-            self.base_ring().clone_el(&el.1),
-            self.base_ring().clone_el(&el.0),
-            self.base_ring()
-        )));
+        debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.1, &el.0,)));
         &el.0
     }
 
@@ -196,11 +193,7 @@ where
     /// );
     /// ```
     pub fn den<'a>(&'a self, el: &'a <Self as RingBase>::Element) -> &'a El<I> {
-        debug_assert!(self.base_ring().is_one(&signed_gcd(
-            self.base_ring().clone_el(&el.1),
-            self.base_ring().clone_el(&el.0),
-            self.base_ring()
-        )));
+        debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.1, &el.0,)));
         &el.1
     }
 }
@@ -226,13 +219,10 @@ where
     I::Type: IntegerRing,
 {
     fn reduce(&self, value: (&mut El<I>, &mut El<I>)) {
-        // take the denominator first, as in this case gcd will have the same sign, and the final
-        // denominator will be positive
-        let gcd = signed_gcd(
-            self.integers.clone_el(&*value.1),
-            self.integers.clone_el(&*value.0),
-            &self.integers,
-        );
+        let mut gcd = self.integers.abs(self.integers.ideal_gen(&*value.0, &*value.1));
+        if self.integers.is_neg(&value.1) {
+            gcd = self.integers.negate(gcd);
+        }
         *value.0 = self.integers.checked_div(&*value.0, &gcd).unwrap();
         *value.1 = self.integers.checked_div(&*value.1, &gcd).unwrap();
     }
@@ -357,17 +347,10 @@ where
     I::Type: IntegerRing + HashableElRing,
 {
     fn hash<H: std::hash::Hasher>(&self, el: &Self::Element, h: &mut H) {
-        let gcd = signed_gcd(
-            self.integers.clone_el(&el.1),
-            self.integers.clone_el(&el.0),
-            &self.integers,
-        );
-        self.integers
-            .get_ring()
-            .hash(&self.integers.checked_div(&el.0, &gcd).unwrap(), h);
-        self.integers
-            .get_ring()
-            .hash(&self.integers.checked_div(&el.1, &gcd).unwrap(), h);
+        debug_assert!(self.base_ring().is_unit(&self.base_ring().ideal_gen(&el.1, &el.0,)));
+        debug_assert!(!self.base_ring().is_neg(&el.1));
+        self.integers.get_ring().hash(&el.0, h);
+        self.integers.get_ring().hash(&el.1, h);
     }
 }
 
@@ -566,12 +549,16 @@ where
         J: Iterator<Item = &'a Self::Element>,
         Self: 'a,
     {
-        let (num, den) = elements.fold((self.integers.zero(), self.integers.one()), |x, y| {
+        let (mut num, mut den) = elements.fold((self.integers.zero(), self.integers.one()), |x, y| {
             (
-                signed_gcd(x.0, self.base_ring().clone_el(self.num(y)), self.base_ring()),
-                signed_lcm(x.1, self.base_ring().clone_el(self.den(y)), self.base_ring()),
+                self.base_ring().gcd(&x.0, self.num(y)),
+                self.base_ring().lcm(&x.1, self.den(y)),
             )
         });
+        if self.integers.is_neg(&den) {
+            self.integers.negate_inplace(&mut num);
+            self.integers.negate_inplace(&mut den);
+        }
         return Some(RationalFieldEl(num, den));
     }
 }
@@ -688,7 +675,7 @@ where
         let den_lcm = QQX
             .terms(poly)
             .map(|(c, _)| QQ.get_ring().den(c))
-            .fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+            .fold(ZZ.one(), |a, b| ZZ.lcm(&a, b));
 
         let ZZX = DensePolyRing::new(ZZ, "X");
         let f = ZZX.from_terms(QQX.terms(poly).map(|(c, i)| {
@@ -725,11 +712,11 @@ where
         let den_lcm_lhs = QQX
             .terms(lhs)
             .map(|(c, _)| QQ.get_ring().den(c))
-            .fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+            .fold(ZZ.one(), |a, b| ZZ.lcm(&a, b));
         let den_lcm_rhs = QQX
             .terms(rhs)
             .map(|(c, _)| QQ.get_ring().den(c))
-            .fold(ZZ.one(), |a, b| signed_lcm(a, ZZ.clone_el(b), ZZ));
+            .fold(ZZ.one(), |a, b| ZZ.lcm(&a, b));
 
         let ZZX = DensePolyRing::new(ZZ, "X");
         let lhs = ZZX.from_terms(QQX.terms(lhs).map(|(c, i)| {
@@ -753,8 +740,6 @@ where
     }
 }
 
-use super::fraction::FractionField;
-use super::poly::PolyRing;
 #[cfg(test)]
 use crate::homomorphism::Homomorphism;
 #[cfg(test)]

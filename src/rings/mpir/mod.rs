@@ -17,9 +17,7 @@ use crate::primitive_int::*;
 use crate::ring::*;
 use crate::rings::rust_bigint::*;
 use crate::specialization::*;
-use crate::{
-    algorithms, impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ,
-};
+use crate::{impl_eval_poly_locally_for_ZZ, impl_interpolation_base_ring_char_zero, impl_poly_gcd_locally_for_ZZ};
 
 mod mpir_bindings;
 
@@ -482,7 +480,31 @@ impl PrincipalIdealRing for MPZBase {
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        algorithms::eea::eea(self.clone_el(lhs), self.clone_el(rhs), MPZ::RING)
+        unsafe {
+            let mut g = MPZEl::new();
+            let mut s = MPZEl::new();
+            let mut t = MPZEl::new();
+            mpir_bindings::__gmpz_gcdext(
+                &mut g.integer as mpir_bindings::mpz_ptr,
+                &mut s.integer as mpir_bindings::mpz_ptr,
+                &mut t.integer as mpir_bindings::mpz_ptr,
+                &lhs.integer as mpir_bindings::mpz_srcptr,
+                &rhs.integer as mpir_bindings::mpz_srcptr,
+            );
+            return (s, t, g);
+        }
+    }
+
+    fn ideal_gen(&self, lhs: &Self::Element, rhs: &Self::Element) -> Self::Element {
+        unsafe {
+            let mut g = MPZEl::new();
+            mpir_bindings::__gmpz_gcd(
+                &mut g.integer as mpir_bindings::mpz_ptr,
+                &lhs.integer as mpir_bindings::mpz_srcptr,
+                &rhs.integer as mpir_bindings::mpz_srcptr,
+            );
+            return g;
+        }
     }
 
     fn checked_div_min(&self, lhs: &Self::Element, rhs: &Self::Element) -> Option<Self::Element> {
@@ -855,6 +877,31 @@ fn test_divisibility_ring_axioms() {
 #[test]
 fn test_euclidean_ring_axioms() {
     crate::pid::generic_tests::test_euclidean_ring_axioms(MPZ::RING, edge_case_elements())
+}
+
+#[test]
+fn test_principal_ideal_ring_axioms() {
+    crate::pid::generic_tests::test_principal_ideal_ring_axioms(MPZ::RING, edge_case_elements())
+}
+
+#[test]
+fn test_gcd() {
+    let ZZ = MPZ::RING;
+    let from = |x: i64| ZZ.coerce(&StaticRing::<i64>::RING, x);
+    for (a, b, expected) in [
+        (0, 0, 0),
+        (0, 5, 5),
+        (-5, 0, 5),
+        (12, 18, 6),
+        (-12, 18, 6),
+        (12, -18, 6),
+        (17, 5, 1),
+    ] {
+        assert_el_eq!(ZZ, from(expected), ZZ.ideal_gen(&from(a), &from(b)));
+        let (s, t, g) = ZZ.extended_ideal_gen(&from(a), &from(b));
+        assert_el_eq!(ZZ, from(expected), &g);
+        assert_el_eq!(ZZ, g, ZZ.add(ZZ.mul(s, from(a)), ZZ.mul(t, from(b))));
+    }
 }
 
 #[test]
