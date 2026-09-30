@@ -910,7 +910,7 @@ where
                 Err(0) => None,
                 Err(i) => Some((&f.data[i - 1].0, &f.data[i - 1].1)),
             };
-            assert!({
+            debug_assert!({
                 let expected = self
                     .terms(f)
                     .filter(|(_, m)| order.compare(RingRef::from(self), m, lt_than) == Ordering::Less)

@@ -126,7 +126,7 @@ use feanor_math::prelude::*;
 use feanor_math::ring_impls::zn::*;
 use feanor_math::ring_impls::zn::zn_64b::*;
 use feanor_math::assert_el_eq;
-use feanor_math::algorithms::buchberger::*;
+use feanor_math::algorithms::groebner::*;
 use feanor_math::ring_impls::multivariate::*;
 use feanor_math::ring_impls::multivariate::multivariate_impl::*;
 use feanor_math::algorithms::poly_factor::*;
