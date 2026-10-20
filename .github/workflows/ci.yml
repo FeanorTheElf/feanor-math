@@ -20,7 +20,7 @@ jobs:
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly-2026-03-01
+        toolchain: nightly-2026-10-12
         components: rustfmt
         override: true
     
@@ -48,7 +48,7 @@ jobs:
     - name: Install Rust toolchain
       uses: actions-rs/toolchain@v1
       with:
-        toolchain: nightly-2026-03-01
+        toolchain: nightly-2026-10-12
         override: true
     
     - name: Install latest nextest release

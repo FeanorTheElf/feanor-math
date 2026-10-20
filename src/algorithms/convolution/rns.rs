@@ -1,4 +1,4 @@
-use std::alloc::{Allocator, Global};
+use std::alloc::{AllocatorNightly, Global};
 use std::cmp::{max, min};
 use std::marker::PhantomData;
 
@@ -32,7 +32,7 @@ pub struct RNSConvolution<
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     integer_ring: I,
@@ -55,7 +55,7 @@ pub struct RNSConvolutionZn<
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     base: RNSConvolution<I, C, A, CreateC>,
@@ -78,7 +78,7 @@ where
 #[stability::unstable(feature = "enable")]
 pub struct CreateNTTConvolution<A = Global>
 where
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     allocator: A,
 }
@@ -88,7 +88,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     fn from(value: RNSConvolutionZn<I, C, A, CreateC>) -> Self { value.base }
@@ -99,7 +99,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     fn from(value: &'a RNSConvolutionZn<I, C, A, CreateC>) -> Self { &value.base }
@@ -110,7 +110,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     fn from(value: RNSConvolution<I, C, A, CreateC>) -> Self { RNSConvolutionZn { base: value } }
@@ -121,7 +121,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     fn from(value: &'a RNSConvolution<I, C, A, CreateC>) -> Self { unsafe { std::mem::transmute(value) } }
@@ -135,7 +135,7 @@ impl CreateNTTConvolution<Global> {
 
 impl<A> FnOnce<(Zn,)> for CreateNTTConvolution<A>
 where
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     type Output = NTTConvolution<ZnBase, ZnFastmulBase, CanHom<ZnFastmul, Zn>, A>;
 
@@ -144,14 +144,14 @@ where
 
 impl<A> FnMut<(Zn,)> for CreateNTTConvolution<A>
 where
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     extern "rust-call" fn call_mut(&mut self, args: (Zn,)) -> Self::Output { self.call(args) }
 }
 
 impl<A> Fn<(Zn,)> for CreateNTTConvolution<A>
 where
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     extern "rust-call" fn call(&self, args: (Zn,)) -> Self::Output {
         let ring = args.0;
@@ -181,7 +181,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
 {
     /// Creates a new [`RNSConvolution`] with all the given configuration parameters.
@@ -576,7 +576,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
     R: ?Sized + IntegerRing,
 {
@@ -685,7 +685,7 @@ where
     I: RingStore + Clone,
     I::Type: IntegerRing,
     C: ConvolutionAlgorithm<ZnBase>,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     CreateC: Fn(Zn) -> C,
     R: ?Sized + ZnRing + CanHomFrom<I::Type>,
 {

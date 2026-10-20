@@ -1,4 +1,4 @@
-use std::alloc::{Allocator, Global};
+use std::alloc::{AllocatorNightly, Global};
 
 use super::ConvolutionAlgorithm;
 use crate::algorithms::fft::cooley_tuckey::CooleyTuckeyFFT;
@@ -20,7 +20,7 @@ where
     R_main: ?Sized + ZnRing,
     R_twiddle: ?Sized + ZnRing,
     H: Homomorphism<R_twiddle, R_main> + Clone,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     hom: H,
     fft_algos: LazyVec<CooleyTuckeyFFT<R_main, R_twiddle, H>>,
@@ -32,7 +32,7 @@ where
 pub struct PreparedConvolutionOperand<R, A = Global>
 where
     R: ?Sized + ZnRing,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     significant_entries: usize,
     ntt_data: Vec<R::Element, A>,
@@ -57,7 +57,7 @@ where
     R_main: ?Sized + ZnRing,
     R_twiddle: ?Sized + ZnRing,
     H: Homomorphism<R_twiddle, R_main> + Clone,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     /// Creates a new [`NTTConvolution`].
     ///
@@ -257,7 +257,7 @@ where
     R_main: ?Sized + ZnRing,
     R_twiddle: ?Sized + ZnRing,
     H: Homomorphism<R_twiddle, R_main> + Clone,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
 {
     type PreparedConvolutionOperand = PreparedConvolutionOperand<R_main, A>;
 
