@@ -1,4 +1,4 @@
-use std::alloc::Allocator;
+use std::alloc::AllocatorNightly;
 use std::cmp::max;
 use std::fmt::{Debug, Formatter, Result};
 use std::sync::Arc;
@@ -272,7 +272,7 @@ pub trait ImplGenericCanIsoFromToMarker: PolyRing {}
 impl<R, A, C> ImplGenericCanIsoFromToMarker for dense_poly::DensePolyRingBase<R, A, C>
 where
     R: RingStore,
-    A: Allocator + Clone,
+    A: AllocatorNightly + Clone,
     C: ConvolutionAlgorithm<R::Type>,
 {
 }
