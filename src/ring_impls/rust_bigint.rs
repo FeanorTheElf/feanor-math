@@ -99,18 +99,19 @@ impl<A: Allocator + Send + Sync + Clone> RustBigIntRingBase<A> {
         }
     }
 
-    /// Returns an iterator over the digits of the `2^64`-adic digit
+    /// Returns an iterator over the digits of the `2^64`-ary digit
     /// representation of the absolute value of the given element.
-    pub fn abs_base_u64_repr<'a>(&self, el: &'a RustBigInt) -> impl 'a + Iterator<Item = u64> { el.1.iter().copied() }
+    pub fn abs_base_u64_repr<A2: Allocator>(&self, src: &RustBigInt<A>, allocator: A2) -> Vec<u64, A2> {
+        let mut result = Vec::with_capacity_in(src.1.len(), allocator);
+        result.extend_from_slice(&src.1);
+        return result;
+    }
 
-    /// Interprets the elements of the iterator as digits in a `2^64`-adic
+    /// Interprets the elements of the iterator as digits in a `2^64`-ary
     /// digit representation, and returns the big integer represented by it.
-    pub fn from_base_u64_repr<I>(&self, data: I) -> RustBigInt<A>
-    where
-        I: Iterator<Item = u64>,
-    {
-        let mut result = Vec::with_capacity_in(data.size_hint().0, self.allocator.clone());
-        result.extend(data);
+    pub fn from_base_u64_repr(&self, data: &[u64]) -> RustBigInt<A> {
+        let mut result = Vec::with_capacity_in(data.len(), self.allocator.clone());
+        result.extend_from_slice(data);
         RustBigInt(false, result)
     }
 

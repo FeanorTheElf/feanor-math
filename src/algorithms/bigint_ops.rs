@@ -658,6 +658,8 @@ where
 
 #[cfg(test)]
 mod tests {
+    use std::alloc::Global;
+
     use super::*;
 
     fn truncate_zeros(mut x: Vec<BlockInt>) -> Vec<BlockInt> {
@@ -672,8 +674,7 @@ mod tests {
         truncate_zeros(
             RustBigIntRing::RING
                 .get_ring()
-                .abs_base_u64_repr(&RustBigIntRing::RING.parse(s, base).unwrap())
-                .collect::<Vec<_>>(),
+                .abs_base_u64_repr(&RustBigIntRing::RING.parse(s, base).unwrap(), Global),
         )
     }
 

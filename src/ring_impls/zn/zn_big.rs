@@ -785,7 +785,6 @@ impl_field_wrap_unwrap_isos! { <{I, J}> ZnGBBase<I>, ZnGBBase<J> where I: RingSt
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ring_impls::rust_bigint::*;
     use crate::ring_properties::integer::BigIntRing;
 
     #[test]
@@ -951,7 +950,7 @@ mod tests {
             )
             .unwrap();
 
-        let x: ZnGBEl<RustBigIntRing> = ZnGBEl(value);
+        let x: ZnGBEl<BigIntRing> = ZnGBEl(value);
         // this means this is a valid representative, although it is > ring.modulus()
         assert!(ZZbig.is_lt(&x.0, &ring.get_ring().twice_modulus));
 

@@ -1,9 +1,7 @@
 use tracing::instrument;
 
 use crate::algorithms::convolution::DynConvolution;
-use crate::algorithms::poly_gcd::finite::{
-    fast_poly_eea, poly_power_decomposition_finite_field, poly_squarefree_part_finite_field,
-};
+use crate::algorithms::poly_gcd::finite::*;
 use crate::homomorphism::Identity;
 use crate::prelude::*;
 use crate::ring_impls::poly::dense_poly::DensePolyRing;
@@ -307,7 +305,7 @@ macro_rules! impl_poly_gcd_for_integer {
         }
     };
     (PolyTFracGCDRing for $self_type:ty) => {
-        impl_field_wrap_unwrap_homs!{ <{}> PolyTFracGCDRing for $self_type where }
+        $crate::impl_poly_gcd_for_integer!{ <{}> PolyTFracGCDRing for $self_type where }
     };
 }
 

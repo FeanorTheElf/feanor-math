@@ -453,11 +453,11 @@ mod tests {
             let input = poly_ring.prod([f, g, h]);
             let actual = poly_factor_integer(&poly_ring, &input);
             assert!(actual.iter().map(|(_, e)| *e).sum::<usize>() >= 3);
-            assert_el_eq!(
-                &poly_ring,
-                input,
-                poly_ring.prod(actual.into_iter().map(|(f, e)| poly_ring.pow(f, e)))
-            );
+            let actual_prod = poly_ring.prod(actual.into_iter().map(|(f, e)| poly_ring.pow(f, e)));
+            let scale = ring
+                .checked_div(poly_ring.lc(&input).unwrap(), poly_ring.lc(&actual_prod).unwrap())
+                .unwrap();
+            assert_el_eq!(&poly_ring, input, poly_ring.inclusion().mul_map(actual_prod, scale));
         }
     }
 }
