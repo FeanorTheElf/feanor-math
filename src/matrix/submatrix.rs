@@ -248,8 +248,8 @@ where
         // row_step)` are valid for `0 <= i < row_count`. Technically, this is not
         // completely legal, as in the case `rows.start == rows.end == row_count`, the
         // resulting pointer might point outside of the allocated area
-        // - this is legal only when we are exactly one byte after it, but if `row_step` has a weird value,
-        //   this does
+        // - this is legal only when we are exactly one byte after it, but if `row_step` has a weird
+        //   value, this does
         // not work. However, `row_step` has suitable values in all safe interfaces.
         unsafe {
             self.row_count = rows.end - rows.start;

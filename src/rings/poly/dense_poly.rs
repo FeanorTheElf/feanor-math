@@ -149,7 +149,9 @@ where
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result { self.data.fmt(f) }
 }
 
-impl<R: RingStore, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>> RingBase for DensePolyRingBase<R, A, C> {
+impl<R: RingStore, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>> RingBase
+    for DensePolyRingBase<R, A, C>
+{
     type Element = DensePolyRingEl<R, A>;
 
     fn clone_el(&self, val: &Self::Element) -> Self::Element {
@@ -530,7 +532,8 @@ where
     }
 }
 
-impl<R, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElementRing for DensePolyRingBase<R, A, C>
+impl<R, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>> SerializableElementRing
+    for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
     R::Type: SerializableElementRing,
@@ -665,7 +668,8 @@ impl<R: RingStore, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>
     fn specialize<O: FiniteRingOperation<Self>>(op: O) -> O::Output { op.fallback() }
 }
 
-impl<R, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyRing for DensePolyRingBase<R, A, C>
+impl<R, A: AllocatorNightly + Clone, C: ConvolutionAlgorithm<R::Type>> EvalPolyLocallyRing
+    for DensePolyRingBase<R, A, C>
 where
     R: RingStore,
     R::Type: InterpolationBaseRing,

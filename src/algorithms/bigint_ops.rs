@@ -315,7 +315,8 @@ fn division_step<A: Allocator>(
     // the basic idea is as follows:
     // we know that for a and b, have a - a//(b+1) * b <= b + a/(b+1)
     // Hence, we perform two steps:
-    //  - by choosing a and b as the top two blocks of lhs resp. lhs, achieve that a - a//(b+1) * b <= b
+    //  - by choosing a and b as the top two blocks of lhs resp. lhs, achieve that a - a//(b+1) * b
+    //    <= b
     //    + 2^k (where k = BLOCK_BITS); hence, lhs - a//(b+1) * rhs <= rhs + 2^k, and so possibly
     //    subtracting rhs achieves new_lhs <= rhs
     //  - by choosing a as the top two blocks and b as only the top block of lhs resp. lhs (now b <

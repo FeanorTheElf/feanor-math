@@ -269,8 +269,8 @@ impl<T, A: Allocator> OwnedMatrix<MaybeUninit<T>, A> {
 
         // SAFETY:
         // * ptr/capacity/alloc come straight from a live Vec, so they're mutually consistent.
-        // * MaybeUninit<T> and T share size and alignment, so the ptr cast preserves the allocation's
-        //   layout requirements for T.
+        // * MaybeUninit<T> and T share size and alignment, so the ptr cast preserves the
+        //   allocation's layout requirements for T.
         // * The elements referenced by the matrix are init T: the checks proved the caller's valid
         //   SubmatrixMut<T> covers exactly [base, base + len).
         let result_data = unsafe { Vec::from_raw_parts_in(ptr as *mut T, length, capacity, alloc) };

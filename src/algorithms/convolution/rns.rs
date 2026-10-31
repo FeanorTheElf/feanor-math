@@ -449,10 +449,11 @@ where
         let mut rhs_tmp = Vec::new_in(self.allocator.clone());
 
         // the algorithm is as follows:
-        //  - we keep track of the current "width" (i.e. number of RNS factors) to represent the result
+        //  - we keep track of the current "width" (i.e. number of RNS factors) to represent the
+        //    result
         //  - we collect iterator elements, until the current width is not sufficient anymore
-        //  - then we do `merge_current()`: forward all collected samples to the child convolutions, add the
-        //    result to `dst`, and clear the buffers; continue with updated width
+        //  - then we do `merge_current()`: forward all collected samples to the child convolutions,
+        //    add the result to `dst`, and clear the buffers; continue with updated width
 
         let mut merge_current =
             |current_width: usize,

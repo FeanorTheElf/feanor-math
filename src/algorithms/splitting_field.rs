@@ -100,8 +100,10 @@ where
 
     // rhs has three columns:
     // - first the `total_rank`-th power of `x + ka` -> this will later give us the minpoly
-    // - second the generator of `K` -> this will give us a repr of this generator in the result field
-    // - third the generator of `L` -> this will give us a repr of this generator in the result field
+    // - second the generator of `K` -> this will give us a repr of this generator in the result
+    //   field
+    // - third the generator of `L` -> this will give us a repr of this generator in the result
+    //   field
     let mut rhs = OwnedMatrix::zero(total_rank, 3, k);
     let current_wrt_basis = L.wrt_canonical_basis(&current);
     for i1 in 0..L.rank() {
@@ -258,13 +260,15 @@ where
             //  - Consider generator `a` of `K` and `b` of `L` over `K`
             //  - Consider the set `A_n = { b, b + a, b + 2a, ..., b + (n - 1)a }`
             //  - Consider also the subset `B_n = { x in A_n | QQ[x] != L }`
-            //  - The idea is now to choose a random element from `A_n`, and hope that it is not in `B_n`
-            //  - To estimate the probability, consider the map `B_n -> { maximal proper subfields of L }` that
-            //    maps any `x` to some maximal proper subfield containing `QQ[x]`
-            //  - Then this map is injective, as any field containing `a + ib` and `a + jb`, `j > i` must
-            //    contain `a, b`, thus be `L`
+            //  - The idea is now to choose a random element from `A_n`, and hope that it is not in
+            //    `B_n`
+            //  - To estimate the probability, consider the map `B_n -> { maximal proper subfields
+            //    of L }` that maps any `x` to some maximal proper subfield containing `QQ[x]`
+            //  - Then this map is injective, as any field containing `a + ib` and `a + jb`, `j > i`
+            //    must contain `a, b`, thus be `L`
             //  - In other words, to find `n`, we need a bound on the maximal proper subfields
-            //  - I believe the degree `[L : QQ]` is such a bound (in the Galois case it is, at least)
+            //  - I believe the degree `[L : QQ]` is such a bound (in the Galois case it is, at
+            //    least)
 
             // take `A` twice as large, so that we find a good element with probability >= 1/2
             let size_of_A: i32 = (2 * total_rank).try_into().unwrap();

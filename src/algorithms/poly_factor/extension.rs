@@ -167,10 +167,10 @@ where
 
     // We use the approach outlined in Cohen's "a course in computational algebraic number theory".
     //  - Use square-free reduction to assume wlog that `f` is square-free
-    //  - Observe that the factorization of `f` is the product over `gcd(f, g)` where `g` runs through
-    //    the factors of `N(f)` over `QQ[X]` - assuming that `N(f)` is square-free! Here `N(f)` is the
-    //    "norm" of `f`, i.e. the product `prod_sigma sigma(f)` where `sigma` runs through the
-    //    embeddings `K -> CC`.
+    //  - Observe that the factorization of `f` is the product over `gcd(f, g)` where `g` runs
+    //    through the factors of `N(f)` over `QQ[X]` - assuming that `N(f)` is square-free! Here
+    //    `N(f)` is the "norm" of `f`, i.e. the product `prod_sigma sigma(f)` where `sigma` runs
+    //    through the embeddings `K -> CC`.
     //  - It is now left to actually compute `N(f)`, which is not so simple as we do not known the
     //    `sigma`. As it turns out, this is the resultant of `f` and `MiPo(theta)` where `theta`
     //    generates `K`
