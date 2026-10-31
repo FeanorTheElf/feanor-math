@@ -1,40 +1,27 @@
 use tracing::instrument;
 
-use super::BasisPoly;
+use crate::algorithms::groebner::spoly::{BasisPoly, ExpandedTerm};
 use crate::homomorphism::Homomorphism;
 use crate::prelude::*;
 use crate::ring_impls::multivariate::*;
-use crate::ring_properties::divisibility::{DivisibilityRing, DivisibilityRingStore};
+use crate::ring_properties::divisibility::DivisibilityRing;
 
-// origin (w.r.t. `algorithms/buchberger.rs`): minor changes: from `find_reducer`; uses cached
-// leading terms, takes a single term, returns the reducer instead of its index
-/// Returns the first reducer whose leading term divides the term `c * X^exponents`,
-/// together with the coefficient of the quotient.
 #[inline(never)]
-fn find_reducer<'a, P, I>(
-    ring: P,
-    c: &PolyCoeff<P>,
-    exponents: &[usize],
-    reducers: I,
-) -> Option<(&'a BasisPoly<P>, PolyCoeff<P>)>
+fn find_reducer<'a, P, I>(ring: P, lt: &ExpandedTerm<P>, reducers: I) -> Option<&'a BasisPoly<P>>
 where
-    P: 'a + RingStore,
+    P: 'a + Copy + RingStore,
     P::Ring: MultivariatePolyRing,
     <BaseRingStore<P> as RingStore>::Ring: DivisibilityRing,
     I: Iterator<Item = &'a BasisPoly<P>>,
 {
     for reducer in reducers {
-        if reducer.lt.monomial_divides(exponents) {
-            if let Some(quo_c) = ring.base_ring().checked_div(c, &reducer.lt.coeff) {
-                return Some((reducer, quo_c));
-            }
+        if ExpandedTerm::divides(ring, lt, &reducer.lt) {
+            return Some(reducer);
         }
     }
     return None;
 }
 
-// origin (w.r.t. `algorithms/buchberger.rs`): major changes: from `reduce_poly`; additionally
-// supports tail reduction and tracks sugar degree
 /// Reduces `f` modulo the given reducers.
 ///
 /// If `full` is `false`, this only reduces the leading term, i.e. stops as soon as the leading
@@ -47,7 +34,8 @@ where
 /// Note that the reduction uses strong divisibility, i.e. a term `c * m` is only reduced by a
 /// reducer with leading term `d * n` if both `n | m` and `d | c`.
 #[instrument(skip_all, level = "trace")]
-pub(super) fn reduce<'a, P, O, F, I>(ring: P, f: &mut El<P>, sugar: &mut usize, mut reducers: F, order: O, full: bool)
+#[stability::unstable(feature = "enable")]
+pub fn reduce<'a, P, O, F, I>(ring: P, f: &mut El<P>, sugar: &mut usize, mut reducers: F, order: O, full: bool)
 where
     P: 'a + RingStore + Copy,
     P::Ring: MultivariatePolyRing,
@@ -56,7 +44,10 @@ where
     F: FnMut() -> I,
     I: Iterator<Item = &'a BasisPoly<P>>,
 {
-    let mut exponents = (0..ring.indeterminate_count()).map(|_| 0).collect::<Vec<_>>();
+    if ring.is_zero(f) {
+        return;
+    }
+    let mut current_lt = ExpandedTerm::lt(ring, f, order);
     // all terms larger than `bound` are already reduced; `None` means that no term is reduced yet
     let mut bound: Option<PolyMonomial<P>> = None;
     loop {
@@ -64,21 +55,23 @@ where
             None => ring.LT(f, order),
             Some(bound) => ring.largest_term_lt(f, order, bound),
         };
-        let Some((c, m)) = current_term else {
+        let Some((coeff, mon)) = current_term else {
             return;
         };
-        ring.expand_monomial_to(m, &mut exponents);
-        match find_reducer(ring, c, &exponents, reducers()) {
-            Some((reducer, quo_c)) => {
-                let quo_m = ring.create_monomial(exponents.iter().zip(reducer.lt.exponents.iter()).map(|(l, r)| l - r));
-                *sugar = (*sugar).max(ring.monomial_deg(&quo_m) + reducer.sugar);
+        current_lt.coeff = coeff.clone();
+        current_lt.monomial = mon.clone();
+        ring.expand_monomial_to(mon, &mut current_lt.exponents);
+        match find_reducer(ring, &current_lt, reducers()) {
+            Some(reducer) => {
+                let quo = ExpandedTerm::checked_div(ring, &current_lt, &reducer.lt).unwrap();
+                *sugar = (*sugar).max(quo.deg() + reducer.sugar_degree);
                 let mut scaled_reducer = reducer.poly.clone();
-                ring.mul_assign_monomial(&mut scaled_reducer, quo_m);
-                ring.inclusion().mul_assign_ref_map(&mut scaled_reducer, &quo_c);
+                ring.mul_assign_monomial(&mut scaled_reducer, quo.monomial);
+                ring.inclusion().mul_assign_ref_map(&mut scaled_reducer, &quo.coeff);
                 ring.sub_assign(f, scaled_reducer);
             }
             None if full => {
-                bound = Some(ring.clone_monomial(m));
+                bound = Some(current_lt.monomial.clone());
             }
             None => {
                 return;
@@ -87,8 +80,6 @@ where
     }
 }
 
-// origin (w.r.t. `algorithms/buchberger.rs`): minor changes: from `multivariate_division`; now
-// computes a full normal form instead of only reducing the leading term
 /// Computes the remainder of the multivariate division of `f` by the given reducers.
 ///
 /// More concretely, this repeatedly subtracts suitable multiples of the reducers from `f`, until
@@ -97,10 +88,11 @@ where
 /// `n | m` and `d | c`.
 ///
 /// If the reducers form a strong Groebner basis of an ideal `I` (e.g. if they have been computed by
-/// [`super::buchberger()`]), then the result is a normal form of `f` modulo `I`. In particular, it
+/// [`buchberger()`]), then the result is a normal form of `f` modulo `I`. In particular, it
 /// is zero if and only if `f` is in `I`. For arbitrary reducers, the result depends on the order of
 /// the reducers, and may be nonzero even if `f` is in the ideal generated by the reducers.
-#[stability::unstable(feature = "enable")]
+///
+/// [`buchberger()`]: crate::algorithms::groebner::buchberger()
 #[instrument(skip_all, level = "trace")]
 pub fn multivariate_division<'a, P, O, I>(ring: P, mut f: El<P>, reducers: I, order: O) -> El<P>
 where
@@ -112,7 +104,12 @@ where
 {
     let reducers = reducers
         .filter(|g| !ring.is_zero(g))
-        .map(|g| BasisPoly::new(ring, g.clone(), 0, order))
+        .map(|g| BasisPoly {
+            lt: ExpandedTerm::lt(ring, g, order),
+            poly: g.clone(),
+            sugar_degree: 0,
+            redundant: false,
+        })
         .collect::<Vec<_>>();
     reduce(ring, &mut f, &mut 0, || reducers.iter(), order, true);
     return f;

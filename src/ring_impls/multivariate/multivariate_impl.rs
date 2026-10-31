@@ -736,8 +736,6 @@ where
         };
     }
 
-    fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial { mon.data.clone().wrap() }
-
     #[instrument(skip_all, level = "trace")]
     fn add_assign_from_terms<I>(&self, lhs: &mut Self::Element, terms: I)
     where

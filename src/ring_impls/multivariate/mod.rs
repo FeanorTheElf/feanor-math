@@ -18,7 +18,7 @@ pub type PolyMonomial<P> = <<P as RingStore>::Ring as MultivariatePolyRing>::Mon
 
 /// Trait for multivariate polynomial rings.
 pub trait MultivariatePolyRing: RingExtension {
-    type Monomial: Send + Sync;
+    type Monomial: Send + Sync + Clone;
     type TermIter<'a>: Iterator<Item = (&'a El<Self::BaseRing>, &'a Self::Monomial)>
     where
         Self: 'a;
@@ -133,10 +133,6 @@ pub trait MultivariatePolyRing: RingExtension {
             from.expand_monomial_to(m, &mut exponents_storage);
             (hom.map_ref(c), self.create_monomial(exponents_storage.iter().copied()))
         }));
-    }
-
-    fn clone_monomial(&self, mon: &Self::Monomial) -> Self::Monomial {
-        self.create_monomial((0..self.indeterminate_count()).map(|i| self.exponent_at(mon, i)))
     }
 
     /// Returns a list of all variables appearing in the given polynomial.
@@ -321,8 +317,6 @@ where
     {
         self.get_ring().create_monomial(exponents)
     }
-
-    fn clone_monomial(&self, mon: &PolyMonomial<Self>) -> PolyMonomial<Self> { self.get_ring().clone_monomial(mon) }
 
     /// Returns the coefficient of a polynomial corresponding to a monomial.
     ///
@@ -828,13 +822,13 @@ pub mod generic_tests {
             let xi = ring.indeterminate(i);
             let mut a = ring.create_term(base_ring.int_hom().map(3), ring.create_monomial((0..n).map(|_| 0)));
             let terms_with_multiples = [
-                (base_ring.one(), ring.clone_monomial(&xi)),
-                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), xi.clone()),
+                (base_ring.one(), xi.clone()),
                 (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
                 (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
-                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), xi.clone()),
                 (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
-                (base_ring.one(), ring.clone_monomial(&xi)),
+                (base_ring.one(), xi.clone()),
                 (base_ring.one(), ring.create_monomial((0..n).map(|_| 0))),
             ];
             ring.get_ring().add_assign_from_terms(&mut a, terms_with_multiples);
@@ -852,8 +846,8 @@ pub mod generic_tests {
             let one = ring.create_monomial((0..n).map(|_| 0));
             let x0 = ring.indeterminate(0);
             let x1 = ring.indeterminate(1);
-            let x0_v = ring.create_term(base_ring.one(), ring.clone_monomial(&x0));
-            let x1_v = ring.create_term(base_ring.one(), ring.clone_monomial(&x1));
+            let x0_v = ring.create_term(base_ring.one(), x0.clone());
+            let x1_v = ring.create_term(base_ring.one(), x1.clone());
             let x0_2 = ring.create_monomial((0..n).map(|k| if k == 0 { 2 } else { 0 }));
             let x0_3 = ring.create_monomial((0..n).map(|k| if k == 0 { 3 } else { 0 }));
             let x0_4 = ring.create_monomial((0..n).map(|k| if k == 0 { 4 } else { 0 }));
@@ -880,12 +874,9 @@ pub mod generic_tests {
                         let g = ring.add(ring.inclusion().mul_ref_map(&x0_v, c), x1_v.clone());
                         let h = ring.from_terms(
                             [
-                                (base_ring.mul_ref(a, c), ring.clone_monomial(&x0_2)),
-                                (
-                                    base_ring.add_ref_snd(base_ring.mul_ref(b, c), a),
-                                    ring.clone_monomial(&x0x1),
-                                ),
-                                (b.clone(), ring.clone_monomial(&x1_2)),
+                                (base_ring.mul_ref(a, c), x0_2.clone()),
+                                (base_ring.add_ref_snd(base_ring.mul_ref(b, c), a), x0x1.clone()),
+                                (b.clone(), x1_2.clone()),
                             ]
                             .into_iter(),
                         );
@@ -899,19 +890,16 @@ pub mod generic_tests {
                 for b in &elements {
                     for c in &elements {
                         let f = ring.from_terms([
-                            (a.clone(), ring.clone_monomial(&one)),
-                            (c.clone(), ring.clone_monomial(&x0_2)),
-                            (base_ring.one(), ring.clone_monomial(&x0x1)),
+                            (a.clone(), one.clone()),
+                            (c.clone(), x0_2.clone()),
+                            (base_ring.one(), x0x1.clone()),
                         ]);
-                        let g = ring.from_terms([
-                            (b.clone(), ring.clone_monomial(&x0)),
-                            (base_ring.one(), ring.clone_monomial(&x0_2)),
-                        ]);
+                        let g = ring.from_terms([(b.clone(), x0.clone()), (base_ring.one(), x0_2.clone())]);
                         let h = ring.from_terms([
-                            (a.clone(), ring.clone_monomial(&one)),
-                            (b.clone(), ring.clone_monomial(&x0)),
-                            (base_ring.add_ref_fst(c, base_ring.one()), ring.clone_monomial(&x0_2)),
-                            (base_ring.one(), ring.clone_monomial(&x0x1)),
+                            (a.clone(), one.clone()),
+                            (b.clone(), x0.clone()),
+                            (base_ring.add_ref_fst(c, base_ring.one()), x0_2.clone()),
+                            (base_ring.one(), x0x1.clone()),
                         ]);
                         assert_el_eq!(ring, h, ring.add(f, g));
                     }
@@ -923,18 +911,18 @@ pub mod generic_tests {
                 for b in &elements {
                     for c in &elements {
                         let mut f = ring.from_terms([
-                            (a.clone(), ring.clone_monomial(&one)),
-                            (b.clone(), ring.clone_monomial(&x0)),
-                            (c.clone(), ring.clone_monomial(&x0_2)),
-                            (base_ring.one(), ring.clone_monomial(&x0x1)),
+                            (a.clone(), one.clone()),
+                            (b.clone(), x0.clone()),
+                            (c.clone(), x0_2.clone()),
+                            (base_ring.one(), x0x1.clone()),
                         ]);
                         let h = ring.from_terms([
-                            (a.clone(), ring.clone_monomial(&x0_2)),
-                            (b.clone(), ring.clone_monomial(&x0_3)),
-                            (c.clone(), ring.clone_monomial(&x0_4)),
-                            (base_ring.one(), ring.clone_monomial(&x0_3x1)),
+                            (a.clone(), x0_2.clone()),
+                            (b.clone(), x0_3.clone()),
+                            (c.clone(), x0_4.clone()),
+                            (base_ring.one(), x0_3x1.clone()),
                         ]);
-                        let m = ring.clone_monomial(&x0_2);
+                        let m = x0_2.clone();
                         ring.mul_assign_monomial(&mut f, m);
                         assert_el_eq!(ring, h, f);
                     }
@@ -945,10 +933,10 @@ pub mod generic_tests {
             for a in &elements {
                 for b in &elements {
                     let f = ring.from_terms([
-                        (base_ring.int_hom().map(3), ring.clone_monomial(&one)),
-                        (base_ring.int_hom().map(10), ring.clone_monomial(&x0)),
-                        (base_ring.neg_one(), ring.clone_monomial(&x0_2)),
-                        (base_ring.one(), ring.clone_monomial(&x0x1)),
+                        (base_ring.int_hom().map(3), one.clone()),
+                        (base_ring.int_hom().map(10), x0.clone()),
+                        (base_ring.neg_one(), x0_2.clone()),
+                        (base_ring.one(), x0x1.clone()),
                     ]);
                     let expected = <_ as RingStore>::sum(
                         base_ring,

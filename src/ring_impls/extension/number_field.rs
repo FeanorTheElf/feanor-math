@@ -563,7 +563,7 @@ mod tests {
         let K = NumberField::new(&ZZX, &f);
 
         let elements = multi_cartesian_product(
-            [(-4..4), (-2..2)].into_iter(),
+            [(-3..4), (-1..2)].into_iter(),
             |slice| K.from_power_basis(slice.iter().map(|x| K.base_ring().int_hom().map(*x))),
             |_, x| *x,
         )

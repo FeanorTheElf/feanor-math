@@ -244,8 +244,6 @@ where
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::ring_impls::multivariate::multivariate_impl::MultivariatePolyRingImpl;
-    use crate::ring_impls::multivariate::*;
 
     // #[test]
     // #[allow(deprecated)]

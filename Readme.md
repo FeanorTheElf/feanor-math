@@ -13,13 +13,15 @@ Furthermore, there might be bugs, and many implementations are not particularly 
 Nevertheless, I think this library can already be useful, and I regularly use it for various applications, including cryptography.
 Note that I will try to keep the interfaces stable, unless they are marked with `#[stability::unstable]`.
 
-This library uses nightly Rust, ~~and even unstable features like const-generics and specialization~~ - this caused too much of a headache, so I removed those uses again.
+This library uses nightly Rust.
 
 ### Update notes
 
 The most important changes from version 3.x.y are the following:
  - attempted to simplify the overall design; carefully introducing dynamic dispatch when it doesn't harm performance or type safety, make ring elements and [`RingStore`]s `Clone`
- - performance improvements, in particular to polynomial gcd and factorization
+ - extracted groups into a dedicated crate
+ - removed unnecessary and badly designed components, including the `ndarray` feature, sieve of erathostenes, local ring wrapper
+ - performance improvements, including gcd and xgcd, Buchberger's algorithm, high-precision Z/nZ, polynomial factorization
 
 ## A short introduction
 
@@ -54,22 +56,20 @@ The following algorithms are implemented
  - Miller-Rabin test to check primality of integers.
  - Buchberger's algorithm (F4-style) to compute Gröbner basis.
 
-Generic abelian groups (the traits `AbelianGroupBase`/`AbelianGroupStore`) and the algorithms on them - in particular baby-step-giant-step and factorization-based discrete logarithms, and the structure of finitely generated subgroups - used to be part of this library.
+Generic abelian groups (the traits `AbelianGroupBase`/`AbelianGroupStore`) and the algorithms on them used to be part of this library.
 As of version 4.0.0, they live in the separate crate [`feanor-group`](https://github.com/FeanorTheElf/feanor-group).
-
-Unfortunately, operations with polynomials over infinite rings (integers, rationals, number fields) are currently very slow, since efficient implementation require a lot of care to prevent coefficient blowup, which I did not have time or need to invest.
 
 ### Most important missing features
 
- - Optimization and better handling of coefficient blowup during algorithms over infinite rings (in particular `Q`, `Z` and number fields). 
+ - Optimization and better handling of coefficient blowup during algorithms over infinite rings (in particular `Q`, `Z` and number fields). This is work in progress, and version 4.0.0 has already seen some improvements.
  - More linear algebra operations, apart from determinants and solving linear systems.
- - Higher-level number theory algorithms, e.g. computing maximal orders.
- - An implementation of general fraction fields (implementations of `Q` and the ring of rational functions already exist).
+ - Higher-level number theory algorithms, e.g. computing maximal orders. This is also a prerequisite for simplifying number fields, which will hopefully improve performance for computations in large-degree number fields.
+ - Better and more canonical implementations for general fraction fields.
 
 ## SemVer
 
-In version `1.x.x` the library used an inconsistent version scheme.
-This is now fixed, and all versions from `2.x.x` onwards use semantic versioning, as described in the [Cargo book](https://doc.rust-lang.org/cargo/reference/resolver.html#semver-compatibility).
+In version `1.x.y` the library used an inconsistent version scheme.
+This is now fixed, and all versions from `2.0.0` onwards use semantic versioning, as described in the [Cargo book](https://doc.rust-lang.org/cargo/reference/resolver.html#semver-compatibility).
 Note that all items marked with the annotation `#[stability::unstable]` from the rust library [`stability`](https://docs.rs/stability/latest/stability/index.html) are exempt from semantic version.
 In other words, breaking changes in the interface of these structs/traits/functions will only increment the minor version number.
 Note that these are not visible to other crates at all, unless the feature `unstable-enable` is active.

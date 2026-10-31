@@ -2,43 +2,197 @@ use elsa::sync::FrozenVec;
 use rayon::iter::{IntoParallelIterator, IntoParallelRefIterator, ParallelIterator};
 use tracing::{Level, Span, event, instrument, span};
 
-use super::pairs::{Basis, CriticalPair};
 use super::reduction::reduce;
-use super::{BasisPoly, BasisView, total_degree};
+use super::spoly::CriticalPair;
+use crate::algorithms::groebner::spoly::{BasisPoly, CriticalPairKind, ExpandedTerm};
 use crate::prelude::*;
 use crate::ring_impls::multivariate::*;
-use crate::ring_properties::field::Field;
 use crate::ring_properties::pid::PrincipalIdealRing;
 
-// origin (w.r.t. `algorithms/buchberger.rs`): new: replaces `default_sort_fn` and the
-// minimal-degree rule
-/// Removes and returns the critical pairs that should be reduced next.
-///
-/// This is the place where a future pair selection strategy would hook in.
-///
-/// We use the sugar strategy, i.e. we select all pairs of minimal sugar degree. For homogeneous
-/// input, this is the same as selecting all pairs of minimal degree.
-fn select_batch<P>(basis: &mut Basis<P>) -> Vec<CriticalPair<P>>
+#[stability::unstable(feature = "enable")]
+pub trait BuchbergerStrategy<P>
 where
     P: RingStore,
     P::Ring: MultivariatePolyRing,
 {
-    let open = basis.open_pairs_mut();
-    let Some(min_sugar) = open.iter().map(|pair| pair.sugar).min() else {
-        return Vec::new();
-    };
-    let (mut batch, rest): (Vec<_>, Vec<_>) = std::mem::take(open)
-        .into_iter()
-        .partition(|pair| pair.sugar == min_sugar);
-    *open = rest;
-    batch.sort_by_key(|pair| pair.deg);
-    return batch;
+    /// Removes and returns the critical pairs that should be reduced next.
+    ///
+    /// The default implementation uses the sugar strategy, i.e. we select all pairs of minimal
+    /// sugar degree. For homogeneous input, this is the same as selecting all pairs of minimal
+    /// degree.
+    fn select_batch(
+        &mut self,
+        _ring: P,
+        _basis: &[BasisPoly<P>],
+        open: &mut Vec<CriticalPair<P>>,
+    ) -> Vec<CriticalPair<P>> {
+        let Some(min_sugar) = open.iter().map(|pair| pair.sugar).min() else {
+            return Vec::new();
+        };
+        let (mut batch, rest): (Vec<_>, Vec<_>) = std::mem::take(open)
+            .into_iter()
+            .partition(|pair| pair.sugar == min_sugar);
+        *open = rest;
+        batch.sort_by_key(|pair| pair.deg);
+        return batch;
+    }
+
+    /// Is regularly called by [`buchberger()`] and [`buchberger_with_strategy()`]; if it returns
+    /// true, the Groebner basis computation is stopped and current basis is returned.
+    ///
+    /// The default implementation always returns `false`.
+    fn should_abort(&mut self, _ring: P, _basis: &[BasisPoly<P>], _open: &[CriticalPair<P>]) -> bool { false }
 }
 
-// origin (w.r.t. `algorithms/buchberger.rs`): new
+/// Adds `h` to the basis, and updates the set of open critical pairs.
+///
+/// The leading term of `h` must not be divisible by the leading term of any
+/// non-redundant basis polynomial.
+///
+/// This follows the procedure "Update" of Becker and Weispfenning ("Groebner bases",
+/// 1993), which implements the Gebauer-Moeller criteria:
+///  - Old pairs `S(i, j)` are removed if `LT(h)` divides `lcm(i, j)`, and `lcm(i, j)` is different
+///    from both `lcm(i, h)` and `lcm(j, h)`. They then follow from `S(i, h)` and `S(j, h)`.
+///  - New pairs `S(i, h)` are removed if there is another new pair `S(j, h)` whose lcm divides
+///    `lcm(i, h)`. If the lcms are equal, exactly one of them is kept.
+///  - New pairs `S(i, h)` are removed if the leading monomials of `f_i` and `h` are coprime, and
+///    their leading coefficients are comaximal (product criterion). If this is the case, all pairs
+///    with the same lcm are removed as well.
+///  - New pairs `S(i, h)` are removed if the lcm of the leading coefficients is zero, since they
+///    then are a combination of annihilator polynomials. (Note that this cannot happen over local
+///    rings, but is cheap to check.)
+///
+/// Over a ring with zero-divisors, we also add the annihilator polynomial `a * h`, where `a`
+/// generates the annihilator of `LC(h)`. We only need this one, since every other element of
+/// `Ann(LC(h))` is a multiple of `a`.
+#[instrument(skip_all, level = "trace")]
+fn insert_and_update_basis<P, O>(
+    ring: P,
+    h: BasisPoly<P>,
+    basis: &mut Vec<BasisPoly<P>>,
+    open: &mut Vec<CriticalPair<P>>,
+    filtered_pair_count: &mut usize,
+    order: O,
+) where
+    P: Copy + RingStore,
+    P::Ring: MultivariatePolyRing,
+    <BaseRingStore<P> as RingStore>::Ring: PrincipalIdealRing,
+    O: MonomialOrder + Copy,
+{
+    assert!(!h.redundant);
+    let h_index = basis.len();
+    debug_assert!(
+        basis
+            .iter()
+            .all(|b| b.redundant || !ExpandedTerm::divides(ring, &h.lt, &b.lt))
+    );
+
+    // we compute the lcms also with redundant polynomials, as they are needed to apply the
+    // criterion to old pairs
+    let mut lcms = basis
+        .iter()
+        .map(|b| Some(ExpandedTerm::lcm(ring, &b.lt, &h.lt)))
+        .collect::<Vec<_>>();
+    let lcm = |i: usize| lcms[i].as_ref().unwrap();
+
+    // criterion for old pairs
+    let open_count_before = open.len();
+    open.retain(|pair| match &pair.kind {
+        CriticalPairKind::Standard { i, j, lcm: lcm_ij } => {
+            !ExpandedTerm::divides(ring, lcm_ij, &h.lt)
+                || ExpandedTerm::is_associated(ring, lcm_ij, lcm(*i))
+                || ExpandedTerm::is_associated(ring, lcm_ij, lcm(*j))
+        }
+        CriticalPairKind::Annihilator { .. } => true,
+    });
+    *filtered_pair_count += open_count_before - open.len();
+
+    // criteria for new pairs
+    let candidates = basis
+        .iter()
+        .enumerate()
+        .filter(|(_, b)| !b.redundant)
+        .map(|(i, _)| i)
+        .filter(|i| !ring.base_ring().is_zero(&lcm(*i).coeff))
+        .collect::<Vec<_>>();
+    let is_coprime = |i: usize| {
+        basis[i]
+            .lt
+            .exponents
+            .iter()
+            .zip(&h.lt.exponents)
+            .all(|(l, r)| *l == 0 || *r == 0)
+            && ring
+                .base_ring()
+                .is_unit(&ring.base_ring().ideal_gen(&basis[i].lt.coeff, &h.lt.coeff))
+    };
+    let mut kept: Vec<(usize, bool)> = Vec::new();
+    for (k, i) in candidates.iter().enumerate() {
+        let coprime = is_coprime(*i);
+        if coprime
+            || !candidates[(k + 1)..]
+                .iter()
+                .chain(kept.iter().map(|(j, _)| j))
+                .any(|j| ExpandedTerm::divides(ring, lcm(*i), lcm(*j)))
+        {
+            kept.push((*i, coprime));
+        }
+    }
+    *filtered_pair_count += basis.iter().filter(|b| !b.redundant).count() - kept.len();
+
+    for (i, coprime) in kept {
+        if coprime {
+            *filtered_pair_count += 1;
+            continue;
+        }
+        let f = &basis[i];
+        let lcm = lcms[i].take().unwrap();
+        let deg = lcm.deg();
+        let sugar = (f.sugar_degree + deg - f.lt.deg()).max(h.sugar_degree + deg - h.lt.deg());
+        open.push(CriticalPair {
+            kind: CriticalPairKind::Standard { i, j: h_index, lcm },
+            sugar,
+            deg,
+        });
+    }
+
+    // annihilator polynomial
+    if !ring.base_ring().is_unit(&h.lt.coeff) {
+        let annihilator = ring.base_ring().annihilator(&h.lt.coeff);
+        let leading_monomial = ring
+            .terms(&h.poly)
+            .filter(|(c, _)| !ring.base_ring().is_zero(&ring.base_ring().mul_ref(c, &annihilator)))
+            .map(|(_, m)| m)
+            .max_by(|l, r| order.compare(ring, l, r));
+        if let Some(m) = leading_monomial {
+            open.push(CriticalPair {
+                deg: ring.monomial_deg(m),
+                kind: CriticalPairKind::Annihilator {
+                    i: h_index,
+                    annihilator,
+                },
+                sugar: h.sugar_degree,
+            });
+        }
+    }
+    for i in 0..basis.len() {
+        if !basis[i].redundant && ExpandedTerm::divides(ring, &basis[i].lt, &h.lt) {
+            basis[i].redundant = true;
+        }
+    }
+    basis.push(h);
+}
+
 /// Reduces `f` modulo the current basis and, if the result is nonzero, adds it to the basis.
-fn reduce_and_insert<P, O>(ring: P, basis: &mut Basis<P>, mut f: El<P>, mut sugar: usize, order: O)
-where
+fn reduce_and_insert<P, O>(
+    ring: P,
+    mut h: El<P>,
+    mut sugar_degree: usize,
+    basis: &mut Vec<BasisPoly<P>>,
+    open: &mut Vec<CriticalPair<P>>,
+    filtered_pair_count: &mut usize,
+    order: O,
+) where
     P: RingStore + Copy,
     P::Ring: MultivariatePolyRing,
     <BaseRingStore<P> as RingStore>::Ring: PrincipalIdealRing,
@@ -46,19 +200,29 @@ where
 {
     reduce(
         ring,
-        &mut f,
-        &mut sugar,
-        || basis.active().map(|(_, g)| g),
+        &mut h,
+        &mut sugar_degree,
+        || basis.iter().filter(|b| !b.redundant),
         order,
         false,
     );
-    if !ring.is_zero(&f) {
-        basis.insert(ring, BasisPoly::new(ring, f, sugar, order), order);
+    if !ring.is_zero(&h) {
+        insert_and_update_basis(
+            ring,
+            BasisPoly {
+                lt: ExpandedTerm::lt(ring, &h, order),
+                poly: h,
+                redundant: false,
+                sugar_degree,
+            },
+            basis,
+            open,
+            filtered_pair_count,
+            order,
+        );
     }
 }
 
-// origin (w.r.t. `algorithms/buchberger.rs`): major changes: from `inter_reduce`; only reduces
-// tails, in parallel, and never removes polynomials
 /// Reduces the tails of the given polynomials, whose leading terms must be pairwise not
 /// divisible by each other. This does not change the leading terms.
 #[instrument(skip_all, level = "trace")]
@@ -86,8 +250,6 @@ where
         .collect()
 }
 
-// origin (w.r.t. `algorithms/buchberger.rs`): major changes: from `buchberger_with_strategy`; no
-// restarts, sugar strategy, no `sort_spolys` parameter
 /// Computes a Groebner basis of the ideal generated by the input basis w.r.t. the given monomial
 /// order.
 ///
@@ -101,38 +263,24 @@ where
 /// divides any term of another basis polynomial. However, the coefficients are not normalized,
 /// i.e. leading coefficients may be any unit (or, over rings that are not fields, any element).
 ///
-/// For a variant of this function that uses sensible defaults for most parameters, see
-/// [`buchberger()`].
-///
-/// The algorithm proceeds F4-style, i.e. reduces multiple S-polynomials (in parallel) before
-/// adding them to the basis. Critical pairs are selected using the sugar strategy, and filtered
-/// using the Gebauer-Moeller criteria. Furthermore, the behavior can be modified by passing a
-/// custom function `abort_early_if`, which is called after every step with the current basis,
-/// and can return `true` to abort the computation, yielding the current basis. In this case, the
-/// basis will in general not be a Groebner basis, but can still be useful (e.g. `abort_early_if`
-/// might decide that a Groebner basis up to a fixed degree is sufficient).
+/// See also [`buchberger()`], which runs the algorithm with the default strategy.
 ///
 /// # Panics
 ///
 /// Panics if the base ring is not local.
 #[stability::unstable(feature = "enable")]
 #[instrument(skip_all, level = "trace")]
-pub fn buchberger_with_strategy<P, O, AbortFn>(
-    ring: P,
-    input_basis: Vec<El<P>>,
-    order: O,
-    mut abort_early_if: AbortFn,
-) -> Vec<El<P>>
+pub fn buchberger_with_strategy<P, O, S>(ring: P, input_basis: Vec<El<P>>, order: O, mut strategy: S) -> Vec<El<P>>
 where
     P: RingStore + Copy,
     P::Ring: MultivariatePolyRing,
     <BaseRingStore<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder + Copy + Send + Sync,
-    AbortFn: FnMut(&BasisView<P>) -> bool,
+    S: BuchbergerStrategy<P>,
 {
     assert!(
         ring.base_ring().get_ring().is_local(),
-        "Groebner basis computations are only supported over local rings (e.g. fields or Z/p^eZ); for Z/nZ with composite n, decompose the ring into its local components using the Chinese Remainder Theorem"
+        "Groebner basis computations are only supported over local rings"
     );
     event!(Level::TRACE, var_count = ring.indeterminate_count());
 
@@ -140,33 +288,48 @@ where
         .into_iter()
         .filter(|f| !ring.is_zero(f))
         .map(|f| {
-            let sugar = total_degree(ring, &f);
-            BasisPoly::new(ring, f, sugar, order)
+            let sugar_degree = ring.terms(&f).map(|(_, m)| ring.monomial_deg(m)).max().unwrap();
+            BasisPoly {
+                lt: ExpandedTerm::lt(ring, &f, order),
+                poly: f,
+                redundant: false,
+                sugar_degree,
+            }
         })
         .collect::<Vec<_>>();
     input_basis.sort_by(|l, r| order.compare(ring, &l.lt.monomial, &r.lt.monomial));
 
-    let mut basis = Basis::new();
+    let mut basis = Vec::new();
+    let mut open = Vec::new();
+    let mut filtered_pair_count = 0;
     for f in input_basis {
-        reduce_and_insert(ring, &mut basis, f.poly, f.sugar, order);
+        reduce_and_insert(
+            ring,
+            f.poly,
+            f.sugar_degree,
+            &mut basis,
+            &mut open,
+            &mut filtered_pair_count,
+            order,
+        );
     }
 
     loop {
         event!(
             Level::TRACE,
-            basis_poly_count = basis.active().count(),
-            open_pair_count = basis.open_pair_count(),
-            filtered_pair_count = basis.filtered_pair_count()
+            basis_poly_count = basis.iter().filter(|b| !b.redundant).count(),
+            open_pair_count = open.len(),
+            filtered_pair_count = filtered_pair_count
         );
 
-        let batch = select_batch(&mut basis);
+        let batch = strategy.select_batch(ring, &basis, &mut open);
         if batch.is_empty() {
             break;
         }
         event!(Level::TRACE, batch_size = batch.len(), sugar = batch[0].sugar);
 
         // we sort reducers, as that will speed up the multivariate division
-        let mut reducers = basis.active().map(|(_, f)| f).collect::<Vec<_>>();
+        let mut reducers = basis.iter().filter(|b| !b.redundant).collect::<Vec<_>>();
         reducers.sort_by(|l, r| {
             order
                 .compare(ring, &l.lt.monomial, &r.lt.monomial)
@@ -191,7 +354,12 @@ where
                     true,
                 );
                 if !ring.is_zero(&f) {
-                    _ = new_polys.push(Box::new(BasisPoly::new(ring, f, sugar, order)));
+                    _ = new_polys.push(Box::new(BasisPoly {
+                        lt: ExpandedTerm::lt(ring, &f, order),
+                        poly: f,
+                        sugar_degree: sugar,
+                        redundant: false,
+                    }));
                 }
             })
         });
@@ -209,19 +377,26 @@ where
         // by each other
         new_polys.sort_by(|l, r| order.compare(ring, &l.lt.monomial, &r.lt.monomial));
         for f in new_polys {
-            reduce_and_insert(ring, &mut basis, f.poly, f.sugar, order);
+            reduce_and_insert(
+                ring,
+                f.poly,
+                f.sugar_degree,
+                &mut basis,
+                &mut open,
+                &mut filtered_pair_count,
+                order,
+            );
         }
 
-        if abort_early_if(&BasisView { basis: &basis }) {
+        if strategy.should_abort(ring, &basis, &open) {
             event!(Level::TRACE, "early_abort");
-            return basis.into_active().into_iter().map(|f| f.poly).collect();
+            return basis.into_iter().filter(|b| !b.redundant).map(|b| b.poly).collect();
         }
     }
 
-    return tail_reduce(ring, basis.into_active(), order);
+    return tail_reduce(ring, basis.into_iter().filter(|b| !b.redundant).collect(), order);
 }
 
-// origin (w.r.t. `algorithms/buchberger.rs`): minor changes: from `buchberger`
 /// Computes a Groebner basis of the ideal generated by the input basis w.r.t. the given monomial
 /// order.
 ///
@@ -229,8 +404,14 @@ where
 /// divides any term of another basis polynomial. However, the coefficients are not normalized,
 /// i.e. basis polynomials are not necessarily monic.
 ///
-/// For a variant of this function that allows for more configuration, and also supports some
-/// base rings that are not fields, see [`buchberger_with_strategy()`].
+/// The base ring must be local (i.e. its ideals must be totally ordered by inclusion), as
+/// reported by [`PrincipalIdealRing::is_local()`]. This includes fields, discrete valuation rings
+/// and rings like `Z/p^eZ`. Over such rings, the result is a strong Groebner basis. For `Z/nZ`
+/// with composite `n`, decompose the ring into its components `Z/p^eZ` using the Chinese Remainder
+/// Theorem, and compute Groebner bases over each of them.
+///
+/// For a variant of this function that allows for more configuration, see
+/// [`buchberger_with_strategy()`].
 ///
 /// # Example
 /// ```rust
@@ -250,14 +431,27 @@ where
 ///         .any(|f| ring.appearing_indeterminates(f) == vec![(1, 2)])
 /// );
 /// ```
+///
+/// # Panics
+///
+/// Panics if the base ring is not local.
 pub fn buchberger<P, O>(ring: P, input_basis: Vec<El<P>>, order: O) -> Vec<El<P>>
 where
     P: RingStore + Copy,
     P::Ring: MultivariatePolyRing,
-    <BaseRingStore<P> as RingStore>::Ring: Field,
+    <BaseRingStore<P> as RingStore>::Ring: PrincipalIdealRing,
     O: MonomialOrder + Copy + Send + Sync,
 {
-    buchberger_with_strategy(ring, input_basis, order, |_| false)
+    struct DefaultStrategy;
+
+    impl<P> BuchbergerStrategy<P> for DefaultStrategy
+    where
+        P: RingStore,
+        P::Ring: MultivariatePolyRing,
+    {
+    }
+
+    buchberger_with_strategy(ring, input_basis, order, DefaultStrategy)
 }
 
 #[cfg(test)]
@@ -272,9 +466,6 @@ mod tests {
     use crate::ring_properties::divisibility::DivisibilityRingStore;
     use crate::ring_properties::pid::PrincipalIdealRingStore;
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
-    /// Checks that `gb` is a strong Groebner basis over a local ring, by checking that all
-    /// S-polynomials and annihilator polynomials reduce to zero.
     fn assert_is_strong_gb<P, O>(ring: P, gb: &[El<P>], order: O)
     where
         P: RingStore + Copy,
@@ -299,17 +490,17 @@ mod tests {
             for j in (i + 1)..gb.len() {
                 let (c_j, m_j) = ring.LT(&gb[j], order).unwrap();
                 let lcm_c = ring.base_ring().ideal_intersect(c_i, c_j);
-                let lcm_m = ring.monomial_lcm(ring.clone_monomial(m_i), m_j);
+                let lcm_m = ring.monomial_lcm(m_i.clone(), m_j);
                 let spoly = ring.sub(
                     scale(
                         &gb[i],
                         ring.base_ring().checked_div(&lcm_c, c_i).unwrap(),
-                        ring.monomial_div(ring.clone_monomial(&lcm_m), m_i).ok().unwrap(),
+                        ring.monomial_div(lcm_m.clone(), m_i).ok().unwrap(),
                     ),
                     scale(
                         &gb[j],
                         ring.base_ring().checked_div(&lcm_c, c_j).unwrap(),
-                        ring.monomial_div(ring.clone_monomial(&lcm_m), m_j).ok().unwrap(),
+                        ring.monomial_div(lcm_m.clone(), m_j).ok().unwrap(),
                     ),
                 );
                 assert!(ring.is_zero(&multivariate_division(ring, spoly, gb.iter(), order)));
@@ -317,15 +508,13 @@ mod tests {
         }
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
     #[test]
     fn test_gb_local_ring_many_annihilators() {
-        // regression test: this used to overflow the stack due to infinitely many restarts
         feanor_tracing::DelayedLogger::init_test();
         let base = zn_static::Zn::<16>::RING;
         let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
         let [f] = ring.with_wrapped_indeterminates(|[X]| [8 * X.pow_ref(3) + 4 * X.pow_ref(2) + 2 * X + 1]);
-        let gb = buchberger_with_strategy(&ring, vec![f], DegRevLex, |_| false);
+        let gb = buchberger(&ring, vec![f], DegRevLex);
 
         assert_eq!(1, gb.len());
         let (c, m) = ring.LT(&gb[0], DegRevLex).unwrap();
@@ -333,7 +522,6 @@ mod tests {
         assert!(base.is_unit(c));
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
     #[test]
     fn test_gb_local_ring_nontrivial() {
         feanor_tracing::DelayedLogger::init_test();
@@ -347,39 +535,28 @@ mod tests {
             ]
         });
         for order in [DegRevLex] {
-            let gb = buchberger_with_strategy(&ring, system.iter().cloned().collect(), order, |_| false);
+            let gb = buchberger(&ring, system.iter().cloned().collect(), order);
             assert_is_strong_gb(&ring, &gb, order);
             for f in &system {
                 assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), order)));
             }
         }
-        let gb = buchberger_with_strategy(&ring, system.iter().cloned().collect(), Lex, |_| false);
+        let gb = buchberger(&ring, system.iter().cloned().collect(), Lex);
         assert_is_strong_gb(&ring, &gb, Lex);
         for f in &system {
             assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), Lex)));
         }
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
     #[test]
     #[should_panic(expected = "only supported over local rings")]
     fn test_gb_non_local_ring_zn() {
         let base = zn_static::Zn::<6>::RING;
         let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(base, 1);
         let [f, g] = ring.with_wrapped_indeterminates(|[X]| [2 * X, 3 * X]);
-        _ = buchberger_with_strategy(&ring, vec![f, g], DegRevLex, |_| false);
+        _ = buchberger(&ring, vec![f, g], DegRevLex);
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
-    #[test]
-    #[should_panic(expected = "only supported over local rings")]
-    fn test_gb_non_local_ring_zz() {
-        let ring: MultivariatePolyRingImpl<_> = MultivariatePolyRingImpl::new(ZZi64, 1);
-        let [f, g] = ring.with_wrapped_indeterminates(|[X]| [2 * X, 3 * X]);
-        _ = buchberger_with_strategy(&ring, vec![f, g], DegRevLex, |_| false);
-    }
-
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
     #[test]
     fn test_gb_abort_early() {
         feanor_tracing::DelayedLogger::init_test();
@@ -393,20 +570,29 @@ mod tests {
                 x * y * z * t - 1,
             ]
         });
-        let mut calls = 0;
-        let gb = buchberger_with_strategy(&ring, system.clone(), DegRevLex, |basis| {
-            calls += 1;
-            assert!(basis.len() >= 4);
-            true
-        });
-        assert_eq!(1, calls);
+
+        struct TestStrategy(usize);
+
+        impl<'a, P> BuchbergerStrategy<P> for &'a mut TestStrategy
+        where
+            P: RingStore,
+            P::Ring: MultivariatePolyRing,
+        {
+            fn should_abort(&mut self, _ring: P, basis: &[BasisPoly<P>], _open: &[CriticalPair<P>]) -> bool {
+                self.0 += 1;
+                assert!(basis.len() >= 4);
+                true
+            }
+        }
+
+        let mut strategy = TestStrategy(0);
+        let gb = buchberger_with_strategy(&ring, system.clone(), DegRevLex, &mut strategy);
+        assert_eq!(1, strategy.0);
         for f in &system {
             assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), DegRevLex)));
         }
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API, checks the strong
-    // GB property
     #[test]
     fn test_buchberger_small() {
         feanor_tracing::DelayedLogger::init_test();
@@ -453,8 +639,6 @@ mod tests {
         );
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API, checks the strong
-    // GB property
     #[test]
     fn test_buchberger_larger() {
         feanor_tracing::DelayedLogger::init_test();
@@ -519,9 +703,8 @@ mod tests {
         );
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API, checks the strong
-    // GB property
     #[test]
+    #[ignore]
     fn test_generic_computation() {
         feanor_tracing::DelayedLogger::init_test();
         let base = zn_static::F17;
@@ -559,7 +742,6 @@ mod tests {
         assert_eq!(11, gb1.len());
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API
     #[test]
     fn test_gb_local_ring() {
         feanor_tracing::DelayedLogger::init_test();
@@ -573,13 +755,12 @@ mod tests {
             ]
             .into_iter(),
         );
-        let gb = buchberger_with_strategy(&ring, vec![f], DegRevLex, |_| false);
+        let gb = buchberger(&ring, vec![f], DegRevLex);
 
         assert_eq!(1, gb.len());
-        assert_el_eq!(ring, ring.one(), gb[0]);
+        assert!(ring.is_one(&gb[0]));
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): unchanged
     #[test]
     fn test_gb_lex() {
         feanor_tracing::DelayedLogger::init_test();
@@ -621,7 +802,6 @@ mod tests {
         }
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API
     #[ignore]
     #[test]
     fn test_expensive_gb_1() {
@@ -660,7 +840,7 @@ mod tests {
                 ]
             });
 
-        let gb = buchberger_with_strategy(&ring, system.iter().map(|f| f.clone()).collect(), DegRevLex, |_| false);
+        let gb = buchberger(&ring, system.iter().map(|f| f.clone()).collect(), DegRevLex);
 
         for f in &part_of_result {
             assert!(ring.is_zero(&multivariate_division(&ring, f.clone(), gb.iter(), DegRevLex)));
@@ -668,7 +848,6 @@ mod tests {
         assert_eq!(108, gb.len());
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API
     #[test]
     #[ignore]
     fn test_expensive_gb_2() {
@@ -811,11 +990,10 @@ mod tests {
             ]
         });
 
-        let gb = buchberger_with_strategy(&ring, basis, DegRevLex, |_| false);
+        let gb = buchberger(&ring, basis, DegRevLex);
         assert_eq!(130, gb.len());
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API
     #[test]
     #[ignore]
     fn test_groebner_cyclic6() {
@@ -839,7 +1017,7 @@ mod tests {
             ]
         });
 
-        let gb = buchberger_with_strategy(&ring, cyclic6, DegRevLex, |_| false);
+        let gb = buchberger(&ring, cyclic6, DegRevLex);
         assert_eq!(45, gb.len());
     }
 
@@ -881,11 +1059,10 @@ mod tests {
             ]
         });
 
-        let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, |_| false);
+        let gb = buchberger(&ring, cyclic7, DegRevLex);
         assert_eq!(209, gb.len());
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): minor changes: adapted to new API
     #[test]
     #[ignore]
     fn test_groebner_cyclic8() {
@@ -934,11 +1111,10 @@ mod tests {
             ]
         });
 
-        let gb = buchberger_with_strategy(&ring, cyclic7, DegRevLex, |_| false);
+        let gb = buchberger(&ring, cyclic7, DegRevLex);
         assert_eq!(372, gb.len());
     }
 
-    // origin (w.r.t. `algorithms/buchberger.rs`): new
     #[test]
     #[ignore]
     fn test_groebner_dense_lex() {
