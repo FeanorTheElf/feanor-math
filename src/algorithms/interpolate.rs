@@ -1,4 +1,4 @@
-use std::alloc::Allocator;
+use std::alloc::AllocatorNightly;
 use std::cmp::min;
 use std::ops::Range;
 
@@ -130,7 +130,7 @@ pub enum InterpolationError {
 /// assert!(actual.is_err());
 /// ```
 #[stability::unstable(feature = "enable")]
-pub fn interpolate<P, V1, V2, A: Allocator>(
+pub fn interpolate<P, V1, V2, A: AllocatorNightly>(
     poly_ring: P,
     x: V1,
     y: V2,
@@ -209,8 +209,8 @@ where
     <<P::Type as RingExtension>::BaseRing as RingStore>::Type: DivisibilityRing + Domain,
     V1: VectorFn<V2>,
     V2: VectorFn<El<<P::Type as RingExtension>::BaseRing>>,
-    A: Allocator,
-    A2: Allocator,
+    A: AllocatorNightly,
+    A2: AllocatorNightly,
 {
     let dim_prod = |range: Range<usize>| {
         <_ as RingStore>::prod(

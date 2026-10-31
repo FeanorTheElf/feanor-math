@@ -16,7 +16,7 @@
 #![feature(test)]
 #![feature(min_specialization)]
 #![feature(iter_array_chunks)]
-#![feature(allocator_api)]
+#![feature(allocator_ext)]
 #![feature(fn_traits)]
 #![feature(iter_advance_by)]
 #![feature(unboxed_closures)]
