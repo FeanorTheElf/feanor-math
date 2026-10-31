@@ -347,9 +347,9 @@ impl RingBase for MPZBase {
         out: &mut std::fmt::Formatter<'a>,
         _env: EnvBindingStrength,
     ) -> std::fmt::Result {
-        RustBigintRing::RING
+        RustBigIntRing::RING
             .get_ring()
-            .dbg(&self.map_out(RustBigintRing::RING.get_ring(), value.clone(), &()), out)
+            .dbg(&self.map_out(RustBigIntRing::RING.get_ring(), value.clone(), &()), out)
     }
 
     fn characteristic<I: IntegerRingStore + Copy>(&self, other_ZZ: I) -> Option<El<I>>
@@ -678,30 +678,30 @@ impl HashableElRing for MPZBase {
     }
 }
 
-impl IntCast<RustBigintRingBase> for MPZBase {
-    fn cast(&self, _: &RustBigintRingBase, el: RustBigint) -> Self::Element {
+impl IntCast<RustBigIntRingBase> for MPZBase {
+    fn cast(&self, _: &RustBigIntRingBase, el: RustBigint) -> Self::Element {
         let mut result = MPZEl::new();
         self.from_base_u64_repr(
             &mut result,
-            &RustBigintRing::RING
+            &RustBigIntRing::RING
                 .get_ring()
                 .abs_base_u64_repr(&el)
                 .collect::<Vec<_>>()[..],
         );
-        if RustBigintRing::RING.is_neg(&el) {
+        if RustBigIntRing::RING.is_neg(&el) {
             self.negate_inplace(&mut result);
         }
         return result;
     }
 }
 
-impl IntCast<MPZBase> for RustBigintRingBase {
+impl IntCast<MPZBase> for RustBigIntRingBase {
     fn cast(&self, from: &MPZBase, el: MPZEl) -> RustBigint {
         let mut result = (0..from.abs_base_u64_repr_len(&el)).map(|_| 0u64).collect::<Vec<_>>();
         from.abs_base_u64_repr(&el, &mut result[..]);
-        let result = RustBigintRing::RING.get_ring().from_base_u64_repr(result.into_iter());
+        let result = RustBigIntRing::RING.get_ring().from_base_u64_repr(result.into_iter());
         if from.is_neg(&el) {
-            return RustBigintRing::RING.negate(result);
+            return RustBigIntRing::RING.negate(result);
         } else {
             return result;
         }
@@ -799,28 +799,28 @@ mod tests {
 
     fn edge_case_elements_bigint() -> impl Iterator<Item = RustBigint> {
         [
-            RustBigintRing::RING.int_hom().map(0),
-            RustBigintRing::RING.int_hom().map(1),
-            RustBigintRing::RING.int_hom().map(-1),
-            RustBigintRing::RING.int_hom().map(7),
-            RustBigintRing::RING.int_hom().map(-7),
-            RustBigintRing::RING.int_hom().map(i32::MAX),
-            RustBigintRing::RING.int_hom().map(i32::MIN),
-            RustBigintRing::RING.power_of_two(64),
-            RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(64)),
-            RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(64), RustBigintRing::RING.one()),
-            RustBigintRing::RING.power_of_two(128),
-            RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(128)),
-            RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(128), RustBigintRing::RING.one()),
-            RustBigintRing::RING.power_of_two(192),
-            RustBigintRing::RING.negate(RustBigintRing::RING.power_of_two(192)),
-            RustBigintRing::RING.sub(RustBigintRing::RING.power_of_two(192), RustBigintRing::RING.one()),
+            RustBigIntRing::RING.int_hom().map(0),
+            RustBigIntRing::RING.int_hom().map(1),
+            RustBigIntRing::RING.int_hom().map(-1),
+            RustBigIntRing::RING.int_hom().map(7),
+            RustBigIntRing::RING.int_hom().map(-7),
+            RustBigIntRing::RING.int_hom().map(i32::MAX),
+            RustBigIntRing::RING.int_hom().map(i32::MIN),
+            RustBigIntRing::RING.power_of_two(64),
+            RustBigIntRing::RING.negate(RustBigIntRing::RING.power_of_two(64)),
+            RustBigIntRing::RING.sub(RustBigIntRing::RING.power_of_two(64), RustBigIntRing::RING.one()),
+            RustBigIntRing::RING.power_of_two(128),
+            RustBigIntRing::RING.negate(RustBigIntRing::RING.power_of_two(128)),
+            RustBigIntRing::RING.sub(RustBigIntRing::RING.power_of_two(128), RustBigIntRing::RING.one()),
+            RustBigIntRing::RING.power_of_two(192),
+            RustBigIntRing::RING.negate(RustBigIntRing::RING.power_of_two(192)),
+            RustBigIntRing::RING.sub(RustBigIntRing::RING.power_of_two(192), RustBigIntRing::RING.one()),
         ]
         .into_iter()
     }
 
     fn edge_case_elements() -> impl Iterator<Item = MPZEl> {
-        edge_case_elements_bigint().map(|n| MPZ::RING.coerce(&RustBigintRing::RING, n))
+        edge_case_elements_bigint().map(|n| MPZ::RING.coerce(&RustBigIntRing::RING, n))
     }
 
     #[test]
@@ -965,8 +965,8 @@ mod tests {
     #[test]
     fn test_canonical_iso_axioms_bigint() {
         feanor_tracing::DelayedLogger::init_test();
-        crate::ring::generic_tests::test_hom_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
-        crate::ring::generic_tests::test_iso_axioms(RustBigintRing::RING, MPZ::RING, edge_case_elements_bigint());
+        crate::ring::generic_tests::test_hom_axioms(RustBigIntRing::RING, MPZ::RING, edge_case_elements_bigint());
+        crate::ring::generic_tests::test_iso_axioms(RustBigIntRing::RING, MPZ::RING, edge_case_elements_bigint());
     }
 
     #[test]
@@ -1030,8 +1030,8 @@ mod tests {
     fn bench_mul_300_bits(bencher: &mut test::Bencher) {
         feanor_tracing::DelayedLogger::init_test();
         let x = MPZ::RING.coerce(
-            &RustBigintRing::RING,
-            RustBigintRing::RING
+            &RustBigIntRing::RING,
+            RustBigIntRing::RING
                 .get_ring()
                 .parse(
                     "2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754",
@@ -1040,13 +1040,13 @@ mod tests {
                 .unwrap(),
         );
         let y = MPZ::RING.coerce(
-            &RustBigintRing::RING,
-            RustBigintRing::RING
+            &RustBigIntRing::RING,
+            RustBigIntRing::RING
                 .get_ring()
                 .parse("48937502893645789234569182735646324895723409587234", 10)
                 .unwrap(),
         );
-        let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
+        let z = MPZ::RING.coerce(&RustBigIntRing::RING, RustBigIntRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
         bencher.iter(|| {
             let p = MPZ::RING.mul_ref(&x, &y);
             assert_el_eq!(MPZ::RING, z, p);
@@ -1057,8 +1057,8 @@ mod tests {
     fn bench_div_300_bits(bencher: &mut test::Bencher) {
         feanor_tracing::DelayedLogger::init_test();
         let x = MPZ::RING.coerce(
-            &RustBigintRing::RING,
-            RustBigintRing::RING
+            &RustBigIntRing::RING,
+            RustBigIntRing::RING
                 .get_ring()
                 .parse(
                     "2382385687561872365981723456981723456987134659834659813491964132897159283746918732563498628754",
@@ -1067,13 +1067,13 @@ mod tests {
                 .unwrap(),
         );
         let y = MPZ::RING.coerce(
-            &RustBigintRing::RING,
-            RustBigintRing::RING
+            &RustBigIntRing::RING,
+            RustBigIntRing::RING
                 .get_ring()
                 .parse("48937502893645789234569182735646324895723409587234", 10)
                 .unwrap(),
         );
-        let z = MPZ::RING.coerce(&RustBigintRing::RING, RustBigintRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
+        let z = MPZ::RING.coerce(&RustBigIntRing::RING, RustBigIntRing::RING.get_ring().parse("116588006478839442056346504147013274749794691549803163727888681858469844569693215953808606899770104590589390919543097259495176008551856143726436", 10).unwrap());
         bencher.iter(|| {
             let q = MPZ::RING.euclidean_div(MPZ::z.clone(), &y);
             assert_el_eq!(MPZ::RING, x, q);

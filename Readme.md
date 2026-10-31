@@ -37,8 +37,8 @@ In the end, though not perfect, this turns out to work quite well.
 ## Features
 
 The following rings are provided
- - The integer ring `Z`, as a trait [`IntegerRing`] with implementations for all primitive ints (`i8` to `i128`) given by [`StaticRing`], an arbitrary-precision implementation [`RustBigintRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`) given by [`MPZ`].
- - The quotient ring `Z/nZ`, as a trait [`ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`Zn64B`], an optimized implementation of Montgomery-reductions for moduli somewhat smaller than 64 bits [`Zn64M`], a generic implementation of Barett-reductions for any modulus and any integer ring (optimized for arbitrary-precision ones) [`ZnGBBase`] and a residue-number-system implementation for highly composite moduli [`ZnRNS`].
+ - The integer ring `Z`, as a trait [`IntegerRing`] with implementations for all primitive ints (`i8` to `i128`) given by [`StaticRing`], an arbitrary-precision implementation [`RustBigIntRing`], and an optional implementation using bindings to the heavily optimized library [mpir](https://github.com/wbhart/mpir) (enable with `features=mpir`) given by [`MPZ`].
+ - The quotient ring `Z/nZ`, as a trait [`ZnRing`] with four implementations. One where the modulus is small and known at compile-time [`Zn`], an optimized implementation of Barett-reductions for moduli somewhat smaller than 64 bits [`Zn64B`], an optimized implementation of Montgomery-reductions for moduli somewhat smaller than 64 bits [`Zn64M`], a generic implementation of Barett-reductions for any modulus and any integer ring (optimized for arbitrary-precision ones) [`ZnGB`] and a residue-number-system implementation for highly composite moduli [`ZnRNS`].
  - The polynomial ring `R[X]` over any base ring, as a trait [`PolyRing`] with two implementations, one for densely filled polynomials [`DensePolyRing`] and one for sparsely filled polynomials [`SparsePolyRing`].
  - Finite-rank simple and free ring extensions, as a trait [`MonogenicExtension`], with an implementation based on polynomial division [`MonogenicExtensionSparse`]. In particular, this includes finite/galois fields and number fields.
  - Multivariate polynomial rings `R[X1, ..., XN]` over any base ring, as the trait [`MultivariatePolyRing`] and one implementation [`MultivariatePolyRingImpl`] based on a sparse representation using ordered vectors.
@@ -158,12 +158,12 @@ groebner_basis_lex.sort_unstable_by(|f, g| Lex.compare(&F7XY, F7XY.LT(f, Lex).un
 // we can now solve by choosing `y` as a root of `g` and `x` as a joint root of `fi(X, y)`, i.e. the `fi` with `y` "plugged in"
 let poly_in_y = F7XY.evaluate(&groebner_basis_lex.pop().unwrap(), [F7T.zero(), F7T.indeterminate()].clone_els(), F7T.inclusion());
 let (poly_in_y_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_y);
-let y = poly_in_y_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
+let y = poly_in_y_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.neg(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
 // we found `y`! now plug in `y` into the `fi(X, Y)`, take their gcd (as univariate polynomials in `X`), and find a root `x`
 let poly_in_x = groebner_basis_lex.into_iter().fold(F7T.zero(), |f, g| F7T.ideal_gen(&f, &F7XY.evaluate(&g, [F7T.indeterminate(), F7T.inclusion().map(y)].clone_els(), F7T.inclusion())));
 let (poly_in_x_factorization, _) = <_ as FactorPolyField>::factor_poly(&F7T, &poly_in_x);
-let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.negate(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
+let x = poly_in_x_factorization.into_iter().filter_map(|(f, _)| if F7T.degree(&f).unwrap() != 1 { None } else { Some(F7.neg(F7.div(F7T.coefficient_at(&f, 0), F7T.coefficient_at(&f, 1)))) }).next().unwrap();
 
 // check the solution
 assert_el_eq!(F7, F7.zero(), F7XY.evaluate(&f1, [x, y].clone_els(), F7.identity()));
@@ -485,19 +485,20 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 ## Tipps for achieving optimal performance
 
  - Use `lto = "fat"` in the `Cargo.toml` of your project. This is absolutely vital to enable inlining across crate boundaries, and can have a huge impact if you extensively use rings that have "simple" basic arithmetic - like [`Zn64B`] or [`StaticRing`].
- - Different parts of this library are at different stages of optimization. While I have spent some time on finite fields and the FFT algorithms, for example working over rationals is currently somewhat slow.
  - The default arbitrary-precision integer arithmetic is somewhat slow. Use the feature "mpir" together with an installation of the [mpir](https://github.com/wbhart/mpir) library if you heavily use arbitrary-precision integers. 
- - Write your code so that it is easy to replace ring types and other generic parameters! `feanor-math` often provides different implementations of the same thing, but with different performance characteristics (e.g. [`SparsePolyRing`] vs [`DensePolyRing`], [`KaratsubaAlgorithm`] vs [`NTTConvolution`] and so on). If your code makes it easy to replace one with the other, you can just experiment which version gives the best performance. `feanor-math` supports that by exposing basically all interfaces through traits.
+ - More generally, use appropriate implementations. If the characteristic of your prime field is small enough, use [`Zn64B`] instead of [`ZnGB`]; if your polynomials have very high degree, prefer FFT- or NTT-based convolution algorithms over the default one (conversely, if the degree is usually low, use default convolution algorithms, or explicitly use [`SchoolbookConvolution`])
+ - Many functions in `feanor-math` are instrumented using `tracing`. For best performance, you can disable tracing at compile time by setting `tracing = { version = "same version as the one used by feanor-math", features = ["release_max_level_off"] }
+ - You can also activate the feature `unroll_recursive_algorithms`, behind which some compile-time optimizations are gated.
 
 [`RingStore`]: crate::ring::RingStore
 [`RingBase`]: crate::ring::RingBase
 [`IntegerRing`]: crate::ring_properties::integer::IntegerRing
 [`StaticRing`]: crate::ring_impls::primitive_int::StaticRing
-[`RustBigintRing`]: crate::ring_impls::rust_bigint::RustBigintRing
+[`RustBigIntRing`]: crate::ring_impls::rust_bigint::RustBigIntRing
 [`MPZ`]: crate::ring_impls::mpir::MPZ
 [`ZnRing`]: crate::ring_impls::zn::ZnRing
 [`Zn`]: crate::ring_impls::zn::zn_static::Zn
-[`ZnGBBase`]: crate::ring_impls::zn::zn_big::ZnGBBase
+[`ZnGB`]: crate::ring_impls::zn::zn_big::ZnGB
 [`Zn64B`]: crate::ring_impls::zn::zn_64b::Zn64B
 [`Zn64M`]: crate::ring_impls::zn::zn_64m::Zn64M
 [`ZnRNS`]: crate::ring_impls::zn::zn_rns::ZnRNS
@@ -514,4 +515,5 @@ However, I did not have the time so far to thoroughly optimize many of the algor
 [`ConvolutionAlgorithm`]: crate::algorithms::convolution::ConvolutionAlgorithm
 [`FactorPolyField`]: crate::algorithms::poly_factor::FactorPolyField
 [`KaratsubaAlgorithm`]: crate::algorithms::convolution::KaratsubaAlgorithm
+[`SchoolbookConvolution`]: crate::algorithms::convolution::SchoolbookConvolution
 [`NTTConvolution`]: crate::algorithms::convolution::ntt::NTTConvolution

@@ -532,7 +532,7 @@ pub mod generic_impls {
 /// # use feanor_math::iters::*;
 /// // the binomial coefficient is equal to the number of combinations of fixed size
 /// assert_eq!(
-///     binomial(10, &3, ZZi64) as usize,
+///     binomial(ZZi64, 10, &3) as usize,
 ///     multiset_combinations(&[1; 10], 3, |_| ()).count()
 /// );
 /// ```

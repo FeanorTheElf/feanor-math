@@ -21,7 +21,7 @@ use crate::ring_properties::serialization::*;
 use crate::ring_properties::specialization::*;
 use crate::{impl_eval_poly_locally_for_integer, impl_interpolation_base_ring_char_zero, impl_poly_gcd_for_integer};
 
-/// An element of the integer ring implementation [`RustBigintRing`].
+/// An element of the integer ring implementation [`RustBigIntRing`].
 ///
 /// An object of this struct does represent an arbitrary-precision integer,
 /// but it follows the general approach of `feanor-math` to expose its actual
@@ -30,8 +30,8 @@ use crate::{impl_eval_poly_locally_for_integer, impl_interpolation_base_ring_cha
 /// ```rust
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::rust_bigint::*;
-/// const ZZ: RustBigintRing = RustBigintRing::RING;
-/// let a: RustBigint = ZZ.add(ZZ.power_of_two(50), ZZ.power_of_two(100));
+/// const ZZ: RustBigIntRing = RustBigIntRing::RING;
+/// let a: RustBigInt = ZZ.add(ZZ.power_of_two(50), ZZ.power_of_two(100));
 /// assert_eq!(
 ///     "1267650600228230527396610048000",
 ///     format!("{}", ZZ.formatted_el(&a))
@@ -57,7 +57,7 @@ pub struct RustBigIntRingBase<A: Allocator + Send + Sync + Clone = Global> {
     allocator: A,
 }
 
-/// [`RingStore`] corresponding to [`RustBigintRingBase`].
+/// [`RingStore`] corresponding to [`RustBigIntRingBase`].
 pub type RustBigIntRing<A = Global> = RingValue<RustBigIntRingBase<A>>;
 
 impl<A: Allocator + Send + Sync + Clone> RustBigIntRing<A> {
@@ -66,7 +66,7 @@ impl<A: Allocator + Send + Sync + Clone> RustBigIntRing<A> {
 }
 
 impl RustBigIntRing {
-    /// Default instance of [`RustBigintRing`], the ring of arbitrary-precision integers.
+    /// Default instance of [`RustBigIntRing`], the ring of arbitrary-precision integers.
     pub const RING: RustBigIntRing = RingValue::from(RustBigIntRingBase { allocator: Global });
 }
 
@@ -139,7 +139,7 @@ impl<A: Allocator + Send + Sync + Clone> Debug for RustBigIntRingBase<A> {
 
 impl<A: Allocator + Send + Sync + Clone> PartialEq for RustBigIntRingBase<A> {
     fn eq(&self, _other: &Self) -> bool {
-        // it is perfectly valid to swap elements between two different `RustBigintRing`s,
+        // it is perfectly valid to swap elements between two different `RustBigIntRing`s,
         // even if they have different allocators. Every element keeps track of their allocator
         // themselves
         true

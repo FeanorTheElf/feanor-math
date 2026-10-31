@@ -7,7 +7,7 @@ use crate::integer::*;
 use crate::pid::*;
 use crate::primitive_int::{StaticRing, StaticRingBase};
 use crate::ring::*;
-use crate::rings::rust_bigint::{RustBigintRing, RustBigintRingBase};
+use crate::rings::rust_bigint::{RustBigIntRing, RustBigIntRingBase};
 use crate::rings::zn::*;
 use crate::specialization::*;
 use crate::{
@@ -48,7 +48,7 @@ pub struct Z2kBase<const N: usize = DEFAULT_SMALLVEC_SIZE> {
     k: usize,
     n_limbs: usize,
     last_limb_mask: u64,
-    modulus: El<RustBigintRing>,
+    modulus: El<RustBigIntRing>,
 }
 impl<const N: usize> Z2kBase<N>
 where
@@ -61,7 +61,7 @@ where
             n_limbs <= 16,
             "This implementation is not optimized for such a large modulus."
         );
-        let modulus = RustBigintRing::RING.power_of_two(k);
+        let modulus = RustBigIntRing::RING.power_of_two(k);
 
         let last_limb_mask = if k % 64 == 0 {
             0xFFFFFFFFFFFFFFFF
@@ -81,7 +81,7 @@ where
         el.0.truncate(self.n_limbs);
     }
 
-    fn bigint_to_el(&self, ZZ: &RustBigintRing, x: &El<RustBigintRing>) -> Z2kEl<N> {
+    fn bigint_to_el(&self, ZZ: &RustBigIntRing, x: &El<RustBigIntRing>) -> Z2kEl<N> {
         let mut rem = ZZ.euclidean_rem(ZZ.clone_el(x), self.modulus());
 
         // normalize to `[0, 2^k)`.
@@ -96,7 +96,7 @@ where
         Z2kEl(limbs)
     }
 
-    fn el_to_bigint(&self, ZZ: &RustBigintRing, mut el: Z2kEl<N>) -> El<RustBigintRing> {
+    fn el_to_bigint(&self, ZZ: &RustBigIntRing, mut el: Z2kEl<N>) -> El<RustBigIntRing> {
         self.mask_el(&mut el);
         let mut acc = ZZ.zero();
         let i128_ring = StaticRing::<i128>::RING;
@@ -201,7 +201,7 @@ where
     fn mul_assign_ref(&self, lhs: &mut Self::Element, rhs: &Self::Element) { *lhs = mul_z2k(lhs, rhs, self.n_limbs); }
 
     fn from_int(&self, value: i32) -> Self::Element {
-        let ZZ = &RustBigintRing::RING;
+        let ZZ = &RustBigIntRing::RING;
         let x = ZZ.int_hom().map(value);
         self.bigint_to_el(ZZ, &x)
     }
@@ -231,7 +231,7 @@ where
         out: &mut std::fmt::Formatter<'a>,
         _: EnvBindingStrength,
     ) -> std::fmt::Result {
-        let ZZ = RustBigintRing::RING;
+        let ZZ = RustBigIntRing::RING;
         write!(out, "{}", ZZ.format(&self.el_to_bigint(&ZZ, value.clone())))
     }
 
@@ -378,9 +378,9 @@ where
                 || self.k < other_ZZ.get_ring().representable_bits().unwrap()
             {
                 Some(int_cast(
-                    RustBigintRing::RING.clone_el(&self.modulus),
+                    RustBigIntRing::RING.clone_el(&self.modulus),
                     other_ZZ,
-                    &RustBigintRing::RING,
+                    &RustBigIntRing::RING,
                 ))
             } else {
                 None
@@ -402,7 +402,7 @@ where
         lhs: &Self::Element,
         rhs: &Self::Element,
     ) -> (Self::Element, Self::Element, Self::Element) {
-        let ZZ = RustBigintRing::RING;
+        let ZZ = RustBigIntRing::RING;
         let l = self.el_to_bigint(&ZZ, lhs.clone());
         let r = self.el_to_bigint(&ZZ, rhs.clone());
         let (s, t, d) = ZZ.extended_ideal_gen(&l, &r);
@@ -415,14 +415,14 @@ impl<const N: usize, I: ?Sized + IntegerRing> CanHomFrom<I> for Z2kBase<N>
 where
     [u64; N]: smallvec::Array<Item = u64>,
 {
-    type Homomorphism = super::generic_impls::BigIntToZnHom<I, RustBigintRingBase, Self>;
+    type Homomorphism = super::generic_impls::BigIntToZnHom<I, RustBigIntRingBase, Self>;
 
     fn has_canonical_hom(&self, from: &I) -> Option<Self::Homomorphism> {
-        super::generic_impls::has_canonical_hom_from_bigint(from, self, RustBigintRing::RING.get_ring(), None)
+        super::generic_impls::has_canonical_hom_from_bigint(from, self, RustBigIntRing::RING.get_ring(), None)
     }
 
     default fn map_in(&self, from: &I, el: I::Element, hom: &Self::Homomorphism) -> Self::Element {
-        let ZZ = &RustBigintRing::RING;
+        let ZZ = &RustBigIntRing::RING;
         super::generic_impls::map_in_from_bigint(
             from,
             self,
@@ -435,17 +435,17 @@ where
     }
 }
 
-impl<const N: usize> CanHomFrom<RustBigintRingBase> for Z2kBase<N>
+impl<const N: usize> CanHomFrom<RustBigIntRingBase> for Z2kBase<N>
 where
     [u64; N]: smallvec::Array<Item = u64>,
 {
     fn map_in(
         &self,
-        _from: &RustBigintRingBase,
-        el: <RustBigintRingBase as RingBase>::Element,
+        _from: &RustBigIntRingBase,
+        el: <RustBigIntRingBase as RingBase>::Element,
         _: &Self::Homomorphism,
     ) -> Self::Element {
-        self.bigint_to_el(&RustBigintRing::RING, &el)
+        self.bigint_to_el(&RustBigIntRing::RING, &el)
     }
 }
 
@@ -462,7 +462,7 @@ macro_rules! impl_static_int_to_z2k {
                     el: $int,
                     _: &Self::Homomorphism,
                 ) -> Self::Element {
-                    let ZZ = &RustBigintRing::RING;
+                    let ZZ = &RustBigIntRing::RING;
                     let x = int_cast(el, ZZ, RingRef::new(from));
                     self.bigint_to_el(ZZ, &x)
                 }
@@ -477,13 +477,13 @@ impl<const N: usize> ZnRing for Z2kBase<N>
 where
     [u64; N]: smallvec::Array<Item = u64>,
 {
-    type IntegerRingBase = RustBigintRingBase;
-    type IntegerRing = RustBigintRing;
+    type IntegerRingBase = RustBigIntRingBase;
+    type IntegerRing = RustBigIntRing;
 
-    fn integer_ring(&self) -> &Self::IntegerRing { &RustBigintRing::RING }
+    fn integer_ring(&self) -> &Self::IntegerRing { &RustBigIntRing::RING }
 
     fn smallest_positive_lift(&self, el: Self::Element) -> El<Self::IntegerRing> {
-        let ZZ = RustBigintRing::RING;
+        let ZZ = RustBigIntRing::RING;
         self.el_to_bigint(&ZZ, el)
     }
 
@@ -504,10 +504,10 @@ where
 
     fn from_int_promise_reduced(&self, x: El<Self::IntegerRing>) -> Self::Element {
         debug_assert!({
-            let ZZ = RustBigintRing::RING;
+            let ZZ = RustBigIntRing::RING;
             !ZZ.is_neg(&x) && ZZ.is_lt(&x, &self.modulus)
         });
-        self.bigint_to_el(&RustBigintRing::RING, &x)
+        self.bigint_to_el(&RustBigIntRing::RING, &x)
     }
 }
 

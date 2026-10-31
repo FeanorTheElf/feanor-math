@@ -24,7 +24,7 @@ use crate::seq::{SwappableVectorViewMut, VectorViewMut};
 /// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// // this ring has a 256-th primitive root of unity
-/// let ring = Zn64B::new(257);
+/// let ring = Zn64B::new(257).as_field().unwrap();
 /// let fft_table = CooleyTuckeyFFT::for_fp(ring, 8).unwrap();
 /// let mut data = [ring.one()]
 ///     .into_iter()

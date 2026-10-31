@@ -1338,7 +1338,7 @@ mod tests {
             ZZi64,
             20,
             16,
-            (4, 6),
+            (2, 3),
             Global,
         )));
         let [f] = ring.with_wrapped_indeterminates(|X: [_; 20]| [X[0] + X[5] + X[19]]);

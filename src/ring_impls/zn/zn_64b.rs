@@ -919,13 +919,14 @@ impl HashableElRing for Zn64BBase {
 /// # use feanor_math::prelude::*;
 /// # use feanor_math::ring_impls::zn::zn_64b::*;
 /// # use feanor_math::algorithms::fft::*;
+/// # use feanor_math::algorithms::cyclotomic::get_prim_root_of_unity_pow2_zn;
 /// # use feanor_math::algorithms::fft::cooley_tuckey::*;
 /// let ring = Zn64B::new(1073872897);
 /// let fastmul_ring = Zn64BFastmul::new(ring).unwrap();
 /// // The values stored by the FFT table are elements of `ZnFastmulBase`
-/// let fft = CooleyTuckeyFFT::for_fp_with_hom(ring.can_hom(&fastmul_ring).unwrap(), 15).unwrap();
-/// // Note that data uses `ZnBase`
-/// let mut data = (0..(1 << 15))
+/// let root_of_unity = get_prim_root_of_unity_pow2_zn(fastmul_ring, 8).unwrap();
+/// let fft = CooleyTuckeyFFT::new_with_hom(ring.can_hom(&fastmul_ring).unwrap(), root_of_unity, 8);
+/// let mut data = (0..(1 << 8))
 ///     .map(|i| ring.int_hom().map(i))
 ///     .collect::<Vec<_>>();
 /// fft.unordered_fft(&mut data[..], &ring);

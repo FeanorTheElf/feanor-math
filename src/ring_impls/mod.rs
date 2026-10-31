@@ -2,7 +2,7 @@
 /// with arithmetic given by the primitive integer types ``i8` to `i128`.
 pub mod primitive_int;
 
-/// Contains [`rust_bigint::RustBigintRing`], a pure Rust implementation of
+/// Contains [`rust_bigint::RustBigIntRing`], a pure Rust implementation of
 /// arbitrary precision integers. It is not very optimized, however
 ///  
 pub mod rust_bigint;

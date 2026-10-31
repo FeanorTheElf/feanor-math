@@ -98,11 +98,12 @@ pub fn cyclotomic_polynomial_cache(
 /// `Phi_n(X)`, assuming it is squarefree. Note that if the underlying ring is not a field, there
 /// may be more than `phi(n)` such roots.
 ///
+/// See also [`is_prim_root_of_unity()`], [`is_prim_root_of_unity_general()`].
+///
+/// # Panic
+///
 /// Panics if the characteristic of the ring is not coprime to `n = 2^log2_n`, in which case
 /// `Phi_n(X)` is ramified and there is no sensible notion of primitive roots of unity.
-///
-/// See also [`is_prim_root_of_unity()`],
-/// [`is_prim_root_of_unity_general()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usize) -> bool {
     let characteristic = ring.characteristic(ZZbig).unwrap();
@@ -118,10 +119,12 @@ pub fn is_prim_root_of_unity_pow2<R: RingStore>(ring: R, el: &El<R>, log2_n: usi
 /// A primitive `n`-th root of unity is defined as any root of the `n`-th cyclotomic polynomial
 /// `Phi_n(X)`, assuming it is squarefree.
 ///
+/// See also [`is_prim_root_of_unity_pow2()`], [`is_prim_root_of_unity_general()`].
+///
+/// # Panic
+///
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
-///
-/// See also [`is_prim_root_of_unity_pow2()`], [`is_prim_root_of_unity_general()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity<R>(ring: R, el: &El<R>, n: &El<BigIntRing>) -> bool
 where
@@ -139,10 +142,12 @@ where
 /// `Phi_n(X)`, assuming it is squarefree. Note that if the underlying ring is not a field, there
 /// may be more than `phi(n)` such roots.
 ///
+/// See also [`is_prim_root_of_unity_pow2()`], [`is_prim_root_of_unity()`].
+///
+/// # Panic
+///
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
-///
-/// See also [`is_prim_root_of_unity_pow2()`], [`is_prim_root_of_unity()`].
 #[instrument(skip_all, level = "trace")]
 pub fn is_prim_root_of_unity_general<R: RingStore>(ring: R, el: &El<R>, n: usize) -> bool {
     let characteristic = ring.characteristic(ZZbig).unwrap();
@@ -161,6 +166,8 @@ pub fn is_prim_root_of_unity_general<R: RingStore>(ring: R, el: &El<R>, n: usize
 ///
 /// A primitive `n`-th root of unity is defined as any root of the `n`-th cyclotomic polynomial
 /// `Phi_n(X)`, assuming it is squarefree.
+///
+/// # Panic
 ///
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
@@ -192,6 +199,10 @@ where
 /// A primitive `n`-th root of unity is defined as any root of the `n`-th cyclotomic polynomial
 /// `Phi_n(X)`, assuming it is squarefree. Note that if the underlying ring is not a field, there
 /// may be more than `phi(n)` such roots.
+///
+/// Note that this function has to factor the characteristic of the ring, which may be expensive.
+///
+/// # Panic
 ///
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
@@ -253,6 +264,8 @@ where
 /// `Phi_n(X)`, assuming it is squarefree. Note that if the underlying ring is not a field, there
 /// may be more than `phi(n)` such roots.
 ///
+/// # Panic
+///
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
 #[instrument(skip_all, level = "trace")]
@@ -282,6 +295,10 @@ where
 /// A primitive `n`-th root of unity is defined as any root of the `n`-th cyclotomic polynomial
 /// `Phi_n(X)`, assuming it is squarefree. Note that if the underlying ring is not a field, there
 /// may be more than `phi(n)` such roots.
+///
+/// Note that this function has to factor the characteristic of the ring, which may be expensive.
+///
+/// # Panic
 ///
 /// Panics if the characteristic of the ring is not coprime to `n`, in which case `Phi_n(X)` is
 /// ramified and there is no sensible notion of primitive roots of unity.
